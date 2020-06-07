@@ -1,0 +1,3 @@
+#please specify:g_eve_server = 'tranquility'  # eveonline' server
+#please specify:g_user_agent = 'http://your-server(dot)com/ Maintainer: Your Name your@email.com'  # for example : Qandra Si qandra.si@gmail.com
+#please specify:g_tmp_directory = '/full/path/to/generated/files'  # for example : /tmp
