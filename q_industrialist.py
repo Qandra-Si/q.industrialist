@@ -23,7 +23,6 @@ import json
 from shared_flow import print_auth_url
 from shared_flow import send_token_request
 from shared_flow import send_token_refresh
-from shared_flow import handle_sso_token_response
 from shared_flow import send_esi_request
 from auth_cache import read_cache
 from auth_cache import make_cache
@@ -157,19 +156,37 @@ def main():
     blueprint_path = ("https://esi.evetech.net/latest/characters/{}/blueprints/".format(character_id))
     blueprint_data = send_esi_request(access_token, blueprint_path)
     print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
+    sys.stdout.flush()
     dump_json_into_file(".debug_blueprints.json", blueprint_data)
 
     wallet_path = ("https://esi.evetech.net/latest/characters/{}/wallet/".format(character_id))
     wallet_data = send_esi_request(access_token, wallet_path)
     print("\n{} has {} ISK".format(character_name, wallet_data))
+    sys.stdout.flush()
     dump_json_into_file(".debug_wallet.json", wallet_data)
 
     assets_path = ("https://esi.evetech.net/latest/characters/{}/assets/".format(character_id))
     assets_data = send_esi_request(access_token, assets_path)
     print("\n{} has {} assets".format(character_name, len(assets_data)))
+    sys.stdout.flush()
     dump_json_into_file(".debug_assets.json", assets_data)
 
-    dump_into_report(wallet_data, blueprint_data, assets_data)
+    names_data = []
+    for ass in assets_data:
+        if ass["type_id"] in [17363,   # Small Audit Log Secure Container
+                              17364,   # Medium Audit Log Secure Container
+                              17365,   # Large Audit Log Secure Container
+                              17366,   # Station Container
+                              17367,   # Station Vault Container
+                              17368]:  # Station Warehouse Container
+            names_data.append(ass["item_id"])
+    if len(names_data):
+        names_path = ("https://esi.evetech.net/latest/characters/{}/assets/names/".format(character_id))
+        names_data = send_esi_request(access_token, names_path, json.dumps(names_data))
+        sys.stdout.flush()
+        dump_json_into_file(".debug_assets_names.json", names_data)
+
+    dump_into_report(wallet_data, blueprint_data, assets_data, names_data)
 
 
 if __name__ == "__main__":
