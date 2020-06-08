@@ -30,6 +30,8 @@ from auth_cache import make_cache
 from auth_cache import store_cache
 from auth_cache import is_timestamp_expired
 from auth_cache import get_timestamp_expired
+from debug import dump_json_into_file
+from render_html import dump_into_report
 
 import q_industrialist_settings
 
@@ -37,7 +39,8 @@ import q_industrialist_settings
 # R Initiative 4 Q.Industrialist
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 g_client_scope = ["esi-characters.read_blueprints.v1",
-                  "esi-wallet.read_character_wallet.v1"]
+                  "esi-wallet.read_character_wallet.v1",
+                  "esi-assets.read_assets.v1"]
 
 
 def print_sso_failure(sso_response):
@@ -51,7 +54,7 @@ def print_sso_failure(sso_response):
     print("\nSSO response JSON is: {}".format(sso_response.json()))
 
 
-def auth():
+def auth(client_id=""):
     print("Follow the prompts and enter the info asked for.")
 
     # Generate the PKCE code challenge
@@ -61,11 +64,12 @@ def auth():
     d = m.digest()
     code_challenge = base64.urlsafe_b64encode(d).decode().replace("=", "")
 
-    client_id = input("Copy your SSO application's client ID and enter it "
-                      "here [press 'Enter' for R Initiative 4 app]: ")
     if not client_id:
-        global g_ri4_client_id
-        client_id = g_ri4_client_id
+        client_id = input("Copy your SSO application's client ID and enter it "
+                          "here [press 'Enter' for R Initiative 4 app]: ")
+        if not client_id:
+            global g_ri4_client_id
+            client_id = g_ri4_client_id
 
     # Because this is a desktop/mobile application, you should use
     # the PKCE protocol when contacting the EVE SSO. In this case, that
@@ -117,7 +121,7 @@ def re_auth(auth_cache):
     refresh_token = auth_cache["refresh_token"]
     client_id = auth_cache["client_id"]
 
-    sso_auth_response = send_token_refresh(refresh_token, client_id)
+    sso_auth_response = send_token_refresh(refresh_token, client_id, g_client_scope)
 
     if sso_auth_response.status_code == 200:
         data = sso_auth_response.json()
@@ -137,9 +141,12 @@ def re_auth(auth_cache):
 
 
 def main():
+    global g_client_scope
     cache = read_cache()
     if not ('access_token' in cache) or not ('refresh_token' in cache) or (not 'expired' in cache):
         cache = auth()
+    elif not ('scope' in cache) or (cache["scope"] != g_client_scope):
+        cache = auth(cache["client_id"])
     elif is_timestamp_expired(int(cache["expired"])):
         cache = re_auth(cache)
 
@@ -150,11 +157,19 @@ def main():
     blueprint_path = ("https://esi.evetech.net/latest/characters/{}/blueprints/".format(character_id))
     blueprint_data = send_esi_request(access_token, blueprint_path)
     print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
-    # print("{}".format(json.dumps(blueprint_data, indent=1, sort_keys=False)))
+    dump_json_into_file(".debug_blueprints.json", blueprint_data)
 
     wallet_path = ("https://esi.evetech.net/latest/characters/{}/wallet/".format(character_id))
     wallet_data = send_esi_request(access_token, wallet_path)
     print("\n{} has {} ISK".format(character_name, wallet_data))
+    dump_json_into_file(".debug_wallet.json", wallet_data)
+
+    assets_path = ("https://esi.evetech.net/latest/characters/{}/assets/".format(character_id))
+    assets_data = send_esi_request(access_token, assets_path)
+    print("\n{} has {} assets".format(character_name, len(assets_data)))
+    dump_json_into_file(".debug_assets.json", assets_data)
+
+    dump_into_report(wallet_data, blueprint_data, assets_data)
 
 
 if __name__ == "__main__":

@@ -59,11 +59,13 @@ def make_cache(access_token, refresh_token):
     character_name = validated_jwt["name"]
     expired = validated_jwt["exp"]
     client_id = validated_jwt["azp"]
+    scope = validated_jwt["scp"]
 
     cache.update({"expired": expired,
                   "character_id": character_id,
                   "character_name": character_name,
-                  "client_id": client_id})
+                  "client_id": client_id,
+                  "scope": scope})
 
     store_cache(cache)
     return cache

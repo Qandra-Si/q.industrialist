@@ -48,39 +48,108 @@ def dump_footer(glf):
 </script></html>""")
 
 
-def dump_blueprints(glf, data):
-    glf.write("<h3>Blueprints</h3>\n")
+def dump_wallet(glf, wallet_data):
+    glf.write("<h3>Wallet</h3><p>{} ISK</p>\n".format(wallet_data))
 
+
+def get_station_name(id):
+    dict = get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: {}".format(id))
+    if "itemName" in dict:
+        return dict["itemName"]
+    return ""
+
+
+def build_hangar_tree(blueprint_data, assets_data):
     locations = []
-    for bp in data:
-        location_id = int(bp["location_id"])
-        if 0 == locations.count(location_id):
-            locations.append(location_id)
-
-    for location_id in locations:
+    for bp in blueprint_data:
         # location_id
         # References a station, a ship or an item_id if this blueprint is located within a container.
         # If the return value is an item_id, then the Character AssetList API must be queried to find
         # the container using the given item_id to determine the correct location of the Blueprint.
-        location_dict = get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: {}".format(location_id))
-        if "itemName" in location_dict:
-            glf.write("<p>{}</p>\n".format(location_dict["itemName"]))
+        location_id1 = int(bp["location_id"])
+        found = False
+        for l1 in locations:
+            if l1["id"] == location_id1:
+                found = True
+                break
+        if found:
+            continue
+        loc1 = {"id": location_id1}  # id, station_id, station_name
+        for ass in assets_data:
+            if ass["item_id"] == location_id1:
+                if ass["location_type"] == "station":
+                    location_id2 = int(ass["location_id"])
+                    loc1.update({"station_id": location_id2, "level": 1})
+                    found = False
+                    for l3 in locations:
+                        if l3["id"] == location_id2:
+                            found = True
+                            break
+                    if not found:
+                        loc2 = {"id": location_id2, "station_id": ass["location_id"], "level": 0}
+                        name2 = get_station_name(location_id2)
+                        if name2:
+                            loc2.update({"station_name": name2})
+                        locations.append(loc2)
+        if ("station_id" in loc1) and not ("station_name" in loc1):  # контейнер с известным id на станции
+            name1 = get_station_name(loc1["station_id"])
+            if name1:
+                loc1.update({"station_name": name1})
+        if not ("station_id" in loc1):  # станция с известным id
+            name1 = get_station_name(location_id1)
+            if name1:
+                loc1.update({"station_name": name1})
+                loc1.update({"station_id": location_id1})
+                loc1.update({"level": 0})
+        locations.append(loc1)
+    return locations
+
+
+def dump_blueprints(glf, blueprint_data, assets_data):
+    glf.write("<h3>Blueprints</h3>\n")
+
+    locations = build_hangar_tree(blueprint_data, assets_data)
+    # debug:glf.write("<!-- {} -->\n".format(locations))
+    for loc in locations:
+        # level
+        offset_str = ""
+        offset_num = loc["level"]
+        while offset_num:
+            offset_str = offset_str + "&nbsp;&nbsp;&nbsp;&nbsp;"
+            offset_num = offset_num - 1
+        # location_id
+        location_id = int(loc["id"])
+        if "station_name" in loc:
+            glf.write("<p id='{id}'>{off}{nm}</p>\n".format(off=offset_str, id=location_id, nm=loc["station_name"]))
+        elif "station_id" in loc:
+            glf.write("<p id='{id}'>{off}{nm}</p>\n".format(off=offset_str, id=location_id, nm=loc["station_id"]))
         else:
-            glf.write("<p>{}</p>\n".format(location_id))
+            glf.write("<p id='{id}'>{off}{id}</p>\n".format(off=offset_str, id=location_id))
         # blueprints list
-        for bp in data:
-            if location_id != int(bp["location_id"]):
+        for bp in blueprint_data:
+            if loc["id"] != location_id:
                 continue
             type_id = bp["type_id"]
             type_dict = get_yaml(2, 'sde/fsd/typeIDs.yaml', "{}:".format(type_id))
             if ("name" in type_dict) and ("en" in type_dict["name"]):
-                glf.write("<p>&nbsp;&nbsp;&nbsp;&nbsp;{}</p>\n".format(type_dict["name"]["en"]))
+                glf.write("<p>{off}&nbsp;&nbsp;&nbsp;&nbsp;{nm}</p>\n".format(off=offset_str, nm=type_dict["name"]["en"]))
             else:
-                glf.write("<p>&nbsp;&nbsp;&nbsp;&nbsp;{}</p>\n".format(type_id))
+                glf.write("<p>{off}&nbsp;&nbsp;&nbsp;&nbsp;{id}</p>\n".format(off=offset_str, id=type_id))
+
+
+def dump_into_report(wallet_data, blueprint_data, assets_data):
+    glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    try:
+        dump_header(glf)
+        dump_wallet(glf, wallet_data)
+        dump_blueprints(glf, blueprint_data, assets_data)
+        dump_footer(glf)
+    finally:
+        glf.close()
 
 
 def main():
-    data = (json.loads("""[
+    blueprints_data = (json.loads("""[
  {
   "item_id": 1032415077622,
   "location_flag": "Hangar",
@@ -122,13 +191,18 @@ def main():
   "type_id": 836
  }
 ]"""))
-    glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
-    try:
-        dump_header(glf)
-        dump_blueprints(glf, data)
-        dump_footer(glf)
-    finally:
-       glf.close()
+    assets_data = (json.loads("""[
+{
+  "is_singleton": true,
+  "item_id": 1033013802131,
+  "location_flag": "Hangar",
+  "location_id": 60003760,
+  "location_type": "station",
+  "quantity": 1,
+  "type_id": 17366
+ }
+]"""))
+    dump_into_report(14966087542.58, blueprints_data, assets_data)
 
 
 if __name__ == "__main__":

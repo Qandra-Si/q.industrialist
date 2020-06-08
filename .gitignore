@@ -137,3 +137,4 @@ dmypy.json
 /auth_cache.json
 /*.~json
 /report.html
+/.debug_*.json
