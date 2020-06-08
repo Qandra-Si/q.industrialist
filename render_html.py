@@ -8,26 +8,24 @@ from parse_sde_yaml import get_yaml
 
 import q_industrialist_settings
 
-
 g_local_timezone = tzlocal.get_localzone()
 
 
 def dump_header(glf):
-    glf.write("""<!DOCTYPE html>
-<html><head><!--<meta charset="utf-8">--><title>Q.Industrialist</title><style>
-body { margin: 0; padding: 0; background-color: #101010; overflow-y: hidden; }
-h2 { margin-bottom: 3px }
-h3 { margin-bottom: 0px }
-body, html { min-height: 100vh; overflow-x: hidden; box-sizing: border-box; line-height: 1.5; color: #fff; font-family: Shentox,Rogan,sans-serif; }
-table { border-collapse: collapse; border: none; }
-th,td { border: 1px solid gray; text-align: left; vertical-align: top; }
-div p, .div p { margin:0px; color:#888; }
-p a, .p a, h3 a, .h3 a { color: #2a9fd6; text-decoration: none; }
-small { color:gray; }
-a.inert { color:#999; }
-</style></head><body>
+    glf.write("""<!doctype html>
+<html lang="ru">
+  <head>
+    <!-- <meta charset="utf-8"> -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Q.Industrialist</title>
+    <link rel="stylesheet" href="bootstrap/3.4.1/css/bootstrap.min.css">
+  </head>
+  <body>
+    <h1>Q.Industrialist</h1>
+    <script src="jquery/jquery-1.12.4.min.js"></script>
+    <script src="bootstrap/3.4.1/js/bootstrap.min.js"></script>
 """)
-    glf.write("<h2>Q.Industrialist</h2>\n")
 
 
 def dump_footer(glf):
@@ -40,17 +38,29 @@ def dump_footer(glf):
 <small>EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.</small>
 </small></p>""")
     # Don't remove line above !
-    glf.write("""</body>
-<script type="text/javascript">
-//document.onkeydown = function(evt) {
-//    evt = evt || window.event;
-//    if (evt.keyCode == 27) showAll();
-//};
-</script></html>""")
+    glf.write("</body></html>")
 
 
 def dump_wallet(glf, wallet_data):
-    glf.write("<h3>Wallet</h3><p>{} ISK</p>\n".format(wallet_data))
+    glf.write("""<!-- Button trigger for Wallet Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalWallet">Show Wallet</button>
+<!-- Wallet Modal -->
+<div class="modal fade" id="modalWallet" tabindex="-1" role="dialog" aria-labelledby="modalWalletLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalWalletLabel">Wallet</h4>
+      </div>
+      <div class="modal-body">""")
+    glf.write("{} ISK".format(wallet_data))
+    glf.write("""</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>""")
 
 
 def get_station_name(id):
@@ -93,6 +103,9 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
                             loc2.update({"station_name": name2})
                         locations.append(loc2)
         if "station_id" in loc1:  # контейнер с известным id на станции
+            station_name1 = get_station_name(loc1["station_id"])
+            if station_name1:
+                loc1.update({"station_name": station_name1})
             for nm in names_data:
                 if nm["item_id"] == location_id1:
                     name1 = nm["name"]
@@ -109,43 +122,82 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
 
 
 def dump_blueprints(glf, blueprint_data, assets_data, names_data):
-    glf.write("<h3>Blueprints</h3>\n")
+    glf.write("""<!-- Button trigger for Blueprints Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalBlueprints">Show Blueprints</button>
+<!-- Blueprints Modal -->
+<div class="modal fade" id="modalBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalBlueprintsLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalBlueprintsLabel">Blueprints</h4>
+      </div>
+      <div class="modal-body">
+<!-- BEGIN: collapsable group (stations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
     locations = build_hangar_tree(blueprint_data, assets_data, names_data)
-    # debug:glf.write("<!-- {} -->\n".format(locations))
+    # debug:
+    glf.write("<!-- {} -->\n".format(locations))
     for loc in locations:
-        # level
-        offset_str = ""
-        offset_num = loc["level"]
-        while offset_num:
-            offset_str = offset_str + "&nbsp;&nbsp;&nbsp;&nbsp;"
-            offset_num = offset_num - 1
-        # location_id
+        # level : loc["level"] : REQUIRED
+        # type_id : loc["type_id"] : OPTIONAL
+        # location_id : loc["id"] : REQUIRED
         location_id = int(loc["id"])
-        glf.write("<p id='{id}'>{off}".format(off=offset_str, id=location_id))
-        if "type_id" in loc:  # у станции нет type_id, он есть только у item-ов (контейнеров)
-            glf.write('<img src=\'./3/Types/{tp}_32.png\'/>'.format(tp=loc["type_id"]))
-        if "station_name" in loc:
-            glf.write("{nm}".format(nm=loc["station_name"]))
-        elif "item_name" in loc:
-            glf.write("{nm}".format(nm=loc["item_name"]))
+        glf.write(
+            " <div class=\"panel panel-default\">\n"
+            "  <div class=\"panel-heading\" role=\"tab\" id=\"heading{id}\">\n"
+            "   <h4 class=\"panel-title\">\n".format(id=location_id)
+        )
+        if "item_name" in loc:
+            location_name = loc["item_name"]
+            if "station_name" in loc:
+                location_name = "{} - {}".format(loc["station_name"], location_name)
+        elif "station_name" in loc:
+            location_name = loc["station_name"]
         elif "station_id" in loc:
-            glf.write("{nm}".format(nm=loc["station_id"]))
+            location_name = loc["station_id"]
         else:
-            glf.write("{id}".format(id=location_id))
-        glf.write("</p>\n")
+            location_name = location_id
+        glf.write("    <a role=\"button\" data-toggle=\"collapse\" data-parent=\"#accordion\" "
+                  "href=\"#collapse{id}\" aria-expanded=\"true\" aria-controls=\"collapse{id}\""
+                  ">{nm}</a>\n".format(id=location_id, nm=location_name))
+        # if "type_id" in loc:  # у станции нет type_id, он есть только у item-ов (контейнеров)
+        #     glf.write('<img src=\'./3/Types/{tp}_32.png\'/>'.format(tp=loc["type_id"]))
+        glf.write(
+            "   </h4>\n"
+            "  </div>\n"
+            "  <div id=\"collapse{id}\" class=\"panel-collapse collapse\" role=\"tabpanel\""
+            "  aria-labelledby=\"heading{id}\">\n"
+            "   <div class=\"panel-body\">\n".format(id=location_id)
+        )
         # blueprints list
         for bp in blueprint_data:
             if bp["location_id"] != location_id:
                 continue
             type_id = bp["type_id"]
             type_dict = get_yaml(2, 'sde/fsd/typeIDs.yaml', "{}:".format(type_id))
-            glf.write('<p>{off}&nbsp;&nbsp;&nbsp;&nbsp;<img src=\'./3/Types/{tp}_32.png\'/>'.format(off=offset_str, tp=type_id))
             if ("name" in type_dict) and ("en" in type_dict["name"]):
-                glf.write('{nm}'.format(nm=type_dict["name"]["en"]))
+                blueprint_name = type_dict["name"]["en"]
             else:
-                glf.write("{id}".format(id=type_id))
-            glf.write('</p>\n')
+                blueprint_name = type_id
+            glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm}</p>\n'.format(nm=blueprint_name, tp=type_id))
+        glf.write(
+            "   </div>\n"
+            "  </div>\n"
+            " </div>\n"
+        )
+
+    glf.write("""</div>
+<!-- END: collapsable group (stations) -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary">Choose</button>
+      </div>
+    </div>
+  </div>
+</div>""")
 
 
 def dump_into_report(wallet_data, blueprint_data, assets_data, names_data):
