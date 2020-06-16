@@ -12,6 +12,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
+>>> python manipulate_yaml_and_json.py
 >>> python q_industrialist.py
 """
 import base64
@@ -31,8 +32,6 @@ from auth_cache import is_timestamp_expired
 from auth_cache import get_timestamp_expired
 from debug import dump_json_into_file
 from render_html import dump_into_report
-
-import q_industrialist_settings
 
 
 # R Initiative 4 Q.Industrialist
@@ -157,19 +156,19 @@ def main():
     blueprint_data = send_esi_request(access_token, blueprint_path)
     print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
     sys.stdout.flush()
-    dump_json_into_file(".debug_blueprints.json", blueprint_data)
+    dump_json_into_file("blueprints", blueprint_data)
 
     wallet_path = ("https://esi.evetech.net/latest/characters/{}/wallet/".format(character_id))
     wallet_data = send_esi_request(access_token, wallet_path)
     print("\n{} has {} ISK".format(character_name, wallet_data))
     sys.stdout.flush()
-    dump_json_into_file(".debug_wallet.json", wallet_data)
+    dump_json_into_file("wallet", wallet_data)
 
     assets_path = ("https://esi.evetech.net/latest/characters/{}/assets/".format(character_id))
     assets_data = send_esi_request(access_token, assets_path)
     print("\n{} has {} assets".format(character_name, len(assets_data)))
     sys.stdout.flush()
-    dump_json_into_file(".debug_assets.json", assets_data)
+    dump_json_into_file("assets", assets_data)
 
     names_data = []
     for ass in assets_data:
@@ -184,7 +183,7 @@ def main():
         names_path = ("https://esi.evetech.net/latest/characters/{}/assets/names/".format(character_id))
         names_data = send_esi_request(access_token, names_path, json.dumps(names_data))
         sys.stdout.flush()
-        dump_json_into_file(".debug_assets_names.json", names_data)
+        dump_json_into_file("assets_names", names_data)
 
     dump_into_report(wallet_data, blueprint_data, assets_data, names_data)
 

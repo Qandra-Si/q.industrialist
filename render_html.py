@@ -1,10 +1,9 @@
-import json
 import time
 import tzlocal
 
-from datetime import date
 from datetime import datetime
-from parse_sde_yaml import get_yaml
+from manipulate_yaml_and_json import get_yaml
+from manipulate_yaml_and_json import read_converted
 
 import q_industrialist_settings
 
@@ -121,7 +120,7 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
     return locations
 
 
-def dump_blueprints(glf, blueprint_data, assets_data, names_data):
+def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
     glf.write("""<!-- Button trigger for Blueprints Modal -->
 <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalBlueprints">Show Blueprints</button>
 <!-- Blueprints Modal -->
@@ -175,12 +174,15 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data):
         for bp in blueprint_data:
             if bp["location_id"] != location_id:
                 continue
-            type_id = bp["type_id"]
-            type_dict = get_yaml(2, 'sde/fsd/typeIDs.yaml', "{}:".format(type_id))
-            if ("name" in type_dict) and ("en" in type_dict["name"]):
-                blueprint_name = type_dict["name"]["en"]
-            else:
+            type_id = str(bp["type_id"])
+            if not (type_id in type_ids):
                 blueprint_name = type_id
+            else:
+                type_dict = type_ids[type_id]
+                if ("name" in type_dict) and ("en" in type_dict["name"]):
+                    blueprint_name = type_dict["name"]["en"]
+                else:
+                    blueprint_name = type_id
             glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm}</p>\n'.format(nm=blueprint_name, tp=type_id))
         glf.write(
             "   </div>\n"
@@ -201,11 +203,109 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data):
 
 
 def dump_into_report(wallet_data, blueprint_data, assets_data, names_data):
+    type_ids = read_converted("typeIDs")
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
         dump_wallet(glf, wallet_data)
-        dump_blueprints(glf, blueprint_data, assets_data, names_data)
+        dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids)
+        dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def dump_materials(glf, materials, type_ids):
+    glf.write("""<!-- Button trigger for all Possible Materials Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalAllPossibleMaterials">Show all Possible Materials</button>
+<!-- All Possible Modal -->
+<div class="modal fade" id="modalAllPossibleMaterials" tabindex="-1" role="dialog" aria-labelledby="modalAllPossibleMaterialsLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalAllPossibleMaterialsLabel">All Possible Materials</h4>
+      </div>
+      <div class="modal-body">""")
+    for type_id in materials:
+        sid = str(type_id)
+        if not (sid in type_ids):
+            material_name = sid
+        else:
+            material_name = type_ids[sid]["name"]["en"]
+        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+    glf.write("""</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
+def dump_bp_wo_manufacturing(glf, blueprints, type_ids):
+    glf.write("""<!-- Button trigger for Impossible to Produce Blueprints Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalImpossible2ProduceBlueprints">Show Impossible to Produce Blueprints</button>
+<!-- Impossible to Produce Blueprints Modal -->
+<div class="modal fade" id="modalImpossible2ProduceBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalImpossible2ProduceBlueprintsLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalImpossible2ProduceBlueprintsLabel">Impossible to Produce Blueprints</h4>
+      </div>
+      <div class="modal-body">""")
+    for type_id in blueprints:
+        sid = str(type_id)
+        if not (sid in type_ids):
+            material_name = sid
+        else:
+            material_name = type_ids[sid]["name"]["en"]
+        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+    glf.write("""</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
+def dump_bp_wo_materials(glf, blueprints, type_ids):
+    glf.write("""<!-- Button trigger for Blueprints without Materials Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalBlueprintsWithoutMaterials">Show Blueprints without Materials</button>
+<!-- Blueprints without Materials Modal -->
+<div class="modal fade" id="modalBlueprintsWithoutMaterials" tabindex="-1" role="dialog" aria-labelledby="modalBlueprintsWithoutMaterialsLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalBlueprintsWithoutMaterialsLabel">Blueprints without Materials</h4>
+      </div>
+      <div class="modal-body">""")
+    for type_id in blueprints:
+        sid = str(type_id)
+        if not (sid in type_ids):
+            material_name = sid
+        else:
+            material_name = type_ids[sid]["name"]["en"]
+        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+    glf.write("""</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
+def dump_materials_into_report(materials, wo_manufacturing, wo_materials):
+    type_ids = read_converted("typeIDs")
+    glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    try:
+        dump_header(glf)
+        dump_materials(glf, materials, type_ids)
+        dump_bp_wo_manufacturing(glf, wo_manufacturing, type_ids)
+        dump_bp_wo_materials(glf, wo_materials, type_ids)
         dump_footer(glf)
     finally:
         glf.close()

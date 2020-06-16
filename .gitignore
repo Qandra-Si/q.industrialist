@@ -140,4 +140,6 @@ dmypy.json
 /auth_cache.json
 /*.~json
 /report.html
+/materials.html
 /.debug_*.json
+/.converted_*.json
