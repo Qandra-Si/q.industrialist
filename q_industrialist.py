@@ -38,7 +38,8 @@ from render_html import dump_into_report
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 g_client_scope = ["esi-characters.read_blueprints.v1",
                   "esi-wallet.read_character_wallet.v1",
-                  "esi-assets.read_assets.v1"]
+                  "esi-assets.read_assets.v1",
+                  "esi-contracts.read_character_contracts.v1"]
 
 
 def print_sso_failure(sso_response):
@@ -169,6 +170,18 @@ def main():
     print("\n{} has {} assets".format(character_name, len(assets_data)))
     sys.stdout.flush()
     dump_json_into_file("assets", assets_data)
+
+    contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
+    contracts_data = send_esi_request(access_token, contracts_path)
+    print("\n{} has {} contracts".format(character_name, len(contracts_data)))
+    sys.stdout.flush()
+    dump_json_into_file("contracts", contracts_data)
+
+    contract158928740_path = ("https://esi.evetech.net/latest/characters/{}/contracts/{}/items/".format(character_id, 158928740))
+    contract158928740_data = send_esi_request(access_token, contract158928740_path)
+    print("\n{} has {} contract158928740".format(character_name, len(contract158928740_data)))
+    sys.stdout.flush()
+    dump_json_into_file("contract158928740", contract158928740_data)
 
     names_data = []
     for ass in assets_data:
