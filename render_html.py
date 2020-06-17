@@ -27,6 +27,23 @@ def dump_header(glf):
 """)
 
 
+def dump_online_header(glf):
+    glf.write("""<!doctype html>
+<html lang="ru">
+  <head>
+    <!-- <meta charset="utf-8"> -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Q.Industrialist</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+  </head>
+  <body>
+    <h1>Q.Industrialist</h1>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+""")
+
+
 def dump_footer(glf):
     # Don't remove line below !
     glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
@@ -232,7 +249,8 @@ def dump_materials(glf, materials, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        # glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -260,7 +278,7 @@ def dump_bp_wo_manufacturing(glf, blueprints, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -288,7 +306,7 @@ def dump_bp_wo_materials(glf, blueprints, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -302,7 +320,7 @@ def dump_materials_into_report(materials, wo_manufacturing, wo_materials):
     type_ids = read_converted("typeIDs")
     glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
-        dump_header(glf)
+        dump_online_header(glf)
         dump_materials(glf, materials, type_ids)
         dump_bp_wo_manufacturing(glf, wo_manufacturing, type_ids)
         dump_bp_wo_materials(glf, wo_materials, type_ids)
