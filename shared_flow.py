@@ -18,6 +18,7 @@ g_content_type = "application/x-www-form-urlencoded"
 g_login_host = "login.eveonline.com"
 g_base_auth_url = "https://login.eveonline.com/v2/oauth/authorize/"
 g_token_req_url = "https://login.eveonline.com/v2/oauth/token"
+g_debug = False
 
 
 def combine_client_scopes(scopes):
@@ -184,12 +185,14 @@ def send_esi_request(access_token, uri, body=None):
 
     if body is None:
         res = requests.get(uri, headers=headers)
-        print("\nMade GET request to {} with headers: "
-              "{}".format(uri, res.request.headers))
+        if g_debug:
+            print("\nMade GET request to {} with headers: "
+                  "{}".format(uri, res.request.headers))
     else:
         res = requests.post(uri, data=body, headers=headers)
-        print("\nMade POST request to {} with data {} and headers: "
-              "{}".format(uri, body, res.request.headers))
+        if g_debug:
+            print("\nMade POST request to {} with data {} and headers: "
+                  "{}".format(uri, body, res.request.headers))
     res.raise_for_status()
 
     return res.json()

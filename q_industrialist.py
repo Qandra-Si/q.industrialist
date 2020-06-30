@@ -39,7 +39,9 @@ g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 g_client_scope = ["esi-characters.read_blueprints.v1",
                   "esi-wallet.read_character_wallet.v1",
                   "esi-assets.read_assets.v1",
-                  "esi-contracts.read_character_contracts.v1"]
+                  # "esi-contracts.read_character_contracts.v1",
+                  "esi-fittings.read_fittings.v1",
+                  "esi-assets.read_corporation_assets.v1"]
 
 
 def print_sso_failure(sso_response):
@@ -153,6 +155,14 @@ def main():
     character_id = cache["character_id"]
     character_name = cache["character_name"]
 
+    character_path = ("https://esi.evetech.net/latest/characters/{}/".format(character_id))
+    character_data = send_esi_request(access_token, character_path)
+    print("\n{} is from {} corporation".format(character_name, character_data["corporation_id"]))
+    sys.stdout.flush()
+    dump_json_into_file("character", character_data)
+
+    corporation_id = character_data["corporation_id"]
+
     blueprint_path = ("https://esi.evetech.net/latest/characters/{}/blueprints/".format(character_id))
     blueprint_data = send_esi_request(access_token, blueprint_path)
     print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
@@ -171,7 +181,13 @@ def main():
     sys.stdout.flush()
     dump_json_into_file("assets", assets_data)
 
-    contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
+    corp_assets_path = ("https://esi.evetech.net/latest/corporations/{}/assets/".format(corporation_id))
+    corp_assets_data = send_esi_request(access_token, corp_assets_path)
+    print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
+    sys.stdout.flush()
+    dump_json_into_file("corp_assets", corp_assets_data)
+
+    """contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
     contracts_data = send_esi_request(access_token, contracts_path)
     print("\n{} has {} contracts".format(character_name, len(contracts_data)))
     sys.stdout.flush()
@@ -181,7 +197,13 @@ def main():
     contract158928740_data = send_esi_request(access_token, contract158928740_path)
     print("\n{} has {} contract158928740".format(character_name, len(contract158928740_data)))
     sys.stdout.flush()
-    dump_json_into_file("contract158928740", contract158928740_data)
+    dump_json_into_file("contract158928740", contract158928740_data)"""
+
+    fittings_path = ("https://esi.evetech.net/latest/characters/{}/fittings/".format(character_id))
+    fittings_data = send_esi_request(access_token, fittings_path)
+    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
+    sys.stdout.flush()
+    dump_json_into_file("fittings", fittings_data)
 
     names_data = []
     for ass in assets_data:
