@@ -43,7 +43,9 @@ g_client_scope = ["esi-characters.read_blueprints.v1",
                   "esi-assets.read_assets.v1",
                   # "esi-contracts.read_character_contracts.v1",
                   "esi-fittings.read_fittings.v1",
-                  "esi-assets.read_corporation_assets.v1"]
+                  "esi-assets.read_corporation_assets.v1",
+                  "esi-corporations.read_blueprints.v1",
+                  "esi-corporations.read_titles.v1"]
 
 
 def print_sso_failure(sso_response):
