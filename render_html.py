@@ -268,6 +268,20 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
                         blueprint_name = type_dict["name"]["en"]
                     else:
                         blueprint_name = type_id
+                glf.write(
+                    '<div class="media">\n'
+                    ' <div class="media-left">\n'
+                    '  <img class="media-object" src="./3/Types/{tp}_32.png" alt="{nm}">\n'
+                    ' </div>\n'
+                    ' <div class="media-body">\n'
+                    '  <h4 class="media-heading">{nm}</h4>\n'
+                    ' </div>\n'
+                    '</div>\n'.format(
+                        tp=type_id,
+                        nm=blueprint_name
+                    )
+                )
+
                 glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>&nbsp;'.format(tp=type_id))
                 if is_blueprint_copy:
                     glf.write('&nbsp;<span class="label label-default">copy</span>'
