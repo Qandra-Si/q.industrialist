@@ -28,14 +28,14 @@ import q_industrialist_settings
 from shared_flow import print_auth_url
 from shared_flow import send_token_request
 from shared_flow import send_token_refresh
-from shared_flow import send_esi_request
 from auth_cache import read_cache
 from auth_cache import make_cache
 from auth_cache import store_cache
 from auth_cache import is_timestamp_expired
 from auth_cache import get_timestamp_expired
-from debug import dump_json_into_file
-from debug import take_json_from_file
+from esi_interface import get_esi_data
+from esi_interface import get_esi_paged_data
+from esi_interface import dump_json_into_file
 from render_html import dump_into_report
 
 
@@ -167,106 +167,56 @@ def main():
     character_id = cache["character_id"]
     character_name = cache["character_name"]
 
-    if not q_industrialist_settings.g_offline_mode:
-        character_path = ("https://esi.evetech.net/latest/characters/{}/".format(character_id))
-        character_data = send_esi_request(access_token, character_path)
-        print("\n{} is from {} corporation".format(character_name, character_data["corporation_id"]))
-        sys.stdout.flush()
-        dump_json_into_file("character", character_data)
-    else:
-        character_data = take_json_from_file("character")
+    character_data = get_esi_data(
+        access_token,
+        "characters/{}/".format(character_id),
+        "character")
+    print("\n{} is from {} corporation".format(character_name, character_data["corporation_id"]))
+    sys.stdout.flush()
 
     corporation_id = character_data["corporation_id"]
 
-    if not q_industrialist_settings.g_offline_mode:
-        blueprint_path = ("https://esi.evetech.net/latest/characters/{}/blueprints/".format(character_id))
-        blueprint_data = send_esi_request(access_token, blueprint_path)
-        print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
-        sys.stdout.flush()
-        dump_json_into_file("blueprints", blueprint_data)
-    else:
-        blueprint_data = take_json_from_file("blueprints")
+    wallet_data = get_esi_data(
+        access_token,
+        "characters/{}/wallet/".format(character_id),
+        "wallet")
+    print("\n{} has {} ISK".format(character_name, wallet_data))
+    sys.stdout.flush()
 
-    if not q_industrialist_settings.g_offline_mode:
-        wallet_path = ("https://esi.evetech.net/latest/characters/{}/wallet/".format(character_id))
-        wallet_data = send_esi_request(access_token, wallet_path)
-        print("\n{} has {} ISK".format(character_name, wallet_data))
-        sys.stdout.flush()
-        dump_json_into_file("wallet", wallet_data)
-    else:
-        wallet_data = take_json_from_file("wallet")
+    blueprint_data = get_esi_data(
+        access_token,
+        "characters/{}/blueprints/".format(character_id),
+        "blueprints")
+    print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
+    sys.stdout.flush()
 
-    if not q_industrialist_settings.g_offline_mode:
-        assets_path = ("https://esi.evetech.net/latest/characters/{}/assets/".format(character_id))
-        assets_data = send_esi_request(access_token, assets_path)
-        print("\n{} has {} assets".format(character_name, len(assets_data)))
-        sys.stdout.flush()
-        dump_json_into_file("assets", assets_data)
-    else:
-        assets_data = take_json_from_file("assets")
+    assets_data = get_esi_data(
+        access_token,
+        "characters/{}/assets/".format(character_id),
+        "assets")
+    print("\n{} has {} assets".format(character_name, len(assets_data)))
+    sys.stdout.flush()
 
-    if not q_industrialist_settings.g_offline_mode:
-        page = 1
-        corp_assets_data = []
-        while True:
-            corp_assets_path = ("https://esi.evetech.net/latest/corporations/{}/assets/?page={}".format(corporation_id, page))
-            page_data = send_esi_request(access_token, corp_assets_path)
-            page_len = len(page_data)
-            if 0 == page_len:
-                break
-            # print("\n{}' corporation has {} assets on {} page".format(character_name, page_len, page))
-            # sys.stdout.flush()
-            # dump_json_into_file("corp_assets_page{:03d}".format(page), page_data)
-            corp_assets_data.extend(page_data)
-            page = page + 1
-        print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
-        sys.stdout.flush()
-        dump_json_into_file("corp_assets", corp_assets_data)
-    else:
-        corp_assets_data = take_json_from_file("corp_assets")
+    # contracts_data = get_esi_data(
+    #   access_token,
+    #   "characters/{}/contracts/".format(character_id),
+    #   "contracts")
+    # print("\n{} has {} contracts".format(character_name, len(contracts_data)))
+    # sys.stdout.flush()
 
-    if not q_industrialist_settings.g_offline_mode:
-        page = 1
-        corp_blueprints_data = []
-        while True:
-            corp_blueprints_path = ("https://esi.evetech.net/latest/corporations/{}/blueprints/?page={}".format(corporation_id, page))
-            page_data = send_esi_request(access_token, corp_blueprints_path)
-            page_len = len(page_data)
-            if 0 == page_len:
-                break
-            # print("\n{}' corporation has {} blueprints on {} page".format(character_name, page_len, page))
-            # sys.stdout.flush()
-            # dump_json_into_file("corp_blueprints_part{:03d}".format(page), page_data)
-            corp_blueprints_data.extend(page_data)
-            page = page + 1
-        print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
-        sys.stdout.flush()
-        dump_json_into_file("corp_blueprints", corp_blueprints_data)
-    else:
-        corp_blueprints_data = take_json_from_file("corp_blueprints")
+    corp_assets_data = get_esi_paged_data(
+        access_token,
+        "corporations/{}/assets/".format(corporation_id),
+        "corp_assets")
+    print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
+    sys.stdout.flush()
 
-    """ Converting from :
-    [{
-     "item_id": 153834090,
-     "location_flag": "CorpSAG6",
-     "location_id": 1033160348166,
-     "material_efficiency": 10,
-     "quantity": -1,
-     "runs": -1,
-     "time_efficiency": 20,
-     "type_id": 30014
-    }, {...}, ...]
-    Into :
-    { "CorpSAG6": {
-        "1033160348166": [{
-          "id": 153834090,
-          "type": 30014,
-          "me": 10,
-          "te": 20,
-          "q": -1,
-          "r": -1
-        },{...},...] }, ... }
-    """
+    corp_blueprints_data = get_esi_paged_data(
+        access_token,
+        "corporations/{}/blueprints/".format(corporation_id),
+        "corp_blueprints")
+    print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
+    sys.stdout.flush()
 
     corp_bp_loc_data = {}
     for bp in corp_blueprints_data:
@@ -286,43 +236,28 @@ def main():
         })
     dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
 
-    """contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
-    contracts_data = send_esi_request(access_token, contracts_path)
-    print("\n{} has {} contracts".format(character_name, len(contracts_data)))
+    fittings_data = get_esi_data(
+        access_token,
+        "characters/{}/fittings/".format(character_id),
+        "fittings")
+    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
     sys.stdout.flush()
-    dump_json_into_file("contracts", contracts_data)
-
-    contract158928740_path = ("https://esi.evetech.net/latest/characters/{}/contracts/{}/items/".format(character_id, 158928740))
-    contract158928740_data = send_esi_request(access_token, contract158928740_path)
-    print("\n{} has {} contract158928740".format(character_name, len(contract158928740_data)))
-    sys.stdout.flush()
-    dump_json_into_file("contract158928740", contract158928740_data)"""
-
-    if not q_industrialist_settings.g_offline_mode:
-        fittings_path = ("https://esi.evetech.net/latest/characters/{}/fittings/".format(character_id))
-        fittings_data = send_esi_request(access_token, fittings_path)
-        print("\n{} has {} fittings".format(character_name, len(fittings_data)))
-        sys.stdout.flush()
-        dump_json_into_file("fittings", fittings_data)
-    else:
-        fittings_data = take_json_from_file("fittings")
 
     names_data = []
-    if not q_industrialist_settings.g_offline_mode:
-        for ass in assets_data:
-            if ass["type_id"] in [17363,   # Small Audit Log Secure Container
-                                  17364,   # Medium Audit Log Secure Container
-                                  17365,   # Large Audit Log Secure Container
-                                  17366,   # Station Container
-                                  17367,   # Station Vault Container
-                                  17368]:  # Station Warehouse Container
-                names_data.append(ass["item_id"])
-        if len(names_data):
-            names_path = ("https://esi.evetech.net/latest/characters/{}/assets/names/".format(character_id))
-            names_data = send_esi_request(access_token, names_path, json.dumps(names_data))
-        dump_json_into_file("assets_names", names_data)
-    else:
-        names_data = take_json_from_file("assets_names")
+    for ass in assets_data:
+        if ass["type_id"] in [17363,   # Small Audit Log Secure Container
+                              17364,   # Medium Audit Log Secure Container
+                              17365,   # Large Audit Log Secure Container
+                              17366,   # Station Container
+                              17367,   # Station Vault Container
+                              17368]:  # Station Warehouse Container
+            names_data.append(ass["item_id"])
+    if len(names_data):
+        names_data = get_esi_data(
+            access_token,
+            "characters/{}/assets/names/".format(character_id),
+            "assets_names",
+            json.dumps(names_data))
 
     dump_into_report(wallet_data, blueprint_data, assets_data, names_data)
 
