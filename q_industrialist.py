@@ -320,8 +320,7 @@ def main():
         if len(names_data):
             names_path = ("https://esi.evetech.net/latest/characters/{}/assets/names/".format(character_id))
             names_data = send_esi_request(access_token, names_path, json.dumps(names_data))
-            sys.stdout.flush()
-            dump_json_into_file("assets_names", names_data)
+        dump_json_into_file("assets_names", names_data)
     else:
         names_data = take_json_from_file("assets_names")
 

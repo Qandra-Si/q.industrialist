@@ -137,10 +137,10 @@ dmypy.json
 /bootstrap
 /jquery
 /q_industrialist_settings.py
+/.q_industrialist/
 /auth_cache.json
 /auth_cache.*.json
 /*.~json
 /report.html
 /materials.html
-/.debug_*.json
 /.converted_*.json
