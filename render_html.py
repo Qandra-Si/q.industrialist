@@ -4,47 +4,47 @@ import tzlocal
 from datetime import datetime
 from manipulate_yaml_and_json import get_yaml
 from manipulate_yaml_and_json import read_converted
+from manipulate_yaml_and_json import get_item_name_by_type_id
+from manipulate_yaml_and_json import get_blueprint_manufacturing_materials
 
 import q_industrialist_settings
 
 g_local_timezone = tzlocal.get_localzone()
+g_use_file_system_resources = False
+
+
+def get_img_src(tp, sz):
+    if g_use_file_system_resources:
+        return './3/Types/{}_{}.png'.format(tp, sz)
+    else:
+        return 'http://imageserver.eveonline.com/Type/{}_{}.png'.format(tp, sz)
 
 
 def dump_header(glf):
-    glf.write("""<!doctype html>
-<html lang="ru">
-  <head>
-    <!-- <meta charset="utf-8"> -->
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Q.Industrialist</title>
-    <link rel="stylesheet" href="bootstrap/3.4.1/css/bootstrap.min.css">
-<style type="text/css">
-.icn64 { width:64px; height:64px; }    
-</style>
-  </head>
-  <body>
-    <h1>Q.Industrialist</h1>
-    <script src="jquery/jquery-1.12.4.min.js"></script>
-    <script src="bootstrap/3.4.1/js/bootstrap.min.js"></script>
-""")
-
-
-def dump_online_header(glf):
-    glf.write("""<!doctype html>
-<html lang="ru">
-  <head>
-    <!-- <meta charset="utf-8"> -->
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Q.Industrialist</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
-  </head>
-  <body>
-    <h1>Q.Industrialist</h1>
-    <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
-""")
+    glf.write(
+        '<!doctype html>\n'
+        '<html lang="ru">\n'
+        ' <head>\n'
+        ' <!-- <meta charset="utf-8"> -->\n'
+        ' <meta http-equiv="X-UA-Compatible" content="IE=edge">\n'
+        ' <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        ' <title>Q.Industrialist</title>\n'
+        ' <link rel="stylesheet" href="{bs_css}">\n'
+        '<style type="text/css">\n'
+        '.icn24 {{ width:24px; height:24px; }}\n'
+        '.icn32 {{ width:32px; height:32px; }}\n'
+        '.icn64 {{ width:64px; height:64px; }}\n'
+        '</style>\n'
+        '</head>\n'
+        '<body>\n'
+        '<h1>Q.Industrialist</h1>\n'
+        '<script src="{jq_js}"></script>\n'
+        '<script src="{bs_js}"></script>\n'.format(
+            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if g_use_file_system_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous',
+            jq_js='jquery/jquery-1.12.4.min.js' if g_use_file_system_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
+            bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if g_use_file_system_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
+        )
+    )
 
 
 def dump_footer(glf):
@@ -193,16 +193,12 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
         for bp in blueprint_data:
             if bp["location_id"] != location_id:
                 continue
-            type_id = str(bp["type_id"])
-            if not (type_id in type_ids):
-                blueprint_name = type_id
-            else:
-                type_dict = type_ids[type_id]
-                if ("name" in type_dict) and ("en" in type_dict["name"]):
-                    blueprint_name = type_dict["name"]["en"]
-                else:
-                    blueprint_name = type_id
-            glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm}</p>\n'.format(nm=blueprint_name, tp=type_id))
+            type_id = bp["type_id"]
+            blueprint_name = get_item_name_by_type_id(type_ids, type_id)
+            glf.write('<p><img class="icn32" src="{src}"/>{nm}</p>\n'.format(
+                nm=blueprint_name,
+                src=get_img_src(type_id, 32)
+            ))
         glf.write(
             "   </div>\n"
             "  </div>\n"
@@ -221,7 +217,7 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 </div>""")
 
 
-def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
+def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
     glf.write("""<!-- Button trigger for Corp Blueprints Modal -->
     <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpBlueprints">Show Corp Blueprints</button>
     <!-- Corp Blueprints Modal -->
@@ -271,25 +267,19 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
             )
             type_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
             for type_id in type_keys:
-                if not (str(type_id) in type_ids):
-                    blueprint_name = type_id
-                else:
-                    type_dict = type_ids[str(type_id)]
-                    if ("name" in type_dict) and ("en" in type_dict["name"]):
-                        blueprint_name = type_dict["name"]["en"]
-                    else:
-                        blueprint_name = type_id
+                blueprint_name = get_item_name_by_type_id(type_ids, type_id)
                 glf.write(
                     '<div class="media">\n'
                     ' <div class="media-left">\n'
-                    '  <img class="media-object icn64" src="./3/Types/{tp}_64.png" alt="{nm}">\n'
+                    '  <img class="media-object icn64" src="{src}" alt="{nm}">\n'
                     ' </div>\n'
                     ' <div class="media-body">\n'
                     '  <h4 class="media-heading">{nm}</h4>\n'.format(
-                        tp=type_id,
+                        src=get_img_src(type_id, 64),
                         nm=blueprint_name
                     )
                 )
+                bp_manuf_mats = get_blueprint_manufacturing_materials(bp_materials, type_id)
                 bp_keys = corp_bp_loc_data[loc_flag][loc_id][type_id].keys()
                 for bpk in bp_keys:
                     bp = corp_bp_loc_data[loc_flag][loc_id][type_id][bpk]
@@ -300,7 +290,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
                     glf.write(
                         '<span class="label label-{cpc}">{cpn}</span>'
                         '&nbsp;<span class="label label-success">{me} {te}</span>'
-                        '&nbsp;<span class="badge">{qr}</span></br>\n'.format(
+                        '&nbsp;<span class="badge">{qr}</span>\n'.format(
                             qr=quantity_or_runs,
                             cpc='default' if is_blueprint_copy else 'info',
                             cpn='copy' if is_blueprint_copy else 'original',
@@ -308,6 +298,30 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
                             te=time_efficiency
                         )
                     )
+                    if bp_manuf_mats is None:
+                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>\n')
+                    else:
+                        glf.write('</br><div>\n')
+                        for m in bp_manuf_mats:
+                            bpmmq = int(m["quantity"])
+                            bpmmq_me = bpmmq
+                            if material_efficiency > 0:
+                                _me = int(100 - material_efficiency)
+                                bpmmq_me = int((bpmmq * _me) / 100)
+                                if 0 != ((bpmmq * _me) % 100):
+                                    bpmmq_me = bpmmq_me + 1
+                            bpmm_tid = int(m["typeID"])
+                            bpmm_tnm = get_item_name_by_type_id(type_ids, bpmm_tid)
+                            glf.write(
+                                '<span style="white-space:nowrap;">'
+                                '<img class="icn24" src="{src}"> {q} x {nm} '
+                                '</span>\n'.format(
+                                    src=get_img_src(bpmm_tid, 32),
+                                    q=bpmmq_me * quantity_or_runs,
+                                    nm=bpmm_tnm
+                                )
+                            )
+                        glf.write('</div>\n')
                 glf.write(
                     ' </div>\n'
                     '</div>\n'
@@ -338,12 +352,13 @@ def dump_into_report(
         corp_assets_data,
         corp_bp_loc_data):
     type_ids = read_converted("typeIDs")
+    bp_materials = read_converted("blueprints")
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids)
-        dump_corp_blueprints(glf, corp_bp_loc_data, type_ids)
+        dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials)
         dump_footer(glf)
     finally:
         glf.close()
@@ -367,8 +382,7 @@ def dump_materials(glf, materials, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
-        # glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -396,7 +410,7 @@ def dump_bp_wo_manufacturing(glf, blueprints, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src="{src}">{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -424,7 +438,7 @@ def dump_bp_wo_materials(glf, blueprints, type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src=\'http://imageserver.eveonline.com/Type/{tp}_32.png\'/>{nm} ({tp})</p>\n'.format(nm=material_name, tp=type_id))
+        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
     glf.write("""</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -438,7 +452,7 @@ def dump_materials_into_report(materials, wo_manufacturing, wo_materials):
     type_ids = read_converted("typeIDs")
     glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
-        dump_online_header(glf)
+        dump_header(glf)
         dump_materials(glf, materials, type_ids)
         dump_bp_wo_manufacturing(glf, wo_manufacturing, type_ids)
         dump_bp_wo_materials(glf, wo_materials, type_ids)

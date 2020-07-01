@@ -114,6 +114,34 @@ def read_converted(name):
     return None
 
 
+def get_item_name_by_type_id(type_ids, type_id):
+    if not (str(type_id) in type_ids):
+        name = type_id
+    else:
+        type_dict = type_ids[str(type_id)]
+        if ("name" in type_dict) and ("en" in type_dict["name"]):
+            name = type_dict["name"]["en"]
+        else:
+            name = type_id
+    return name
+
+
+def get_blueprint_manufacturing_materials(blueprints, type_id):
+    if not (str(type_id) in blueprints):
+        return None
+    else:
+        bp = blueprints[str(type_id)]
+        if not ("activities" in bp):
+            return None
+        elif not ("manufacturing" in bp["activities"]):
+            return None
+        elif not ("materials" in bp["activities"]["manufacturing"]):
+            return None
+        else:
+            materials = bp["activities"]["manufacturing"]["materials"]
+            return materials
+
+
 def main():  # rebuild .yaml files
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
