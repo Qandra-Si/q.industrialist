@@ -225,14 +225,32 @@ def main():
         if not (loc_flag in corp_bp_loc_data):
             corp_bp_loc_data.update({loc_flag: {}})
         if not (loc_id in corp_bp_loc_data[loc_flag]):
-            corp_bp_loc_data[loc_flag].update({int(loc_id): []})
-        corp_bp_loc_data[loc_flag][int(loc_id)].append({
+            corp_bp_loc_data[loc_flag].update({loc_id: {}})
+        # --
+        type_id = int(bp["type_id"])
+        quantity = int(bp["quantity"])
+        is_blueprint_copy = quantity < -1
+        bp_type = 'c' if is_blueprint_copy else 'o'
+        material_efficiency = int(bp["material_efficiency"])
+        time_efficiency = int(bp["time_efficiency"])
+        bp_key = '{tp}_{bpt}_{me}_{te}'.format(tp=type_id, bpt=bp_type, me=material_efficiency, te=time_efficiency)
+        runs = int(bp["runs"])
+        quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
+        if not (bp_key in corp_bp_loc_data[loc_flag][loc_id]):
+            corp_bp_loc_data[loc_flag][loc_id].update({bp_key: {
+                "tp": type_id,
+                "cp": is_blueprint_copy,
+                "me": material_efficiency,
+                "te": time_efficiency,
+                "qr": quantity_or_runs,
+                "itm": []
+            }})
+        elif is_blueprint_copy:
+            corp_bp_loc_data[loc_flag][loc_id][bp_key]["qr"] = corp_bp_loc_data[loc_flag][loc_id][bp_key]["qr"] + quantity_or_runs
+        corp_bp_loc_data[loc_flag][loc_id][bp_key]["itm"].append({
           "id": int(bp["item_id"]),
-          "type": int(bp["type_id"]),
-          "me": int(bp["material_efficiency"]),
-          "te": int(bp["time_efficiency"]),
-          "q": int(bp["quantity"]),
-          "r": int(bp["runs"])
+          "q": quantity,
+          "r": runs
         })
     dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
 
@@ -259,7 +277,13 @@ def main():
             "assets_names",
             json.dumps(names_data))
 
-    dump_into_report(wallet_data, blueprint_data, assets_data, names_data)
+    dump_into_report(
+        wallet_data,
+        blueprint_data,
+        assets_data,
+        names_data,
+        corp_assets_data,
+        corp_bp_loc_data)
 
 
 if __name__ == "__main__":

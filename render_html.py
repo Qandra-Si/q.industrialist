@@ -153,8 +153,7 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
     locations = build_hangar_tree(blueprint_data, assets_data, names_data)
-    # debug:
-    glf.write("<!-- {} -->\n".format(locations))
+    # debug: glf.write("<!-- {} -->\n".format(locations))
     for loc in locations:
         # level : loc["level"] : REQUIRED
         # type_id : loc["type_id"] : OPTIONAL
@@ -219,13 +218,100 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 </div>""")
 
 
-def dump_into_report(wallet_data, blueprint_data, assets_data, names_data):
+def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
+    glf.write("""<!-- Button trigger for Corp Blueprints Modal -->
+    <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpBlueprints">Show Corp Blueprints</button>
+    <!-- Corp Blueprints Modal -->
+    <div class="modal fade" id="modalCorpBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalCorpBlueprintsLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="modalCorpBlueprintsLabel">Corp Blueprints</h4>
+          </div>
+          <div class="modal-body">
+    <!-- BEGIN: collapsable group (locations) -->
+    <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+
+    loc_flags = corp_bp_loc_data.keys()
+    for loc_flag in loc_flags:
+        loc_ids = corp_bp_loc_data[loc_flag].keys()
+        for loc in loc_ids:
+            loc_id = int(loc)
+            glf.write(
+                " <div class=\"panel panel-default\">\n"
+                "  <div class=\"panel-heading\" role=\"tab\" id=\"heading{id}\">\n"
+                "   <h4 class=\"panel-title\">\n".format(id=loc_id)
+            )
+            glf.write("    <a role=\"button\" data-toggle=\"collapse\" data-parent=\"#accordion\" "
+                      "href=\"#collapse{id}\" aria-expanded=\"true\" aria-controls=\"collapse{id}\""
+                      ">{nm}</a>\n".format(id=loc_id, nm="{} - {}".format(loc_flag, loc_id)))
+            glf.write(
+                "   </h4>\n"
+                "  </div>\n"
+                "  <div id=\"collapse{id}\" class=\"panel-collapse collapse\" role=\"tabpanel\""
+                "  aria-labelledby=\"heading{id}\">\n"
+                "   <div class=\"panel-body\">\n".format(id=loc_id)
+            )
+            bp_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
+            for bpk in bp_keys:
+                type_id = str(corp_bp_loc_data[loc_flag][loc_id][bpk]["tp"])
+                is_blueprint_copy = corp_bp_loc_data[loc_flag][loc_id][bpk]["cp"]
+                quantity_or_runs = corp_bp_loc_data[loc_flag][loc_id][bpk]["qr"]
+                material_efficiency = corp_bp_loc_data[loc_flag][loc_id][bpk]["me"]
+                time_efficiency = corp_bp_loc_data[loc_flag][loc_id][bpk]["te"]
+                if not (type_id in type_ids):
+                    blueprint_name = type_id
+                else:
+                    type_dict = type_ids[type_id]
+                    if ("name" in type_dict) and ("en" in type_dict["name"]):
+                        blueprint_name = type_dict["name"]["en"]
+                    else:
+                        blueprint_name = type_id
+                glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>&nbsp;'.format(tp=type_id))
+                if is_blueprint_copy:
+                    glf.write('&nbsp;<span class="label label-default">copy</span>'
+                              '&nbsp;<span class="badge">{}</span>'.format(quantity_or_runs))
+                else:
+                    glf.write('&nbsp;<span class="label label-info">original</span>'
+                              '&nbsp;<span class="badge">{}</span>'.format(quantity_or_runs))
+                #glf.write('&nbsp;<span class="label label-success">{} {}</span>'.format(
+                #           material_efficiency, time_efficiency))
+                glf.write('&nbsp;{nm}'
+                          '&nbsp;<span class="label label-success">{me} {te}</span></p>'.format(
+                          nm=blueprint_name, me=material_efficiency, te=time_efficiency))
+            glf.write(
+                "   </div>\n"
+                "  </div>\n"
+                " </div>\n"
+            )
+
+    glf.write("""</div>
+<!-- END: collapsable group (locations) -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary">Choose</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
+def dump_into_report(
+        wallet_data,
+        blueprint_data,
+        assets_data,
+        names_data,
+        corp_assets_data,
+        corp_bp_loc_data):
     type_ids = read_converted("typeIDs")
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids)
+        dump_corp_blueprints(glf, corp_bp_loc_data, type_ids)
         dump_footer(glf)
     finally:
         glf.close()
