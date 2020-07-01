@@ -36,6 +36,7 @@ from auth_cache import get_timestamp_expired
 from esi_interface import get_esi_data
 from esi_interface import get_esi_paged_data
 from esi_interface import dump_json_into_file
+from manipulate_yaml_and_json import read_converted
 from render_html import dump_into_report
 
 
@@ -176,6 +177,9 @@ def main():
 
     corporation_id = character_data["corporation_id"]
 
+    sde_type_ids = read_converted("typeIDs")
+    sde_bp_materials = read_converted("blueprints")
+
     wallet_data = get_esi_data(
         access_token,
         "characters/{}/wallet/".format(character_id),
@@ -284,6 +288,8 @@ def main():
             json.dumps(names_data))
 
     dump_into_report(
+        sde_type_ids,
+        sde_bp_materials,
         wallet_data,
         blueprint_data,
         assets_data,

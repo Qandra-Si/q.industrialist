@@ -3,7 +3,6 @@ import tzlocal
 
 from datetime import datetime
 from manipulate_yaml_and_json import get_yaml
-from manipulate_yaml_and_json import read_converted
 from manipulate_yaml_and_json import get_item_name_by_type_id
 from manipulate_yaml_and_json import get_blueprint_manufacturing_materials
 
@@ -344,20 +343,20 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
 
 
 def dump_into_report(
+        sde_type_ids,
+        sde_bp_materials,
         wallet_data,
         blueprint_data,
         assets_data,
         names_data,
         corp_assets_data,
         corp_bp_loc_data):
-    type_ids = read_converted("typeIDs")
-    bp_materials = read_converted("blueprints")
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
         dump_wallet(glf, wallet_data)
-        dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids)
-        dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials)
+        dump_blueprints(glf, blueprint_data, assets_data, names_data, sde_type_ids)
+        dump_corp_blueprints(glf, corp_bp_loc_data, sde_type_ids, sde_bp_materials)
         dump_footer(glf)
     finally:
         glf.close()
@@ -447,14 +446,13 @@ def dump_bp_wo_materials(glf, blueprints, type_ids):
 </div>""")
 
 
-def dump_materials_into_report(materials, wo_manufacturing, wo_materials):
-    type_ids = read_converted("typeIDs")
+def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_materials):
     glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
-        dump_materials(glf, materials, type_ids)
-        dump_bp_wo_manufacturing(glf, wo_manufacturing, type_ids)
-        dump_bp_wo_materials(glf, wo_materials, type_ids)
+        dump_materials(glf, materials, sde_type_ids)
+        dump_bp_wo_manufacturing(glf, wo_manufacturing, sde_type_ids)
+        dump_bp_wo_materials(glf, wo_materials, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()
