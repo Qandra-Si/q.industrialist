@@ -19,6 +19,9 @@ def dump_header(glf):
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Q.Industrialist</title>
     <link rel="stylesheet" href="bootstrap/3.4.1/css/bootstrap.min.css">
+<style type="text/css">
+.icn64 { width:64px; height:64px; }    
+</style>
   </head>
   <body>
     <h1>Q.Industrialist</h1>
@@ -238,32 +241,40 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
         loc_ids = corp_bp_loc_data[loc_flag].keys()
         for loc in loc_ids:
             loc_id = int(loc)
+            # пока нет возможности считать названия контейнеров, - хардкодим тут
+            loc_name = loc_id
+            if loc_id == 1033012626278:
+                loc_name = "Sideproject"
+            elif loc_id == 1032890037923:
+                loc_name = "Alexa O'Connor pet project"
+            elif loc_id == 1033063942756:
+                loc_name = "Alexa O'Connor - Остатки"
+            elif loc_id == 1033675076928:
+                loc_name = "[prod] conveyor 2"
+            elif loc_id == 1032846295901:
+                loc_name = "[prod] conveyor 1"
             glf.write(
-                " <div class=\"panel panel-default\">\n"
-                "  <div class=\"panel-heading\" role=\"tab\" id=\"heading{id}\">\n"
-                "   <h4 class=\"panel-title\">\n".format(id=loc_id)
+                ' <div class="panel panel-default">\n'
+                '  <div class="panel-heading" role="tab" id="heading{id}">\n'
+                '   <h4 class="panel-title">\n'
+                '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
+                'href="#collapse{id}" aria-expanded="true" aria-controls="collapse{id}"'
+                '>{nm}</a>\n'
+                '   </h4>\n'
+                '  </div>\n'
+                '  <div id="collapse{id}" class="panel-collapse collapse" role="tabpanel" '
+                'aria-labelledby="heading{id}">\n'
+                '   <div class="panel-body">\n'.format(
+                    id=loc_id,
+                    nm="{} - {}".format(loc_flag, loc_name)
+                )
             )
-            glf.write("    <a role=\"button\" data-toggle=\"collapse\" data-parent=\"#accordion\" "
-                      "href=\"#collapse{id}\" aria-expanded=\"true\" aria-controls=\"collapse{id}\""
-                      ">{nm}</a>\n".format(id=loc_id, nm="{} - {}".format(loc_flag, loc_id)))
-            glf.write(
-                "   </h4>\n"
-                "  </div>\n"
-                "  <div id=\"collapse{id}\" class=\"panel-collapse collapse\" role=\"tabpanel\""
-                "  aria-labelledby=\"heading{id}\">\n"
-                "   <div class=\"panel-body\">\n".format(id=loc_id)
-            )
-            bp_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
-            for bpk in bp_keys:
-                type_id = str(corp_bp_loc_data[loc_flag][loc_id][bpk]["tp"])
-                is_blueprint_copy = corp_bp_loc_data[loc_flag][loc_id][bpk]["cp"]
-                quantity_or_runs = corp_bp_loc_data[loc_flag][loc_id][bpk]["qr"]
-                material_efficiency = corp_bp_loc_data[loc_flag][loc_id][bpk]["me"]
-                time_efficiency = corp_bp_loc_data[loc_flag][loc_id][bpk]["te"]
-                if not (type_id in type_ids):
+            type_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
+            for type_id in type_keys:
+                if not (str(type_id) in type_ids):
                     blueprint_name = type_id
                 else:
-                    type_dict = type_ids[type_id]
+                    type_dict = type_ids[str(type_id)]
                     if ("name" in type_dict) and ("en" in type_dict["name"]):
                         blueprint_name = type_dict["name"]["en"]
                     else:
@@ -271,29 +282,36 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids):
                 glf.write(
                     '<div class="media">\n'
                     ' <div class="media-left">\n'
-                    '  <img class="media-object" src="./3/Types/{tp}_32.png" alt="{nm}">\n'
+                    '  <img class="media-object icn64" src="./3/Types/{tp}_64.png" alt="{nm}">\n'
                     ' </div>\n'
                     ' <div class="media-body">\n'
-                    '  <h4 class="media-heading">{nm}</h4>\n'
-                    ' </div>\n'
-                    '</div>\n'.format(
+                    '  <h4 class="media-heading">{nm}</h4>\n'.format(
                         tp=type_id,
                         nm=blueprint_name
                     )
                 )
-
-                glf.write('<p><img src=\'./3/Types/{tp}_32.png\'/>&nbsp;'.format(tp=type_id))
-                if is_blueprint_copy:
-                    glf.write('&nbsp;<span class="label label-default">copy</span>'
-                              '&nbsp;<span class="badge">{}</span>'.format(quantity_or_runs))
-                else:
-                    glf.write('&nbsp;<span class="label label-info">original</span>'
-                              '&nbsp;<span class="badge">{}</span>'.format(quantity_or_runs))
-                #glf.write('&nbsp;<span class="label label-success">{} {}</span>'.format(
-                #           material_efficiency, time_efficiency))
-                glf.write('&nbsp;{nm}'
-                          '&nbsp;<span class="label label-success">{me} {te}</span></p>'.format(
-                          nm=blueprint_name, me=material_efficiency, te=time_efficiency))
+                bp_keys = corp_bp_loc_data[loc_flag][loc_id][type_id].keys()
+                for bpk in bp_keys:
+                    bp = corp_bp_loc_data[loc_flag][loc_id][type_id][bpk]
+                    is_blueprint_copy = bp["cp"]
+                    quantity_or_runs = bp["qr"]
+                    material_efficiency = bp["me"]
+                    time_efficiency = bp["te"]
+                    glf.write(
+                        '<span class="label label-{cpc}">{cpn}</span>'
+                        '&nbsp;<span class="label label-success">{me} {te}</span>'
+                        '&nbsp;<span class="badge">{qr}</span></br>\n'.format(
+                            qr=quantity_or_runs,
+                            cpc='default' if is_blueprint_copy else 'info',
+                            cpn='copy' if is_blueprint_copy else 'original',
+                            me=material_efficiency,
+                            te=time_efficiency
+                        )
+                    )
+                glf.write(
+                    ' </div>\n'
+                    '</div>\n'
+                )
             glf.write(
                 "   </div>\n"
                 "  </div>\n"

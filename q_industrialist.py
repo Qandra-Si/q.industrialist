@@ -222,23 +222,27 @@ def main():
     for bp in corp_blueprints_data:
         loc_flag = str(bp["location_flag"])
         loc_id = int(bp["location_id"])
+        # { "CorpSAG6": {} }
         if not (loc_flag in corp_bp_loc_data):
             corp_bp_loc_data.update({loc_flag: {}})
+        # { "CorpSAG6": { "1033160348166": {} } }
         if not (loc_id in corp_bp_loc_data[loc_flag]):
             corp_bp_loc_data[loc_flag].update({loc_id: {}})
-        # --
+        # { "CorpSAG6": { "1033160348166": { "30014": {} } } }
         type_id = int(bp["type_id"])
+        if not (type_id in corp_bp_loc_data[loc_flag][loc_id]):
+            corp_bp_loc_data[loc_flag][loc_id].update({type_id: {}})
+        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": {} } } } }
         quantity = int(bp["quantity"])
         is_blueprint_copy = quantity < -1
         bp_type = 'c' if is_blueprint_copy else 'o'
         material_efficiency = int(bp["material_efficiency"])
         time_efficiency = int(bp["time_efficiency"])
-        bp_key = '{tp}_{bpt}_{me}_{te}'.format(tp=type_id, bpt=bp_type, me=material_efficiency, te=time_efficiency)
+        bp_key = '{bpt}_{me}_{te}'.format(bpt=bp_type, me=material_efficiency, te=time_efficiency)
         runs = int(bp["runs"])
         quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
-        if not (bp_key in corp_bp_loc_data[loc_flag][loc_id]):
-            corp_bp_loc_data[loc_flag][loc_id].update({bp_key: {
-                "tp": type_id,
+        if not (bp_key in corp_bp_loc_data[loc_flag][loc_id][type_id]):
+            corp_bp_loc_data[loc_flag][loc_id][type_id].update({bp_key: {
                 "cp": is_blueprint_copy,
                 "me": material_efficiency,
                 "te": time_efficiency,
@@ -246,8 +250,8 @@ def main():
                 "itm": []
             }})
         elif is_blueprint_copy:
-            corp_bp_loc_data[loc_flag][loc_id][bp_key]["qr"] = corp_bp_loc_data[loc_flag][loc_id][bp_key]["qr"] + quantity_or_runs
-        corp_bp_loc_data[loc_flag][loc_id][bp_key]["itm"].append({
+            corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] = corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] + quantity_or_runs
+        corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["itm"].append({
           "id": int(bp["item_id"]),
           "q": quantity,
           "r": runs
