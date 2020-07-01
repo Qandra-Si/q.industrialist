@@ -138,6 +138,7 @@ dmypy.json
 /jquery
 /q_industrialist_settings.py
 /auth_cache.json
+/auth_cache.*.json
 /*.~json
 /report.html
 /materials.html
