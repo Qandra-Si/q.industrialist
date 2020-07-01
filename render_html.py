@@ -10,11 +10,10 @@ from manipulate_yaml_and_json import get_blueprint_manufacturing_materials
 import q_industrialist_settings
 
 g_local_timezone = tzlocal.get_localzone()
-g_use_file_system_resources = False
 
 
 def get_img_src(tp, sz):
-    if g_use_file_system_resources:
+    if q_industrialist_settings.g_use_filesystem_resources:
         return './3/Types/{}_{}.png'.format(tp, sz)
     else:
         return 'http://imageserver.eveonline.com/Type/{}_{}.png'.format(tp, sz)
@@ -40,9 +39,9 @@ def dump_header(glf):
         '<h1>Q.Industrialist</h1>\n'
         '<script src="{jq_js}"></script>\n'
         '<script src="{bs_js}"></script>\n'.format(
-            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if g_use_file_system_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous',
-            jq_js='jquery/jquery-1.12.4.min.js' if g_use_file_system_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
-            bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if g_use_file_system_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
+            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous',
+            jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
+            bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
         )
     )
 
