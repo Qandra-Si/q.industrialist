@@ -23,6 +23,8 @@ import secrets
 import sys
 import json
 
+import q_industrialist_settings
+
 from shared_flow import print_auth_url
 from shared_flow import send_token_request
 from shared_flow import send_token_refresh
@@ -37,9 +39,6 @@ from debug import take_json_from_file
 from render_html import dump_into_report
 
 
-# online_mode : download & save data from CCP servers
-# offline_mode : read data from file system
-g_offline_mode = True
 # R Initiative 4 Q.Industrialist
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
@@ -152,7 +151,7 @@ def re_auth(auth_cache):
 def main():
     global g_client_scope
     cache = read_cache()
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         if not ('access_token' in cache) or not ('refresh_token' in cache) or not ('expired' in cache):
             cache = auth()
         elif not ('scope' in cache) or (cache["scope"] != g_client_scope):
@@ -168,7 +167,7 @@ def main():
     character_id = cache["character_id"]
     character_name = cache["character_name"]
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         character_path = ("https://esi.evetech.net/latest/characters/{}/".format(character_id))
         character_data = send_esi_request(access_token, character_path)
         print("\n{} is from {} corporation".format(character_name, character_data["corporation_id"]))
@@ -179,7 +178,7 @@ def main():
 
     corporation_id = character_data["corporation_id"]
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         blueprint_path = ("https://esi.evetech.net/latest/characters/{}/blueprints/".format(character_id))
         blueprint_data = send_esi_request(access_token, blueprint_path)
         print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
@@ -188,7 +187,7 @@ def main():
     else:
         blueprint_data = take_json_from_file("blueprints")
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         wallet_path = ("https://esi.evetech.net/latest/characters/{}/wallet/".format(character_id))
         wallet_data = send_esi_request(access_token, wallet_path)
         print("\n{} has {} ISK".format(character_name, wallet_data))
@@ -197,7 +196,7 @@ def main():
     else:
         wallet_data = take_json_from_file("wallet")
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         assets_path = ("https://esi.evetech.net/latest/characters/{}/assets/".format(character_id))
         assets_data = send_esi_request(access_token, assets_path)
         print("\n{} has {} assets".format(character_name, len(assets_data)))
@@ -206,7 +205,7 @@ def main():
     else:
         assets_data = take_json_from_file("assets")
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         page = 1
         corp_assets_data = []
         while True:
@@ -226,7 +225,7 @@ def main():
     else:
         corp_assets_data = take_json_from_file("corp_assets")
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         page = 1
         corp_blueprints_data = []
         while True:
@@ -299,7 +298,7 @@ def main():
     sys.stdout.flush()
     dump_json_into_file("contract158928740", contract158928740_data)"""
 
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         fittings_path = ("https://esi.evetech.net/latest/characters/{}/fittings/".format(character_id))
         fittings_data = send_esi_request(access_token, fittings_path)
         print("\n{} has {} fittings".format(character_name, len(fittings_data)))
@@ -309,7 +308,7 @@ def main():
         fittings_data = take_json_from_file("fittings")
 
     names_data = []
-    if not g_offline_mode:
+    if not q_industrialist_settings.g_offline_mode:
         for ass in assets_data:
             if ass["type_id"] in [17363,   # Small Audit Log Secure Container
                                   17364,   # Medium Audit Log Secure Container
