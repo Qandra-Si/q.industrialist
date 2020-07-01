@@ -3,6 +3,6 @@
 # tmp_directory example format : 'c:/dev/industrialist'
 
 g_eve_server = 'tranquility'  # eveonline' server
-g_user_agent = 'Q.Industrialist v0.1'  # 'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
+g_user_agent = 'Q.Industrialist v0.2'  # 'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
 g_offline_mode = False
 #please specify:g_tmp_directory = '/full/path/to/generated/files'  # for example : /tmp
