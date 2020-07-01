@@ -185,28 +185,38 @@ def main():
     dump_json_into_file("assets", assets_data)
 
     page = 1
+    corp_assets_data = []
     while True:
         corp_assets_path = ("https://esi.evetech.net/latest/corporations/{}/assets/?page={}".format(corporation_id, page))
-        corp_assets_data = send_esi_request(access_token, corp_assets_path)
-        data_len = len(corp_assets_data)
-        if 0 == data_len:
+        page_data = send_esi_request(access_token, corp_assets_path)
+        page_len = len(page_data)
+        if 0 == page_len:
             break
-        print("\n{}' corporation has {} assets on {} page".format(character_name, data_len, page))
-        sys.stdout.flush()
-        dump_json_into_file("corp_assets_page{:03d}".format(page), corp_assets_data)
+        # print("\n{}' corporation has {} assets on {} page".format(character_name, page_len, page))
+        # sys.stdout.flush()
+        # dump_json_into_file("corp_assets_page{:03d}".format(page), page_data)
+        corp_assets_data.extend(page_data)
         page = page + 1
+    print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
+    sys.stdout.flush()
+    dump_json_into_file("corp_assets", corp_assets_data)
 
     page = 1
+    corp_blueprints_data = []
     while True:
         corp_blueprints_path = ("https://esi.evetech.net/latest/corporations/{}/blueprints/?page={}".format(corporation_id, page))
-        corp_blueprints_data = send_esi_request(access_token, corp_blueprints_path)
-        data_len = len(corp_blueprints_data)
-        if 0 == data_len:
+        page_data = send_esi_request(access_token, corp_blueprints_path)
+        page_len = len(page_data)
+        if 0 == page_len:
             break
-        print("\n{}' corporation has {} blueprints on {} page".format(character_name, data_len, page))
-        sys.stdout.flush()
-        dump_json_into_file("corp_blueprints_part{:03d}".format(page), corp_blueprints_data)
+        # print("\n{}' corporation has {} blueprints on {} page".format(character_name, page_len, page))
+        # sys.stdout.flush()
+        # dump_json_into_file("corp_blueprints_part{:03d}".format(page), page_data)
+        corp_blueprints_data.extend(page_data)
         page = page + 1
+    print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
+    sys.stdout.flush()
+    dump_json_into_file("corp_blueprints", corp_blueprints_data)
 
     """contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
     contracts_data = send_esi_request(access_token, contracts_path)
