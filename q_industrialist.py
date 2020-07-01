@@ -241,6 +241,7 @@ def main():
         bp_key = '{bpt}_{me}_{te}'.format(bpt=bp_type, me=material_efficiency, te=time_efficiency)
         runs = int(bp["runs"])
         quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
+        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } } }
         if not (bp_key in corp_bp_loc_data[loc_flag][loc_id][type_id]):
             corp_bp_loc_data[loc_flag][loc_id][type_id].update({bp_key: {
                 "cp": is_blueprint_copy,
@@ -251,6 +252,7 @@ def main():
             }})
         elif is_blueprint_copy:
             corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] = corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] + quantity_or_runs
+        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } } }
         corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["itm"].append({
           "id": int(bp["item_id"]),
           "q": quantity,
