@@ -218,6 +218,47 @@ def main():
     sys.stdout.flush()
     dump_json_into_file("corp_blueprints", corp_blueprints_data)
 
+    """ Converting from :
+    [{
+     "item_id": 153834090,
+     "location_flag": "CorpSAG6",
+     "location_id": 1033160348166,
+     "material_efficiency": 10,
+     "quantity": -1,
+     "runs": -1,
+     "time_efficiency": 20,
+     "type_id": 30014
+    }, {...}, ...]
+    Into :
+    { "CorpSAG6": {
+        "1033160348166": [{
+          "id": 153834090,
+          "type": 30014,
+          "me": 10,
+          "te": 20,
+          "q": -1,
+          "r": -1
+        },{...},...] }, ... }
+    """
+
+    corp_bp_loc_data = {}
+    for bp in corp_blueprints_data:
+        loc_flag = str(bp["location_flag"])
+        loc_id = int(bp["location_id"])
+        if not (loc_flag in corp_bp_loc_data):
+            corp_bp_loc_data.update({loc_flag: {}})
+        if not (loc_id in corp_bp_loc_data[loc_flag]):
+            corp_bp_loc_data[loc_flag].update({int(loc_id): []})
+        corp_bp_loc_data[loc_flag][int(loc_id)].append({
+          "id": int(bp["item_id"]),
+          "type": int(bp["type_id"]),
+          "me": int(bp["material_efficiency"]),
+          "te": int(bp["time_efficiency"]),
+          "q": int(bp["quantity"]),
+          "r": int(bp["runs"])
+        })
+    dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
+
     """contracts_path = ("https://esi.evetech.net/latest/characters/{}/contracts/".format(character_id))
     contracts_data = send_esi_request(access_token, contracts_path)
     print("\n{} has {} contracts".format(character_name, len(contracts_data)))
