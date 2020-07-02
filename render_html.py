@@ -301,7 +301,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
                     else:
                         glf.write('</br><div>\n')
                         for m in bp_manuf_mats:
-                            bpmmq = int(m["quantity"])
+                            bpmmq = int(m["quantity"]) * quantity_or_runs
                             bpmmq_me = bpmmq
                             if material_efficiency > 0:
                                 _me = int(100 - material_efficiency)
@@ -315,7 +315,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
                                 '<img class="icn24" src="{src}"> {q} x {nm} '
                                 '</span>\n'.format(
                                     src=get_img_src(bpmm_tid, 32),
-                                    q=bpmmq_me * quantity_or_runs,
+                                    q=bpmmq_me,
                                     nm=bpmm_tnm
                                 )
                             )
