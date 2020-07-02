@@ -215,7 +215,10 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 </div>""")
 
 
-def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
+def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_materials):
+    # временная мера: хардкодим тут код '.res ALL' контейнера
+    tmp_res_src = corp_ass_loc_data["Unlocked"][1032950982419]
+
     glf.write("""<!-- Button trigger for Corp Blueprints Modal -->
     <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpBlueprints">Show Corp Blueprints</button>
     <!-- Corp Blueprints Modal -->
@@ -266,6 +269,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
                 )
             )
             type_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
+            materials_summary = {}
             for type_id in type_keys:
                 blueprint_name = get_item_name_by_type_id(type_ids, type_id)
                 glf.write(
@@ -302,6 +306,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
                         glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>\n')
                     else:
                         glf.write('</br><div>\n')
+                        not_enough_materials = []
                         for m in bp_manuf_mats:
                             bpmmq = int(m["quantity"]) * quantity_or_runs
                             bpmmq_me = bpmmq
@@ -312,16 +317,43 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
                                     bpmmq_me = bpmmq_me + 1
                             bpmm_tid = int(m["typeID"])
                             bpmm_tnm = get_item_name_by_type_id(type_ids, bpmm_tid)
+                            # проверка наличия имеющихся ресурсов для постройки по этому БП
+                            not_available = bpmmq_me
+                            if m["typeID"] in tmp_res_src:
+                                not_available = 0 if tmp_res_src[m["typeID"]] >= bpmmq_me else bpmmq_me - tmp_res_src[m["typeID"]]
+                            # вывод наименования ресурса
                             glf.write(
-                                '<span style="white-space:nowrap;">'
+                                '<span style="white-space:nowrap;{enough}">'
                                 '<img class="icn24" src="{src}"> {q} x {nm} '
                                 '</span>\n'.format(
                                     src=get_img_src(bpmm_tid, 32),
                                     q=bpmmq_me,
-                                    nm=bpmm_tnm
+                                    nm=bpmm_tnm,
+                                    enough="" if not_available == 0 else "color:red;"
                                 )
                             )
+                            # сохраняем недостающее кол-во материалов для производства по этому чертежу
+                            if not_available > 0:
+                                not_enough_materials.append({"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm})
+                            # сохраняем материалы для производства в список их суммарного кол-ва
+                            if m["typeID"] in materials_summary:
+                                materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bpmmq_me
+                            else:
+                                materials_summary.update({m["typeID"]: bpmmq_me})
                         glf.write('</div>\n')
+                        if len(not_enough_materials) > 0:
+                            glf.write('<div>\n')
+                            for m in not_enough_materials:
+                                glf.write(
+                                    '&nbsp;<span class="label label-warning">'
+                                    '<img class="icn24" src="{src}"> {q} x {nm} '
+                                    '</span>'.format(
+                                        src=get_img_src(m["id"], 32),
+                                        q=m["q"],
+                                        nm=m["nm"]
+                                    )
+                                )
+                            glf.write('</div>\n')
                 glf.write(
                     ' </div>\n'
                     '</div>\n'
@@ -436,7 +468,7 @@ def dump_into_report(
         dump_header(glf)
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, names_data, sde_type_ids)
-        dump_corp_blueprints(glf, corp_bp_loc_data, sde_type_ids, sde_bp_materials)
+        dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
         dump_corp_assets(glf, corp_ass_loc_data, sde_type_ids)
         dump_footer(glf)
     finally:
