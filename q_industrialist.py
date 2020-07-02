@@ -236,6 +236,9 @@ def main():
     for bp in corp_blueprints_data:
         loc_flag = str(bp["location_flag"])
         loc_id = int(bp["location_id"])
+        if q_industrialist_settings.g_adopt_for_ri4:
+            if not (loc_id in [1033012626278,1032890037923,1033063942756,1033675076928,1032846295901]):
+                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
         # { "CorpSAG6": {} }
         if not (loc_flag in corp_bp_loc_data):
             corp_bp_loc_data.update({loc_flag: {}})
@@ -294,22 +297,26 @@ def main():
     corp_ass_loc_data = {}
     for a in corp_assets_data:
         type_id = int(a["type_id"])
-        if materials_for_bps.count(type_id) > 0:
-            loc_flag = str(a["location_flag"])
-            if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Cargo"):
-                continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
-            loc_id = int(a["location_id"])
-            quantity = int(a["quantity"])
-            # { "DroneBay": {} }
-            if not (loc_flag in corp_ass_loc_data):
-                corp_ass_loc_data.update({loc_flag: {}})
-            # { "DroneBay": { "1033692665735": {} } }
-            if not (loc_id in corp_ass_loc_data[loc_flag]):
-                corp_ass_loc_data[loc_flag].update({loc_id: {}})
-            # { "DroneBay": { "1033692665735": { "2488": { "q":? } } } }
-            if not (type_id in corp_ass_loc_data[loc_flag][loc_id]):
-                corp_ass_loc_data[loc_flag][loc_id].update({type_id: {"q": 0}})
-            corp_ass_loc_data[loc_flag][loc_id][type_id]["q"] = corp_ass_loc_data[loc_flag][loc_id][type_id]["q"] + quantity
+        # if materials_for_bps.count(type_id) > 0:
+        loc_flag = str(a["location_flag"])
+        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
+            continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
+        loc_id = int(a["location_id"])
+        if q_industrialist_settings.g_adopt_for_ri4:
+            if loc_id != 1032950982419:
+                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
+        quantity = int(a["quantity"])
+        # { "DroneBay": {} }
+        if not (loc_flag in corp_ass_loc_data):
+            corp_ass_loc_data.update({loc_flag: {}})
+        # { "DroneBay": { "1033692665735": {} } }
+        if not (loc_id in corp_ass_loc_data[loc_flag]):
+            corp_ass_loc_data[loc_flag].update({loc_id: {}})
+        # { "DroneBay": { "1033692665735": { "2488": { "q":? } } } }
+        if not (type_id in corp_ass_loc_data[loc_flag][loc_id]):
+            corp_ass_loc_data[loc_flag][loc_id].update({type_id: quantity})
+        else:
+            corp_ass_loc_data[loc_flag][loc_id][type_id] = quantity + corp_ass_loc_data[loc_flag][loc_id][type_id]
     dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
     """
@@ -340,8 +347,8 @@ def main():
         blueprint_data,
         assets_data,
         names_data,
-        corp_assets_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_ass_loc_data,
         corp_bp_loc_data)
 
 

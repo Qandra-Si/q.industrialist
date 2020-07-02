@@ -237,30 +237,32 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
             loc_id = int(loc)
             # пока нет возможности считать названия контейнеров, - хардкодим тут
             loc_name = loc_id
-            if loc_id == 1033012626278:
-                loc_name = "Sideproject"
-            elif loc_id == 1032890037923:
-                loc_name = "Alexa O'Connor pet project"
-            elif loc_id == 1033063942756:
-                loc_name = "Alexa O'Connor - Остатки"
-            elif loc_id == 1033675076928:
-                loc_name = "[prod] conveyor 2"
-            elif loc_id == 1032846295901:
-                loc_name = "[prod] conveyor 1"
+            if q_industrialist_settings.g_adopt_for_ri4:
+                if loc_id == 1033012626278:
+                    loc_name = "Sideproject"
+                elif loc_id == 1032890037923:
+                    loc_name = "Alexa O'Connor pet project"
+                elif loc_id == 1033063942756:
+                    loc_name = "Alexa O'Connor - Остатки"
+                elif loc_id == 1033675076928:
+                    loc_name = "[prod] conveyor 2"
+                elif loc_id == 1032846295901:
+                    loc_name = "[prod] conveyor 1"
             glf.write(
                 ' <div class="panel panel-default">\n'
-                '  <div class="panel-heading" role="tab" id="heading{id}">\n'
+                '  <div class="panel-heading" role="tab" id="headingB{fl}{id}">\n'
                 '   <h4 class="panel-title">\n'
                 '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-                'href="#collapse{id}" aria-expanded="true" aria-controls="collapse{id}"'
-                '>{nm}</a>\n'
+                'href="#collapseB{fl}{id}" aria-expanded="true" aria-controls="collapseB{fl}{id}"'
+                '>{fl} - {nm}</a>\n'
                 '   </h4>\n'
                 '  </div>\n'
-                '  <div id="collapse{id}" class="panel-collapse collapse" role="tabpanel" '
-                'aria-labelledby="heading{id}">\n'
+                '  <div id="collapseB{fl}{id}" class="panel-collapse collapse" role="tabpanel" '
+                'aria-labelledby="headingB{fl}{id}">\n'
                 '   <div class="panel-body">\n'.format(
+                    fl=loc_flag,
                     id=loc_id,
-                    nm="{} - {}".format(loc_flag, loc_name)
+                    nm=loc_name
                 )
             )
             type_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
@@ -342,6 +344,84 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, type_ids, bp_materials):
 </div>""")
 
 
+def dump_corp_assets(glf, corp_ass_loc_data, type_ids):
+    glf.write("""<!-- Button trigger for Corp Assets Modal -->
+    <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
+    <!-- Corp Assets Modal -->
+    <div class="modal fade" id="modalCorpAssets" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title" id="modalCorpAssetsLabel">Corp Assets</h4>
+          </div>
+          <div class="modal-body">
+    <!-- BEGIN: collapsable group (locations) -->
+    <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+
+    loc_flags = corp_ass_loc_data.keys()
+    for loc_flag in loc_flags:
+        loc_ids = corp_ass_loc_data[loc_flag].keys()
+        for loc in loc_ids:
+            loc_id = int(loc)
+            # пока нет возможности считать названия контейнеров, - хардкодим тут
+            loc_name = loc_id
+            if q_industrialist_settings.g_adopt_for_ri4:
+                if loc_id == 1032950982419:
+                    loc_name = ".stock ALL"
+            type_keys = corp_ass_loc_data[loc_flag][loc_id].keys()
+            glf.write(
+                ' <div class="panel panel-default">\n'
+                '  <div class="panel-heading" role="tab" id="headingA{fl}{id}">\n'
+                '   <h4 class="panel-title">\n'
+                '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
+                'href="#collapseA{fl}{id}" aria-expanded="true" aria-controls="collapseA{fl}{id}"'
+                '>{fl} - {nm}</a> <span class="badge">{q}</span>\n'
+                '   </h4>\n'
+                '  </div>\n'
+                '  <div id="collapseA{fl}{id}" class="panel-collapse collapse" role="tabpanel" '
+                'aria-labelledby="headingA{fl}{id}">\n'
+                '   <div class="panel-body">\n'.format(
+                    fl=loc_flag,
+                    id=loc_id,
+                    nm=loc_name,
+                    q=len(type_keys)
+                )
+            )
+            for type_id in type_keys:
+                item_name = get_item_name_by_type_id(type_ids, type_id)
+                glf.write(
+                    '<div class="media">\n'
+                    ' <div class="media-left">\n'
+                    '  <img class="media-object icn32" src="{src}" alt="{nm}">\n'
+                    ' </div>\n'
+                    ' <div class="media-body">\n'
+                    '  <h4 class="media-heading">{nm} <span class="badge">{q}</span></h4>\n'
+                    ' </div>\n'
+                    '</div>\n'.format(
+                        src=get_img_src(type_id, 32),
+                        nm=item_name,
+                        q=corp_ass_loc_data[loc_flag][loc_id][type_id]
+                    )
+                )
+            glf.write(
+                "   </div>\n"
+                "  </div>\n"
+                " </div>\n"
+            )
+
+    glf.write("""</div>
+<!-- END: collapsable group (locations) -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary">Choose</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
 def dump_into_report(
         sde_type_ids,
         sde_bp_materials,
@@ -349,7 +429,7 @@ def dump_into_report(
         blueprint_data,
         assets_data,
         names_data,
-        corp_assets_data,
+        corp_ass_loc_data,
         corp_bp_loc_data):
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
@@ -357,6 +437,7 @@ def dump_into_report(
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, names_data, sde_type_ids)
         dump_corp_blueprints(glf, corp_bp_loc_data, sde_type_ids, sde_bp_materials)
+        dump_corp_assets(glf, corp_ass_loc_data, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()
