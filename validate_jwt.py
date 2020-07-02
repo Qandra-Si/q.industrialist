@@ -1,4 +1,4 @@
-"""Validates a given JWT token originating from the EVE SSO.
+﻿"""Validates a given JWT token originating from the EVE SSO.
 
 Prerequisites:
     * Have a Python 3 environment available to you (possibly by using a

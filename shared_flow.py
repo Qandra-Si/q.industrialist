@@ -1,4 +1,4 @@
-"""Contains all shared OAuth 2.0 flow functions
+﻿"""Contains all shared OAuth 2.0 flow functions
 
 This module contains all shared functions between the two different OAuth 2.0
 flows recommended for web based and mobile/desktop applications. The functions

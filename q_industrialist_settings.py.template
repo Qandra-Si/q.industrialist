@@ -1,4 +1,4 @@
-# online_mode : download & save data from CCP servers
+﻿# online_mode : download & save data from CCP servers
 # offline_mode : read data from file system (to optimize interaction with CCP servers)
 # tmp_directory example format : 'c:/dev/industrialist'
 # filesystem resources : data located in .3\ & .bootstrap\ & .jquery\ directories

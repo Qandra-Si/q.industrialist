@@ -1,4 +1,4 @@
-""" Q.Industrialist (desktop/mobile)
+﻿""" Q.Industrialist (desktop/mobile)
 
 To build .html report about used blueprint's materials
 run the following command from this directory as the root:

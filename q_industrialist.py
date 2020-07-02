@@ -1,4 +1,4 @@
-""" Q.Industrialist (desktop/mobile)
+﻿""" Q.Industrialist (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at developers.eveonline.com with the scope
@@ -222,6 +222,16 @@ def main():
     print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
+    fittings_data = get_esi_data(
+        access_token,
+        "characters/{}/fittings/".format(character_id),
+        "fittings")
+    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
+    sys.stdout.flush()
+
+    """
+    Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
+    """
     corp_bp_loc_data = {}
     for bp in corp_blueprints_data:
         loc_flag = str(bp["location_flag"])
@@ -264,13 +274,47 @@ def main():
         })
     dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
 
-    fittings_data = get_esi_data(
-        access_token,
-        "characters/{}/fittings/".format(character_id),
-        "fittings")
-    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
-    sys.stdout.flush()
+    """
+    Построение списка модулей и ресурсов, которые используются в производстве
+    """
+    materials_for_bps = []
+    for bp in sde_bp_materials:
+        if "manufacturing" in sde_bp_materials[bp]["activities"]:
+            if "materials" in sde_bp_materials[bp]["activities"]["manufacturing"]:
+                for m in sde_bp_materials[bp]["activities"]["manufacturing"]["materials"]:
+                    if "typeID" in m:
+                        type_id = int(m["typeID"])
+                        if 0 == materials_for_bps.count(type_id):
+                            materials_for_bps.append(type_id)
 
+    """
+    Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
+    которые предназначены для использования в чертежах
+    """
+    corp_ass_loc_data = {}
+    for a in corp_assets_data:
+        type_id = int(a["type_id"])
+        if materials_for_bps.count(type_id) > 0:
+            loc_flag = str(a["location_flag"])
+            if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Cargo"):
+                continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
+            loc_id = int(a["location_id"])
+            quantity = int(a["quantity"])
+            # { "DroneBay": {} }
+            if not (loc_flag in corp_ass_loc_data):
+                corp_ass_loc_data.update({loc_flag: {}})
+            # { "DroneBay": { "1033692665735": {} } }
+            if not (loc_id in corp_ass_loc_data[loc_flag]):
+                corp_ass_loc_data[loc_flag].update({loc_id: {}})
+            # { "DroneBay": { "1033692665735": { "2488": { "q":? } } } }
+            if not (type_id in corp_ass_loc_data[loc_flag][loc_id]):
+                corp_ass_loc_data[loc_flag][loc_id].update({type_id: {"q": 0}})
+            corp_ass_loc_data[loc_flag][loc_id][type_id]["q"] = corp_ass_loc_data[loc_flag][loc_id][type_id]["q"] + quantity
+    dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
+
+    """
+    Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
+    """
     names_data = []
     for ass in assets_data:
         if ass["type_id"] in [17363,   # Small Audit Log Secure Container
@@ -288,13 +332,16 @@ def main():
             json.dumps(names_data))
 
     dump_into_report(
+        # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        # esi данные, загруженные с серверов CCP
         wallet_data,
         blueprint_data,
         assets_data,
         names_data,
         corp_assets_data,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_bp_loc_data)
 
 

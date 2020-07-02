@@ -1,4 +1,4 @@
-""" Q.Industrialist (desktop/mobile)
+﻿""" Q.Industrialist (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at https://developers.eveonline.com/applications
