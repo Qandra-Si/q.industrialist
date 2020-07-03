@@ -43,13 +43,15 @@ from render_html import dump_into_report
 # R Initiative 4 Q.Industrialist
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
-g_client_scope = ["esi-characters.read_blueprints.v1",
-                  "esi-wallet.read_character_wallet.v1",
-                  "esi-assets.read_assets.v1",
-                  # "esi-contracts.read_character_contracts.v1",
-                  "esi-fittings.read_fittings.v1",
-                  "esi-assets.read_corporation_assets.v1",
-                  "esi-corporations.read_blueprints.v1"]
+g_client_scope = ["esi-characters.read_blueprints.v1",  # Requires: access token
+                  "esi-wallet.read_character_wallet.v1",  # Requires: access token
+                  "esi-assets.read_assets.v1",  # Requires: access token
+                  # "esi-contracts.read_character_contracts.v1",  # Requires: access token
+                  "esi-fittings.read_fittings.v1",  # Requires: access token
+                  "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
+                  "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
+                  "esi-industry.read_corporation_jobs.v1"  # Requires role(s): Factory_Manager
+                 ]
 
 
 def print_sso_failure(sso_response):
@@ -168,6 +170,7 @@ def main():
     character_id = cache["character_id"]
     character_name = cache["character_name"]
 
+    # Public information about a character
     character_data = get_esi_data(
         access_token,
         "characters/{}/".format(character_id),
@@ -180,6 +183,7 @@ def main():
     sde_type_ids = read_converted("typeIDs")
     sde_bp_materials = read_converted("blueprints")
 
+    # Requires: access token
     wallet_data = get_esi_data(
         access_token,
         "characters/{}/wallet/".format(character_id),
@@ -187,6 +191,7 @@ def main():
     print("\n{} has {} ISK".format(character_name, wallet_data))
     sys.stdout.flush()
 
+    # Requires: access token
     blueprint_data = get_esi_data(
         access_token,
         "characters/{}/blueprints/".format(character_id),
@@ -194,6 +199,7 @@ def main():
     print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
     sys.stdout.flush()
 
+    # Requires: access token
     assets_data = get_esi_data(
         access_token,
         "characters/{}/assets/".format(character_id),
@@ -201,6 +207,7 @@ def main():
     print("\n{} has {} assets".format(character_name, len(assets_data)))
     sys.stdout.flush()
 
+    # Requires: access token
     # contracts_data = get_esi_data(
     #   access_token,
     #   "characters/{}/contracts/".format(character_id),
@@ -208,6 +215,15 @@ def main():
     # print("\n{} has {} contracts".format(character_name, len(contracts_data)))
     # sys.stdout.flush()
 
+    # Requires role(s): Factory_Manager
+    corp_industry_jobs_data = get_esi_paged_data(
+        access_token,
+        "corporations/{}/industry/jobs/".format(corporation_id),
+        "corp_industry_jobs")
+    print("\n{}' corporation has {} industry jobs".format(character_name, len(corp_industry_jobs_data)))
+    sys.stdout.flush()
+
+    # Requires role(s): Director
     corp_assets_data = get_esi_paged_data(
         access_token,
         "corporations/{}/assets/".format(corporation_id),
@@ -215,6 +231,7 @@ def main():
     print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
     sys.stdout.flush()
 
+    # Requires role(s): Director
     corp_blueprints_data = get_esi_paged_data(
         access_token,
         "corporations/{}/blueprints/".format(corporation_id),
@@ -222,6 +239,7 @@ def main():
     print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
+    # Public information about a character
     fittings_data = get_esi_data(
         access_token,
         "characters/{}/fittings/".format(character_id),
@@ -332,6 +350,7 @@ def main():
                               17368]:  # Station Warehouse Container
             names_data.append(ass["item_id"])
     if len(names_data):
+        # Requires: access token
         names_data = get_esi_data(
             access_token,
             "characters/{}/assets/names/".format(character_id),
