@@ -4,7 +4,7 @@
 ## v0.1
 Программа подключается по ESI-интерфейсу к CCP-серверам и генерирует активныу html-станицу с возможностью производить планирование и рассчёты, отображает сводные сведения по имеющимся ассетам.
 
-<img src="https://raw.githubusercontent.com/Qandra-Si/q.industrialist/master/examples/002-bootstrap_version.png" height="66%" width="66%">
+<img src="https://raw.githubusercontent.com/Qandra-Si/q.industrialist/master/examples/003-first_manufacturing_calculations.png" height="66%" width="66%">
 
 ### Отчёт о чертежах, производство по которым невозможно
 
