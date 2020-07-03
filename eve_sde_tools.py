@@ -2,7 +2,7 @@
 
 run the following command from this directory as the root:
 
->>> python manipulate_yaml_and_json.py
+>>> python eve_sde_tools.py
 """
 import yaml
 import json
@@ -140,6 +140,22 @@ def get_blueprint_manufacturing_materials(blueprints, type_id):
         else:
             materials = bp["activities"]["manufacturing"]["materials"]
             return materials
+
+
+def get_materials_for_blueprints(sde_bp_materials):
+    """
+    Построение списка модулей и ресурсов, которые используются в производстве
+    """
+    materials_for_bps = []
+    for bp in sde_bp_materials:
+        if "manufacturing" in sde_bp_materials[bp]["activities"]:
+            if "materials" in sde_bp_materials[bp]["activities"]["manufacturing"]:
+                for m in sde_bp_materials[bp]["activities"]["manufacturing"]["materials"]:
+                    if "typeID" in m:
+                        type_id = int(m["typeID"])
+                        if 0 == materials_for_bps.count(type_id):
+                            materials_for_bps.append(type_id)
+    return materials_for_bps
 
 
 def main():  # rebuild .yaml files

@@ -2,9 +2,9 @@
 import tzlocal
 
 from datetime import datetime
-from manipulate_yaml_and_json import get_yaml
-from manipulate_yaml_and_json import get_item_name_by_type_id
-from manipulate_yaml_and_json import get_blueprint_manufacturing_materials
+from eve_sde_tools import get_yaml
+from eve_sde_tools import get_item_name_by_type_id
+from eve_sde_tools import get_blueprint_manufacturing_materials
 
 import q_industrialist_settings
 
@@ -291,6 +291,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                     quantity_or_runs = bp["qr"]
                     material_efficiency = bp["me"]
                     time_efficiency = bp["te"]
+                    blueprint_status = bp["st"]
                     glf.write(
                         '<span class="label label-{cpc}">{cpn}</span>'
                         '&nbsp;<span class="label label-success">{me} {te}</span>'
@@ -302,10 +303,17 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                             te=time_efficiency
                         )
                     )
-                    if bp_manuf_mats is None:
-                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>\n')
+                    if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
+                        if (blueprint_status == "active") or (blueprint_status == "delivered") or (blueprint_status == "ready"):
+                            glf.write('&nbsp;<span class="label label-info">{}</span></br>\n'.format(blueprint_status))
+                        elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
+                            glf.write('&nbsp;<span class="label label-warning">{}</span></br>\n'.format(blueprint_status))
+                        else:
+                            glf.write('&nbsp;<span class="label label-danger">{}</span></br>\n'.format(blueprint_status))
+                    elif bp_manuf_mats is None:
+                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span></br>\n')
                     else:
-                        glf.write('</br><div>\n')
+                        glf.write('</br><div>\n')  # div(materials)
                         not_enough_materials = []
                         for m in bp_manuf_mats:
                             bpmmq = int(m["quantity"]) * quantity_or_runs
@@ -339,9 +347,9 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                                 materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bpmmq_me
                             else:
                                 materials_summary.update({m["typeID"]: bpmmq_me})
-                        glf.write('</div>\n')
+                        glf.write('</div>\n')  # div(materials)
                         if len(not_enough_materials) > 0:
-                            glf.write('<div>\n')
+                            glf.write('<div>\n')  # div(not_enough_materials)
                             for m in not_enough_materials:
                                 glf.write(
                                     '&nbsp;<span class="label label-warning">'
@@ -352,10 +360,10 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                                         nm=m["nm"]
                                     )
                                 )
-                            glf.write('</div>\n')
+                            glf.write('</div>\n')  # div(not_enough_materials)
                 glf.write(
-                    ' </div>\n'
-                    '</div>\n'
+                    ' </div>\n'  # media-body
+                    '</div>\n'  # media
                 )
             if len(materials_summary) > 0:
                 ms_keys = materials_summary.keys()

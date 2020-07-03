@@ -14,7 +14,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python manipulate_yaml_and_json.py
+>>> python eve_sde_tools.py
 >>> python q_industrialist.py
 """
 import base64
@@ -24,6 +24,9 @@ import sys
 import json
 
 import q_industrialist_settings
+import eve_esi_tools
+import eve_sde_tools
+import eve_esi_interface
 
 from shared_flow import print_auth_url
 from shared_flow import send_token_request
@@ -33,10 +36,6 @@ from auth_cache import make_cache
 from auth_cache import store_cache
 from auth_cache import is_timestamp_expired
 from auth_cache import get_timestamp_expired
-from esi_interface import get_esi_data
-from esi_interface import get_esi_paged_data
-from esi_interface import dump_json_into_file
-from manipulate_yaml_and_json import read_converted
 from render_html import dump_into_report
 
 
@@ -171,12 +170,12 @@ def main():
     character_name = cache["character_name"]
 
     # Public information about a character
-    character_data = get_esi_data(
+    character_data = eve_esi_interface.get_esi_data(
         access_token,
         "characters/{}/".format(character_id),
         "character")
     # Public information about a corporation
-    corporation_data = get_esi_data(
+    corporation_data = eve_esi_interface.get_esi_data(
         access_token,
         "corporations/{}/".format(character_data["corporation_id"]),
         "corporation")
@@ -186,11 +185,11 @@ def main():
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
 
-    sde_type_ids = read_converted("typeIDs")
-    sde_bp_materials = read_converted("blueprints")
+    sde_type_ids = eve_sde_tools.read_converted("typeIDs")
+    sde_bp_materials = eve_sde_tools.read_converted("blueprints")
 
     # Requires: access token
-    wallet_data = get_esi_data(
+    wallet_data = eve_esi_interface.get_esi_data(
         access_token,
         "characters/{}/wallet/".format(character_id),
         "wallet")
@@ -198,7 +197,7 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
-    blueprint_data = get_esi_data(
+    blueprint_data = eve_esi_interface.get_esi_data(
         access_token,
         "characters/{}/blueprints/".format(character_id),
         "blueprints")
@@ -206,7 +205,7 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
-    assets_data = get_esi_data(
+    assets_data = eve_esi_interface.get_esi_data(
         access_token,
         "characters/{}/assets/".format(character_id),
         "assets")
@@ -214,7 +213,7 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
-    fittings_data = get_esi_data(
+    fittings_data = eve_esi_interface.get_esi_data(
         access_token,
         "characters/{}/fittings/".format(character_id),
         "fittings")
@@ -222,7 +221,7 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
-    # contracts_data = get_esi_data(
+    # contracts_data = eve_esi_interface.get_esi_data(
     #   access_token,
     #   "characters/{}/contracts/".format(character_id),
     #   "contracts")
@@ -230,7 +229,7 @@ def main():
     # sys.stdout.flush()
 
     # Requires role(s): Factory_Manager
-    corp_industry_jobs_data = get_esi_paged_data(
+    corp_industry_jobs_data = eve_esi_interface.get_esi_paged_data(
         access_token,
         "corporations/{}/industry/jobs/".format(corporation_id),
         "corp_industry_jobs")
@@ -238,7 +237,7 @@ def main():
     sys.stdout.flush()
 
     # Requires role(s): Director
-    corp_assets_data = get_esi_paged_data(
+    corp_assets_data = eve_esi_interface.get_esi_paged_data(
         access_token,
         "corporations/{}/assets/".format(corporation_id),
         "corp_assets")
@@ -246,102 +245,24 @@ def main():
     sys.stdout.flush()
 
     # Requires role(s): Director
-    corp_blueprints_data = get_esi_paged_data(
+    corp_blueprints_data = eve_esi_interface.get_esi_paged_data(
         access_token,
         "corporations/{}/blueprints/".format(corporation_id),
         "corp_blueprints")
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
-    """
-    Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
-    """
-    corp_bp_loc_data = {}
-    for bp in corp_blueprints_data:
-        loc_flag = str(bp["location_flag"])
-        loc_id = int(bp["location_id"])
-        if q_industrialist_settings.g_adopt_for_ri4:
-            if not (loc_id in [1033012626278,1032890037923,1033063942756,1033675076928,1032846295901]):
-                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
-        # { "CorpSAG6": {} }
-        if not (loc_flag in corp_bp_loc_data):
-            corp_bp_loc_data.update({loc_flag: {}})
-        # { "CorpSAG6": { "1033160348166": {} } }
-        if not (loc_id in corp_bp_loc_data[loc_flag]):
-            corp_bp_loc_data[loc_flag].update({loc_id: {}})
-        # { "CorpSAG6": { "1033160348166": { "30014": {} } } }
-        type_id = int(bp["type_id"])
-        if not (type_id in corp_bp_loc_data[loc_flag][loc_id]):
-            corp_bp_loc_data[loc_flag][loc_id].update({type_id: {}})
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": {} } } } }
-        quantity = int(bp["quantity"])
-        is_blueprint_copy = quantity < -1
-        bp_type = 'c' if is_blueprint_copy else 'o'
-        material_efficiency = int(bp["material_efficiency"])
-        time_efficiency = int(bp["time_efficiency"])
-        bp_key = '{bpt}_{me}_{te}'.format(bpt=bp_type, me=material_efficiency, te=time_efficiency)
-        runs = int(bp["runs"])
-        quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } } }
-        if not (bp_key in corp_bp_loc_data[loc_flag][loc_id][type_id]):
-            corp_bp_loc_data[loc_flag][loc_id][type_id].update({bp_key: {
-                "cp": is_blueprint_copy,
-                "me": material_efficiency,
-                "te": time_efficiency,
-                "qr": quantity_or_runs,
-                "itm": []
-            }})
-        elif is_blueprint_copy:
-            corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] = corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] + quantity_or_runs
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } } }
-        corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["itm"].append({
-          "id": int(bp["item_id"]),
-          "q": quantity,
-          "r": runs
-        })
-    dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
+    # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
+    corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
+    eve_esi_interface.dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
 
-    """
-    Построение списка модулей и ресурсов, которые используются в производстве
-    """
-    materials_for_bps = []
-    for bp in sde_bp_materials:
-        if "manufacturing" in sde_bp_materials[bp]["activities"]:
-            if "materials" in sde_bp_materials[bp]["activities"]["manufacturing"]:
-                for m in sde_bp_materials[bp]["activities"]["manufacturing"]["materials"]:
-                    if "typeID" in m:
-                        type_id = int(m["typeID"])
-                        if 0 == materials_for_bps.count(type_id):
-                            materials_for_bps.append(type_id)
+    # Построение списка модулей и ресурсов, которые используются в производстве
+    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
 
-    """
-    Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
-    которые предназначены для использования в чертежах
-    """
-    corp_ass_loc_data = {}
-    for a in corp_assets_data:
-        type_id = int(a["type_id"])
-        # if materials_for_bps.count(type_id) > 0:
-        loc_flag = str(a["location_flag"])
-        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
-            continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
-        loc_id = int(a["location_id"])
-        if q_industrialist_settings.g_adopt_for_ri4:
-            if loc_id != 1032950982419:
-                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
-        quantity = int(a["quantity"])
-        # { "DroneBay": {} }
-        if not (loc_flag in corp_ass_loc_data):
-            corp_ass_loc_data.update({loc_flag: {}})
-        # { "DroneBay": { "1033692665735": {} } }
-        if not (loc_id in corp_ass_loc_data[loc_flag]):
-            corp_ass_loc_data[loc_flag].update({loc_id: {}})
-        # { "DroneBay": { "1033692665735": { "2488": { "q":? } } } }
-        if not (type_id in corp_ass_loc_data[loc_flag][loc_id]):
-            corp_ass_loc_data[loc_flag][loc_id].update({type_id: quantity})
-        else:
-            corp_ass_loc_data[loc_flag][loc_id][type_id] = quantity + corp_ass_loc_data[loc_flag][loc_id][type_id]
-    dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
+    # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
+    # которые предназначены для использования в чертежах
+    corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data)
+    eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
     """
     Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
@@ -357,7 +278,7 @@ def main():
             names_data.append(ass["item_id"])
     if len(names_data):
         # Requires: access token
-        names_data = get_esi_data(
+        names_data = eve_esi_interface.get_esi_data(
             access_token,
             "characters/{}/assets/names/".format(character_id),
             "assets_names",
