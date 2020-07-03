@@ -175,10 +175,16 @@ def main():
         access_token,
         "characters/{}/".format(character_id),
         "character")
-    print("\n{} is from {} corporation".format(character_name, character_data["corporation_id"]))
+    # Public information about a corporation
+    corporation_data = get_esi_data(
+        access_token,
+        "corporations/{}/".format(character_data["corporation_id"]),
+        "corporation")
+    print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
 
     corporation_id = character_data["corporation_id"]
+    corporation_name = corporation_data["name"]
 
     sde_type_ids = read_converted("typeIDs")
     sde_bp_materials = read_converted("blueprints")
@@ -208,6 +214,14 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
+    fittings_data = get_esi_data(
+        access_token,
+        "characters/{}/fittings/".format(character_id),
+        "fittings")
+    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
+    sys.stdout.flush()
+
+    # Requires: access token
     # contracts_data = get_esi_data(
     #   access_token,
     #   "characters/{}/contracts/".format(character_id),
@@ -220,7 +234,7 @@ def main():
         access_token,
         "corporations/{}/industry/jobs/".format(corporation_id),
         "corp_industry_jobs")
-    print("\n{}' corporation has {} industry jobs".format(character_name, len(corp_industry_jobs_data)))
+    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -228,7 +242,7 @@ def main():
         access_token,
         "corporations/{}/assets/".format(corporation_id),
         "corp_assets")
-    print("\n{}' corporation has {} assets".format(character_name, len(corp_assets_data)))
+    print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -236,15 +250,7 @@ def main():
         access_token,
         "corporations/{}/blueprints/".format(corporation_id),
         "corp_blueprints")
-    print("\n{}' corporation has {} blueprints".format(character_name, len(corp_blueprints_data)))
-    sys.stdout.flush()
-
-    # Public information about a character
-    fittings_data = get_esi_data(
-        access_token,
-        "characters/{}/fittings/".format(character_id),
-        "fittings")
-    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
+    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
     """
