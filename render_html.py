@@ -320,16 +320,15 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                             # проверка наличия имеющихся ресурсов для постройки по этому БП
                             not_available = bpmmq_me
                             if m["typeID"] in tmp_res_src:
-                                not_available = 0 if tmp_res_src[m["typeID"]] >= bpmmq_me else bpmmq_me - tmp_res_src[m["typeID"]]
+                                not_available = 0 if tmp_res_src[m["typeID"]] >= not_available else not_available - tmp_res_src[m["typeID"]]
                             # вывод наименования ресурса
                             glf.write(
-                                '<span style="white-space:nowrap;{enough}">'
+                                '<span style="white-space:nowrap">'
                                 '<img class="icn24" src="{src}"> {q} x {nm} '
                                 '</span>\n'.format(
                                     src=get_img_src(bpmm_tid, 32),
                                     q=bpmmq_me,
-                                    nm=bpmm_tnm,
-                                    enough="" if not_available == 0 else "color:red;"
+                                    nm=bpmm_tnm
                                 )
                             )
                             # сохраняем недостающее кол-во материалов для производства по этому чертежу
@@ -347,13 +346,50 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                                 glf.write(
                                     '&nbsp;<span class="label label-warning">'
                                     '<img class="icn24" src="{src}"> {q} x {nm} '
-                                    '</span>'.format(
+                                    '</span>\n'.format(
                                         src=get_img_src(m["id"], 32),
                                         q=m["q"],
                                         nm=m["nm"]
                                     )
                                 )
                             glf.write('</div>\n')
+                glf.write(
+                    ' </div>\n'
+                    '</div>\n'
+                )
+            if len(materials_summary) > 0:
+                ms_keys = materials_summary.keys()
+                glf.write(
+                    '<hr><div class="media">\n'
+                    ' <div class="media-left">\n'
+                    '  <span class="glyphicon glyphicon-alert" aria-hidden="true" style="font-size: 64px;"></span>\n'
+                    ' </div>\n'
+                    ' <div class="media-body">\n'
+                )
+                for ms_type_id in ms_keys:
+                    glf.write(
+                        '<span style="white-space:nowrap">'
+                        '<img class="icn24" src="{src}"> {q} x {nm} '
+                        '</span>\n'.format(
+                            src=get_img_src(ms_type_id, 32),
+                            q=materials_summary[ms_type_id],
+                            nm=get_item_name_by_type_id(type_ids, ms_type_id)
+                        )
+                    )
+                for ms_type_id in ms_keys:
+                    not_available = materials_summary[ms_type_id]
+                    if ms_type_id in tmp_res_src:
+                        not_available = 0 if tmp_res_src[ms_type_id] >= not_available else not_available - tmp_res_src[ms_type_id]
+                    if not_available > 0:
+                        glf.write(
+                            '&nbsp;<span class="label label-warning">'
+                            '<img class="icn24" src="{src}"> {q} x {nm} '
+                            '</span>\n'.format(
+                                src=get_img_src(ms_type_id, 32),
+                                q=not_available,
+                                nm=get_item_name_by_type_id(type_ids, ms_type_id)
+                            )
+                        )
                 glf.write(
                     ' </div>\n'
                     '</div>\n'
