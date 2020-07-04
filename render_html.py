@@ -420,7 +420,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
 </div>""")
 
 
-def dump_corp_assets(glf, corp_ass_loc_data, type_ids):
+def dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, type_ids):
     glf.write("""<!-- Button trigger for Corp Assets Modal -->
     <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
     <!-- Corp Assets Modal -->
@@ -440,11 +440,7 @@ def dump_corp_assets(glf, corp_ass_loc_data, type_ids):
         loc_ids = corp_ass_loc_data[loc_flag].keys()
         for loc in loc_ids:
             loc_id = int(loc)
-            # пока нет возможности считать названия контейнеров, - хардкодим тут
-            loc_name = loc_id
-            if q_industrialist_settings.g_adopt_for_ri4:
-                if loc_id == 1032950982419:
-                    loc_name = ".stock ALL"
+            loc_name = next((n["name"] for n in corp_asset_names_data if n['item_id'] == loc_id), loc_id)
             type_keys = corp_ass_loc_data[loc_flag][loc_id].keys()
             glf.write(
                 ' <div class="panel panel-default">\n'
@@ -504,16 +500,17 @@ def dump_into_report(
         wallet_data,
         blueprint_data,
         assets_data,
-        names_data,
+        asset_names_data,
+        corp_asset_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data):
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
         dump_wallet(glf, wallet_data)
-        dump_blueprints(glf, blueprint_data, assets_data, names_data, sde_type_ids)
+        dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
         dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
-        dump_corp_assets(glf, corp_ass_loc_data, sde_type_ids)
+        dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()
@@ -610,6 +607,19 @@ def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_mat
         dump_materials(glf, materials, sde_type_ids)
         dump_bp_wo_manufacturing(glf, wo_manufacturing, sde_type_ids)
         dump_bp_wo_materials(glf, wo_materials, sde_type_ids)
+        dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def dump_cynonetwork_into_report(
+        sde_type_ids,
+        corp_asset_names_data,
+        corp_ass_loc_data):
+    glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    try:
+        dump_header(glf)
+        dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()

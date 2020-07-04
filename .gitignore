@@ -138,9 +138,11 @@ dmypy.json
 /jquery
 /q_industrialist_settings.py
 /.q_industrialist/
+/.converted_*.json
+/.auth_cache
 /auth_cache.json
 /auth_cache.*.json
 /*.~json
 /report.html
 /materials.html
-/.converted_*.json
+/cynonetwork.html

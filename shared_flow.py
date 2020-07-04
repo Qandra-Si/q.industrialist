@@ -5,12 +5,14 @@ flows recommended for web based and mobile/desktop applications. The functions
 found here are used by the OAuth 2.0 contained in this project.
 """
 import urllib
-
 import requests
-
-from validate_jwt import validate_eve_jwt
+import sys
+import base64
+import hashlib
+import secrets
 
 import q_industrialist_settings
+import auth_cache
 
 
 g_client_callback_url = "https://localhost/callback/"
@@ -125,74 +127,128 @@ def send_token_refresh(refresh_token, client_id, client_scopes=[]):
     return res
 
 
-# def handle_sso_token_response(sso_response):
-#     """Handles the authorization code response from the EVE SSO.
-# 
-#     Args:
-#         sso_response: A requests Response object gotten by calling the EVE
-#                       SSO /v2/oauth/token endpoint
-#     """
-# 
-#     if sso_response.status_code == 200:
-#         data = sso_response.json()
-#         access_token = data["access_token"]
-# 
-#         print("\nVerifying access token JWT...")
-# 
-#         jwt = validate_eve_jwt(access_token)
-#         character_id = jwt["sub"].split(":")[2]
-#         character_name = jwt["name"]
-#         blueprint_path = ("https://esi.evetech.net/latest/characters/{}/"
-#                           "blueprints/".format(character_id))
-# 
-#         print("\nSuccess! Here is the payload received from the EVE SSO: {}"
-#               "\nYou can use the access_token to make an authenticated "
-#               "request to {}".format(data, blueprint_path))
-# 
-#         input("\nPress any key to have this program make the request for you:")
-# 
-#         headers = {
-#             "Authorization": "Bearer {}".format(access_token)
-#         }
-# 
-#         res = requests.get(blueprint_path, headers=headers)
-#         print("\nMade request to {} with headers: "
-#               "{}".format(blueprint_path, res.request.headers))
-#         res.raise_for_status()
-# 
-#         data = res.json()
-#         print("\n{} has {} blueprints".format(character_name, len(data)))
-#     else:
-#         print("\nSomething went wrong! Re read the comment at the top of this "
-#               "file and make sure you completed all the prerequisites then "
-#               "try again. Here's some debug info to help you out:")
-#         print("\nSent request with url: {} \nbody: {} \nheaders: {}".format(
-#             sso_response.request.url,
-#             sso_response.request.body,
-#             sso_response.request.headers
-#         ))
-#         print("\nSSO response code is: {}".format(sso_response.status_code))
-#         print("\nSSO response JSON is: {}".format(sso_response.json()))
-#     return
-
-
 def send_esi_request(access_token, uri, body=None):
     headers = {
-        "Authorization": "Bearer {}".format(access_token)
+        "Authorization": "Bearer {}".format(access_token),
     }
     if q_industrialist_settings.g_user_agent:
         headers.update({"User-Agent": q_industrialist_settings.g_user_agent})
 
-    if body is None:
-        res = requests.get(uri, headers=headers)
-        if g_debug:
-            print("\nMade GET request to {} with headers: "
-                  "{}".format(uri, res.request.headers))
-    else:
-        res = requests.post(uri, data=body, headers=headers)
-        if g_debug:
-            print("\nMade POST request to {} with data {} and headers: "
-                  "{}".format(uri, body, res.request.headers))
-    res.raise_for_status()
+    try:
+        if body is None:
+            res = requests.get(uri, headers=headers)
+            if g_debug:
+                print("\nMade GET request to {} with headers: "
+                      "{}".format(uri, res.request.headers))
+        else:
+            headers.update({"Content-Type": "application/json"})
+            res = requests.post(uri, data=body, headers=headers)
+            if g_debug:
+                print("\nMade POST request to {} with data {} and headers: "
+                      "{}".format(uri, body, res.request.headers))
+        res.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        print(err)
+        print(res.json())
+        raise
+    except:
+        print(sys.exc_info())
+        raise
 
     return res.json()
+
+
+def print_sso_failure(sso_response):
+    print("\nSomething went wrong! Here's some debug info to help you out:")
+    print("\nSent request with url: {} \nbody: {} \nheaders: {}".format(
+        sso_response.request.url,
+        sso_response.request.body,
+        sso_response.request.headers
+    ))
+    print("\nSSO response code is: {}".format(sso_response.status_code))
+    print("\nSSO response JSON is: {}".format(sso_response.json()))
+
+
+def auth(client_scopes, client_id=""):
+    print("Follow the prompts and enter the info asked for.")
+
+    # Generate the PKCE code challenge
+    random = base64.urlsafe_b64encode(secrets.token_bytes(32))
+    m = hashlib.sha256()
+    m.update(random)
+    d = m.digest()
+    code_challenge = base64.urlsafe_b64encode(d).decode().replace("=", "")
+
+    if not client_id:
+        client_id = input("Copy your SSO application's client ID and enter it "
+                          "here [press 'Enter' for R Initiative 4 app]: ")
+        if not client_id:
+            global g_ri4_client_id
+            client_id = g_ri4_client_id
+
+    # Because this is a desktop/mobile application, you should use
+    # the PKCE protocol when contacting the EVE SSO. In this case, that
+    # means sending a base 64 encoded sha256 hashed 32 byte string
+    # called a code challenge. This 32 byte string should be ephemeral
+    # and never stored anywhere. The code challenge string generated for
+    # this program is ${random} and the hashed code challenge is ${code_challenge}.
+    # Notice that the query parameter of the following URL will contain this
+    # code challenge.
+
+    print_auth_url(client_id, client_scopes, code_challenge=code_challenge)
+
+    auth_code = input("Copy the \"code\" query parameter and enter it here: ")
+
+    code_verifier = random
+
+    form_values = {
+        "grant_type": "authorization_code",
+        "client_id": client_id,
+        "code": auth_code,
+        "code_verifier": code_verifier
+    }
+
+    # Because this is using PCKE protocol, your application never has
+    # to share its secret key with the SSO. Instead, this next request
+    # will send the base 64 encoded unhashed value of the code
+    # challenge, called the code verifier, in the request body so EVE's
+    # SSO knows your application was not tampered with since the start
+    # of this process. The code verifier generated for this program is
+    # ${code_verifier} derived from the raw string ${random}
+
+    sso_auth_response = send_token_request(form_values)
+
+    if sso_auth_response.status_code == 200:
+        data = sso_auth_response.json()
+        access_token = data["access_token"]
+        refresh_token = data["refresh_token"]
+        auth_cache_data = auth_cache.make_cache(access_token, refresh_token)
+        return auth_cache_data
+    else:
+        print_sso_failure(sso_auth_response)
+        sys.exit(1)
+
+    # handle_sso_token_response(sso_auth_response)
+
+
+def re_auth(client_scopes, auth_cache_data):
+    refresh_token = auth_cache_data["refresh_token"]
+    client_id = auth_cache_data["client_id"]
+
+    sso_auth_response = send_token_refresh(refresh_token, client_id, client_scopes)
+
+    if sso_auth_response.status_code == 200:
+        data = sso_auth_response.json()
+
+        access_token = data["access_token"]
+        refresh_token = data["refresh_token"]
+        expired = auth_cache.get_timestamp_expired(int(data["expires_in"]))
+
+        auth_cache_data.update({"access_token": access_token})
+        auth_cache_data.update({"refresh_token": refresh_token})
+        auth_cache_data.update({"expired": expired})
+        auth_cache.store_cache(auth_cache_data)
+        return auth_cache_data
+    else:
+        print_sso_failure(sso_auth_response)
+        sys.exit(1)

@@ -47,6 +47,23 @@ def store_cache(cache=g_cache):
     return
 
 
+# intersection of two lists in most simple way
+def intersection(lst1, lst2):
+    lst3 = [value for value in lst1 if value in lst2]
+    return lst3
+
+
+def verify_auth_scope(cache, scope):
+    """
+    Проверяем: scope должен быть необходимым и достаточным для использования программой
+    """
+    if len(scope) == 0:
+        return True
+    if not ("scope" in cache):
+        return False
+    return intersection(cache["scope"], scope) == scope
+
+
 def make_cache(access_token, refresh_token):
     cache = {}
     cache.update({"access_token": access_token})
