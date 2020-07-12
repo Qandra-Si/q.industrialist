@@ -421,7 +421,7 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
 </div>""")
 
 
-def dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, type_ids):
+def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
     glf.write("""<!-- Button trigger for Corp Assets Modal -->
 <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
 <!-- Corp Assets Modal -->
@@ -441,7 +441,7 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, type_ids):
         loc_ids = corp_ass_loc_data[loc_flag].keys()
         for loc in loc_ids:
             loc_id = int(loc)
-            loc_name = next((n["name"] for n in corp_cont_names_data if n['item_id'] == loc_id), loc_id)
+            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
             type_keys = corp_ass_loc_data[loc_flag][loc_id].keys()
             glf.write(
                 ' <div class="panel panel-default">\n'
@@ -495,7 +495,7 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, type_ids):
 </div>""")
 
 
-def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
     # constellation_name = None
     loc_name = None
     itm_dict = None
@@ -510,7 +510,12 @@ def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets
                     region_name = sde_inv_names[str(constellation_item["locationID"])]
                     loc_name = '{} {}'.format(region_name, loc_name)
     else:
-        loc_name = next((n["name"] for n in corp_cont_names_data if n['item_id'] == location_id), "")
+        loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
+        # if loc_name is None:
+        #     if itm_dict is None:
+        #         itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+        #     if not (itm_dict is None):
+        #         loc_name = itm_dict["location_flag"]
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
     items = loc_dict["items"] if "items" in loc_dict else None
@@ -518,31 +523,37 @@ def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets
     if not (items is None):
         quantity = len(items)
     else:
-        quantity = next((a["quantity"] for a in corp_assets_data if a['item_id'] == location_id), None)
+        if itm_dict is None:
+            itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+        if not (itm_dict is None):
+            quantity = itm_dict["quantity"]
+    if itm_dict is None:
+        itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
     glf.write(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
         ' <div class="media-body">\n'
         '  <h4 class="media-heading">{where}{what}{q}</h4>\n'
-        '  <span class="label label-info">{id}</span>\n'.
+        '  <span class="label label-info">{id}</span>{loc_flag}\n'.
         format(
             img='<img class="media-object icn32" src="{src}">'.format(src=get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
             what='{} '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
             id=location_id,
-            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) else ""
+            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) else "",
+            loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else ""
         )
     )
     if not (items is None):
         for itm in items:
-            dump_corp_assets_tree_nested(glf, itm, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+            dump_corp_assets_tree_nested(glf, itm, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
     glf.write(
         ' </div>\n'
         '</div>\n'
     )
 
 
-def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
     glf.write("""<!-- Button trigger for Corp Assets Tree Modal -->
 <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssetsTree">Show Corp Assets Tree</button>
 <!-- Corp Assets Tree Modal -->
@@ -562,7 +573,7 @@ def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_cont_nam
     if "roots" in corp_assets_tree:
         roots = corp_assets_tree["roots"]
         for loc_id in roots:
-            dump_corp_assets_tree_nested(glf, loc_id, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+            dump_corp_assets_tree_nested(glf, loc_id, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
 
     glf.write("""    </li>
   </ul>
@@ -585,7 +596,7 @@ def dump_into_report(
         blueprint_data,
         assets_data,
         asset_names_data,
-        corp_cont_names_data,
+        corp_ass_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data):
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
@@ -594,7 +605,7 @@ def dump_into_report(
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
         dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
-        dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, sde_type_ids)
+        dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()
@@ -701,14 +712,14 @@ def dump_cynonetwork_into_report(
         sde_inv_names,
         sde_inv_items,
         corp_assets_data,
-        corp_cont_names_data,
+        corp_ass_names_data,
         corp_ass_loc_data,
         corp_assets_tree):
     glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
-        dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, sde_type_ids)
-        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
         dump_footer(glf)
     finally:
         glf.close()

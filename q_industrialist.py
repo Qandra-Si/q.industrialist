@@ -109,14 +109,14 @@ def main():
 
     # Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
     asset_names_data = []
-    ass_cont_ids = eve_esi_tools.get_assets_containers_ids(assets_data)
-    if len(ass_cont_ids) > 0:
+    ass_named_ids = eve_esi_tools.get_assets_named_ids(assets_data)
+    if len(ass_named_ids) > 0:
         # Requires: access token
         asset_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "characters/{}/assets/names/".format(character_id),
             "assets_names",
-            json.dumps(ass_cont_ids, indent=0, sort_keys=False))
+            json.dumps(ass_named_ids, indent=0, sort_keys=False))
     print("\n{} has {} asset's names".format(character_name, len(asset_names_data)))
     sys.stdout.flush()
 
@@ -152,16 +152,16 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
-    corp_cont_names_data = []
-    corp_ass_cont_ids = eve_esi_tools.get_assets_containers_ids(corp_assets_data)
-    if len(corp_ass_cont_ids) > 0:
+    corp_ass_names_data = []
+    corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+    if len(corp_ass_named_ids) > 0:
         # Requires role(s): Director
-        corp_cont_names_data = eve_esi_interface.get_esi_data(
+        corp_ass_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_cont_names",
-            json.dumps(corp_ass_cont_ids, indent=0, sort_keys=False))
-    print("\n'{}' corporation has {} container's names".format(corporation_name, len(corp_cont_names_data)))
+            "corp_ass_names",
+            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -198,7 +198,7 @@ def main():
         blueprint_data,
         assets_data,
         asset_names_data,
-        corp_cont_names_data,
+        corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_bp_loc_data)

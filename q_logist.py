@@ -85,16 +85,16 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
-    corp_cont_names_data = []
-    corp_ass_cont_ids = eve_esi_tools.get_assets_containers_ids(corp_assets_data)
-    if len(corp_ass_cont_ids) > 0:
+    corp_ass_names_data = []
+    corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+    if len(corp_ass_named_ids) > 0:
         # Requires role(s): Director
-        corp_cont_names_data = eve_esi_interface.get_esi_data(
+        corp_ass_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_cont_names",
-            json.dumps(corp_ass_cont_ids, indent=0, sort_keys=False))
-    print("\n'{}' corporation has {} container's names".format(corporation_name, len(corp_cont_names_data)))
+            "corp_ass_names",
+            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
     # # Public information with list of public structures
@@ -127,7 +127,7 @@ def main():
         sde_inv_items,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
-        corp_cont_names_data,
+        corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_assets_tree)
