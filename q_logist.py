@@ -33,7 +33,9 @@ from render_html import dump_cynonetwork_into_report
 # R Initiative 4 Q.Industrialist
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
-g_client_scope = ["esi-assets.read_corporation_assets.v1"]  # Requires role(s): Director
+g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
+                  "esi-universe.read_structures.v1"  # Requires: access token
+                 ]
 
 
 def main():
@@ -72,6 +74,8 @@ def main():
     corporation_name = corporation_data["name"]
 
     sde_type_ids = eve_sde_tools.read_converted("typeIDs")
+    sde_inv_names = eve_sde_tools.read_converted("invNames")
+    sde_inv_items = eve_sde_tools.read_converted("invItems")
 
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
@@ -81,30 +85,52 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
-    corp_asset_names_data = []
+    corp_cont_names_data = []
     corp_ass_cont_ids = eve_esi_tools.get_assets_containers_ids(corp_assets_data)
     if len(corp_ass_cont_ids) > 0:
         # Requires role(s): Director
-        corp_asset_names_data = eve_esi_interface.get_esi_data(
+        corp_cont_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_asset_names",
+            "corp_cont_names",
             json.dumps(corp_ass_cont_ids, indent=0, sort_keys=False))
-    print("\n'{}' corporation has {} asset's names".format(corporation_name, len(corp_asset_names_data)))
+    print("\n'{}' corporation has {} container's names".format(corporation_name, len(corp_cont_names_data)))
     sys.stdout.flush()
+
+    # # Public information with list of public structures
+    # universe_structures_data = eve_esi_interface.get_esi_data(
+    #     access_token,
+    #     "universe/structures/",
+    #     "universe_structures")
+    # print("\nFound {} public structures in universe".format(len(universe_structures_data)))
+    # sys.stdout.flush()
+
+    # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+    # элементов, в виде:
+    # { location1: {items:[item1,item2,...],type_id,location_id},
+    #   location2: {items:[item3],type_id} }
+    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data)
+    eve_esi_interface.dump_json_into_file("corp_assets_tree", corp_assets_tree)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
     # которые предназначены для использования в чертежах
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data)
     eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
+    print("\nBuilding report...")
+    sys.stdout.flush()
+
     dump_cynonetwork_into_report(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
+        sde_inv_items,
         # esi данные, загруженные с серверов CCP
-        corp_asset_names_data,
+        corp_assets_data,
+        corp_cont_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data)
+        corp_ass_loc_data,
+        corp_assets_tree)
 
 
 if __name__ == "__main__":

@@ -49,6 +49,15 @@ def get_converted_name(name):
     return '{dir}/.converted_{nm}.json'.format(dir=q_industrialist_settings.g_tmp_directory, nm=name)
 
 
+def read_converted(name):
+    f_name_json = get_converted_name(name)
+    with open(f_name_json, 'r', encoding='utf8') as f:
+        s = f.read()
+        json_data = (json.loads(s))
+        return json_data
+    return None
+
+
 def rebuild(subname, name, items_to_stay=None):
     keys_to_stay = []
     dicts_to_stay = []
@@ -67,8 +76,14 @@ def rebuild(subname, name, items_to_stay=None):
             yaml_data = yaml.load(s, Loader=SafeLoader)
             # clean yaml
             for yd in yaml_data:
+                if isinstance(yaml_data, dict) and (isinstance(yd, str) or isinstance(yd, int)):
+                    yd_ref =yaml_data[yd]
+                elif isinstance(yaml_data, list):
+                    yd_ref = yd
+                else:
+                    break  # нет смысла продолжать, т.к. все элементы в файлы однотипны
                 while True:
-                    keys1 = yaml_data[yd].keys()
+                    keys1 = yd_ref.keys()
                     deleted1 = False
                     for key1 in keys1:                  # ["iconID","name"]
                         found1 = False
@@ -80,18 +95,18 @@ def rebuild(subname, name, items_to_stay=None):
                                 continue
                             found1 = True
                             while True:
-                                keys2 = yaml_data[yd][key1].keys()  # ["en","de","ru"]
+                                keys2 = yd_ref[key1].keys()  # ["en","de","ru"]
                                 deleted2 = False
                                 for key2 in keys2:
                                     if not (key2 in k2s):           # "en"
-                                        del yaml_data[yd][key1][key2]
+                                        del yd_ref[key1][key2]
                                         deleted2 = True
                                         break
                                 if deleted2:
                                     continue
                                 break
                         if not found1:
-                            del yaml_data[yd][key1]
+                            del yd_ref[key1]
                             deleted1 = True
                             break
                     if deleted1:
@@ -105,13 +120,30 @@ def rebuild(subname, name, items_to_stay=None):
             f.close()
 
 
-def read_converted(name):
+def rebuild_list2dict_by_key(name, key, val=None):
+    # перечитываем построенный файл и преобразуем его из списка в справочник
+    # при этом одно из значений элементов списка выбирается ключём в справочнике,
+    # в том числ поддерживается возможность упростить
+    #  [key1: {key1_2: val1_2}, key2: {key2_1: val2_2}]
+    # до
+    #  {"key1": val1_2, "key2": val2_2}
+    # задав необязательный val-параметр
+    lst = read_converted(name)
+    if not isinstance(lst, list):
+        return
+    dct = {}
+    for itm in lst:
+        if val is None:
+            key_value = itm[key]
+            del itm[key]
+            dct.update({str(key_value): itm})
+        else:
+            dct.update({str(itm[key]): itm[val]})
+    # json
     f_name_json = get_converted_name(name)
-    with open(f_name_json, 'r', encoding='utf8') as f:
-        s = f.read()
-        json_data = (json.loads(s))
-        return json_data
-    return None
+    s = json.dumps(dct, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+")
+    f.write(s)
 
 
 def get_item_name_by_type_id(type_ids, type_id):
@@ -159,11 +191,25 @@ def get_materials_for_blueprints(sde_bp_materials):
 
 
 def main():  # rebuild .yaml files
+    print("Rebuilding invNames.yaml file...")
+    sys.stdout.flush()
+    rebuild("bsd", "invNames", ["itemID", "itemName"])
+    print("Reindexing .converted_invNames.json file...")
+    sys.stdout.flush()
+    rebuild_list2dict_by_key("invNames", "itemID", "itemName")
+
+    print("Rebuilding invItems.yaml file...")
+    sys.stdout.flush()
+    rebuild("bsd", "invItems", ["itemID", "locationID", "typeID"])
+    print("Reindexing .converted_invItems.json file...")
+    sys.stdout.flush()
+    rebuild_list2dict_by_key("invItems", "itemID")
+
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
     rebuild("fsd", "typeIDs", ["groupID", "iconID", "published", {"name": ["en"]}])
 
-    print("Rebuilding typeIDs.yaml file...")
+    print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
     rebuild("fsd", "blueprints", ["activities"])
 

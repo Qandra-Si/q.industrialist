@@ -123,10 +123,11 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
             station_name1 = get_station_name(loc1["station_id"])
             if station_name1:
                 loc1.update({"station_name": station_name1})
+            name1 = None
             for nm in names_data:
                 if nm["item_id"] == location_id1:
                     name1 = nm["name"]
-            if name1:
+            if not (name1 is None):
                 loc1.update({"item_name": name1})
         if not ("station_id" in loc1):  # станция с известным id
             name1 = get_station_name(location_id1)
@@ -420,27 +421,27 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
 </div>""")
 
 
-def dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, type_ids):
+def dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, type_ids):
     glf.write("""<!-- Button trigger for Corp Assets Modal -->
-    <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
-    <!-- Corp Assets Modal -->
-    <div class="modal fade" id="modalCorpAssets" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsLabel">
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-            <h4 class="modal-title" id="modalCorpAssetsLabel">Corp Assets</h4>
-          </div>
-          <div class="modal-body">
-    <!-- BEGIN: collapsable group (locations) -->
-    <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
+<!-- Corp Assets Modal -->
+<div class="modal fade" id="modalCorpAssets" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalCorpAssetsLabel">Corp Assets</h4>
+      </div>
+      <div class="modal-body">
+<!-- BEGIN: collapsable group (locations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
     loc_flags = corp_ass_loc_data.keys()
     for loc_flag in loc_flags:
         loc_ids = corp_ass_loc_data[loc_flag].keys()
         for loc in loc_ids:
             loc_id = int(loc)
-            loc_name = next((n["name"] for n in corp_asset_names_data if n['item_id'] == loc_id), loc_id)
+            loc_name = next((n["name"] for n in corp_cont_names_data if n['item_id'] == loc_id), loc_id)
             type_keys = corp_ass_loc_data[loc_flag][loc_id].keys()
             glf.write(
                 ' <div class="panel panel-default">\n'
@@ -494,6 +495,89 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, type_ids):
 </div>""")
 
 
+def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+    # constellation_name = None
+    loc_name = None
+    itm_dict = None
+    if int(location_id) < 1000000000000:
+        if str(location_id) in sde_inv_names:
+            loc_name = sde_inv_names[str(location_id)]
+            if str(location_id) in sde_inv_items:
+                root_item = sde_inv_items[str(location_id)]
+                if root_item["typeID"] == 5:  # Solar System
+                    # constellation_name = sde_inv_names[str(root_item["locationID"])]
+                    constellation_item = sde_inv_items[str(root_item["locationID"])]  # Constellation
+                    region_name = sde_inv_names[str(constellation_item["locationID"])]
+                    loc_name = '{} {}'.format(region_name, loc_name)
+    else:
+        loc_name = next((n["name"] for n in corp_cont_names_data if n['item_id'] == location_id), "")
+    loc_dict = corp_assets_tree[str(location_id)]
+    type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
+    items = loc_dict["items"] if "items" in loc_dict else None
+    quantity = None
+    if not (items is None):
+        quantity = len(items)
+    else:
+        quantity = next((a["quantity"] for a in corp_assets_data if a['item_id'] == location_id), None)
+    glf.write(
+        '<div class="media">\n'
+        ' <div class="media-left media-top">{img}</div>\n'
+        ' <div class="media-body">\n'
+        '  <h4 class="media-heading">{where}{what}{q}</h4>\n'
+        '  <span class="label label-info">{id}</span>\n'.
+        format(
+            img='<img class="media-object icn32" src="{src}">'.format(src=get_img_src(type_id, 32)) if not (type_id is None) else "",
+            where='{} '.format(loc_name) if not (loc_name is None) else "",
+            what='{} '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
+            id=location_id,
+            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) else ""
+        )
+    )
+    if not (items is None):
+        for itm in items:
+            dump_corp_assets_tree_nested(glf, itm, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+    glf.write(
+        ' </div>\n'
+        '</div>\n'
+    )
+
+
+def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+    glf.write("""<!-- Button trigger for Corp Assets Tree Modal -->
+<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssetsTree">Show Corp Assets Tree</button>
+<!-- Corp Assets Tree Modal -->
+<div class="modal fade" id="modalCorpAssetsTree" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsTreeLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalCorpAssetsTreeLabel">Corp Assets Tree</h4>
+      </div>
+      <div class="modal-body">
+<!-- BEGIN: collapsable group (locations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+  <ul class="media-list">
+    <li class="media">""")
+
+    if "roots" in corp_assets_tree:
+        roots = corp_assets_tree["roots"]
+        for loc_id in roots:
+            dump_corp_assets_tree_nested(glf, loc_id, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+
+    glf.write("""    </li>
+  </ul>
+</div>
+<!-- END: collapsable group (locations) -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary">Choose</button>
+      </div>
+    </div>
+  </div>
+</div>""")
+
+
 def dump_into_report(
         sde_type_ids,
         sde_bp_materials,
@@ -501,7 +585,7 @@ def dump_into_report(
         blueprint_data,
         assets_data,
         asset_names_data,
-        corp_asset_names_data,
+        corp_cont_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data):
     glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
@@ -510,7 +594,7 @@ def dump_into_report(
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
         dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
-        dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, sde_type_ids)
+        dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, sde_type_ids)
         dump_footer(glf)
     finally:
         glf.close()
@@ -614,12 +698,17 @@ def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_mat
 
 def dump_cynonetwork_into_report(
         sde_type_ids,
-        corp_asset_names_data,
-        corp_ass_loc_data):
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_data,
+        corp_cont_names_data,
+        corp_ass_loc_data,
+        corp_assets_tree):
     glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
         dump_header(glf)
-        dump_corp_assets(glf, corp_ass_loc_data, corp_asset_names_data, sde_type_ids)
+        dump_corp_assets(glf, corp_ass_loc_data, corp_cont_names_data, sde_type_ids)
+        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_cont_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
         dump_footer(glf)
     finally:
         glf.close()

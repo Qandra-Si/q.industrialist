@@ -40,7 +40,8 @@ g_client_scope = ["esi-characters.read_blueprints.v1",  # Requires: access token
                   "esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
-                  "esi-industry.read_corporation_jobs.v1"  # Requires role(s): Factory_Manager
+                  "esi-industry.read_corporation_jobs.v1",  # Requires role(s): Factory_Manager
+                  "esi-universe.read_structures.v1"  # Requires: access token
                  ]
 
 
@@ -151,16 +152,16 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
-    corp_asset_names_data = []
+    corp_cont_names_data = []
     corp_ass_cont_ids = eve_esi_tools.get_assets_containers_ids(corp_assets_data)
     if len(corp_ass_cont_ids) > 0:
         # Requires role(s): Director
-        corp_asset_names_data = eve_esi_interface.get_esi_data(
+        corp_cont_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_asset_names",
+            "corp_cont_names",
             json.dumps(corp_ass_cont_ids, indent=0, sort_keys=False))
-    print("\n'{}' corporation has {} asset's names".format(corporation_name, len(corp_asset_names_data)))
+    print("\n'{}' corporation has {} container's names".format(corporation_name, len(corp_cont_names_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -185,6 +186,9 @@ def main():
         [1032950982419] if q_industrialist_settings.g_adopt_for_ri4 else None)
     eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
+    print("\nBuilding report...")
+    sys.stdout.flush()
+
     dump_into_report(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
@@ -194,7 +198,7 @@ def main():
         blueprint_data,
         assets_data,
         asset_names_data,
-        corp_asset_names_data,
+        corp_cont_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_bp_loc_data)

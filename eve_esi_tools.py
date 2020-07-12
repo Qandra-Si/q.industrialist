@@ -112,3 +112,51 @@ def get_assets_containers_ids(corp_assets_data):
                             17368]:  # Station Warehouse Container
             ass_cont_ids.append(a["item_id"])
     return ass_cont_ids
+
+
+def get_assets_tree_root(ass_tree, location_id):
+    if not (str(location_id) in ass_tree):
+        return location_id
+    itm = ass_tree[str(location_id)]
+    if not ("location_id" in itm):
+        return location_id
+    return get_assets_tree_root(ass_tree, itm["location_id"])
+
+
+def get_assets_tree(corp_assets_data):
+    """
+    https://docs.esi.evetech.net/docs/asset_location_id
+    https://forums-archive.eveonline.com/topic/520027/
+
+    Строит дерево в виде:
+    { location1: [item1,item2,...], location2: [item3,item4,...] }
+    """
+    ass_tree = {}
+    for a in corp_assets_data:
+        item_id = int(a["item_id"])
+        location_id = int(a["location_id"])
+        type_id = int(a["type_id"])
+        if (str(location_id) in ass_tree) and ("items" in ass_tree[str(location_id)]):
+            ass_tree[str(location_id)]["items"].append(item_id)
+        else:
+            ass_tree.update({str(location_id): {"items": [item_id]}})
+        if not (str(item_id) in ass_tree):
+            ass_tree.update({str(item_id): {"type_id": type_id}})
+        elif not ("type_id" in ass_tree[str(item_id)]):
+            ass_tree[str(item_id)]["type_id"] = type_id
+    for a in corp_assets_data:
+        item_id = int(a["item_id"])
+        location_id = int(a["location_id"])
+        if str(item_id) in ass_tree:
+            itm = ass_tree[str(item_id)]
+            if not ("location_id" in itm):
+                itm["location_id"] = location_id
+    ass_keys = ass_tree.keys()
+    if len(ass_keys) > 0:
+        roots = []
+        for k in ass_keys:
+            root = get_assets_tree_root(ass_tree, k)
+            if 0 == roots.count(int(root)):
+                roots.append(int(root))
+        ass_tree["roots"] = roots
+    return ass_tree
