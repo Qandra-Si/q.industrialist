@@ -1,4 +1,4 @@
-﻿""" Q.Logist (desktop/mobile)
+﻿""" Q.BPOs (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at developers.eveonline.com with the scope
@@ -33,7 +33,8 @@ from datetime import datetime
 # R Initiative 4 Q.Industrialist
 g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
-g_client_scope = ["esi-assets.read_corporation_assets.v1"  # Requires role(s): Director
+g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
+                  "esi-corporations.read_blueprints.v1"  # Requires role(s): Director
                  ]
 # Current timezone offset                 ]
 g_local_timezone = tzlocal.get_localzone()
@@ -85,20 +86,39 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
+    # Requires role(s): Director
+    corp_blueprints_data = eve_esi_interface.get_esi_paged_data(
+        access_token,
+        "corporations/{}/blueprints/".format(corporation_id),
+        "corp_blueprints")
+    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+    sys.stdout.flush()
+
     print("\nBuilding report...")
     sys.stdout.flush()
 
     glf = open('{tmp}/corp_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
     try:
+        glf.write('Blueprint\tBase Price\tMaterial Efficiency\tTime Efficiency\n')
         for a in corp_assets_data:
             if not (str(a["type_id"]) in sde_bp_materials):
                 continue
             if ("is_blueprint_copy" in a) and a["is_blueprint_copy"]:
                 continue
+            item_id = a["item_id"]
+            blueprint = None
+            for b in corp_blueprints_data:
+                if b["item_id"] == item_id:
+                    blueprint = b
+                    break
+            if blueprint is None:
+                continue
             type_id = sde_type_ids[str(a["type_id"])]
-            glf.write('{}\t{}\n'.format(
-                type_id["name"]["en"],
-                type_id["basePrice"] if "basePrice" in type_id else ""
+            glf.write('{nm}\t{prc}\t{me}\t{te}\n'.format(
+                nm=type_id["name"]["en"],
+                prc=type_id["basePrice"] if "basePrice" in type_id else "",
+                me=blueprint["material_efficiency"],
+                te=blueprint["time_efficiency"]
             ))
         glf.write('\nGenerated {}'.format(datetime.fromtimestamp(time.time(), g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
     finally:
