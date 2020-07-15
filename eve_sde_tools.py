@@ -197,7 +197,7 @@ def main():  # rebuild .yaml files
     print("Reindexing .converted_invNames.json file...")
     sys.stdout.flush()
     rebuild_list2dict_by_key("invNames", "itemID", "itemName")
-
+    
     print("Rebuilding invItems.yaml file...")
     sys.stdout.flush()
     rebuild("bsd", "invItems", ["itemID", "locationID", "typeID"])
@@ -207,7 +207,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "typeIDs", ["groupID", "iconID", "published", {"name": ["en"]}])
+    rebuild("fsd", "typeIDs", ["basePrice", "groupID", "iconID", "published", {"name": ["en"]}])
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
