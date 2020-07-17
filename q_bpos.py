@@ -97,7 +97,8 @@ def main():
     print("\nBuilding report...")
     sys.stdout.flush()
 
-    glf = open('{tmp}/corp_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    found_blueprints = []
+    glf = open('{tmp}/corp_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
         glf.write('Blueprint\tBase Price\tMaterial Efficiency\tTime Efficiency\n')
         for a in corp_assets_data:
@@ -119,6 +120,26 @@ def main():
                 prc=type_id["basePrice"] if "basePrice" in type_id else "",
                 me=blueprint["material_efficiency"],
                 te=blueprint["time_efficiency"]
+            ))
+            found_blueprints.append(int(a["type_id"]))
+        glf.write('\nGenerated {}'.format(datetime.fromtimestamp(time.time(), g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
+    finally:
+        glf.close()
+
+    glf = open('{tmp}/corp_absent_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    try:
+        glf.write('Blueprint\tBase Price\tPresent\tManufacturing Impossible\tAbsent Materials\n')
+        bpo_keys = sde_bp_materials.keys()
+        for tid in bpo_keys:
+            type_id = int(tid)
+            sde_type_id = sde_type_ids[str(type_id)]
+            found = next((True for b in found_blueprints if b == type_id), False)
+            glf.write('{nm}\t{prc}\t{fnd}\t{impsbl}\t{absnt}\n'.format(
+                nm=sde_type_id["name"]["en"],
+                prc=sde_type_id["basePrice"] if "basePrice" in sde_type_id else "",
+                fnd="yes" if found else "no",
+                impsbl="yes" if not ("activities" in sde_bp_materials[tid]) or not ("manufacturing" in sde_bp_materials[tid]["activities"]) else "no",
+                absnt="yes" if not ("activities" in sde_bp_materials[tid]) or not ("manufacturing" in sde_bp_materials[tid]["activities"]) or not ("materials" in sde_bp_materials[tid]["activities"]["manufacturing"]) else "no"
             ))
         glf.write('\nGenerated {}'.format(datetime.fromtimestamp(time.time(), g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
     finally:

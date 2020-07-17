@@ -143,7 +143,5 @@ dmypy.json
 /auth_cache.json
 /auth_cache.*.json
 /*.~json
-/report.html
-/materials.html
-/cynonetwork.html
-/corp_bpo.csv
+/*.html
+/*.csv
