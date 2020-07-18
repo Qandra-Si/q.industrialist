@@ -18,7 +18,21 @@ def get_img_src(tp, sz):
         return 'http://imageserver.eveonline.com/Type/{}_{}.png'.format(tp, sz)
 
 
-def dump_header(glf):
+def get_icon_src(icon_id, sde_icon_ids):
+    """
+    see: https://forums.eveonline.com/t/eve-online-icons/78457/3
+    """
+    if str(icon_id) in sde_icon_ids:
+        nm = sde_icon_ids[str(icon_id)]["iconFile"]
+        if q_industrialist_settings.g_use_filesystem_resources:
+            return './3/{}'.format(nm)
+        else:  # https://everef.net/img/Icons/items/9_64_5.png
+            return 'https://everef.net/img/{}'.format(nm)
+    else:
+        return ""
+
+
+def dump_header(glf, header_name):
     glf.write(
         '<!doctype html>\n'
         '<html lang="ru">\n'
@@ -26,7 +40,7 @@ def dump_header(glf):
         ' <!-- <meta charset="utf-8"> -->\n'
         ' <meta http-equiv="X-UA-Compatible" content="IE=edge">\n'
         ' <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        ' <title>Q.Industrialist</title>\n'
+        ' <title>Q.Industrialist - {nm}</title>\n'
         ' <link rel="stylesheet" href="{bs_css}">\n'
         '<style type="text/css">\n'
         '.icn24 {{ width:24px; height:24px; }}\n'
@@ -35,9 +49,12 @@ def dump_header(glf):
         '</style>\n'
         '</head>\n'
         '<body>\n'
-        '<h1>Q.Industrialist</h1>\n'
+        '<div class="page-header">\n'
+        ' <h1>Q.Industrialist <small>{nm}</small></h1>\n'
+        '</div>\n'
         '<script src="{jq_js}"></script>\n'
         '<script src="{bs_js}"></script>\n'.format(
+            nm=header_name,
             bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous',
             jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
             bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
@@ -599,9 +616,9 @@ def dump_into_report(
         corp_ass_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data):
-    glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
-        dump_header(glf)
+        dump_header(glf, "Workflow")
         dump_wallet(glf, wallet_data)
         dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
         dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
@@ -696,9 +713,9 @@ def dump_bp_wo_materials(glf, blueprints, type_ids):
 
 
 def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_materials):
-    glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
-        dump_header(glf)
+        dump_header(glf, "Materials")
         dump_materials(glf, materials, sde_type_ids)
         dump_bp_wo_manufacturing(glf, wo_manufacturing, sde_type_ids)
         dump_bp_wo_materials(glf, wo_materials, sde_type_ids)
@@ -715,11 +732,162 @@ def dump_cynonetwork_into_report(
         corp_ass_names_data,
         corp_ass_loc_data,
         corp_assets_tree):
-    glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+")
+    glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
-        dump_header(glf)
+        dump_header(glf, "CynoNetwork")
         # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def dump_market_groups_tree_nested(
+        group_id,
+        sde_market_groups,
+        sde_icon_ids,
+        market_groups_tree,
+        market_data,
+        market_data_printer):
+    if not (str(group_id) in market_data) and not ("items" in market_groups_tree[str(group_id)]):
+        return ""
+    sde_group = sde_market_groups[str(group_id)]
+    icon_id = sde_group["iconID"] if "iconID" in sde_group else 0
+    tbl_glf = market_data_printer(group_id, market_data)
+    sub_glf = ''
+    if "items" in market_groups_tree[str(group_id)]:
+        for group_id in market_groups_tree[str(group_id)]["items"]:
+            sub_glf = sub_glf + dump_market_groups_tree_nested(
+                group_id,
+                sde_market_groups,
+                sde_icon_ids,
+                market_groups_tree,
+                market_data,
+                market_data_printer
+            )
+    if not tbl_glf and not sub_glf:
+        return ""
+    glf = '' \
+          '<div class="media">\n' \
+          ' <div class="media-left media-top">{img}</div>\n' \
+          ' <div class="media-body">\n' \
+          '  <h4 class="media-heading">{nm}</h4>\n' \
+          '{tbl}{sub}' \
+          ' </div>\n' \
+          '</div>\n'.format(
+            img='<img class="media-object icn32" src="{src}">'.format(src=get_icon_src(icon_id, sde_icon_ids)),
+            nm=sde_group["nameID"]["en"],
+            tbl=tbl_glf,
+            sub=sub_glf
+          )
+    return glf
+
+
+def dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, market_data_printer):
+    glf.write("""<ul class="media-list">
+ <li class="media">""")
+
+    if "roots" in market_groups_tree:
+        roots = market_groups_tree["roots"]
+        for group_id in roots:
+            glf.write(
+                dump_market_groups_tree_nested(
+                    group_id,
+                    sde_market_groups,
+                    sde_icon_ids,
+                    market_groups_tree,
+                    market_data,
+                    market_data_printer)
+            )
+
+    glf.write(""" </li>
+</ul>""")
+
+
+def dump_bpos_into_report(
+        sde_type_ids,
+        sde_market_groups,
+        sde_icon_ids,
+        sde_bp_materials,
+        corp_assets_data,
+        corp_blueprints_data,
+        market_groups_tree):
+    market_data = {}
+    for a in corp_assets_data:
+        if not (str(a["type_id"]) in sde_bp_materials):
+            continue
+        if ("is_blueprint_copy" in a) and a["is_blueprint_copy"]:
+            continue
+        item_id = a["item_id"]
+        blueprint = next((b for b in corp_blueprints_data if b["item_id"] == item_id), None)
+        if blueprint is None:
+            continue
+        type_id = sde_type_ids[str(a["type_id"])]
+        data_item = {
+            "type_id": int(a["type_id"]),
+            "name": type_id["name"]["en"],
+            "me": blueprint["material_efficiency"],
+            "te": blueprint["time_efficiency"],
+            "quantity": 1
+        }
+        if "basePrice" in type_id:
+            data_item["price"] = type_id["basePrice"]
+        group_id = type_id["marketGroupID"]
+        if not (str(group_id) in market_data):
+            market_data[str(group_id)] = [data_item]
+        else:
+            prev_items = market_data[str(group_id)]
+            found = False
+            for prev in prev_items:
+                if (prev["type_id"] == data_item["type_id"]) and (prev["me"] == data_item["me"])  and (prev["te"] == data_item["te"]):
+                    prev["quantity"] = prev["quantity"] + 1
+                    found = True
+                    break
+            if not found:
+                market_data[str(group_id)].append(data_item)
+
+    def blueprints_printer(group_id, market_data):
+        if not (str(group_id) in market_data):
+            return ""
+        res = '<table class="table">\n' \
+              '<thead>' \
+              '<tr>' \
+              '<th>#</th>' \
+              '<th>Blueprint</th>' \
+              '<th>Base Price</th>' \
+              '<th>Material Efficiency</th>' \
+              '<th>Time Efficiency</th>' \
+              '<th>Quantity</th>' \
+              '</tr>' \
+              '</thead>\n' \
+              '<tbody>\n'
+        items = market_data[str(group_id)]
+        num = 1
+        for item in items:
+            res = res + '<tr>' \
+                        '<th scope="row">{num}</th>' \
+                        '<td>{nm}</td>' \
+                        '<td>{prc}</td>' \
+                        '<td>{me}</td>' \
+                        '<td>{te}</td>' \
+                        '<td>{q}</td>' \
+                        '</tr>\n'.format(
+                            num=num,
+                            nm=item["name"],
+                            prc=item["price"] if "price" in item else "",
+                            me=item["me"],
+                            te=item["te"],
+                            q=item["quantity"]
+                        )
+            num = num + 1
+        res = res + '</tbody>\n' \
+                    '</table>\n'
+        return res
+
+    glf = open('{tmp}/bpos.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    try:
+        dump_header(glf, "BPOs")
+        dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, blueprints_printer)
         dump_footer(glf)
     finally:
         glf.close()

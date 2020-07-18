@@ -26,6 +26,7 @@ import auth_cache
 import shared_flow
 import eve_sde_tools
 import eve_esi_interface
+import render_html
 
 from datetime import datetime
 
@@ -77,6 +78,8 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted("typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted("blueprints")
+    sde_market_groups = eve_sde_tools.read_converted("marketGroups")
+    sde_icon_ids = eve_sde_tools.read_converted("iconIDs")
 
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
@@ -93,6 +96,12 @@ def main():
         "corp_blueprints")
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
+
+    # Построение дерева merket-групп с элементами, в виде:
+    # { group1: {items:[sub1,sub2,...]},
+    #   group2: {items:[sub3],parent_id} }
+    market_groups_tree = eve_sde_tools.get_market_groups_tree(sde_market_groups)
+    eve_esi_interface.dump_json_into_file("market_groups_tree", market_groups_tree)
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -144,6 +153,19 @@ def main():
         glf.write('\nGenerated {}'.format(datetime.fromtimestamp(time.time(), g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
     finally:
         glf.close()
+
+    render_html.dump_bpos_into_report(
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_market_groups,
+        sde_icon_ids,
+        sde_bp_materials,
+        # esi данные, загруженные с серверов CCP
+        corp_assets_data,
+        corp_blueprints_data,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        market_groups_tree
+    )
 
 
 if __name__ == "__main__":

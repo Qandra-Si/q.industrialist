@@ -84,28 +84,31 @@ def main():
     sde_bp_materials = eve_sde_tools.read_converted("blueprints")
 
     # Requires: access token
-    wallet_data = eve_esi_interface.get_esi_data(
-        access_token,
-        "characters/{}/wallet/".format(character_id),
-        "wallet")
-    print("\n{} has {} ISK".format(character_name, wallet_data))
-    sys.stdout.flush()
+    wallet_data = -1
+    # wallet_data = eve_esi_interface.get_esi_data(
+    #     access_token,
+    #     "characters/{}/wallet/".format(character_id),
+    #     "wallet")
+    # print("\n{} has {} ISK".format(character_name, wallet_data))
+    # sys.stdout.flush()
 
     # Requires: access token
-    blueprint_data = eve_esi_interface.get_esi_data(
-        access_token,
-        "characters/{}/blueprints/".format(character_id),
-        "blueprints")
-    print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
-    sys.stdout.flush()
+    blueprint_data = []
+    # blueprint_data = eve_esi_interface.get_esi_data(
+    #     access_token,
+    #     "characters/{}/blueprints/".format(character_id),
+    #     "blueprints")
+    # print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
+    # sys.stdout.flush()
 
     # Requires: access token
-    assets_data = eve_esi_interface.get_esi_data(
-        access_token,
-        "characters/{}/assets/".format(character_id),
-        "assets")
-    print("\n{} has {} assets".format(character_name, len(assets_data)))
-    sys.stdout.flush()
+    assets_data = []
+    # assets_data = eve_esi_interface.get_esi_data(
+    #     access_token,
+    #     "characters/{}/assets/".format(character_id),
+    #     "assets")
+    # print("\n{} has {} assets".format(character_name, len(assets_data)))
+    # sys.stdout.flush()
 
     # Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
     asset_names_data = []

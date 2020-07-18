@@ -114,7 +114,7 @@ def rebuild(subname, name, items_to_stay=None):
                     break
             # json
             s = json.dumps(yaml_data, indent=1, sort_keys=False)
-            f = open(f_name_json, "wt+")
+            f = open(f_name_json, "wt+", encoding='utf8')
             f.write(s)
         finally:
             f.close()
@@ -142,7 +142,7 @@ def rebuild_list2dict_by_key(name, key, val=None):
     # json
     f_name_json = get_converted_name(name)
     s = json.dumps(dct, indent=1, sort_keys=False)
-    f = open(f_name_json, "wt+")
+    f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
 
 
@@ -190,7 +190,69 @@ def get_materials_for_blueprints(sde_bp_materials):
     return materials_for_bps
 
 
+def get_market_groups_tree_root(groups_tree, group_id):
+    if not (str(group_id) in groups_tree):
+        return group_id
+    itm = groups_tree[str(group_id)]
+    if not ("parent_id" in itm):
+        return group_id
+    return get_market_groups_tree_root(groups_tree, itm["parent_id"])
+
+
+def get_market_groups_tree(sde_market_groups):
+    """
+    Строит дерево в виде:
+    { group1: [sub1,sub2,...], group2: [sub3,sub4,...] }
+    """
+    groups_tree = {}
+    sde_market_groups_keys = sde_market_groups.keys()
+    for group_id in sde_market_groups_keys:
+        mg = sde_market_groups[str(group_id)]
+        if "parentGroupID" in mg:
+            parent_id = mg["parentGroupID"]
+            if (str(parent_id) in groups_tree) and ("items" in groups_tree[str(parent_id)]):
+                groups_tree[str(parent_id)]["items"].append(int(group_id))
+            else:
+                groups_tree.update({str(parent_id): {"items": []}})
+            groups_tree.update({str(group_id): {"parent_id": int(parent_id)}})
+        else:
+            groups_tree.update({str(group_id): {}})
+    groups_tree_keys = groups_tree.keys()
+    if len(groups_tree_keys) > 0:
+        roots = []
+        for k in groups_tree_keys:
+            root = get_market_groups_tree_root(groups_tree, k)
+            if 0 == roots.count(int(root)):
+                roots.append(int(root))
+        groups_tree["roots"] = roots
+    return groups_tree
+
+
+def rebuild_icons(name):
+    icons = read_converted(name)
+    icon_keys = icons.keys()
+    for ik in icon_keys:
+        icon_file = icons[str(ik)]["iconFile"]
+        if icon_file[:22].lower() == "res:/ui/texture/icons/":
+            icon_file = '{}/{}'.format("Icons/items", icon_file[22:])
+            icons[str(ik)]["iconFile"] = icon_file
+    # json
+    f_name_json = get_converted_name(name)
+    s = json.dumps(icons, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+", encoding='utf8')
+    f.write(s)
+
 def main():  # rebuild .yaml files
+    print("Rebuilding marketGroups.yaml file...")
+    sys.stdout.flush()
+    rebuild("fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
+    
+    print("Rebuilding iconIDs.yaml file...")
+    sys.stdout.flush()
+    rebuild("fsd", "iconIDs", ["iconFile"])
+    print("Reindexing .converted_iconIDs.json file...")
+    rebuild_icons("iconIDs")
+    
     print("Rebuilding invNames.yaml file...")
     sys.stdout.flush()
     rebuild("bsd", "invNames", ["itemID", "itemName"])
@@ -207,7 +269,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "typeIDs", ["basePrice", "groupID", "iconID", "published", {"name": ["en"]}])
+    rebuild("fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}])
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
