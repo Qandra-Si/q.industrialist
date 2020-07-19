@@ -111,6 +111,12 @@ def get_assets_named_ids(corp_assets_data):
                             17367,   # Station Vault Container
                             17368,   # Station Warehouse Container
                             2233,    # Customs Office
+                            24445,   # Giant Freight Container
+                            33003,   # Enormous Freight Container
+                            33005,   # Huge Freight Container
+                            33007,   # Large Freight Container
+                            33009,   # Medium Freight Container
+                            33011,   # Small Freight Container
                             35825,   # Raitaru
                             35826,   # Azbel
                             35827,   # Sotiyo
@@ -128,6 +134,28 @@ def get_assets_named_ids(corp_assets_data):
     return ass_cont_ids
 
 
+def get_foreign_structures_ids(corp_assets_data):
+    foreign_structs_ids = []
+    for a in corp_assets_data:
+        # проверяем либо location_flag=OfficeFolder, либо type_id=27 (Office)
+        if a["type_id"] == 27:
+            # если будет найден Офис корпорации, то надо найти станцию
+            # в том случае, если её нет в ассетах, то станция принадлежит другой
+            # корпорации (пропускаем NPC-станции, с int32-кодами, и формируем
+            # список из станций с int64-кодами)
+            station_id = int(a["location_id"])
+            if station_id < 1000000000000:
+                continue
+            found = False
+            for _a in corp_assets_data:
+                if _a["item_id"] == station_id:
+                    found = True
+                    break
+            if not found:
+                foreign_structs_ids.append(station_id)
+    return foreign_structs_ids
+
+
 def get_assets_tree_root(ass_tree, location_id):
     if not (str(location_id) in ass_tree):
         return location_id
@@ -137,7 +165,7 @@ def get_assets_tree_root(ass_tree, location_id):
     return get_assets_tree_root(ass_tree, itm["location_id"])
 
 
-def get_assets_tree(corp_assets_data):
+def get_assets_tree(corp_assets_data, foreign_structures_data):
     """
     https://docs.esi.evetech.net/docs/asset_location_id
     https://forums-archive.eveonline.com/topic/520027/
@@ -146,6 +174,7 @@ def get_assets_tree(corp_assets_data):
     { location1: [item1,item2,...], location2: [item3,item4,...] }
     """
     ass_tree = {}
+    # формируем дерево из набора корпоративных ассетов
     for a in corp_assets_data:
         item_id = int(a["item_id"])
         location_id = int(a["location_id"])
@@ -165,6 +194,23 @@ def get_assets_tree(corp_assets_data):
             itm = ass_tree[str(item_id)]
             if not ("location_id" in itm):
                 itm["location_id"] = location_id
+    # дополняем дерево сведениями о станциях, не принадлежащих корпорации (всё равно,
+    # что добавить в список NPC-станции)
+    foreign_station_ids = foreign_structures_data.keys()
+    for station_id in foreign_station_ids:
+        fs = foreign_structures_data[str(station_id)]
+        solar_system_id = int(fs["solar_system_id"])
+        # находим элемент дерева с известным item_id (станцию чужой корпы) и дополняем
+        # элемент типом строения и его расположением
+        station = ass_tree[str(station_id)]
+        station["location_id"] = solar_system_id
+        station["type_id"] = fs["type_id"]
+        # находим солнечную систему или добоавляем её в дерево
+        if str(solar_system_id) in ass_tree:
+            ass_tree[str(solar_system_id)]["items"].append(int(station_id))
+        else:
+            ass_tree.update({str(solar_system_id): {"items": [int(station_id)]}})
+    # формируем корни дерева (станции и системы, с которых начинается общая иерархия)
     ass_keys = ass_tree.keys()
     if len(ass_keys) > 0:
         roots = []

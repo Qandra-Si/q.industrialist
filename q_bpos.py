@@ -31,8 +31,6 @@ import render_html
 from datetime import datetime
 
 
-# R Initiative 4 Q.Industrialist
-g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
 g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1"  # Requires role(s): Director

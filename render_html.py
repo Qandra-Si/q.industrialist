@@ -512,10 +512,20 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
 </div>""")
 
 
-def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+def dump_corp_assets_tree_nested(
+        glf,
+        location_id,
+        corp_assets_data,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data,
+        sde_type_ids,
+        sde_inv_names,
+        sde_inv_items):
     # constellation_name = None
     loc_name = None
     itm_dict = None
+    foreign = False
     if int(location_id) < 1000000000000:
         if str(location_id) in sde_inv_names:
             loc_name = sde_inv_names[str(location_id)]
@@ -528,11 +538,13 @@ def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets
                     loc_name = '{} {}'.format(region_name, loc_name)
     else:
         loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
-        # if loc_name is None:
-        #     if itm_dict is None:
-        #         itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
-        #     if not (itm_dict is None):
-        #         loc_name = itm_dict["location_flag"]
+        if loc_name is None:
+            loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
+            foreign = False if loc_name is None else True
+        # if itm_dict is None:
+        #     itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+        # if not (itm_dict is None):
+        #     loc_name = itm_dict["location_flag"]
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
     items = loc_dict["items"] if "items" in loc_dict else None
@@ -551,26 +563,44 @@ def dump_corp_assets_tree_nested(glf, location_id, corp_assets_data, corp_assets
         ' <div class="media-left media-top">{img}</div>\n'
         ' <div class="media-body">\n'
         '  <h4 class="media-heading">{where}{what}{q}</h4>\n'
-        '  <span class="label label-info">{id}</span>{loc_flag}\n'.
+        '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'.
         format(
             img='<img class="media-object icn32" src="{src}">'.format(src=get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
-            what='{} '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
+            what='<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
             id=location_id,
             q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) else "",
-            loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else ""
+            loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else "",
+            foreign='<br/><span class="label label-warning">foreign</span>' if foreign else ""
         )
     )
     if not (items is None):
         for itm in items:
-            dump_corp_assets_tree_nested(glf, itm, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+            dump_corp_assets_tree_nested(
+                glf,
+                itm,
+                corp_assets_data,
+                corp_assets_tree,
+                corp_ass_names_data,
+                foreign_structures_data,
+                sde_type_ids,
+                sde_inv_names,
+                sde_inv_items)
     glf.write(
         ' </div>\n'
         '</div>\n'
     )
 
 
-def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items):
+def dump_corp_assets_tree(
+        glf,
+        corp_assets_data,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data,
+        sde_type_ids,
+        sde_inv_names,
+        sde_inv_items):
     glf.write("""<!-- Button trigger for Corp Assets Tree Modal -->
 <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssetsTree">Show Corp Assets Tree</button>
 <!-- Corp Assets Tree Modal -->
@@ -590,7 +620,16 @@ def dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_name
     if "roots" in corp_assets_tree:
         roots = corp_assets_tree["roots"]
         for loc_id in roots:
-            dump_corp_assets_tree_nested(glf, loc_id, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+            dump_corp_assets_tree_nested(
+                glf,
+                loc_id,
+                corp_assets_data,
+                corp_assets_tree,
+                corp_ass_names_data,
+                foreign_structures_data,
+                sde_type_ids,
+                sde_inv_names,
+                sde_inv_items)
 
     glf.write("""    </li>
   </ul>
@@ -724,19 +763,29 @@ def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_mat
         glf.close()
 
 
-def dump_cynonetwork_into_report(
+def dump_assets_tree_into_report(
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
         corp_assets_data,
         corp_ass_names_data,
+        foreign_structures_data,
         corp_ass_loc_data,
         corp_assets_tree):
+    glf = open('{tmp}/assets_tree.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    try:
+        dump_header(glf, "Corp Assets")
+        # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def dump_cynonetwork_into_report():
     glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "CynoNetwork")
-        # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
-        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        dump_header(glf, "Cyno Network")
         dump_footer(glf)
     finally:
         glf.close()
@@ -891,91 +940,6 @@ def dump_bpos_into_report(
         dump_footer(glf)
     finally:
         glf.close()
-
-
-def main():
-    # time_efficiency - повышается только после того, как нажимаешь кнопку "Доставить", даже если
-    # исследования уже завершились
-    blueprints_data = (json.loads("""[
- {
-  "item_id": 1032415077622,
-  "location_flag": "Hangar",
-  "location_id": 1033013802131,
-  "material_efficiency": 5,
-  "quantity": -2,
-  "runs": 188,
-  "time_efficiency": 2,
-  "type_id": 1220
- },
- {
-  "item_id": 1033373083634,
-  "location_flag": "Hangar",
-  "location_id": 60003760,
-  "material_efficiency": 0,
-  "quantity": 1,
-  "runs": -1,
-  "time_efficiency": 0,
-  "type_id": 32859
- },
- {
-  "item_id": 1033373084812,
-  "location_flag": "Hangar",
-  "location_id": 60003760,
-  "material_efficiency": 0,
-  "quantity": 1,
-  "runs": -1,
-  "time_efficiency": 0,
-  "type_id": 32860
- },
-  {
-  "item_id": 1033506273254,
-  "location_flag": "Hangar",
-  "location_id": 60003760,
-  "material_efficiency": 0,
-  "quantity": -2,
-  "runs": 2,
-  "time_efficiency": 0,
-  "type_id": 836
- },
- {
-  "item_id": 1033129071528,
-  "location_flag": "Hangar",
-  "location_id": 60002065,
-  "material_efficiency": 10,
-  "quantity": -1,
-  "runs": -1,
-  "time_efficiency": 12,
-  "type_id": 32858
- },
- {
-  "item_id": 1033334232054,
-  "location_flag": "Hangar",
-  "location_id": 60002065,
-  "material_efficiency": 7,
-  "quantity": -1,
-  "runs": -1,
-  "time_efficiency": 0,
-  "type_id": 940
- }
-]"""))
-    assets_data = (json.loads("""[
-{
-  "is_singleton": true,
-  "item_id": 1033013802131,
-  "location_flag": "Hangar",
-  "location_id": 60003760,
-  "location_type": "station",
-  "quantity": 1,
-  "type_id": 17366
- }
-]"""))
-    names_data = (json.loads("""[
- {
-  "item_id": 1033013802131,
-  "name": "\u0427\u0435\u0440\u0442\u0435\u0436\u0438"
- }
-]"""))
-    dump_into_report(14966087542.58, blueprints_data, assets_data, names_data)
 
 
 if __name__ == "__main__":

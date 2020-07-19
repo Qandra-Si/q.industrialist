@@ -30,8 +30,6 @@ import eve_esi_interface
 from render_html import dump_into_report
 
 
-# R Initiative 4 Q.Industrialist
-g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
 # Application scopes
 g_client_scope = ["esi-characters.read_blueprints.v1",  # Requires: access token
                   "esi-wallet.read_character_wallet.v1",  # Requires: access token

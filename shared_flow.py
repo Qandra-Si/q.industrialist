@@ -15,6 +15,9 @@ import q_industrialist_settings
 import auth_cache
 
 
+# R Initiative 4 Q.Industrialist
+g_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
+
 g_client_callback_url = "https://localhost/callback/"
 g_content_type = "application/x-www-form-urlencoded"
 g_login_host = "login.eveonline.com"

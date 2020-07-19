@@ -5,7 +5,7 @@
 # adopt_for_ri4 : временный параметр, регулирует фильтрацию контейнеров R Initiative 4
 
 g_eve_server = 'tranquility'  # eveonline' server
-g_user_agent = 'Q.Industrialist v0.2'  # 'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
+g_user_agent = 'Q.Industrialist v0.3'  # 'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
 g_offline_mode = False
 g_use_filesystem_resources = True
 g_adopt_for_ri4 = False
