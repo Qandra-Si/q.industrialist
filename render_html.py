@@ -7,6 +7,7 @@ from eve_sde_tools import get_item_name_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
 
 import q_industrialist_settings
+import q_logist_settings
 
 g_local_timezone = tzlocal.get_localzone()
 
@@ -782,10 +783,160 @@ def dump_assets_tree_into_report(
         glf.close()
 
 
-def dump_cynonetwork_into_report():
+def get_route_signalling_type(level):
+    if level == 0:
+        return "success"
+    elif level == 1:
+        return "warning"
+    else:
+        return "danger"
+
+
+def dump_corp_cynonetwork(glf, corp_cynonetwork):
+    glf.write("""<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" href="#"><span class="glyphicon glyphicon-random" aria-hidden="true"></span></a>
+  </div>
+  
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Routes <span class="caret"></span></a>
+      <ul class="dropdown-menu">""")
+    for cn in q_logist_settings.g_cynonetworks:
+        cn_route = cn["route"]
+        from_id = cn_route[0]
+        from_name = corp_cynonetwork[str(from_id)]["solar_system"]
+        to_id = cn_route[-1]
+        to_name = corp_cynonetwork[str(to_id)]["solar_system"]
+        glf.write(
+            '<li><a href="#">{f} &rarr; {t}</a></li>'.  # предполагается: <li><a href="#">JK-Q77 &rarr; Raravath</a></li>
+            format(f=from_name,
+                   t=to_name
+            ))
+    glf.write("""
+       <li role="separator" class="divider"></li>
+       <li><a href="#">All routes</a></li>
+      </ul>
+     </li>
+     <li><a href="#">Problems</a></li>
+    </ul>
+    <form class="navbar-form navbar-right">
+     <div class="form-group">
+      <input type="text" class="form-control" placeholder="Solar System">
+     </div>
+     <button type="submit" class="btn btn-default">Search</button>
+    </form>
+   </div>
+ </div>
+</nav>""")
+
+    for cn in q_logist_settings.g_cynonetworks:
+        cn_route = cn["route"]
+        # from_name = ""
+        # to_name = ""
+        url = ""
+        human_readable = ""
+        route_signalling_level = 0
+        for location_id in cn_route:
+            route_place = corp_cynonetwork[str(location_id)]
+            system_name = route_place["solar_system"]
+            if not url:
+                url = system_name
+                # from_name = system_name
+                human_readable = system_name
+            else:
+                url = url + ":" + system_name
+                # to_name = system_name
+                human_readable = human_readable + " &rarr; " + system_name
+            route_signalling_level = max(route_signalling_level, route_place["signalling_level"])
+        route_signalling_type = get_route_signalling_type(route_signalling_level)
+        # ---
+        glf.write(
+            '<div class="panel panel-{signal}">\n'
+            ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'
+            '  <div class="panel-body">\n'
+            '   <p>Checkout Dotlan link for graphical route building: <a href="https://evemaps.dotlan.net/jump/Rhea,544/{url}" class="panel-link">https://evemaps.dotlan.net/jump/Rhea,544/{url}</a></p>\n'
+            '   <div class="progress">\n'.
+            format(#nm='{} &rarr; {}'.format(from_name, to_name),
+                   nm=human_readable,
+                   url=url,
+                   signal=route_signalling_type
+            ))
+        progress_segments = len(cn_route)
+        progress_width = int(100/progress_segments)
+        progress_times = 1
+        for location_id in cn_route:
+            route_place = corp_cynonetwork[str(location_id)]
+            system_name = route_place["solar_system"]
+            if progress_times == progress_segments:
+                progress_width = progress_width + 100 - progress_width * progress_segments
+            glf.write(
+                '    <div class="progress-bar progress-bar-{signal}" role="progressbar" style="width:{width}%">{nm}</div>\n'.
+                format(width=progress_width,
+                       nm=system_name,
+                       signal=get_route_signalling_type(route_place["signalling_level"])
+                ))
+            progress_times = progress_times + 1
+        glf.write("""   </div>
+   <table class="table">
+    <thead>
+     <tr>
+      <th>#</th>
+      <th>Solar System</th>
+      <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/17888_32.png" width="32px" height="32px" alt="Nitrogen Isotopes"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/17889_32.png" width="32px" height="32px" alt="Hydrogen Isotopes"/></th>
+     </tr>
+    </thead>
+    <tbody>""")
+        row_num = 1
+        for location_id in cn_route:
+            system_name = corp_cynonetwork[str(location_id)]["solar_system"]
+            badger_num = corp_cynonetwork[str(location_id)]["badger"]
+            venture_num = corp_cynonetwork[str(location_id)]["venture"]
+            liquid_ozone_num = corp_cynonetwork[str(location_id)]["liquid_ozone"]
+            indus_cyno_gen_num = corp_cynonetwork[str(location_id)]["indus_cyno_gen"]
+            nitrogen_isotope_num = corp_cynonetwork[str(location_id)]["nitrogen_isotope"]
+            hydrogen_isotope_num = corp_cynonetwork[str(location_id)]["hydrogen_isotope"]
+            glf.write(
+                '<tr>\n'
+                '<th scope="row">{num}</th>\n'
+                '<td>{nm}</td>\n'
+                '<td>{b}</td><td>{v}</td><td>{lo}</td><td>{icg}</td><td>{ni}</td><td>{hi}</td>\n'
+                '</tr>'.
+                format(num=row_num,
+                       nm=system_name,
+                       b=badger_num,
+                       v=venture_num,
+                       lo=liquid_ozone_num,
+                       icg=indus_cyno_gen_num,
+                       ni=nitrogen_isotope_num,
+                       hi=hydrogen_isotope_num
+                ))
+            row_num = row_num + 1
+        glf.write("""    </tbody>
+   </table>
+  </div>
+ </div>
+</div>""")
+
+
+def dump_cynonetwork_into_report(corp_cynonetwork):
     glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Cyno Network")
+        dump_corp_cynonetwork(glf, corp_cynonetwork)
         dump_footer(glf)
     finally:
         glf.close()

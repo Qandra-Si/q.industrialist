@@ -64,8 +64,8 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
                 "venture": venture_ids,
                 "liquid_ozone": liquid_ozone_ids,
                 "indus_cyno_gen": indus_cyno_gen_ids,
-                "nitrogen_isotope_ids": nitrogen_isotope_ids,
-                "hydrogen_isotope_ids": hydrogen_isotope_ids}
+                "nitrogen_isotope": nitrogen_isotope_ids,
+                "hydrogen_isotope": hydrogen_isotope_ids}
     else:
         type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
         if not (type_id is None) and (type_id == abs(subtype)):  # нашли
@@ -195,8 +195,59 @@ def main():
             # если системы в цино сети повторяются, не гоняем искалочку зазря (повторно)
             if not (str(location_id) in corp_cynonetwork):
                 data = get_cyno_solar_system_details(location_id, corp_assets_tree)
+                # ---
+                system_id = data["solar_system"]
+                badger_ids = data["badger"]
+                venture_ids = data["venture"]
+                liquid_ozone_ids = data["liquid_ozone"]
+                indus_cyno_gen_ids = data["indus_cyno_gen"]
+                nitrogen_isotope_ids = data["nitrogen_isotope"]
+                hydrogen_isotope_ids = data["hydrogen_isotope"]
+                system_name = sde_inv_names[str(system_id)]
+                badger_num = 0
+                venture_num = 0
+                liquid_ozone_num = 0
+                indus_cyno_gen_num = 0
+                nitrogen_isotope_num = 0
+                hydrogen_isotope_num = 0
+                # ---
+                for a in corp_assets_data:
+                    item_id = int(a["item_id"])
+                    quantity = int(a["quantity"])
+                    if not (badger_ids is None) and badger_ids.count(item_id) > 0:
+                        badger_num = badger_num + quantity
+                    elif not (venture_ids is None) and venture_ids.count(item_id) > 0:
+                        venture_num = venture_num + quantity
+                    elif not (liquid_ozone_ids is None) and liquid_ozone_ids.count(item_id) > 0:
+                        liquid_ozone_num = liquid_ozone_num + quantity
+                    elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
+                        indus_cyno_gen_num = indus_cyno_gen_num + quantity
+                    elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
+                        nitrogen_isotope_num = nitrogen_isotope_num + quantity
+                    elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
+                        hydrogen_isotope_num = hydrogen_isotope_num + quantity
+                # ---
+                signalling_level = 0  # 0 - normal, 1 - warning, 2 - danger
+                if (badger_num >= 15) and (venture_num >= 15) and (liquid_ozone_num >= 28000) and (indus_cyno_gen_num >= 15) and (nitrogen_isotope_num >= 500000):
+                    signalling_level = 0
+                elif (badger_num >= 6) and (venture_num >= 6) and (liquid_ozone_num >= 10000) and (indus_cyno_gen_num >= 6) and (nitrogen_isotope_num >= 300000):
+                    signalling_level = 1
+                else:
+                    signalling_level = 2
+                # ---
+                data = {
+                    "solar_system": system_name,
+                    "badger": badger_num,
+                    "venture": venture_num,
+                    "liquid_ozone": liquid_ozone_num,
+                    "indus_cyno_gen": indus_cyno_gen_num,
+                    "nitrogen_isotope": nitrogen_isotope_num,
+                    "hydrogen_isotope": hydrogen_isotope_num,
+                    "signalling_level": signalling_level
+                }
                 corp_cynonetwork.update({str(location_id): data})
 
+    # Только для поиска ассетов:
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
     dump_assets_tree_into_report(
@@ -214,7 +265,10 @@ def main():
 
     print("\nBuilding cyno network report...")
     sys.stdout.flush()
-    dump_cynonetwork_into_report()
+    dump_cynonetwork_into_report(
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_cynonetwork
+    )
 
 
 if __name__ == "__main__":
