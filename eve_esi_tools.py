@@ -165,7 +165,28 @@ def get_assets_tree_root(ass_tree, location_id):
     return get_assets_tree_root(ass_tree, itm["location_id"])
 
 
-def get_assets_tree(corp_assets_data, foreign_structures_data):
+def fill_ass_tree_with_sde_data(location_id, ass_tree, sde_inv_items):
+    if location_id <= 5:
+        return
+    if not (str(location_id) in sde_inv_items):
+        return
+    sde_item = sde_inv_items[str(location_id)]
+    type_id = sde_item["typeID"]
+    new_location_id = sde_item["locationID"]
+    if not (str(location_id) in ass_tree):
+        ass_tree.update({str(location_id): {"type_id": type_id}})
+    else:
+        ass_tree[str(location_id)]["type_id"] = type_id
+    if type_id > 5:  # останавливаем глубину на Constellation (и не добавляем её в ass_tree)
+        ass_tree[str(location_id)]["location_id"] = new_location_id
+        if not (str(new_location_id) in ass_tree):
+            ass_tree.update({str(new_location_id): {"items": [location_id]}})
+    if type_id == 5:  # останавливаемся а глубине Solar System
+        return
+    fill_ass_tree_with_sde_data(new_location_id, ass_tree, sde_inv_items)
+
+
+def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items):
     """
     https://docs.esi.evetech.net/docs/asset_location_id
     https://forums-archive.eveonline.com/topic/520027/
@@ -174,6 +195,7 @@ def get_assets_tree(corp_assets_data, foreign_structures_data):
     { location1: [item1,item2,...], location2: [item3,item4,...] }
     """
     ass_tree = {}
+    stations = []
     # формируем дерево из набора корпоративных ассетов
     for a in corp_assets_data:
         item_id = int(a["item_id"])
@@ -183,6 +205,12 @@ def get_assets_tree(corp_assets_data, foreign_structures_data):
             ass_tree[str(location_id)]["items"].append(item_id)
         else:
             ass_tree.update({str(location_id): {"items": [item_id]}})
+            location_type = a["location_type"]
+            if location_type == "solar_system":
+                ass_tree[str(location_id)]["type_id"] = 5  # Solar System
+            elif location_type == "station":
+                if stations.count(location_id) == 0:
+                    stations.append(location_id)
         if not (str(item_id) in ass_tree):
             ass_tree.update({str(item_id): {"type_id": type_id}})
         elif not ("type_id" in ass_tree[str(item_id)]):
@@ -209,7 +237,13 @@ def get_assets_tree(corp_assets_data, foreign_structures_data):
         if str(solar_system_id) in ass_tree:
             ass_tree[str(solar_system_id)]["items"].append(int(station_id))
         else:
-            ass_tree.update({str(solar_system_id): {"items": [int(station_id)]}})
+            ass_tree.update({str(solar_system_id): {"items": [int(station_id)], "type_id": 5}})  # 5 = Solar System
+    # дополняем дерево сведениям о расположении NPC-станций (данными из eve sde)
+    for station_id in stations:
+        a = ass_tree[str(station_id)]
+        if not ("type_id" in a):
+            if stations.count(int(station_id)):
+                fill_ass_tree_with_sde_data(int(station_id), ass_tree, sde_inv_items)
     # формируем корни дерева (станции и системы, с которых начинается общая иерархия)
     ass_keys = ass_tree.keys()
     if len(ass_keys) > 0:

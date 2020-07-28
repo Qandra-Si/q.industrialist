@@ -38,6 +38,61 @@ g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): 
                  ]
 
 
+# type_id - тип требуемых данных
+#  * None : корневой, т.е. данные по текущей локации маршрута циносети
+#  * <number> : значение type_id, поиск которого осуществляется (солнечная система, или топляк)
+#               при type_id > 0 поиск осуществляется вверх по дереву
+#               при type_id < 0 поиск осуществляется вниз по дереву
+def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
+    if not (str(location_id) in corp_assets_tree):
+        return None
+    loc_dict = corp_assets_tree[str(location_id)]
+    if subtype is None:
+        solar_system_id = get_cyno_solar_system_details(
+            loc_dict["location_id"],
+            corp_assets_tree,
+            -5  # Solar System (поиск вниз по дереву)
+        )
+        badger_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 648)  # Badger
+        venture_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 32880)  # Venture
+        liquid_ozone_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 16273)  # Liquid Ozone
+        indus_cyno_gen_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 52694)  # Industrial Cynosural Field Generator
+        nitrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17888)  # Nitrogen Isotopes
+        hydrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17889)  # Hydrogen Isotopes
+        return {"solar_system": solar_system_id,
+                "badger": badger_ids,
+                "venture": venture_ids,
+                "liquid_ozone": liquid_ozone_ids,
+                "indus_cyno_gen": indus_cyno_gen_ids,
+                "nitrogen_isotope_ids": nitrogen_isotope_ids,
+                "hydrogen_isotope_ids": hydrogen_isotope_ids}
+    else:
+        type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
+        if not (type_id is None) and (type_id == abs(subtype)):  # нашли
+            return location_id  # выдаём как item_id
+        if subtype < 0:
+            if "location_id" in loc_dict:
+                return get_cyno_solar_system_details(loc_dict["location_id"], corp_assets_tree, subtype)
+            else:
+                return None
+        else:  # subtype > 0
+            result = []
+            items = loc_dict["items"] if "items" in loc_dict else None
+            if not (items is None):
+                for i in items:
+                    item_ids = get_cyno_solar_system_details(i, corp_assets_tree, subtype)
+                    if not (item_ids is None):
+                        if isinstance(item_ids, list):
+                            result.extend(item_ids)
+                        else:
+                            result.append(item_ids)
+            if len(result) > 0:
+                return result
+            else:
+                return None
+    return None
+
+
 def main():
     global g_client_scope
     cache = auth_cache.read_cache()
@@ -124,7 +179,7 @@ def main():
     # элементов, в виде:
     # { location1: {items:[item1,item2,...],type_id,location_id},
     #   location2: {items:[item3],type_id} }
-    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data)
+    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
     eve_esi_interface.dump_json_into_file("corp_assets_tree", corp_assets_tree)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
@@ -133,7 +188,14 @@ def main():
     eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
     # Фильтрация (вручную) ассетов, которые расположены на станках циносети
-    # ...
+    corp_cynonetwork = {}
+    for cn in q_logist_settings.g_cynonetworks:
+        cn_route = cn["route"]
+        for location_id in cn_route:
+            # если системы в цино сети повторяются, не гоняем искалочку зазря (повторно)
+            if not (str(location_id) in corp_cynonetwork):
+                data = get_cyno_solar_system_details(location_id, corp_assets_tree)
+                corp_cynonetwork.update({str(location_id): data})
 
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
