@@ -228,9 +228,18 @@ def main():
                         hydrogen_isotope_num = hydrogen_isotope_num + quantity
                 # ---
                 signalling_level = 0  # 0 - normal, 1 - warning, 2 - danger
-                if (badger_num >= 15) and (venture_num >= 15) and (liquid_ozone_num >= 28000) and (indus_cyno_gen_num >= 15) and (nitrogen_isotope_num >= 500000):
+                if (badger_num >= 10) and\
+                   (venture_num >= 5) and\
+                   (liquid_ozone_num >= 30000) and\
+                   (indus_cyno_gen_num >= 15) and\
+                   (nitrogen_isotope_num >= 1000000) and\
+                   (hydrogen_isotope_num >= 500000):
                     signalling_level = 0
-                elif (badger_num >= 6) and (venture_num >= 6) and (liquid_ozone_num >= 10000) and (indus_cyno_gen_num >= 6) and (nitrogen_isotope_num >= 300000):
+                elif (badger_num >= 2) and \
+                     (venture_num >= 2) and \
+                     (liquid_ozone_num >= 6000) and \
+                     (indus_cyno_gen_num >= 2) and \
+                     (nitrogen_isotope_num >= 100000):
                     signalling_level = 1
                 else:
                     signalling_level = 2
