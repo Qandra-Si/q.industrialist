@@ -57,6 +57,8 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
         venture_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 32880)  # Venture
         liquid_ozone_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 16273)  # Liquid Ozone
         indus_cyno_gen_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 52694)  # Industrial Cynosural Field Generator
+        exp_cargohold_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 1317)  # Expanded Cargohold I
+        cargohold_rigs_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 31117)  # Small Cargohold Optimization I
         nitrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17888)  # Nitrogen Isotopes
         hydrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17889)  # Hydrogen Isotopes
         return {"solar_system": solar_system_id,
@@ -64,6 +66,8 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
                 "venture": venture_ids,
                 "liquid_ozone": liquid_ozone_ids,
                 "indus_cyno_gen": indus_cyno_gen_ids,
+                "exp_cargohold": exp_cargohold_ids,
+                "cargohold_rigs": cargohold_rigs_ids,
                 "nitrogen_isotope": nitrogen_isotope_ids,
                 "hydrogen_isotope": hydrogen_isotope_ids}
     else:
@@ -201,6 +205,8 @@ def main():
                 venture_ids = data["venture"]
                 liquid_ozone_ids = data["liquid_ozone"]
                 indus_cyno_gen_ids = data["indus_cyno_gen"]
+                exp_cargohold_ids = data["exp_cargohold"]
+                cargohold_rigs_ids = data["cargohold_rigs"]
                 nitrogen_isotope_ids = data["nitrogen_isotope"]
                 hydrogen_isotope_ids = data["hydrogen_isotope"]
                 system_name = sde_inv_names[str(system_id)]
@@ -208,6 +214,8 @@ def main():
                 venture_num = 0
                 liquid_ozone_num = 0
                 indus_cyno_gen_num = 0
+                exp_cargohold_num = 0
+                cargohold_rigs_num = 0
                 nitrogen_isotope_num = 0
                 hydrogen_isotope_num = 0
                 # ---
@@ -222,24 +230,35 @@ def main():
                         liquid_ozone_num = liquid_ozone_num + quantity
                     elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
                         indus_cyno_gen_num = indus_cyno_gen_num + quantity
+                    elif not (exp_cargohold_ids is None) and exp_cargohold_ids.count(item_id) > 0:
+                        exp_cargohold_num = exp_cargohold_num + quantity
+                    elif not (cargohold_rigs_ids is None) and cargohold_rigs_ids.count(item_id) > 0:
+                        cargohold_rigs_num = cargohold_rigs_num + quantity
                     elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
                         nitrogen_isotope_num = nitrogen_isotope_num + quantity
                     elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
                         hydrogen_isotope_num = hydrogen_isotope_num + quantity
                 # ---
-                signalling_level = 0  # 0 - normal, 1 - warning, 2 - danger
+                # signalling_level = 0 - normal, 1 - warning, 2 - danger
+                # оптимальный набор: 10 баджеров, 10 цин, 10'000 (по 950 на прожиг) озона
+                #              плюс: 10 вентур, 10 цин, 10'000 (по 200 на прожиг) озона, 30 риг, 10 каргохолда
+                # минимальный набор: 1 баджер, 1 вентурка, 2 цины, 1150 озона, 3 риги, 1 каргохолд
                 if (badger_num >= 10) and\
-                   (venture_num >= 5) and\
-                   (liquid_ozone_num >= 30000) and\
-                   (indus_cyno_gen_num >= 15) and\
-                   (nitrogen_isotope_num >= 1000000) and\
-                   (hydrogen_isotope_num >= 500000):
+                   (venture_num >= 10) and\
+                   (liquid_ozone_num >= 20000) and\
+                   (indus_cyno_gen_num >= 20) and\
+                   (exp_cargohold_num >= 10) and\
+                   (cargohold_rigs_num >= 30) and\
+                   (nitrogen_isotope_num >= 0) and\
+                   (hydrogen_isotope_num >= 0):
                     signalling_level = 0
-                elif (badger_num >= 2) and \
-                     (venture_num >= 2) and \
-                     (liquid_ozone_num >= 6000) and \
+                elif (badger_num >= 1) and \
+                     (venture_num >= 1) and \
+                     (liquid_ozone_num >= 1150) and \
                      (indus_cyno_gen_num >= 2) and \
-                     (nitrogen_isotope_num >= 100000):
+                     (exp_cargohold_num >= 1) and \
+                     (cargohold_rigs_num >= 3) and \
+                     (nitrogen_isotope_num >= 0):
                     signalling_level = 1
                 else:
                     signalling_level = 2
@@ -250,6 +269,8 @@ def main():
                     "venture": venture_num,
                     "liquid_ozone": liquid_ozone_num,
                     "indus_cyno_gen": indus_cyno_gen_num,
+                    "exp_cargohold": exp_cargohold_num,
+                    "cargohold_rigs": cargohold_rigs_num,
                     "nitrogen_isotope": nitrogen_isotope_num,
                     "hydrogen_isotope": hydrogen_isotope_num,
                     "signalling_level": signalling_level

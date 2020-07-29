@@ -804,7 +804,7 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
    </button>
    <a class="navbar-brand" href="#"><span class="glyphicon glyphicon-random" aria-hidden="true"></span></a>
   </div>
-  
+   
   <div class="collapse navbar-collapse" id="bs-navbar-collapse">
    <ul class="nav navbar-nav">
     <li class="dropdown">
@@ -836,7 +836,8 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
     </form>
    </div>
  </div>
-</nav>""")
+</nav>
+<div class="container-fluid">""")
 
     for cn in q_logist_settings.g_cynonetworks:
         cn_route = cn["route"]
@@ -892,9 +893,11 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
       <th>#</th>
       <th>Solar System</th>
       <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
+               src="https://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
+               src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
+      <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/17888_32.png" width="32px" height="32px" alt="Nitrogen Isotopes"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/17889_32.png" width="32px" height="32px" alt="Hydrogen Isotopes"/></th>
      </tr>
@@ -907,20 +910,29 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
             venture_num = corp_cynonetwork[str(location_id)]["venture"]
             liquid_ozone_num = corp_cynonetwork[str(location_id)]["liquid_ozone"]
             indus_cyno_gen_num = corp_cynonetwork[str(location_id)]["indus_cyno_gen"]
+            exp_cargohold_num = corp_cynonetwork[str(location_id)]["exp_cargohold"]
+            cargohold_rigs_num = corp_cynonetwork[str(location_id)]["cargohold_rigs"]
             nitrogen_isotope_num = corp_cynonetwork[str(location_id)]["nitrogen_isotope"]
             hydrogen_isotope_num = corp_cynonetwork[str(location_id)]["hydrogen_isotope"]
+            badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
+            venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
             glf.write(
                 '<tr>\n'
-                '<th scope="row">{num}</th>\n'
-                '<td>{nm}</td>\n'
-                '<td>{b}</td><td>{v}</td><td>{lo}</td><td>{icg}</td><td>{ni}</td><td>{hi}</td>\n'
+                ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
+                ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
+                ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hi}</td>\n'
                 '</tr>'.
                 format(num=row_num,
                        nm=system_name,
+                       bjumps=badger_jumps_num,
+                       vjumps=venture_jumps_num,
                        b=badger_num,
                        v=venture_num,
                        lo=liquid_ozone_num,
                        icg=indus_cyno_gen_num,
+                       ch=exp_cargohold_num,
+                       chr=cargohold_rigs_num,
                        ni=nitrogen_isotope_num,
                        hi=hydrogen_isotope_num
                 ))
@@ -928,7 +940,35 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
         glf.write("""    </tbody>
    </table>
   </div>
- </div>
+ </div>""")
+    glf.write("""<hr/>
+<h4>Legend</h4>
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="95" aria-valuemin="0" aria-valuemax="100" style="width: 95%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">10 or more jumps</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-warning" role="progressbar" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100" style="width: 25%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">at least 2 jumps</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-danger" role="progressbar" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100" style="width: 10%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">there is a chance to stop</div>
+  </div>
 </div>""")
 
 
