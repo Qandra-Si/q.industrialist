@@ -142,13 +142,26 @@ def send_esi_request(access_token, uri, body=None):
             res = requests.get(uri, headers=headers)
             if g_debug:
                 print("\nMade GET request to {} with headers: "
-                      "{}".format(uri, res.request.headers))
+                      "{}\nAnd the answer {} was received with "
+                      "headers {} and encoding {}".
+                      format(uri,
+                             res.request.headers,
+                             res.status_code,
+                             res.headers,
+                             res.encoding))
         else:
             headers.update({"Content-Type": "application/json"})
             res = requests.post(uri, data=body, headers=headers)
             if g_debug:
                 print("\nMade POST request to {} with data {} and headers: "
-                      "{}".format(uri, body, res.request.headers))
+                      "{}\nAnd the answer {} was received with "
+                      "headers {} and encoding {}".
+                      format(uri,
+                             body,
+                             res.request.headers,
+                             res.status_code,
+                             res.headers,
+                             res.encoding))
         res.raise_for_status()
     except requests.exceptions.HTTPError as err:
         print(err)
