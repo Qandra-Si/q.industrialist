@@ -914,7 +914,7 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
         for location_id in cn_route:
             route_place = corp_cynonetwork[str(location_id)]
             system_name = route_place["solar_system"]
-            if not ("error" in route_place):
+            if not ("error" in route_place) or (route_place["error"] != "no data"):
                 badger_num = route_place["badger"]
                 venture_num = route_place["venture"]
                 liquid_ozone_num = route_place["liquid_ozone"]
@@ -993,7 +993,7 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
      <div class="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width: 50%; background-color:#888;"></div>
     </div>
    </div>
-   <div class="col-xs-9">there are temporary problems with access to ESI (out of sync assets movements)</div>
+   <div class="col-xs-9">there are temporary problems with ESI (out of sync assets movements)</div>
   </div>
 </div>""")
 

@@ -48,13 +48,14 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
         return None
     loc_dict = corp_assets_tree[str(location_id)]
     if subtype is None:
-        if not ("location_id" in loc_dict): # иногда ESI присылает содержимое контейнеров, которые исчезают из ангаров, кораблей и звёздных систем
-            return None
-        solar_system_id = get_cyno_solar_system_details(
-            loc_dict["location_id"],
-            corp_assets_tree,
-            -5  # Solar System (поиск вниз по дереву)
-        )
+        if "location_id" in loc_dict: # иногда ESI присылает содержимое контейнеров, которые исчезают из ангаров, кораблей и звёздных систем
+            solar_system_id = get_cyno_solar_system_details(
+                loc_dict["location_id"],
+                corp_assets_tree,
+                -5  # Solar System (поиск вниз по дереву)
+            )
+        else:
+            solar_system_id = None
         badger_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 648)  # Badger
         venture_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 32880)  # Venture
         liquid_ozone_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 16273)  # Liquid Ozone
@@ -223,8 +224,25 @@ def main():
                 #              плюс: 10 вентур, 10 цин, 10'000 (по 200 на прожиг) озона, 30 риг, 10 каргохолда
                 # минимальный набор: 1 баджер, 1 вентурка, 2 цины, 1150 озона, 3 риги, 1 каргохолд
                 if data is None:
+                    # print('{} {}'.format(location_id, data))
+                    loc_name = "NO-DATA!"
+                    loc_id = location_id
+                    if int(loc_id) < 1000000000000:
+                        if str(loc_id) in sde_inv_names:
+                            loc_name = sde_inv_names[str(loc_id)]
+                            print(loc_name)
+                            if str(loc_id) in sde_inv_items:
+                                root_item = sde_inv_items[str(loc_id)]
+                                # print("root_item", root_item)
+                                if root_item["typeID"] != 5:  # not Solar System (may be Station?)
+                                    loc_id = root_item["locationID"]
+                                    root_item = sde_inv_items[str(loc_id)]
+                                    # print(" >>> ", loc_id, root_item)
+                                    if root_item["typeID"] == 5:  # Solar System
+                                        loc_name = sde_inv_names[str(loc_id)]  # Solar System (name)
+                                        # print(" >>> >>> ", loc_name)
                     data = {"error": "no data",
-                            "solar_system": "NO-DATA!",
+                            "solar_system": loc_name,
                             "signalling_level": 3}
                 else:
                     system_id = data["solar_system"]
@@ -236,7 +254,10 @@ def main():
                     cargohold_rigs_ids = data["cargohold_rigs"]
                     nitrogen_isotope_ids = data["nitrogen_isotope"]
                     hydrogen_isotope_ids = data["hydrogen_isotope"]
-                    system_name = sde_inv_names[str(system_id)]
+                    if system_id is None:
+                        system_name = "NO-DATA!"
+                    else:
+                        system_name = sde_inv_names[str(system_id)]
                     badger_num = 0
                     venture_num = 0
                     liquid_ozone_num = 0
@@ -266,7 +287,9 @@ def main():
                         elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
                             hydrogen_isotope_num = hydrogen_isotope_num + quantity
                     # ---
-                    if (badger_num >= 10) and\
+                    if system_id is None:
+                        signalling_level = 3
+                    elif (badger_num >= 10) and\
                        (venture_num >= 10) and\
                        (liquid_ozone_num >= 20000) and\
                        (indus_cyno_gen_num >= 20) and\
@@ -298,6 +321,8 @@ def main():
                         "hydrogen_isotope": hydrogen_isotope_num,
                         "signalling_level": signalling_level
                     }
+                    if system_id is None:
+                        data.update({"error": "no solar system"})
                 corp_cynonetwork.update({str(location_id): data})
 
     print("\nBuilding cyno network report...")
