@@ -788,7 +788,7 @@ def get_route_signalling_type(level):
         return "success"
     elif level == 1:
         return "warning"
-    else:
+    elif (level == 2) or (level == 3):
         return "danger"
 
 
@@ -879,12 +879,19 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
             system_name = route_place["solar_system"]
             if progress_times == progress_segments:
                 progress_width = progress_width + 100 - progress_width * progress_segments
-            glf.write(
-                '    <div class="progress-bar progress-bar-{signal}" role="progressbar" style="width:{width}%">{nm}</div>\n'.
-                format(width=progress_width,
-                       nm=system_name,
-                       signal=get_route_signalling_type(route_place["signalling_level"])
-                ))
+            if not ("error" in route_place):
+                glf.write(
+                    '    <div class="progress-bar progress-bar-{signal}" role="progressbar" style="width:{width}%">{nm}</div>\n'.
+                    format(width=progress_width,
+                           nm=system_name,
+                           signal=get_route_signalling_type(route_place["signalling_level"])
+                    ))
+            else:
+                glf.write(
+                    '    <div class="progress-bar" role="progressbar" style="width:{width}%; background-color:#888;">{nm}</div>\n'.
+                    format(width=progress_width,
+                           nm=system_name
+                    ))
             progress_times = progress_times + 1
         glf.write("""   </div>
    <table class="table">
@@ -905,37 +912,47 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
     <tbody>""")
         row_num = 1
         for location_id in cn_route:
-            system_name = corp_cynonetwork[str(location_id)]["solar_system"]
-            badger_num = corp_cynonetwork[str(location_id)]["badger"]
-            venture_num = corp_cynonetwork[str(location_id)]["venture"]
-            liquid_ozone_num = corp_cynonetwork[str(location_id)]["liquid_ozone"]
-            indus_cyno_gen_num = corp_cynonetwork[str(location_id)]["indus_cyno_gen"]
-            exp_cargohold_num = corp_cynonetwork[str(location_id)]["exp_cargohold"]
-            cargohold_rigs_num = corp_cynonetwork[str(location_id)]["cargohold_rigs"]
-            nitrogen_isotope_num = corp_cynonetwork[str(location_id)]["nitrogen_isotope"]
-            hydrogen_isotope_num = corp_cynonetwork[str(location_id)]["hydrogen_isotope"]
-            badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
-            venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
-            glf.write(
-                '<tr>\n'
-                ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
-                ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
-                ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hi}</td>\n'
-                '</tr>'.
-                format(num=row_num,
-                       nm=system_name,
-                       bjumps=badger_jumps_num,
-                       vjumps=venture_jumps_num,
-                       b=badger_num,
-                       v=venture_num,
-                       lo=liquid_ozone_num,
-                       icg=indus_cyno_gen_num,
-                       ch=exp_cargohold_num,
-                       chr=cargohold_rigs_num,
-                       ni=nitrogen_isotope_num,
-                       hi=hydrogen_isotope_num
-                ))
+            route_place = corp_cynonetwork[str(location_id)]
+            system_name = route_place["solar_system"]
+            if not ("error" in route_place):
+                badger_num = route_place["badger"]
+                venture_num = route_place["venture"]
+                liquid_ozone_num = route_place["liquid_ozone"]
+                indus_cyno_gen_num = route_place["indus_cyno_gen"]
+                exp_cargohold_num = route_place["exp_cargohold"]
+                cargohold_rigs_num = route_place["cargohold_rigs"]
+                nitrogen_isotope_num = route_place["nitrogen_isotope"]
+                hydrogen_isotope_num = route_place["hydrogen_isotope"]
+                badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
+                venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
+                glf.write(
+                    '<tr>\n'
+                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
+                    ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
+                    ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hi}</td>\n'
+                    '</tr>'.
+                    format(num=row_num,
+                           nm=system_name,
+                           bjumps=badger_jumps_num,
+                           vjumps=venture_jumps_num,
+                           b=badger_num,
+                           v=venture_num,
+                           lo=liquid_ozone_num,
+                           icg=indus_cyno_gen_num,
+                           ch=exp_cargohold_num,
+                           chr=cargohold_rigs_num,
+                           ni=nitrogen_isotope_num,
+                           hi=hydrogen_isotope_num
+                    ))
+            else:
+                glf.write(
+                    '<tr>\n'
+                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td>\n'
+                    '</tr>'.
+                    format(num=row_num,
+                           nm=system_name))
             row_num = row_num + 1
         glf.write("""    </tbody>
    </table>
@@ -968,6 +985,15 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
     </div>
    </div>
    <div class="col-xs-9">there is a chance to stop</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width: 50%; background-color:#888;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">there are temporary problems with access to ESI (out of sync assets movements)</div>
   </div>
 </div>""")
 

@@ -48,6 +48,8 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
         return None
     loc_dict = corp_assets_tree[str(location_id)]
     if subtype is None:
+        if not ("location_id" in loc_dict): # иногда ESI присылает содержимое контейнеров, которые исчезают из ангаров, кораблей и звёздных систем
+            return None
         solar_system_id = get_cyno_solar_system_details(
             loc_dict["location_id"],
             corp_assets_tree,
@@ -191,6 +193,22 @@ def main():
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data)
     eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
+    # Только для поиска ассетов:
+    #print("\nBuilding assets tree report...")
+    #sys.stdout.flush()
+    #dump_assets_tree_into_report(
+    #    # sde данные, загруженные из .converted_xxx.json файлов
+    #    sde_type_ids,
+    #    sde_inv_names,
+    #    sde_inv_items,
+    #    # esi данные, загруженные с серверов CCP
+    #    corp_assets_data,
+    #    corp_ass_names_data,
+    #    foreign_structures_data,
+    #    # данные, полученные в результате анализа и перекомпоновки входных списков
+    #    corp_ass_loc_data,
+    #    corp_assets_tree)
+
     # Фильтрация (вручную) ассетов, которые расположены на станках циносети
     corp_cynonetwork = {}
     for cn in q_logist_settings.g_cynonetworks:
@@ -200,98 +218,87 @@ def main():
             if not (str(location_id) in corp_cynonetwork):
                 data = get_cyno_solar_system_details(location_id, corp_assets_tree)
                 # ---
-                system_id = data["solar_system"]
-                badger_ids = data["badger"]
-                venture_ids = data["venture"]
-                liquid_ozone_ids = data["liquid_ozone"]
-                indus_cyno_gen_ids = data["indus_cyno_gen"]
-                exp_cargohold_ids = data["exp_cargohold"]
-                cargohold_rigs_ids = data["cargohold_rigs"]
-                nitrogen_isotope_ids = data["nitrogen_isotope"]
-                hydrogen_isotope_ids = data["hydrogen_isotope"]
-                system_name = sde_inv_names[str(system_id)]
-                badger_num = 0
-                venture_num = 0
-                liquid_ozone_num = 0
-                indus_cyno_gen_num = 0
-                exp_cargohold_num = 0
-                cargohold_rigs_num = 0
-                nitrogen_isotope_num = 0
-                hydrogen_isotope_num = 0
-                # ---
-                for a in corp_assets_data:
-                    item_id = int(a["item_id"])
-                    quantity = int(a["quantity"])
-                    if not (badger_ids is None) and badger_ids.count(item_id) > 0:
-                        badger_num = badger_num + quantity
-                    elif not (venture_ids is None) and venture_ids.count(item_id) > 0:
-                        venture_num = venture_num + quantity
-                    elif not (liquid_ozone_ids is None) and liquid_ozone_ids.count(item_id) > 0:
-                        liquid_ozone_num = liquid_ozone_num + quantity
-                    elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
-                        indus_cyno_gen_num = indus_cyno_gen_num + quantity
-                    elif not (exp_cargohold_ids is None) and exp_cargohold_ids.count(item_id) > 0:
-                        exp_cargohold_num = exp_cargohold_num + quantity
-                    elif not (cargohold_rigs_ids is None) and cargohold_rigs_ids.count(item_id) > 0:
-                        cargohold_rigs_num = cargohold_rigs_num + quantity
-                    elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
-                        nitrogen_isotope_num = nitrogen_isotope_num + quantity
-                    elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
-                        hydrogen_isotope_num = hydrogen_isotope_num + quantity
-                # ---
-                # signalling_level = 0 - normal, 1 - warning, 2 - danger
+                # signalling_level = 0 - normal, 1 - warning, 2 - danger, 3 - ошибка получения данных
                 # оптимальный набор: 10 баджеров, 10 цин, 10'000 (по 950 на прожиг) озона
                 #              плюс: 10 вентур, 10 цин, 10'000 (по 200 на прожиг) озона, 30 риг, 10 каргохолда
                 # минимальный набор: 1 баджер, 1 вентурка, 2 цины, 1150 озона, 3 риги, 1 каргохолд
-                if (badger_num >= 10) and\
-                   (venture_num >= 10) and\
-                   (liquid_ozone_num >= 20000) and\
-                   (indus_cyno_gen_num >= 20) and\
-                   (exp_cargohold_num >= 10) and\
-                   (cargohold_rigs_num >= 30) and\
-                   (nitrogen_isotope_num >= 0) and\
-                   (hydrogen_isotope_num >= 0):
-                    signalling_level = 0
-                elif (badger_num >= 1) and \
-                     (venture_num >= 1) and \
-                     (liquid_ozone_num >= 1150) and \
-                     (indus_cyno_gen_num >= 2) and \
-                     (exp_cargohold_num >= 1) and \
-                     (cargohold_rigs_num >= 3) and \
-                     (nitrogen_isotope_num >= 0):
-                    signalling_level = 1
+                if data is None:
+                    data = {"error": "no data",
+                            "solar_system": "NO-DATA!",
+                            "signalling_level": 3}
                 else:
-                    signalling_level = 2
-                # ---
-                data = {
-                    "solar_system": system_name,
-                    "badger": badger_num,
-                    "venture": venture_num,
-                    "liquid_ozone": liquid_ozone_num,
-                    "indus_cyno_gen": indus_cyno_gen_num,
-                    "exp_cargohold": exp_cargohold_num,
-                    "cargohold_rigs": cargohold_rigs_num,
-                    "nitrogen_isotope": nitrogen_isotope_num,
-                    "hydrogen_isotope": hydrogen_isotope_num,
-                    "signalling_level": signalling_level
-                }
+                    system_id = data["solar_system"]
+                    badger_ids = data["badger"]
+                    venture_ids = data["venture"]
+                    liquid_ozone_ids = data["liquid_ozone"]
+                    indus_cyno_gen_ids = data["indus_cyno_gen"]
+                    exp_cargohold_ids = data["exp_cargohold"]
+                    cargohold_rigs_ids = data["cargohold_rigs"]
+                    nitrogen_isotope_ids = data["nitrogen_isotope"]
+                    hydrogen_isotope_ids = data["hydrogen_isotope"]
+                    system_name = sde_inv_names[str(system_id)]
+                    badger_num = 0
+                    venture_num = 0
+                    liquid_ozone_num = 0
+                    indus_cyno_gen_num = 0
+                    exp_cargohold_num = 0
+                    cargohold_rigs_num = 0
+                    nitrogen_isotope_num = 0
+                    hydrogen_isotope_num = 0
+                    # ---
+                    for a in corp_assets_data:
+                        item_id = int(a["item_id"])
+                        quantity = int(a["quantity"])
+                        if not (badger_ids is None) and badger_ids.count(item_id) > 0:
+                            badger_num = badger_num + quantity
+                        elif not (venture_ids is None) and venture_ids.count(item_id) > 0:
+                            venture_num = venture_num + quantity
+                        elif not (liquid_ozone_ids is None) and liquid_ozone_ids.count(item_id) > 0:
+                            liquid_ozone_num = liquid_ozone_num + quantity
+                        elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
+                            indus_cyno_gen_num = indus_cyno_gen_num + quantity
+                        elif not (exp_cargohold_ids is None) and exp_cargohold_ids.count(item_id) > 0:
+                            exp_cargohold_num = exp_cargohold_num + quantity
+                        elif not (cargohold_rigs_ids is None) and cargohold_rigs_ids.count(item_id) > 0:
+                            cargohold_rigs_num = cargohold_rigs_num + quantity
+                        elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
+                            nitrogen_isotope_num = nitrogen_isotope_num + quantity
+                        elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
+                            hydrogen_isotope_num = hydrogen_isotope_num + quantity
+                    # ---
+                    if (badger_num >= 10) and\
+                       (venture_num >= 10) and\
+                       (liquid_ozone_num >= 20000) and\
+                       (indus_cyno_gen_num >= 20) and\
+                       (exp_cargohold_num >= 10) and\
+                       (cargohold_rigs_num >= 30) and\
+                       (nitrogen_isotope_num >= 0) and\
+                       (hydrogen_isotope_num >= 0):
+                        signalling_level = 0
+                    elif (badger_num >= 1) and \
+                         (venture_num >= 1) and \
+                         (liquid_ozone_num >= 1150) and \
+                         (indus_cyno_gen_num >= 2) and \
+                         (exp_cargohold_num >= 1) and \
+                         (cargohold_rigs_num >= 3) and \
+                         (nitrogen_isotope_num >= 0):
+                        signalling_level = 1
+                    else:
+                        signalling_level = 2
+                    # ---
+                    data = {
+                        "solar_system": system_name,
+                        "badger": badger_num,
+                        "venture": venture_num,
+                        "liquid_ozone": liquid_ozone_num,
+                        "indus_cyno_gen": indus_cyno_gen_num,
+                        "exp_cargohold": exp_cargohold_num,
+                        "cargohold_rigs": cargohold_rigs_num,
+                        "nitrogen_isotope": nitrogen_isotope_num,
+                        "hydrogen_isotope": hydrogen_isotope_num,
+                        "signalling_level": signalling_level
+                    }
                 corp_cynonetwork.update({str(location_id): data})
-
-    # Только для поиска ассетов:
-    print("\nBuilding assets tree report...")
-    sys.stdout.flush()
-    dump_assets_tree_into_report(
-        # sde данные, загруженные из .converted_xxx.json файлов
-        sde_type_ids,
-        sde_inv_names,
-        sde_inv_items,
-        # esi данные, загруженные с серверов CCP
-        corp_assets_data,
-        corp_ass_names_data,
-        foreign_structures_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
-        corp_assets_tree)
 
     print("\nBuilding cyno network report...")
     sys.stdout.flush()
