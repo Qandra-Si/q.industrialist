@@ -152,7 +152,23 @@ def get_foreign_structures_ids(corp_assets_data):
                     found = True
                     break
             if not found:
-                foreign_structs_ids.append(station_id)
+                if 0 == foreign_structs_ids.count(station_id):
+                    foreign_structs_ids.append(station_id)
+        elif (a["location_flag"] == "CorpDeliveries") and (a["location_type"] == "item"):
+            # если будут найдены корпоративные delivery, то следует иметь в виду, что
+            # всякое corp-delivery всегда находится в разделе "входящие" на станциях, так
+            # что всякая локация corp-deliveries - это станции
+            location_id = int(a["location_id"])
+            if location_id < 1000000000000:
+                continue
+            if 0 == foreign_structs_ids.count(location_id):
+                foreign_structs_ids.append(location_id)
+    # пока не придумал как реагировать, что на один элемент списка сервер даст Forbidden
+    if q_industrialist_settings.g_adopt_for_ri4:
+        if foreign_structs_ids.count(1033351356223):
+            foreign_structs_ids.remove(1033351356223)
+        if foreign_structs_ids.count(1028813912772):
+            foreign_structs_ids.remove(1028813912772)
     return foreign_structs_ids
 
 

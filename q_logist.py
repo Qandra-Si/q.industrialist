@@ -177,7 +177,7 @@ def main():
     # { location1: {items:[item1,item2,...],type_id,location_id},
     #   location2: {items:[item3],type_id} }
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
-    eve_esi_interface.dump_json_into_file("corp_assets_tree", corp_assets_tree)
+    eve_esi_interface.dump_debug_into_file("corp_assets_tree", corp_assets_tree)
 
     # Фильтрация (вручную) ассетов, которые расположены на станках циносети
     corp_cynonetwork = {}
@@ -293,6 +293,7 @@ def main():
                     if system_id is None:
                         data.update({"error": "no solar system"})
                 corp_cynonetwork.update({str(location_id): data})
+    eve_esi_interface.dump_debug_into_file("corp_cynonetwork", corp_cynonetwork)
 
     print("\nBuilding cyno network report...")
     sys.stdout.flush()

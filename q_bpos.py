@@ -99,7 +99,7 @@ def main():
     # { group1: {items:[sub1,sub2,...]},
     #   group2: {items:[sub3],parent_id} }
     market_groups_tree = eve_sde_tools.get_market_groups_tree(sde_market_groups)
-    eve_esi_interface.dump_json_into_file("market_groups_tree", market_groups_tree)
+    eve_esi_interface.dump_debug_into_file("market_groups_tree", market_groups_tree)
 
     print("\nBuilding report...")
     sys.stdout.flush()

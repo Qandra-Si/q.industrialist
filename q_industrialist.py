@@ -122,12 +122,13 @@ def main():
     sys.stdout.flush()
 
     # Requires: access token
-    fittings_data = eve_esi_interface.get_esi_data(
-        access_token,
-        "characters/{}/fittings/".format(character_id),
-        "fittings")
-    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
-    sys.stdout.flush()
+    fittings_data = []
+    # fittings_data = eve_esi_interface.get_esi_data(
+    #     access_token,
+    #     "characters/{}/fittings/".format(character_id),
+    #     "fittings")
+    # print("\n{} has {} fittings".format(character_name, len(fittings_data)))
+    # sys.stdout.flush()
 
     # Requires: access token
     # contracts_data = eve_esi_interface.get_esi_data(
@@ -175,7 +176,7 @@ def main():
 
     # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
     corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
-    eve_esi_interface.dump_json_into_file("corp_bp_loc_data", corp_bp_loc_data)
+    eve_esi_interface.dump_debug_into_file("corp_bp_loc_data", corp_bp_loc_data)
 
     # Построение списка модулей и ресурсов, которые используются в производстве
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
@@ -185,7 +186,7 @@ def main():
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(
         corp_assets_data,
         [1032950982419] if q_industrialist_settings.g_adopt_for_ri4 else None)
-    eve_esi_interface.dump_json_into_file("corp_ass_loc_data", corp_ass_loc_data)
+    eve_esi_interface.dump_debug_into_file("corp_ass_loc_data", corp_ass_loc_data)
 
     print("\nBuilding report...")
     sys.stdout.flush()

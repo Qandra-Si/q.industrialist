@@ -130,10 +130,12 @@ def send_token_refresh(refresh_token, client_id, client_scopes=[]):
     return res
 
 
-def send_esi_request(access_token, uri, body=None):
+def send_esi_request_http(access_token, uri, etag, body=None):
     headers = {
         "Authorization": "Bearer {}".format(access_token),
     }
+    if not (etag is None):
+        headers.update({"If-None-Match": etag})
     if q_industrialist_settings.g_user_agent:
         headers.update({"User-Agent": q_industrialist_settings.g_user_agent})
 
@@ -171,7 +173,11 @@ def send_esi_request(access_token, uri, body=None):
         print(sys.exc_info())
         raise
 
-    return res.json()
+    return res
+
+
+def send_esi_request_json(access_token, uri, etag, body=None):
+    return send_esi_request_http(access_token, uri, etag, body).json()
 
 
 def print_sso_failure(sso_response):
