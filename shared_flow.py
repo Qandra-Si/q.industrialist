@@ -134,7 +134,7 @@ def send_esi_request_http(access_token, uri, etag, body=None):
     headers = {
         "Authorization": "Bearer {}".format(access_token),
     }
-    if not (etag is None):
+    if not (etag is None) and (body is None):
         headers.update({"If-None-Match": etag})
     if q_industrialist_settings.g_user_agent:
         headers.update({"User-Agent": q_industrialist_settings.g_user_agent})
