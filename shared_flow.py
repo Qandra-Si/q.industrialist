@@ -173,6 +173,13 @@ def send_esi_request_http(access_token, uri, etag, body=None):
         print(sys.exc_info())
         raise
 
+    #debug = str(res.status_code) + " " + uri[31:]
+    #if ('Last-Modified' in res.headers):
+    #    debug = debug + " " + str(res.headers['Last-Modified'])[17:-4]
+    #if ('Etag' in res.headers):
+    #    debug = debug + " " + str(res.headers['Etag'])
+    #print(debug)
+
     return res
 
 
