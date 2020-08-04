@@ -63,6 +63,8 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
         cargohold_rigs_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 31117)  # Small Cargohold Optimization I
         nitrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17888)  # Nitrogen Isotopes
         hydrogen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17889)  # Hydrogen Isotopes
+        oxygen_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 17887)  # Oxygen Isotopes
+        helium_isotope_ids = get_cyno_solar_system_details(location_id, corp_assets_tree, 16274)  # Helium Isotopes
         return {"solar_system": solar_system_id,
                 "badger": badger_ids,
                 "venture": venture_ids,
@@ -71,7 +73,9 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
                 "exp_cargohold": exp_cargohold_ids,
                 "cargohold_rigs": cargohold_rigs_ids,
                 "nitrogen_isotope": nitrogen_isotope_ids,
-                "hydrogen_isotope": hydrogen_isotope_ids}
+                "hydrogen_isotope": hydrogen_isotope_ids,
+                "oxygen_isotope": oxygen_isotope_ids,
+                "helium_isotope": helium_isotope_ids}
     else:
         type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
         if not (type_id is None) and (type_id == abs(subtype)):  # нашли
@@ -223,6 +227,8 @@ def main():
                     cargohold_rigs_ids = data["cargohold_rigs"]
                     nitrogen_isotope_ids = data["nitrogen_isotope"]
                     hydrogen_isotope_ids = data["hydrogen_isotope"]
+                    oxygen_isotope_ids = data["oxygen_isotope"]
+                    helium_isotope_ids = data["helium_isotope"]
                     if system_id is None:
                         system_name = "NO-DATA!"
                     else:
@@ -235,6 +241,8 @@ def main():
                     cargohold_rigs_num = 0
                     nitrogen_isotope_num = 0
                     hydrogen_isotope_num = 0
+                    oxygen_isotope_num = 0
+                    helium_isotope_num = 0
                     # ---
                     for a in corp_assets_data:
                         item_id = int(a["item_id"])
@@ -255,6 +263,10 @@ def main():
                             nitrogen_isotope_num = nitrogen_isotope_num + quantity
                         elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
                             hydrogen_isotope_num = hydrogen_isotope_num + quantity
+                        elif not (oxygen_isotope_ids is None) and oxygen_isotope_ids.count(item_id) > 0:
+                            oxygen_isotope_num = oxygen_isotope_num + quantity
+                        elif not (helium_isotope_ids is None) and helium_isotope_ids.count(item_id) > 0:
+                            helium_isotope_num = helium_isotope_num + quantity
                     # ---
                     if system_id is None:
                         signalling_level = 3
@@ -265,7 +277,9 @@ def main():
                        (exp_cargohold_num >= 10) and\
                        (cargohold_rigs_num >= 30) and\
                        (nitrogen_isotope_num >= 0) and\
-                       (hydrogen_isotope_num >= 0):
+                       (hydrogen_isotope_num >= 0) and\
+                       (oxygen_isotope_num >= 0) and\
+                       (helium_isotope_num >= 0):
                         signalling_level = 0
                     elif (badger_num >= 1) and \
                          (venture_num >= 1) and \
@@ -273,7 +287,10 @@ def main():
                          (indus_cyno_gen_num >= 2) and \
                          (exp_cargohold_num >= 1) and \
                          (cargohold_rigs_num >= 3) and \
-                         (nitrogen_isotope_num >= 0):
+                         (nitrogen_isotope_num >= 0) and \
+                         (hydrogen_isotope_num >= 0) and \
+                         (oxygen_isotope_num >= 0) and \
+                         (helium_isotope_num >= 0):
                         signalling_level = 1
                     else:
                         signalling_level = 2
@@ -288,6 +305,8 @@ def main():
                         "cargohold_rigs": cargohold_rigs_num,
                         "nitrogen_isotope": nitrogen_isotope_num,
                         "hydrogen_isotope": hydrogen_isotope_num,
+                        "oxygen_isotope": oxygen_isotope_num,
+                        "helium_isotope": helium_isotope_num,
                         "signalling_level": signalling_level
                     }
                     if system_id is None:

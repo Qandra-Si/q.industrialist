@@ -905,8 +905,7 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/17888_32.png" width="32px" height="32px" alt="Nitrogen Isotopes"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/17889_32.png" width="32px" height="32px" alt="Hydrogen Isotopes"/></th>
+      <th>Nitrogen</th><th>Hydrogen</th><th>Oxygen</th><th>Helium</th>
      </tr>
     </thead>
     <tbody>""")
@@ -923,6 +922,8 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                 cargohold_rigs_num = route_place["cargohold_rigs"]
                 nitrogen_isotope_num = route_place["nitrogen_isotope"]
                 hydrogen_isotope_num = route_place["hydrogen_isotope"]
+                oxygen_isotope_num = route_place["oxygen_isotope"]
+                helium_isotope_num = route_place["helium_isotope"]
                 badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
                 glf.write(
@@ -930,7 +931,7 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
                     ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
                     ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
-                    ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hi}</td>\n'
+                    ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hy}</td><td>{ox}</td><td>{he}</td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name,
@@ -943,13 +944,15 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                            ch=exp_cargohold_num,
                            chr=cargohold_rigs_num,
                            ni=nitrogen_isotope_num,
-                           hi=hydrogen_isotope_num
+                           hy=hydrogen_isotope_num,
+                           ox=oxygen_isotope_num,
+                           he=helium_isotope_num
                     ))
             else:
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name))
