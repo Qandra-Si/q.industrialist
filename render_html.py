@@ -1008,12 +1008,6 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
             route_place = corp_cynonetwork[str(location_id)]
             system_name = route_place["solar_system"]
             lightyears = lightyear_distances[row_num-1] if row_num < len(cn_route) else None
-            if not (lightyears is None):
-                # https://wiki.eveuniversity.org/Jump_drives#Jumpdrive_Isotope_Usage_Formula
-                nitrogen_used = int(lightyears * 10000 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
-                hydrogen_used = int(lightyears * 8200 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
-                oxygen_used = int(lightyears * 9400 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
-                helium_used = int(lightyears * 8800 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
             if not ("error" in route_place) or (route_place["error"] != "no data"):
                 badger_num = route_place["badger"]
                 venture_num = route_place["venture"]
@@ -1027,10 +1021,6 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 helium_isotope_num = route_place["helium_isotope"]
                 badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
-                nitrogen_jumps_num = int(nitrogen_isotope_num / nitrogen_used) if not (lightyears is None) else None
-                hydrogen_jumps_num = int(hydrogen_isotope_num / hydrogen_used) if not (lightyears is None) else None
-                oxygen_jumps_num = int(oxygen_isotope_num / oxygen_used) if not (lightyears is None) else None
-                helium_jumps_num = int(helium_isotope_num / helium_used) if not (lightyears is None) else None
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
@@ -1049,14 +1039,10 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                            icg=indus_cyno_gen_num,
                            ch=exp_cargohold_num,
                            chr=cargohold_rigs_num,
-                           ni='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
-                              jumps=nitrogen_jumps_num, i=nitrogen_isotope_num) if not (nitrogen_jumps_num is None) and (nitrogen_isotope_num > 0) else str(nitrogen_isotope_num),
-                           hy='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
-                              jumps=hydrogen_jumps_num, i=hydrogen_isotope_num) if not (hydrogen_jumps_num is None) and (hydrogen_isotope_num > 0) else str(hydrogen_isotope_num),
-                           ox='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
-                              jumps=oxygen_jumps_num, i=oxygen_isotope_num) if not (oxygen_jumps_num is None) and (oxygen_isotope_num > 0) else str(oxygen_isotope_num),
-                           he='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
-                              jumps=helium_jumps_num, i=helium_isotope_num) if not (helium_jumps_num is None) and (helium_isotope_num > 0) else str(helium_isotope_num)
+                           ni=nitrogen_isotope_num,
+                           hy=hydrogen_isotope_num,
+                           ox=oxygen_isotope_num,
+                           he=helium_isotope_num
                     ))
             else:
                 glf.write(
@@ -1070,16 +1056,11 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr class="active">\n'
                     ' <th></th><td></td>\n'
-                    ' <td colspan="4">{ly}</td><td colspan="4"{ly_val}>{iu}</td>\n'
+                    ' <td colspan="4">{ly}</td><td colspan="4"{ly_val}></td>\n'
                     '</tr>'.
                     format(
                         ly_val='lightyears="{:0.3f}"'.format(lightyears) if not (lightyears is None) else "",
-                        ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else "",
-                        iu='Isotopes needed: <span class="nitrogen"><strong>{}</strong> Ni</span> '
-                           '<span class="hydrogen"><strong>{}</strong> Hy</span> '
-                           '<span class="oxygen"><strong>{}</strong> Ox</span> '
-                           '<span class="helium"><strong>{}</strong> He</span>'.
-                        format(nitrogen_used, hydrogen_used, oxygen_used, helium_used) if not (lightyears is None) else ""
+                        ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else ""
                     ))
             row_num = row_num + 1
         glf.write("""    </tbody>
