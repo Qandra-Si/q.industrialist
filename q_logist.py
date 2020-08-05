@@ -140,6 +140,7 @@ def main():
 
     sde_inv_names = eve_sde_tools.read_converted("invNames")
     sde_inv_items = eve_sde_tools.read_converted("invItems")
+    sde_inv_positions = eve_sde_tools.read_converted("invPositions")
 
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
@@ -198,6 +199,7 @@ def main():
                 # минимальный набор: 1 баджер, 1 вентурка, 2 цины, 1150 озона, 3 риги, 1 каргохолд
                 if data is None:
                     # print('{} {}'.format(location_id, data))
+                    system_id = None
                     loc_name = "NO-DATA!"
                     loc_id = location_id
                     if int(loc_id) < 1000000000000:
@@ -212,9 +214,11 @@ def main():
                                     root_item = sde_inv_items[str(loc_id)]
                                     # print(" >>> ", loc_id, root_item)
                                     if root_item["typeID"] == 5:  # Solar System
+                                        system_id = loc_id
                                         loc_name = sde_inv_names[str(loc_id)]  # Solar System (name)
                                         # print(" >>> >>> ", loc_name)
                     data = {"error": "no data",
+                            "system_id": system_id,
                             "solar_system": loc_name,
                             "signalling_level": 3}
                 else:
@@ -296,6 +300,7 @@ def main():
                         signalling_level = 2
                     # ---
                     data = {
+                        "system_id": system_id,
                         "solar_system": system_name,
                         "badger": badger_num,
                         "venture": venture_num,
@@ -317,6 +322,8 @@ def main():
     print("\nBuilding cyno network report...")
     sys.stdout.flush()
     dump_cynonetwork_into_report(
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_inv_positions,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_cynonetwork
     )

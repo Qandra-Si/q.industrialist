@@ -1,5 +1,6 @@
 ﻿import time
 import tzlocal
+import math
 
 from datetime import datetime
 from eve_sde_tools import get_yaml
@@ -792,7 +793,7 @@ def get_route_signalling_type(level):
         return "danger"
 
 
-def dump_corp_cynonetwork(glf, corp_cynonetwork):
+def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     glf.write("""<nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
@@ -909,10 +910,40 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
      </tr>
     </thead>
     <tbody>""")
+        # --- расчёт дистанции прыжка
+        prev_system_id = None
+        row_num = 1
+        lightyear_distances = []
+        for location_id in cn_route:
+            route_place = corp_cynonetwork[str(location_id)]
+            system_id = route_place["system_id"]
+            if row_num > 1:
+                pos1 = sde_inv_positions[str(system_id)] if not (system_id is None) and (str(system_id) in sde_inv_positions) else None
+                pos2 = sde_inv_positions[str(prev_system_id)] if not (prev_system_id is None) and (str(prev_system_id) in sde_inv_positions) else None
+                if not (pos1 is None) and not (pos2 is None):
+                    # https://en.wikipedia.org/wiki/Euclidean_distance
+                    distance = math.sqrt((pos1["x"]-pos2["x"]) ** 2 + (pos1["y"]-pos2["y"]) ** 2 + (pos1["z"]-pos2["z"]) ** 2)
+                    # https://github.com/nikdoof/cynomap
+                    # ...Distance calculation is based on CCP's lightyear being 9460000000000000 meters, instead of
+                    # the actual value of 9460730472580800 meters...
+                    distance = distance / 9460000000000000
+                    lightyear_distances.append(distance)  # lightyears
+                else:
+                    lightyear_distances.append(None)
+            prev_system_id = system_id
+            row_num = row_num + 1
+        # --- построение таблицы по маршруту циносети
         row_num = 1
         for location_id in cn_route:
             route_place = corp_cynonetwork[str(location_id)]
             system_name = route_place["solar_system"]
+            lightyears = lightyear_distances[row_num-1] if row_num < len(cn_route) else None
+            if not (lightyears is None):
+                # https://wiki.eveuniversity.org/Jump_drives#Jumpdrive_Isotope_Usage_Formula
+                nitrogen_used = int(lightyears * 10000 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
+                hydrogen_used = int(lightyears * 8200 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
+                oxygen_used = int(lightyears * 9400 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
+                helium_used = int(lightyears * 8800 * (1 - 0.1 * 4) * (1 - 0.1 * 4) + 0.5)
             if not ("error" in route_place) or (route_place["error"] != "no data"):
                 badger_num = route_place["badger"]
                 venture_num = route_place["venture"]
@@ -926,12 +957,17 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                 helium_isotope_num = route_place["helium_isotope"]
                 badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
+                nitrogen_jumps_num = int(nitrogen_isotope_num / nitrogen_used) if not (lightyears is None) else None
+                hydrogen_jumps_num = int(hydrogen_isotope_num / hydrogen_used) if not (lightyears is None) else None
+                oxygen_jumps_num = int(oxygen_isotope_num / oxygen_used) if not (lightyears is None) else None
+                helium_jumps_num = int(helium_isotope_num / helium_used) if not (lightyears is None) else None
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
                     ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
                     ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
-                    ' <td>{icg}</td><td>{lo}</td><td>{ni}</td><td>{hy}</td><td>{ox}</td><td>{he}</td>\n'
+                    ' <td>{icg}</td><td>{lo}</td>\n'
+                    ' <td>{ni}</td><td>{hy}</td><td>{ox}</td><td>{he}</td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name,
@@ -943,10 +979,14 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                            icg=indus_cyno_gen_num,
                            ch=exp_cargohold_num,
                            chr=cargohold_rigs_num,
-                           ni=nitrogen_isotope_num,
-                           hy=hydrogen_isotope_num,
-                           ox=oxygen_isotope_num,
-                           he=helium_isotope_num
+                           ni='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                              jumps=nitrogen_jumps_num, i=nitrogen_isotope_num) if not (nitrogen_jumps_num is None) and (nitrogen_isotope_num > 0) else str(nitrogen_isotope_num),
+                           hy='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                              jumps=hydrogen_jumps_num, i=hydrogen_isotope_num) if not (hydrogen_jumps_num is None) and (hydrogen_isotope_num > 0) else str(hydrogen_isotope_num),
+                           ox='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                              jumps=oxygen_jumps_num, i=oxygen_isotope_num) if not (oxygen_jumps_num is None) and (oxygen_isotope_num > 0) else str(oxygen_isotope_num),
+                           he='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                              jumps=helium_jumps_num, i=helium_isotope_num) if not (helium_jumps_num is None) and (helium_isotope_num > 0) else str(helium_isotope_num)
                     ))
             else:
                 glf.write(
@@ -956,6 +996,17 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name))
+            if row_num != len(cn_route):
+                glf.write(
+                    '<tr class="active">\n'
+                    ' <th></th><td></td>\n'
+                    ' <td colspan="4">{ly}</td><td colspan="4">{iu}</td>\n'
+                    '</tr>'.
+                    format(
+                        ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else "",
+                        iu='Isotopes needed: <strong>{}</strong> Ni, <strong>{}</strong> Hy, <strong>{}</strong> Ox, <strong>{}</strong> He'.
+                        format(nitrogen_used, hydrogen_used, oxygen_used, helium_used) if not (lightyears is None) else ""
+                    ))
             row_num = row_num + 1
         glf.write("""    </tbody>
    </table>
@@ -1001,11 +1052,11 @@ def dump_corp_cynonetwork(glf, corp_cynonetwork):
 </div>""")
 
 
-def dump_cynonetwork_into_report(corp_cynonetwork):
+def dump_cynonetwork_into_report(sde_inv_positions, corp_cynonetwork):
     glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Cyno Network")
-        dump_corp_cynonetwork(glf, corp_cynonetwork)
+        dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork)
         dump_footer(glf)
     finally:
         glf.close()

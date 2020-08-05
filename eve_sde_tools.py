@@ -242,7 +242,26 @@ def rebuild_icons(name):
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
 
+
+def clean_positions(name):
+    positions = read_converted(name)
+    positions = [i for i in positions if (i["x"] != 0.0) and (i["y"] != 0.0) and (i["z"] != 0.0)]
+    # json
+    f_name_json = get_converted_name(name)
+    s = json.dumps(positions, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+", encoding='utf8')
+    f.write(s)
+
+
 def main():  # rebuild .yaml files
+    print("Rebuilding invPositions.yaml file...")
+    sys.stdout.flush()
+    rebuild("bsd", "invPositions", ["itemID", "x", "y", "z"])
+    clean_positions("invPositions")
+    print("Reindexing .converted_invPositions.json file...")
+    sys.stdout.flush()
+    rebuild_list2dict_by_key("invPositions", "itemID")
+
     print("Rebuilding marketGroups.yaml file...")
     sys.stdout.flush()
     rebuild("fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
