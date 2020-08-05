@@ -188,6 +188,7 @@ def main():
     corp_cynonetwork = {}
     for cn in q_logist_settings.g_cynonetworks:
         cn_route = cn["route"]
+        jump_num = 1
         for location_id in cn_route:
             # если системы в цино сети повторяются, не гоняем искалочку зазря (повторно)
             if not (str(location_id) in corp_cynonetwork):
@@ -279,22 +280,14 @@ def main():
                        (liquid_ozone_num >= 20000) and\
                        (indus_cyno_gen_num >= 20) and\
                        (exp_cargohold_num >= 10) and\
-                       (cargohold_rigs_num >= 30) and\
-                       (nitrogen_isotope_num >= 0) and\
-                       (hydrogen_isotope_num >= 0) and\
-                       (oxygen_isotope_num >= 0) and\
-                       (helium_isotope_num >= 0):
+                       (cargohold_rigs_num >= 30):
                         signalling_level = 0
                     elif (badger_num >= 1) and \
                          (venture_num >= 1) and \
                          (liquid_ozone_num >= 1150) and \
                          (indus_cyno_gen_num >= 2) and \
                          (exp_cargohold_num >= 1) and \
-                         (cargohold_rigs_num >= 3) and \
-                         (nitrogen_isotope_num >= 0) and \
-                         (hydrogen_isotope_num >= 0) and \
-                         (oxygen_isotope_num >= 0) and \
-                         (helium_isotope_num >= 0):
+                         (cargohold_rigs_num >= 3):
                         signalling_level = 1
                     else:
                         signalling_level = 2
@@ -317,6 +310,7 @@ def main():
                     if system_id is None:
                         data.update({"error": "no solar system"})
                 corp_cynonetwork.update({str(location_id): data})
+            jump_num = jump_num + 1
     eve_esi_interface.dump_debug_into_file("corp_cynonetwork", corp_cynonetwork)
 
     print("\nBuilding cyno network report...")

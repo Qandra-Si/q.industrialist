@@ -794,7 +794,19 @@ def get_route_signalling_type(level):
 
 
 def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
-    glf.write("""<nav class="navbar navbar-default">
+    glf.write("""
+<style>
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu .dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -1px;
+}
+</style>
+
+<nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
@@ -818,24 +830,80 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         to_id = cn_route[-1]
         to_name = corp_cynonetwork[str(to_id)]["solar_system"]
         glf.write(
-            '<li><a href="#">{f} &rarr; {t}</a></li>'.  # предполагается: <li><a href="#">JK-Q77 &rarr; Raravath</a></li>
+            '\n       <li class="disabled"><a data-target="#" role="button">{f} &rarr; {t}</a></li>'.  # предполагается: <li><a href="#">JK-Q77 &rarr; Raravath</a></li>
             format(f=from_name,
                    t=to_name
             ))
     glf.write("""
        <li role="separator" class="divider"></li>
-       <li><a href="#">All routes</a></li>
+       <li class="disabled"><a data-target="#" role="button">All routes</a></li>
+     </ul>
+    </li>
+    
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Jump Options <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Ship <mark id="lbJumpShip"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li class="dropdown-header">[Jump Freighters]</li>
+           <li><a id="btnJumpShip" ship="Anshar" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipAnshar"></span> Anshar</a></li>
+           <li><a id="btnJumpShip" ship="Ark" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipArk"></span> Ark</a></li>
+           <li><a id="btnJumpShip" ship="Nomad" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipNomad"></span> Nomad</a></li>
+           <li><a id="btnJumpShip" ship="Rhea" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipRhea"></span> Rhea</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnJumpAnyShip" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpAnyShip"></span> Any Ship</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Drive Calibration <mark id="lbJumpCalibration"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpCalibration" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration1"></span> 1</a></li>
+           <li><a id="btnJumpCalibration" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration2"></span> 2</a></li>
+           <li><a id="btnJumpCalibration" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration3"></span> 3</a></li>
+           <li><a id="btnJumpCalibration" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration4"></span> 4</a></li>
+           <li><a id="btnJumpCalibration" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Drive Conservation <mark id="lbJumpConservation"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpConservation" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation1"></span> 1</a></li>
+           <li><a id="btnJumpConservation" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation2"></span> 2</a></li>
+           <li><a id="btnJumpConservation" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation3"></span> 3</a></li>
+           <li><a id="btnJumpConservation" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation4"></span> 4</a></li>
+           <li><a id="btnJumpConservation" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Freighter <mark id="lbJumpFreighter"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpFreighter" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter1"></span> 1</a></li>
+           <li><a id="btnJumpFreighter" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter2"></span> 2</a></li>
+           <li><a id="btnJumpFreighter" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter3"></span> 3</a></li>
+           <li><a id="btnJumpFreighter" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter4"></span> 4</a></li>
+           <li><a id="btnJumpFreighter" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
-     </li>
-     <li><a href="#">Problems</a></li>
-    </ul>
-    <form class="navbar-form navbar-right">
-     <div class="form-group">
-      <input type="text" class="form-control" placeholder="Solar System">
-     </div>
-     <button type="submit" class="btn btn-default">Search</button>
-    </form>
-   </div>
+    </li>
+    
+    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <div class="form-group">
+     <input type="text" class="form-control" placeholder="Solar System" disabled>
+    </div>
+    <button type="button" class="btn btn-default disabled">Search</button>
+   </form>
+  </div>
  </div>
 </nav>
 <div class="container-fluid">""")
@@ -906,7 +974,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
       <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
-      <th>Nitrogen</th><th>Hydrogen</th><th>Oxygen</th><th>Helium</th>
+      <th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
      </tr>
     </thead>
     <tbody>""")
@@ -928,6 +996,8 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     # the actual value of 9460730472580800 meters...
                     distance = distance / 9460000000000000
                     lightyear_distances.append(distance)  # lightyears
+                    # https://wiki.eveuniversity.org/Jump_drives#Jumpdrive_Isotope_Usage_Formula
+                    # ... moved to javascript logic ...
                 else:
                     lightyear_distances.append(None)
             prev_system_id = system_id
@@ -967,7 +1037,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
                     ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
                     ' <td>{icg}</td><td>{lo}</td>\n'
-                    ' <td>{ni}</td><td>{hy}</td><td>{ox}</td><td>{he}</td>\n'
+                    ' <td class="nitrogen">{ni}</td><td class="hydrogen">{hy}</td><td class="oxygen">{ox}</td><td class="helium">{he}</td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name,
@@ -979,13 +1049,13 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                            icg=indus_cyno_gen_num,
                            ch=exp_cargohold_num,
                            chr=cargohold_rigs_num,
-                           ni='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                           ni='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
                               jumps=nitrogen_jumps_num, i=nitrogen_isotope_num) if not (nitrogen_jumps_num is None) and (nitrogen_isotope_num > 0) else str(nitrogen_isotope_num),
-                           hy='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                           hy='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
                               jumps=hydrogen_jumps_num, i=hydrogen_isotope_num) if not (hydrogen_jumps_num is None) and (hydrogen_isotope_num > 0) else str(hydrogen_isotope_num),
-                           ox='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                           ox='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
                               jumps=oxygen_jumps_num, i=oxygen_isotope_num) if not (oxygen_jumps_num is None) and (oxygen_isotope_num > 0) else str(oxygen_isotope_num),
-                           he='<abbr title="{jumps} jumps" class="initialism">{i}</abbr>'.format(
+                           he='<abbr title="? jumps" class="initialism">{i}</abbr>'.format(
                               jumps=helium_jumps_num, i=helium_isotope_num) if not (helium_jumps_num is None) and (helium_isotope_num > 0) else str(helium_isotope_num)
                     ))
             else:
@@ -1000,11 +1070,15 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr class="active">\n'
                     ' <th></th><td></td>\n'
-                    ' <td colspan="4">{ly}</td><td colspan="4">{iu}</td>\n'
+                    ' <td colspan="4">{ly}</td><td colspan="4"{ly_val}>{iu}</td>\n'
                     '</tr>'.
                     format(
+                        ly_val='lightyears="{:0.3f}"'.format(lightyears) if not (lightyears is None) else "",
                         ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else "",
-                        iu='Isotopes needed: <strong>{}</strong> Ni, <strong>{}</strong> Hy, <strong>{}</strong> Ox, <strong>{}</strong> He'.
+                        iu='Isotopes needed: <span class="nitrogen"><strong>{}</strong> Ni</span> '
+                           '<span class="hydrogen"><strong>{}</strong> Hy</span> '
+                           '<span class="oxygen"><strong>{}</strong> Ox</span> '
+                           '<span class="helium"><strong>{}</strong> He</span>'.
                         format(nitrogen_used, hydrogen_used, oxygen_used, helium_used) if not (lightyears is None) else ""
                     ))
             row_num = row_num + 1
@@ -1049,7 +1123,182 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
    </div>
    <div class="col-xs-9">there are temporary problems with ESI (out of sync assets movements)</div>
   </div>
-</div>""")
+</div>
+
+<script>
+  // Jump Options storage (prepare)
+  ls = window.localStorage;
+  var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea']
+  var usedIsotopeTags = ['th', 'td', 'span']
+
+  // Jump Options storage (init)
+  function resetOptionsMenuToDefault() {
+    if (!ls.getItem('Jump Drive Calibration')) {
+      ls.setItem('Jump Drive Calibration', 5);
+    }
+    if (!ls.getItem('Jump Drive Conservation')) {
+      ls.setItem('Jump Drive Conservation', 4);
+    }
+    if (!ls.getItem('Jump Freighter')) {
+      ls.setItem('Jump Freighter', 4);
+    }
+  }
+  // Jump Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    var ship = ls.getItem('Ship');
+    if (!ship) {
+      for (var s of knownShips) {
+        $('#imgJumpShip'+s).addClass('hidden');
+      }
+      $('#imgJumpAnyShip').removeClass('hidden');
+      $('#lbJumpShip').addClass('hidden');
+    }
+    else {
+      for (var s of knownShips) {
+        if (ship == s)
+          $('#imgJumpShip'+s).removeClass('hidden');
+        else
+          $('#imgJumpShip'+s).addClass('hidden');
+      }
+      $('#imgJumpAnyShip').addClass('hidden');
+      $('#lbJumpShip').html(ship);
+      $('#lbJumpShip').removeClass('hidden');
+    }
+    var skill = ls.getItem('Jump Drive Calibration');
+    $('#lbJumpCalibration').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpCalibration'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpCalibration'+i.toString()).addClass('hidden');
+    }
+    skill = ls.getItem('Jump Drive Conservation');
+    $('#lbJumpConservation').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpConservation'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpConservation'+i.toString()).addClass('hidden');
+    }
+    skill = ls.getItem('Jump Freighter');
+    $('#lbJumpFreighter').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpFreighter'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpFreighter'+i.toString()).addClass('hidden');
+    }
+  }
+  // Jump Options storage (rebuild body components)
+  function rebuildBody() {
+    var ship = ls.getItem('Ship');
+    var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    $('tr.active td').each(function() {
+      ly = $(this).attr('lightyears');
+      if (ly) {
+        ly = parseFloat(ly);
+        var nitrogen_used = parseInt(ly * 10000 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+        var hydrogen_used = parseInt(ly * 8200 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+        var oxygen_used = parseInt(ly * 9400 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+        var helium_used = parseInt(ly * 8800 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+        $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
+                      '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
+                      '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
+                      '<span class="helium"><strong>' + helium_used + '</strong> He</span>');
+      }
+    });
+    if (!ship) { // show all
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').removeClass('hidden');
+        $(t+'.hydrogen').removeClass('hidden');
+        $(t+'.oxygen').removeClass('hidden');
+        $(t+'.helium').removeClass('hidden');
+      }
+    }
+    else if (ship == 'Anshar') { // Gallente : Oxygen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').removeClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+    else if (ship == 'Ark') { // Amarr : Helium isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').removeClass('hidden');
+      }
+    }
+    else if (ship == 'Nomad') { // Minmatar : Hydrogen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').removeClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+    else if (ship == 'Rhea') { // Caldari : Nitrogen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').removeClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+  }
+
+  // Jump Options menu and submenu setup
+  $(document).ready(function(){
+    $('.dropdown-submenu a.options-submenu').on("click", function(e){
+      $(this).next('ul').toggle();
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    $('a#btnJumpShip').on('click', function() {
+      ship = $(this).attr('ship');
+      ls.setItem('Ship', ship);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnJumpAnyShip').on('click', function() {
+      ls.removeItem('Ship');
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('a#btnJumpCalibration').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Drive Calibration', skill);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('a#btnJumpConservation').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Drive Conservation', skill);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('a#btnJumpFreighter').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Freighter', skill);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildBody();
+  });
+</script>""")
 
 
 def dump_cynonetwork_into_report(sde_inv_positions, corp_cynonetwork):
