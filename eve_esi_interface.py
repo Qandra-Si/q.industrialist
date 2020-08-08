@@ -2,6 +2,8 @@
 import os.path
 from pathlib import Path
 
+import requests
+
 import q_industrialist_settings
 
 from shared_flow import send_esi_request_http
@@ -77,10 +79,21 @@ def take_cache_from_file(nm):
     return None
 
 
+def esi_raise_for_status(code, message):
+    rsp = requests.Response()
+    rsp.status_code = code
+    raise requests.exceptions.HTTPError(message, response=rsp)
+
+
 def get_esi_data(access_token, url, nm, body=None):
     cached_data = take_cache_from_file(nm)
     if q_industrialist_settings.g_offline_mode:
         # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
+        if "Http-Error" in cached_data["headers"]:
+            code = int(cached_data["headers"]["Http-Error"])
+            esi_raise_for_status(
+                code,
+                '{} Client Error: Offile-cache for url: {}'.format(code, url))
         return cached_data["json"] if "json" in cached_data else None
     else:
         # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
@@ -88,12 +101,21 @@ def get_esi_data(access_token, url, nm, body=None):
         # см. рекомендации по программированию тут https://developers.eveonline.com/blog/article/esi-etag-best-practices
         etag = cached_data["headers"]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
                 "etag" in cached_data["headers"]) else None
-        data = send_esi_request_http(access_token, data_path, etag, body)
-        if data.status_code == 304:
-            return cached_data["json"] if "json" in cached_data else None
+        try:
+            data = send_esi_request_http(access_token, data_path, etag, body)
+            if data.status_code == 304:
+                return cached_data["json"] if "json" in cached_data else None
+            else:
+                dump_cache_into_file(nm, get_cached_headers(data), data.json())
+                return data.json()
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 403:  # это нормально, CCP используют 403-ответ для индикации запретов ingame-доступа
+                # сохраняем информацию в кеше и выходим с тем же кодом ошибки
+                dump_cache_into_file(nm, {"Http-Error": 403}, None)
+                raise
         else:
-            dump_cache_into_file(nm, get_cached_headers(data), data.json())
-            return data.json()
+            raise
 
 
 def get_esi_paged_data(access_token, url, nm):

@@ -20,6 +20,8 @@ run the following command from this directory as the root:
 import sys
 import json
 
+import requests
+
 import q_industrialist_settings
 import auth_cache
 import shared_flow
@@ -161,15 +163,28 @@ def main():
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
     foreign_structures_data = {}
     foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+    foreign_structures_forbidden_ids = []
     if len(foreign_structures_ids) > 0:
         # Requires: access token
         for structure_id in foreign_structures_ids:
-            universe_structure_data = eve_esi_interface.get_esi_data(
-                access_token,
-                "universe/structures/{}/".format(structure_id),
-                'universe_structures_{}'.format(structure_id))
-            foreign_structures_data.update({str(structure_id): universe_structure_data})
+            try:
+                universe_structure_data = eve_esi_interface.get_esi_data(
+                    access_token,
+                    "universe/structures/{}/".format(structure_id),
+                    'universe_structures_{}'.format(structure_id))
+                foreign_structures_data.update({str(structure_id): universe_structure_data})
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                    foreign_structures_forbidden_ids.append(structure_id)
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
     print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+    if len(foreign_structures_forbidden_ids) > 0:
+        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
     # # Public information with list of public structures
@@ -207,6 +222,9 @@ def main():
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_assets_tree)
+
+    # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
+    print("\nDone")
 
 
 if __name__ == "__main__":
