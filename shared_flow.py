@@ -141,7 +141,7 @@ def send_esi_request_http(access_token, uri, etag, body=None):
 
     try:
         res = None
-        error_504_times = 0  # трижды пытаемся повторить отправку сломанного запроса (часто случается при подключении через 3G-модем)
+        proxy_error_times = 0  # трижды пытаемся повторить отправку сломанного запроса (часто случается при подключении через 3G-модем)
         while True:
             if body is None:
                 res = requests.get(uri, headers=headers)
@@ -167,10 +167,11 @@ def send_esi_request_http(access_token, uri, etag, body=None):
                                  res.status_code,
                                  res.headers,
                                  res.encoding))
-            if (res.status_code == 504) and (error_504_times < 3):
-                error_504_times = error_504_times + 1
+            if (res.status_code in [502,504]) and (proxy_error_times < 3):
+                proxy_error_times = proxy_error_times + 1
                 continue
             res.raise_for_status()
+            break
     except requests.exceptions.HTTPError as err:
         print(err)
         print(res.json())
