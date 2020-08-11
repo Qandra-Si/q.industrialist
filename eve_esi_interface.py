@@ -93,7 +93,7 @@ def get_esi_data(access_token, url, nm, body=None):
             code = int(cached_data["headers"]["Http-Error"])
             esi_raise_for_status(
                 code,
-                '{} Client Error: Offile-cache for url: {}'.format(code, url))
+                '{} Client Error: Offline-cache for url: {}'.format(code, url))
         return cached_data["json"] if "json" in cached_data else None
     else:
         # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
@@ -152,7 +152,7 @@ def get_esi_paged_data(access_token, url, nm):
             else:
                 if match_pages > 0:
                     # если какая-либо страница посреди набора данных не совпала с ранее известным etag, то весь набор
-                    # данных будем считать невалидным, а ранее загруженные данные устаревшими
+                    # данных будем считать невалидным, а ранее загруженные данные устаревшими полностью
                     page = 1
                     match_pages = 0
                     all_pages = None
@@ -167,9 +167,10 @@ def get_esi_paged_data(access_token, url, nm):
                 if 1 == page:
                     all_pages = int(page_data.headers["X-Pages"]) if "X-Pages" in page_data.headers else 1
                     last_modified = page_data.headers["Last-Modified"]
-                elif last_modified != page_data.headers["Last-Modified"]:
-                    # если в процессе загрузки данных, изменился last-modified у эдемента этого
-                    # набора, то весь набор признаётся невалидным
+                elif (last_modified != page_data.headers["Last-Modified"]) and (
+                      all_pages != page_data.headers["X-Pages"]):
+                    # если в процессе загрузки данных, изменился last-modified или num-pages у
+                    # элемента этого набора, то весь набор признаётся невалидным
                     restart = True
                     restart_cache = True
                     continue
