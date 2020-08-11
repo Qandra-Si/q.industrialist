@@ -821,8 +821,9 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
   <div class="collapse navbar-collapse" id="bs-navbar-collapse">
    <ul class="nav navbar-nav">
     <li class="dropdown">
-     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Routes <span class="caret"></span></a>
+     <a data-target="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Routes <span class="caret"></span></a>
       <ul class="dropdown-menu">""")
+    cynonet_num = 1
     for cn in q_logist_settings.g_cynonetworks:
         cn_route = cn["route"]
         from_id = cn_route[0]
@@ -830,13 +831,19 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         to_id = cn_route[-1]
         to_name = corp_cynonetwork[str(to_id)]["solar_system"]
         glf.write(
-            '\n       <li class="disabled"><a data-target="#" role="button">{f} &rarr; {t}</a></li>'.  # предполагается: <li><a href="#">JK-Q77 &rarr; Raravath</a></li>
+            '\n       '
+            '<li><a id="btnCynoNetSel" cynonet="{cnn}" data-target="#" role="button"><span '
+                   'class="glyphicon glyphicon-star img-cyno-net" cynonet="{cnn}" aria-hidden="true"></span> '
+            '{f} &rarr; {t}</a></li>'.  # предполагается: <li><a>JK-Q77 &rarr; Raravath</a></li>
             format(f=from_name,
-                   t=to_name
+                   t=to_name,
+                   cnn=cynonet_num
             ))
+        cynonet_num = cynonet_num + 1
     glf.write("""
        <li role="separator" class="divider"></li>
-       <li class="disabled"><a data-target="#" role="button">All routes</a></li>
+       <li><a id="btnCynoNetSel" cynonet="0" data-target="#" role="button"><span 
+              class="glyphicon glyphicon-star img-cyno-net" cynonet="0" aria-hidden="true"></span> All routes</a></li>
      </ul>
     </li>
     
@@ -908,7 +915,9 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
 </nav>
 <div class="container-fluid">""")
 
+    cynonetwork_num = 0
     for cn in q_logist_settings.g_cynonetworks:
+        cynonetwork_num = cynonetwork_num + 1
         cn_route = cn["route"]
         # from_name = ""
         # to_name = ""
@@ -930,12 +939,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         route_signalling_type = get_route_signalling_type(route_signalling_level)
         # ---
         glf.write(
-            '<div class="panel panel-{signal}">\n'
+            '<div class="panel panel-{signal} pn-cyno-net" cynonet="{cnn}">\n'
             ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'
             '  <div class="panel-body">\n'
-            '   <p>Checkout Dotlan link for graphical route building: <a href="https://evemaps.dotlan.net/jump/Rhea,544/{url}" class="panel-link">https://evemaps.dotlan.net/jump/Rhea,544/{url}</a></p>\n'
+            '   <p>Checkout Dotlan link for graphical route building: <a class="lnk-dtln" cynonet="{cnn}" routes="{rs}" href="https://evemaps.dotlan.net/jump/Rhea,544/{url}" class="panel-link">https://evemaps.dotlan.net/jump/Rhea,544/{url}</a></p>\n'
             '   <div class="progress">\n'.
             format(#nm='{} &rarr; {}'.format(from_name, to_name),
+                   cnn=cynonetwork_num,
+                   rs=len(cn_route),
                    nm=human_readable,
                    url=url,
                    signal=route_signalling_type
@@ -1022,14 +1033,15 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 badger_jumps_num = min(badger_num, indus_cyno_gen_num, int(liquid_ozone_num/950))
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
                 glf.write(
-                    '<tr>\n'
+                    '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td><abbr title="{bjumps} Badger cynos" class="initialism">{b}</abbr></td>\n'
-                    ' <td><abbr title="{vjumps} Venture cynos" class="initialism">{v}</abbr> / {ch} / {chr}</td>\n'
+                    ' <td><abbr title="{bjumps} Badger cynos">{b}</abbr></td>\n'
+                    ' <td><abbr title="{vjumps} Venture cynos">{v}</abbr> / {ch} / {chr}</td>\n'
                     ' <td>{icg}</td><td>{lo}</td>\n'
                     ' <td class="nitrogen">{ni}</td><td class="hydrogen">{hy}</td><td class="oxygen">{ox}</td><td class="helium">{he}</td>\n'
                     '</tr>'.
                     format(num=row_num,
+                           cnn=cynonetwork_num,
                            nm=system_name,
                            bjumps=badger_jumps_num,
                            vjumps=venture_jumps_num,
@@ -1109,11 +1121,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
 <script>
   // Jump Options storage (prepare)
   ls = window.localStorage;
-  var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea']
-  var usedIsotopeTags = ['th', 'td', 'span']
+  var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea'];
+  var usedIsotopeTags = ['th', 'td', 'span'];
 
   // Jump Options storage (init)
   function resetOptionsMenuToDefault() {
+    if (!ls.getItem('CynoNetNum')) {
+      ls.setItem('CynoNetNum', 0);
+    }
     if (!ls.getItem('Jump Drive Calibration')) {
       ls.setItem('Jump Drive Calibration', 5);
     }
@@ -1126,6 +1141,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
   }
   // Jump Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
+    var cynonet = ls.getItem('CynoNetNum');
+    $('span.img-cyno-net').each(function() {
+      cn = $(this).attr('cynonet');
+      if (cn == cynonet)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    });
     var ship = ls.getItem('Ship');
     if (!ship) {
       for (var s of knownShips) {
@@ -1169,6 +1192,26 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         else
           $('#imgJumpFreighter'+i.toString()).addClass('hidden');
     }
+  }
+  // Jump Options storage (rebuild panel links)
+  function rebuildPanelLinks() {
+    var ship = ls.getItem('Ship');
+    if (!ship)
+        ship = 'Rhea';
+    var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    $('a.lnk-dtln').each(function() {
+      cynonet = $(this).attr('cynonet');
+      routes = $(this).attr('routes');
+      var uri = 'https://evemaps.dotlan.net/jump/'+ship+','+calibration_skill+conservation_skill+freighter_skill+'/';
+      for (var i = 1; i <= routes; i++) {
+        if (i > 1) uri = uri + ':';
+        uri = uri + $('#rowCynoRoute'+cynonet+'_'+i.toString()).attr('system');
+      }
+      $(this).attr('href', uri);
+      $(this).html(uri);
+    });
   }
   // Jump Options storage (rebuild body components)
   function rebuildBody() {
@@ -1230,6 +1273,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         $(t+'.helium').addClass('hidden');
       }
     }
+    var cynonet = ls.getItem('CynoNetNum');
+    $('div.pn-cyno-net').each(function() {
+      cn = $(this).attr('cynonet');
+      if ((cynonet == 0) || (cynonet == cn.toString()))
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
   }
 
   // Jump Options menu and submenu setup
@@ -1239,44 +1290,57 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       e.stopPropagation();
       e.preventDefault();
     });
+    $('a#btnCynoNetSel').on('click', function() {
+      cynonet = $(this).attr('cynonet');
+      ls.setItem('CynoNetNum', cynonet);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
     $('a#btnJumpShip').on('click', function() {
       ship = $(this).attr('ship');
       ls.setItem('Ship', ship);
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     $('#btnJumpAnyShip').on('click', function() {
       ls.removeItem('Ship');
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     $('a#btnJumpCalibration').on('click', function() {
       skill = $(this).attr('skill');
       ls.setItem('Jump Drive Calibration', skill);
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     $('a#btnJumpConservation').on('click', function() {
       skill = $(this).attr('skill');
       ls.setItem('Jump Drive Conservation', skill);
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     $('a#btnJumpFreighter').on('click', function() {
       skill = $(this).attr('skill');
       ls.setItem('Jump Freighter', skill);
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
       rebuildOptionsMenu();
+      rebuildPanelLinks();
       rebuildBody();
     });
     // first init
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
+    rebuildPanelLinks();
     rebuildBody();
   });
 </script>""")
