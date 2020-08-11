@@ -140,31 +140,37 @@ def send_esi_request_http(access_token, uri, etag, body=None):
         headers.update({"User-Agent": q_industrialist_settings.g_user_agent})
 
     try:
-        if body is None:
-            res = requests.get(uri, headers=headers)
-            if g_debug:
-                print("\nMade GET request to {} with headers: "
-                      "{}\nAnd the answer {} was received with "
-                      "headers {} and encoding {}".
-                      format(uri,
-                             res.request.headers,
-                             res.status_code,
-                             res.headers,
-                             res.encoding))
-        else:
-            headers.update({"Content-Type": "application/json"})
-            res = requests.post(uri, data=body, headers=headers)
-            if g_debug:
-                print("\nMade POST request to {} with data {} and headers: "
-                      "{}\nAnd the answer {} was received with "
-                      "headers {} and encoding {}".
-                      format(uri,
-                             body,
-                             res.request.headers,
-                             res.status_code,
-                             res.headers,
-                             res.encoding))
-        res.raise_for_status()
+        res = None
+        error_504_times = 0  # трижды пытаемся повторить отправку сломанного запроса (часто случается при подключении через 3G-модем)
+        while True:
+            if body is None:
+                res = requests.get(uri, headers=headers)
+                if g_debug:
+                    print("\nMade GET request to {} with headers: "
+                          "{}\nAnd the answer {} was received with "
+                          "headers {} and encoding {}".
+                          format(uri,
+                                 res.request.headers,
+                                 res.status_code,
+                                 res.headers,
+                                 res.encoding))
+            else:
+                headers.update({"Content-Type": "application/json"})
+                res = requests.post(uri, data=body, headers=headers)
+                if g_debug:
+                    print("\nMade POST request to {} with data {} and headers: "
+                          "{}\nAnd the answer {} was received with "
+                          "headers {} and encoding {}".
+                          format(uri,
+                                 body,
+                                 res.request.headers,
+                                 res.status_code,
+                                 res.headers,
+                                 res.encoding))
+            if (res.status_code == 504) and (error_504_times < 3):
+                error_504_times = error_504_times + 1
+                continue
+            res.raise_for_status()
     except requests.exceptions.HTTPError as err:
         print(err)
         print(res.json())
@@ -173,12 +179,12 @@ def send_esi_request_http(access_token, uri, etag, body=None):
         print(sys.exc_info())
         raise
 
-    #debug = str(res.status_code) + " " + uri[31:]
-    #if ('Last-Modified' in res.headers):
-    #    debug = debug + " " + str(res.headers['Last-Modified'])[17:-4]
-    #if ('Etag' in res.headers):
-    #    debug = debug + " " + str(res.headers['Etag'])
-    #print(debug)
+    debug = str(res.status_code) + " " + uri[31:]
+    if ('Last-Modified' in res.headers):
+        debug = debug + " " + str(res.headers['Last-Modified'])[17:-4]
+    if ('Etag' in res.headers):
+        debug = debug + " " + str(res.headers['Etag'])
+    print(debug)
 
     return res
 
