@@ -35,20 +35,22 @@ def get_icon_src(icon_id, sde_icon_ids):
 
 
 def dump_header(glf, header_name):
+    glf.write("""
+<!doctype html>
+<html lang="ru">
+ <head>
+ <!-- <meta charset="utf-8"> -->
+ <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+<style type="text/css">
+.icn24 { width:24px; height:24px; }
+.icn32 { width:32px; height:32px; }
+.icn64 { width:64px; height:64px; }
+</style>
+""")
     glf.write(
-        '<!doctype html>\n'
-        '<html lang="ru">\n'
-        ' <head>\n'
-        ' <!-- <meta charset="utf-8"> -->\n'
-        ' <meta http-equiv="X-UA-Compatible" content="IE=edge">\n'
-        ' <meta name="viewport" content="width=device-width, initial-scale=1">\n'
         ' <title>Q.Industrialist - {nm}</title>\n'
         ' <link rel="stylesheet" href="{bs_css}">\n'
-        '<style type="text/css">\n'
-        '.icn24 {{ width:24px; height:24px; }}\n'
-        '.icn32 {{ width:32px; height:32px; }}\n'
-        '.icn64 {{ width:64px; height:64px; }}\n'
-        '</style>\n'
         '</head>\n'
         '<body>\n'
         '<div class="page-header">\n'
@@ -62,7 +64,6 @@ def dump_header(glf, header_name):
             bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
         )
     )
-
 
 def dump_footer(glf):
     # Don't remove line below !
