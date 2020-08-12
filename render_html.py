@@ -815,7 +815,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     <span class="icon-bar"></span>
     <span class="icon-bar"></span>
    </button>
-   <a class="navbar-brand" href="#"><span class="glyphicon glyphicon-random" aria-hidden="true"></span></a>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-random" aria-hidden="true"></span></a>
   </div>
    
   <div class="collapse navbar-collapse" id="bs-navbar-collapse">
@@ -916,6 +916,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
 <div class="container-fluid">""")
 
     cynonetwork_num = 0
+    cynonetwork_distances = []
     for cn in q_logist_settings.g_cynonetworks:
         cynonetwork_num = cynonetwork_num + 1
         cn_route = cn["route"]
@@ -940,7 +941,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         # ---
         glf.write(
             '<div class="panel panel-{signal} pn-cyno-net" cynonet="{cnn}">\n'
-            ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'
+            ' <div class="panel-heading"><h3 class="panel-title">{signal_sign}{nm}</h3></div>\n'
             '  <div class="panel-body">\n'
             '   <p>Checkout Dotlan link for graphical route building: <a class="lnk-dtln" cynonet="{cnn}" routes="{rs}" href="https://evemaps.dotlan.net/jump/Rhea,544/{url}" class="panel-link">https://evemaps.dotlan.net/jump/Rhea,544/{url}</a></p>\n'
             '   <div class="progress">\n'.
@@ -949,7 +950,8 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                    rs=len(cn_route),
                    nm=human_readable,
                    url=url,
-                   signal=route_signalling_type
+                   signal=route_signalling_type,
+                   signal_sign='<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span> ' if route_signalling_type=="danger" else ""
             ))
         progress_segments = len(cn_route)
         progress_width = int(100/progress_segments)
@@ -961,14 +963,16 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 progress_width = progress_width + 100 - progress_width * progress_segments
             if not ("error" in route_place):
                 glf.write(
-                    '    <div class="progress-bar progress-bar-{signal}" role="progressbar" style="width:{width}%">{nm}</div>\n'.
+                    '    <div id="prgrCynoRoute{cnn}_{pt}" class="progress-bar progress-bar-{signal} signal" role="progressbar" style="width:{width}%">{nm}</div>\n'.
                     format(width=progress_width,
                            nm=system_name,
-                           signal=get_route_signalling_type(route_place["signalling_level"])
+                           signal=get_route_signalling_type(route_place["signalling_level"]),
+                           cnn=cynonetwork_num,
+                           pt=progress_times
                     ))
             else:
                 glf.write(
-                    '    <div class="progress-bar" role="progressbar" style="width:{width}%; background-color:#888;">{nm}</div>\n'.
+                    '    <div class="progress-bar signal" role="progressbar" style="width:{width}%; background-color:#888;">{nm}</div>\n'.
                     format(width=progress_width,
                            nm=system_name
                     ))
@@ -1013,6 +1017,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     lightyear_distances.append(None)
             prev_system_id = system_id
             row_num = row_num + 1
+        cynonetwork_distances.append(lightyear_distances)
         # --- построение таблицы по маршруту циносети
         row_num = 1
         for location_id in cn_route:
@@ -1071,7 +1076,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     ' <td colspan="4">{ly}</td><td colspan="4"{ly_val}></td>\n'
                     '</tr>'.
                     format(
-                        ly_val='lightyears="{:0.3f}"'.format(lightyears) if not (lightyears is None) else "",
+                        ly_val='lightyears="{:0.15f}"'.format(lightyears) if not (lightyears is None) else "",
                         ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else ""
                     ))
             row_num = row_num + 1
@@ -1117,8 +1122,43 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
    <div class="col-xs-9">there are temporary problems with ESI (out of sync assets movements)</div>
   </div>
 </div>
-
 <script>
+  // Cynonetwork contents (data)
+  var contentsCynoNetwork = [
+""")
+    # выгрузка данных для работы с ними с пом. java-script-а (повторный прогон с накопленными данными)
+    cynonetwork_num = 1
+    for cn in q_logist_settings.g_cynonetworks:
+        glf.write('    [{cnn}, [\n'.format(cnn=cynonetwork_num))
+        cn_route = cn["route"]
+        route_num = 1
+        for location_id in cn_route:
+            last_route = route_num == len(cn_route)
+            route_place = corp_cynonetwork[str(location_id)]
+            system_name = route_place["solar_system"]
+            nitrogen_isotope_num = route_place["nitrogen_isotope"]
+            hydrogen_isotope_num = route_place["hydrogen_isotope"]
+            oxygen_isotope_num = route_place["oxygen_isotope"]
+            helium_isotope_num = route_place["helium_isotope"]
+            lightyears = 0 if last_route else cynonetwork_distances[cynonetwork_num - 1][route_num - 1]
+            if not lightyears:
+                lightyears = 0
+            if not ("error" in route_place):
+                glf.write("      [{rn},'{nm}','{signal}',{ly},{ni},{hy},{ox},{he}]{comma}\n".
+                          format(comma=',' if not last_route else ']',
+                                 rn=route_num,
+                                 nm=system_name,
+                                 signal=get_route_signalling_type(route_place["signalling_level"]),
+                                 ni=nitrogen_isotope_num,
+                                 hy=hydrogen_isotope_num,
+                                 ox=oxygen_isotope_num,
+                                 he=helium_isotope_num,
+                                 ly=lightyears))
+            route_num = route_num + 1
+        glf.write('    ]{comma}\n'.format(comma=',' if cynonetwork_num != len(q_logist_settings.g_cynonetworks) else ''))
+        cynonetwork_num = cynonetwork_num + 1
+    # крупный листинг с java-программой (без форматирования)
+    glf.write("""  ];
   // Jump Options storage (prepare)
   ls = window.localStorage;
   var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea'];
@@ -1213,20 +1253,76 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       $(this).html(uri);
     });
   }
+  // Isotope Quantity Calculator
+  function calcIsotope(lightyears, fuel_consumption, conservation_skill, freighter_skill) {
+    return parseInt(lightyears * fuel_consumption * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+  }
+  // Jump Options storage (rebuild progress bar signals)
+  function rebuildProgressBarSignals() {
+    var ship = ls.getItem('Ship');
+    //TODO:var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    for (var cn of contentsCynoNetwork) {
+      cn_num = cn[0];
+      for (var rt of cn[1]) {
+        ly = rt[3];
+        if (!ly) continue;
+        signal = rt[2];
+        if (signal == 'danger') continue;
+        rt_num = rt[0];
+        var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
+        var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
+        var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
+        var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
+        var nitrogen_times = parseInt(rt[4] / nitrogen_used, 10);
+        var hydrogen_times = parseInt(rt[5] / hydrogen_used, 10);
+        var oxygen_times = parseInt(rt[6] / oxygen_used, 10);
+        var helium_times = parseInt(rt[7] / helium_used, 10);
+        prgr = $('#prgrCynoRoute'+cn_num.toString()+'_'+rt_num.toString());
+        if (prgr) {
+          var times = 0;
+          if (!ship) times = Math.min(nitrogen_times, hydrogen_times, oxygen_times, helium_times);
+          else if (ship == 'Anshar') times = oxygen_times; // Gallente : Oxygen isotopes
+          else if (ship == 'Ark') times = helium_times; // Amarr : Helium isotopes
+          else if (ship == 'Nomad') times = hydrogen_times; // Minmatar : Hydrogen isotopes
+          else if (ship == 'Rhea') times = nitrogen_times; // Caldari : Nitrogen isotopes
+          if (signal == 'warning') {
+            if (times >= 10) times = 2;
+          }
+          if (times < 2) {
+            prgr.addClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-success');
+            prgr.removeClass('progress-bar-warning');
+          }
+          else if (times >= 10) {
+            prgr.addClass('progress-bar-success');
+            prgr.removeClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-warning');
+          }
+          else {
+            prgr.addClass('progress-bar-warning');
+            prgr.removeClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-success');
+          }
+        }
+      }
+    }
+  }
   // Jump Options storage (rebuild body components)
   function rebuildBody() {
     var ship = ls.getItem('Ship');
-    var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    //TODO:var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
     var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
     var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
     $('tr.active td').each(function() {
       ly = $(this).attr('lightyears');
       if (ly) {
         ly = parseFloat(ly);
-        var nitrogen_used = parseInt(ly * 10000 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
-        var hydrogen_used = parseInt(ly * 8200 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
-        var oxygen_used = parseInt(ly * 9400 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
-        var helium_used = parseInt(ly * 8800 * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+        var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
+        var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
+        var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
+        var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
         $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
                       '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
                       '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
@@ -1301,12 +1397,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       ls.setItem('Ship', ship);
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     $('#btnJumpAnyShip').on('click', function() {
       ls.removeItem('Ship');
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     $('a#btnJumpCalibration').on('click', function() {
@@ -1314,6 +1412,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       ls.setItem('Jump Drive Calibration', skill);
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     $('a#btnJumpConservation').on('click', function() {
@@ -1321,6 +1420,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       ls.setItem('Jump Drive Conservation', skill);
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     $('a#btnJumpFreighter').on('click', function() {
@@ -1328,6 +1428,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       ls.setItem('Jump Freighter', skill);
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     $('#btnResetOptions').on('click', function () {
@@ -1335,12 +1436,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
       resetOptionsMenuToDefault();
       rebuildOptionsMenu();
       rebuildPanelLinks();
+      rebuildProgressBarSignals();
       rebuildBody();
     });
     // first init
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     rebuildPanelLinks();
+    rebuildProgressBarSignals();
     rebuildBody();
   });
 </script>""")
