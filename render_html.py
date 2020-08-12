@@ -1040,10 +1040,13 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td><abbr title="{bjumps} Badger cynos">{b}</abbr></td>\n'
-                    ' <td><abbr title="{vjumps} Venture cynos">{v}</abbr> / {ch} / {chr}</td>\n'
-                    ' <td>{icg}</td><td>{lo}</td>\n'
-                    ' <td class="nitrogen">{ni}</td><td class="hydrogen">{hy}</td><td class="oxygen">{ox}</td><td class="helium">{he}</td>\n'
+                    ' <td><abbr title="{bjumps} Badger cynos">{b:,d}</abbr></td>\n'
+                    ' <td><abbr title="{vjumps} Venture cynos">{v:,d}</abbr> / {ch:,d} / {chr:,d}</td>\n'
+                    ' <td>{icg:,d}</td><td>{lo:,d}</td>\n'
+                    ' <td class="nitrogen" id="niCynoRoute{cnn}_{num}">{ni:,d}</td>\n'
+                    ' <td class="hydrogen" id="hyCynoRoute{cnn}_{num}">{hy:,d}</td>\n'
+                    ' <td class="oxygen" id="oxCynoRoute{cnn}_{num}">{ox:,d}</td>\n'
+                    ' <td class="helium" id="heCynoRoute{cnn}_{num}">{he:,d}</td>\n'
                     '</tr>'.
                     format(num=row_num,
                            cnn=cynonetwork_num,
@@ -1073,10 +1076,12 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr class="active">\n'
                     ' <th></th><td></td>\n'
-                    ' <td colspan="4">{ly}</td><td colspan="4"{ly_val}></td>\n'
+                    ' <td colspan="4">{ly}</td><td colspan="4"{ly_val} cynonet="{cnn}" route="{rt}"></td>\n'
                     '</tr>'.
                     format(
-                        ly_val='lightyears="{:0.15f}"'.format(lightyears) if not (lightyears is None) else "",
+                        ly_val=' lightyears="{:0.15f}"'.format(lightyears) if not (lightyears is None) else "",
+                        cnn=cynonetwork_num,
+                        rt=row_num,
                         ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else ""
                     ))
             row_num = row_num + 1
@@ -1164,6 +1169,10 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
   var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea'];
   var usedIsotopeTags = ['th', 'td', 'span'];
 
+  // Tools & Utils
+  function numLikeEve(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
   // Jump Options storage (init)
   function resetOptionsMenuToDefault() {
     if (!ls.getItem('CynoNetNum')) {
@@ -1323,10 +1332,32 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
         var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
         var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
+        cn_num = $(this).attr('cynonet');
+        rt_num = $(this).attr('route');
+        times = null
+        contents = null
+        for (var rt of contentsCynoNetwork[cn_num-1][1]) {
+          if (rt[0] == rt_num) {
+            contents = [rt[4],rt[5],rt[6],rt[7]]
+            times = [parseInt(rt[4]/nitrogen_used), parseInt(rt[5]/hydrogen_used),
+                     parseInt(rt[6]/oxygen_used), parseInt(rt[7]/helium_used)];
+            break;
+          }
+        }
         $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
                       '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
                       '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
                       '<span class="helium"><strong>' + helium_used + '</strong> He</span>');
+        if (times && contents) {
+          if (contents[0])
+            $('#niCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[0]+' Rhea jumps">'+numLikeEve(contents[0])+'</abbr>');
+          if (contents[1])
+            $('#hyCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[1]+' Nomad jumps">'+numLikeEve(contents[1])+'</abbr>');
+          if (contents[2])
+            $('#oxCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[2]+' Anshar jumps">'+numLikeEve(contents[2])+'</abbr>');
+          if (contents[3])
+            $('#heCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[3]+' Ark jumps">'+numLikeEve(contents[3])+'</abbr>');
+        }
       }
     });
     if (!ship) { // show all
