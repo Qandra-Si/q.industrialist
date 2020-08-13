@@ -167,6 +167,14 @@ def send_esi_request_http(access_token, uri, etag, body=None):
                                  res.status_code,
                                  res.headers,
                                  res.encoding))
+            # вывод отладочной информации : код, uri, last-modified, etag
+            debug = str(res.status_code) + " " + uri[31:]
+            if ('Last-Modified' in res.headers):
+                debug = debug + " " + str(res.headers['Last-Modified'])[17:-4]
+            if ('Etag' in res.headers):
+                debug = debug + " " + str(res.headers['Etag'])
+            print(debug)
+            # обработка исключительных ситуаций
             if (res.status_code in [502,504]) and (proxy_error_times < 3):
                 proxy_error_times = proxy_error_times + 1
                 continue
@@ -179,14 +187,6 @@ def send_esi_request_http(access_token, uri, etag, body=None):
     except:
         print(sys.exc_info())
         raise
-
-    debug = str(res.status_code) + " " + uri[31:]
-    if ('Last-Modified' in res.headers):
-        debug = debug + " " + str(res.headers['Last-Modified'])[17:-4]
-    if ('Etag' in res.headers):
-        debug = debug + " " + str(res.headers['Etag'])
-    print(debug)
-
     return res
 
 
