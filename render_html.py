@@ -1142,13 +1142,19 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
             last_route = route_num == len(cn_route)
             route_place = corp_cynonetwork[str(location_id)]
             system_name = route_place["solar_system"]
-            nitrogen_isotope_num = route_place["nitrogen_isotope"]
-            hydrogen_isotope_num = route_place["hydrogen_isotope"]
-            oxygen_isotope_num = route_place["oxygen_isotope"]
-            helium_isotope_num = route_place["helium_isotope"]
             lightyears = 0 if last_route else cynonetwork_distances[cynonetwork_num - 1][route_num - 1]
             if not lightyears:
                 lightyears = 0
+            if not ("error" in route_place) or (route_place["error"] != "no data"):
+                nitrogen_isotope_num = route_place["nitrogen_isotope"]
+                hydrogen_isotope_num = route_place["hydrogen_isotope"]
+                oxygen_isotope_num = route_place["oxygen_isotope"]
+                helium_isotope_num = route_place["helium_isotope"]
+            else:
+                nitrogen_isotope_num = 0
+                hydrogen_isotope_num = 0
+                oxygen_isotope_num = 0
+                helium_isotope_num = 0
             if not ("error" in route_place):
                 glf.write("      [{rn},'{nm}','{signal}',{ly},{ni},{hy},{ox},{he}]{comma}\n".
                           format(comma=',' if not last_route else ']',
