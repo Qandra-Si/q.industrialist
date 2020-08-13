@@ -141,8 +141,6 @@ dmypy.json
 /.q_industrialist*/
 /.converted_*.json
 /.auth_cache
-/auth_cache.json
-/auth_cache.*.json
 /*.~json
 /*.html
 /*.csv

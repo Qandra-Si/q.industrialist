@@ -18,6 +18,8 @@ run the following command from this directory as the root:
 >>> python q_bpos.py
 """
 import sys
+import getopt
+import os
 import time
 import tzlocal
 
@@ -39,9 +41,28 @@ g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): 
 g_local_timezone = tzlocal.get_localzone()
 
 
-def main():
+def main(argv):
+    character_name = None  # for example : Qandra Si
+    exit_or_wrong_getopt = None
+    try:
+        opts, args = getopt.getopt(argv, "hp:", ["help", "pilot="])
+    except getopt.GetoptError:
+        exit_or_wrong_getopt = 2
+    if exit_or_wrong_getopt is None:
+        for opt, arg in opts:
+            if opt in ('-h', "--help"):
+                exit_or_wrong_getopt = 0
+                break
+            elif opt in ("-p", "--pilot"):
+                character_name = arg
+        if character_name is None:
+            exit_or_wrong_getopt = 0
+    if not (exit_or_wrong_getopt is None):
+        print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
+        sys.exit(exit_or_wrong_getopt)
+
     global g_client_scope
-    cache = auth_cache.read_cache()
+    cache = auth_cache.read_cache(character_name)
     if not q_industrialist_settings.g_offline_mode:
         if not ('access_token' in cache) or not ('refresh_token' in cache) or not ('expired' in cache):
             cache = shared_flow.auth(g_client_scope)
@@ -51,7 +72,7 @@ def main():
             cache = shared_flow.re_auth(g_client_scope, cache)
     else:
         if not ('access_token' in cache):
-            print("There is no way to continue working offline.")
+            print("There is no way to continue working offline (you should authorize at least once).")
             return
 
     access_token = cache["access_token"]
@@ -167,4 +188,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
