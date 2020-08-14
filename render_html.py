@@ -1616,25 +1616,26 @@ def dump_bpos_into_report(
     def blueprints_printer(group_id, market_data):
         if not (str(group_id) in market_data):
             return ""
-        res = '<table class="table">\n' \
-              '<thead>' \
-              '<tr>' \
-              '<th>#</th>' \
-              '<th>Blueprint</th>' \
-              '<th>Base Price</th>' \
-              '<th>Material Efficiency</th>' \
-              '<th>Time Efficiency</th>' \
-              '<th>Quantity</th>' \
-              '</tr>' \
-              '</thead>\n' \
-              '<tbody>\n'
+        res = """<table class="table" style="width: unset; max-width: unset; margin-bottom: 0px;">
+<thead>
+ <tr>
+ <th style="width:30px;">#</th>
+ <th style="width:300px;">Blueprint</th>
+ <th style="width:125px;">Base Price</th>
+ <th style="width:50px;">Material Efficiency</th>
+ <th style="width:50px;">Time Efficiency</th>
+ <th style="width:50px;">Quantity</th>
+ </tr>
+</thead>
+<tbody>
+"""
         items = market_data[str(group_id)]
         num = 1
         for item in items:
             res = res + '<tr>' \
                         '<th scope="row">{num}</th>' \
                         '<td>{nm}</td>' \
-                        '<td>{prc}</td>' \
+                        '<td>{prc:,.1f}</td>' \
                         '<td>{me}</td>' \
                         '<td>{te}</td>' \
                         '<td>{q}</td>' \
@@ -1647,14 +1648,16 @@ def dump_bpos_into_report(
                             q=item["quantity"]
                         )
             num = num + 1
-        res = res + '</tbody>\n' \
-                    '</table>\n'
+        res = res + """</tbody>
+</table>"""
         return res
 
     glf = open('{tmp}/bpos.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
     try:
         dump_header(glf, "BPOs")
+        glf.write("<div class='container-fluid'>\n")
         dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, blueprints_printer)
+        glf.write("</div>\n")
         dump_footer(glf)
     finally:
         glf.close()

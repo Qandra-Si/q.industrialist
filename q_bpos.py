@@ -173,6 +173,8 @@ def main(argv):
     finally:
         glf.close()
 
+    print("\nBuilding BPOs report...")
+    sys.stdout.flush()
     render_html.dump_bpos_into_report(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
@@ -185,6 +187,9 @@ def main(argv):
         # данные, полученные в результате анализа и перекомпоновки входных списков
         market_groups_tree
     )
+
+    # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
+    print("\nDone")
 
 
 if __name__ == "__main__":
