@@ -21,11 +21,8 @@ from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 def validate_eve_jwt(jwt_token):
     """Validate a JWT token retrieved from the EVE SSO.
 
-    Args:
-        jwt_token: A JWT token originating from the EVE SSO
-    Returns
-        dict: The contents of the validated JWT token if there are no
-              validation errors
+    :param jwt_token: Aa JWT token originating from the EVE SSO
+    :returns dict: the contents of the validated JWT token if there are no validation errors
     """
 
     jwk_set_url = "https://login.eveonline.com/oauth/jwks"
