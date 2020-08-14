@@ -16,6 +16,10 @@ run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py
 >>> python q_logist.py
+
+Required application scopes:
+    * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
+    * esi-universe.read_structures.v1 - Requires: access token
 """
 import sys
 import getopt
@@ -33,12 +37,6 @@ import eve_sde_tools
 import eve_esi_interface
 
 from render_html import dump_cynonetwork_into_report
-
-
-# Application scopes
-g_client_scope = ["esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
-                  "esi-universe.read_structures.v1"  # Requires: access token
-                 ]
 
 
 # type_id - тип требуемых данных
@@ -127,15 +125,14 @@ def main(argv):
         print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
         sys.exit(exit_or_wrong_getopt)
 
-    global g_client_scope
     cache = auth_cache.read_cache(character_name)
     if not q_industrialist_settings.g_offline_mode:
         if not ('access_token' in cache) or not ('refresh_token' in cache) or not ('expired' in cache):
-            cache = shared_flow.auth(g_client_scope)
-        elif not ('scope' in cache) or not auth_cache.verify_auth_scope(cache, g_client_scope):
-            cache = shared_flow.auth(g_client_scope, cache["client_id"])
+            cache = shared_flow.auth(q_industrialist_settings.g_client_scope)
+        elif not ('scope' in cache) or not auth_cache.verify_auth_scope(cache, q_industrialist_settings.g_client_scope):
+            cache = shared_flow.auth(q_industrialist_settings.g_client_scope, cache["client_id"])
         elif auth_cache.is_timestamp_expired(int(cache["expired"])):
-            cache = shared_flow.re_auth(g_client_scope, cache)
+            cache = shared_flow.re_auth(q_industrialist_settings.g_client_scope, cache)
     else:
         if not ('access_token' in cache):
             print("There is no way to continue working offline (you should authorize at least once).")

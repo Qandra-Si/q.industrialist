@@ -237,8 +237,11 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 
 
 def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_materials):
-    # временная мера: хардкодим тут код '.res ALL' контейнера
-    tmp_res_src = corp_ass_loc_data["Unlocked"][1032950982419]
+    if q_industrialist_settings.g_adopt_for_ri4:
+        # временная мера: хардкодим тут код '.res ALL' контейнера
+        tmp_res_src = corp_ass_loc_data["Unlocked"][1032950982419]
+    else:
+        tmp_res_src = {}
 
     glf.write("""<!-- Button trigger for Corp Blueprints Modal -->
     <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpBlueprints">Show Corp Blueprints</button>
