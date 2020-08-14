@@ -1622,13 +1622,13 @@ def dump_bpos_into_report(
  <th style="width:30px;">#</th>
  <th style="width:300px;">Blueprint</th>
  <th style="width:125px;">Base Price</th>
- <th style="width:50px;">Material Efficiency</th>
- <th style="width:50px;">Time Efficiency</th>
- <th style="width:50px;">Quantity</th>
+ <th style="width:85px;">Material Efficiency</th>
+ <th style="width:85px;">Time Efficiency</th>
+ <th style="width:75px;">Quantity</th>
  </tr>
 </thead>
 <tbody>
-"""
+"""  # width: 700px
         items = market_data[str(group_id)]
         num = 1
         for item in items:
