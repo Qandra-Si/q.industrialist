@@ -515,6 +515,14 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
 </div>""")
 
 
+def represents_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 def dump_corp_assets_tree_nested(
         glf,
         location_id,
@@ -529,7 +537,8 @@ def dump_corp_assets_tree_nested(
     loc_name = None
     itm_dict = None
     foreign = False
-    if int(location_id) < 1000000000000:
+    loc_is_not_virtual = represents_int(location_id)
+    if loc_is_not_virtual and (int(location_id) < 1000000000000):
         if str(location_id) in sde_inv_names:
             loc_name = sde_inv_names[str(location_id)]
             if str(location_id) in sde_inv_items:
@@ -540,14 +549,17 @@ def dump_corp_assets_tree_nested(
                     region_name = sde_inv_names[str(constellation_item["locationID"])]
                     loc_name = '{} {}'.format(region_name, loc_name)
     else:
-        loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
-        if loc_name is None:
-            loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
-            foreign = False if loc_name is None else True
-        # if itm_dict is None:
-        #     itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
-        # if not (itm_dict is None):
-        #     loc_name = itm_dict["location_flag"]
+        if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":
+            loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])
+        else:
+            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
+            if loc_name is None:
+                loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
+                foreign = False if loc_name is None else True
+            # if itm_dict is None:
+            #     itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+            # if not (itm_dict is None):
+            #     loc_name = itm_dict["location_flag"]
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
     items = loc_dict["items"] if "items" in loc_dict else None
@@ -572,7 +584,7 @@ def dump_corp_assets_tree_nested(
             where='{} '.format(loc_name) if not (loc_name is None) else "",
             what='<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
             id=location_id,
-            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) else "",
+            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) and (quantity > 1) else "",
             loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else "",
             foreign='<br/><span class="label label-warning">foreign</span>' if foreign else ""
         )

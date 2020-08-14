@@ -220,7 +220,7 @@ def main(argv):
     # элементов, в виде:
     # { location1: {items:[item1,item2,...],type_id,location_id},
     #   location2: {items:[item3],type_id} }
-    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
+    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=True)
     eve_esi_interface.dump_debug_into_file("corp_assets_tree", corp_assets_tree)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и

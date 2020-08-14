@@ -196,7 +196,7 @@ def fill_ass_tree_with_sde_data(location_id, ass_tree, sde_inv_items):
     fill_ass_tree_with_sde_data(new_location_id, ass_tree, sde_inv_items)
 
 
-def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items):
+def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag = False):
     """
     https://docs.esi.evetech.net/docs/asset_location_id
     https://forums-archive.eveonline.com/topic/520027/
@@ -210,28 +210,51 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items):
     for a in corp_assets_data:
         item_id = int(a["item_id"])
         location_id = int(a["location_id"])
+        location_flag = a["location_flag"]
         type_id = int(a["type_id"])
-        if (str(location_id) in ass_tree) and ("items" in ass_tree[str(location_id)]):
-            ass_tree[str(location_id)]["items"].append(item_id)
+        if virtual_hierarchy_by_corpsag and (location_flag[:-1] == "CorpSAG"):
+            corpsag_root = '{}_{}'.format(location_id, location_flag)
+            virt_root = str(location_id)
+            if (corpsag_root in ass_tree) and ("items" in ass_tree[corpsag_root]):
+                ass_tree[corpsag_root]["items"].append(item_id)
+            else:
+                ass_tree.update({corpsag_root: {"items": [item_id],
+                                                "location_id": virt_root,
+                                                "type_id": 41567}})  # Hangar Container
+            if (virt_root in ass_tree) and ("items" in ass_tree[virt_root]):
+                if ass_tree[virt_root]["items"].count(corpsag_root) == 0:
+                    ass_tree[virt_root]["items"].append(corpsag_root)
+            else:
+                ass_tree.update({virt_root: {"items": [corpsag_root]}})
         else:
-            ass_tree.update({str(location_id): {"items": [item_id]}})
-            location_type = a["location_type"]
-            if location_type == "solar_system":
-                ass_tree[str(location_id)]["type_id"] = 5  # Solar System
-            elif location_type == "station":
-                if stations.count(location_id) == 0:
-                    stations.append(location_id)
+            locstr_root = str(location_id)
+            if (locstr_root in ass_tree) and ("items" in ass_tree[locstr_root]):
+                ass_tree[locstr_root]["items"].append(item_id)
+            else:
+                ass_tree.update({locstr_root: {"items": [item_id]}})
+                location_type = a["location_type"]
+                if location_type == "solar_system":
+                    ass_tree[locstr_root]["type_id"] = 5  # Solar System
+                elif location_type == "station":
+                    if stations.count(location_id) == 0:
+                        stations.append(location_id)
         if not (str(item_id) in ass_tree):
             ass_tree.update({str(item_id): {"type_id": type_id}})
         elif not ("type_id" in ass_tree[str(item_id)]):
             ass_tree[str(item_id)]["type_id"] = type_id
+    # прописываем location_id парамтеры в каждом элементе по известному item_id
     for a in corp_assets_data:
-        item_id = int(a["item_id"])
-        location_id = int(a["location_id"])
-        if str(item_id) in ass_tree:
-            itm = ass_tree[str(item_id)]
+        item_id = str(a["item_id"])
+        location_id = str(a["location_id"])
+        if virtual_hierarchy_by_corpsag:
+            location_flag = a["location_flag"]
+            virt_root = '{}_{}'.format(location_id, location_flag) if location_flag[:-1] == "CorpSAG" else location_id
+        else:
+            virt_root = location_id
+        if item_id in ass_tree:
+            itm = ass_tree[item_id]
             if not ("location_id" in itm):
-                itm["location_id"] = location_id
+                itm["location_id"] = virt_root
     # дополняем дерево сведениями о станциях, не принадлежащих корпорации (всё равно,
     # что добавить в список NPC-станции)
     foreign_station_ids = foreign_structures_data.keys()
@@ -261,6 +284,6 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items):
         for k in ass_keys:
             root = get_assets_tree_root(ass_tree, k)
             if 0 == roots.count(int(root)):
-                roots.append(int(root))
+                roots.append(int(root))  # составные root-ы типа 123456_CorpASG2 сюда не попадают, т.к. не корни
         ass_tree["roots"] = roots
     return ass_tree
