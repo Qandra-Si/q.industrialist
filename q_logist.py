@@ -148,13 +148,11 @@ def main(argv):
     # Public information about a character
     character_data = eve_esi_interface.get_esi_data(
         access_token,
-        "characters/{}/".format(character_id),
-        "character")
+        "characters/{}/".format(character_id))
     # Public information about a corporation
     corporation_data = eve_esi_interface.get_esi_data(
         access_token,
-        "corporations/{}/".format(character_data["corporation_id"]),
-        "corporation")
+        "corporations/{}/".format(character_data["corporation_id"]))
     print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
 
@@ -168,8 +166,7 @@ def main(argv):
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/assets/".format(corporation_id),
-        "corp_assets")
+        "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
@@ -181,7 +178,6 @@ def main(argv):
         corp_ass_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_ass_names",
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
@@ -196,8 +192,7 @@ def main(argv):
             try:
                 universe_structure_data = eve_esi_interface.get_esi_data(
                     access_token,
-                    "universe/structures/{}/".format(structure_id),
-                    'universe_structures_{}'.format(structure_id))
+                    "universe/structures/{}/".format(structure_id))
                 foreign_structures_data.update({str(structure_id): universe_structure_data})
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code

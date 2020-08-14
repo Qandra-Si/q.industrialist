@@ -18,8 +18,14 @@ def get_cache_dir():
     return f_dir
 
 
-def get_f_name(f_name):
-    f_name = '{dir}/.cache_{nm}.json'.format(dir=get_cache_dir(), nm=f_name)
+def get_f_name(url):
+    if url[-1:] == '/':
+        url = url[:-1]
+    url = url.replace('/', '_')
+    url = url.replace('=', '-')
+    url = url.replace('?', '')
+    url = url.replace('&', '.')
+    f_name = '{dir}/.cache_{nm}.json'.format(dir=get_cache_dir(), nm=url)
     return f_name
 
 
@@ -53,8 +59,8 @@ def get_cached_headers(data):
     return cached_headers
 
 
-def dump_cache_into_file(nm, data_headers, data_json):
-    f_name = get_f_name(nm)
+def dump_cache_into_file(url, data_headers, data_json):
+    f_name = get_f_name(url)
     cache = {"headers": data_headers, "json": data_json}
     s = json.dumps(cache, indent=1, sort_keys=False)
     Path(get_cache_dir()).mkdir(parents=True, exist_ok=True)
@@ -66,8 +72,8 @@ def dump_cache_into_file(nm, data_headers, data_json):
     return
 
 
-def take_cache_from_file(nm):
-    f_name = get_f_name(nm)
+def take_cache_from_file(url):
+    f_name = get_f_name(url)
     if os.path.exists(f_name):
         with open(f_name, 'r', encoding='utf8') as f:
             try:
@@ -85,8 +91,8 @@ def esi_raise_for_status(code, message):
     raise requests.exceptions.HTTPError(message, response=rsp)
 
 
-def get_esi_data(access_token, url, nm, body=None):
-    cached_data = take_cache_from_file(nm)
+def get_esi_data(access_token, url, body=None):
+    cached_data = take_cache_from_file(url)
     if q_industrialist_settings.g_offline_mode:
         # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
         if "Http-Error" in cached_data["headers"]:
@@ -106,20 +112,20 @@ def get_esi_data(access_token, url, nm, body=None):
             if data.status_code == 304:
                 return cached_data["json"] if "json" in cached_data else None
             else:
-                dump_cache_into_file(nm, get_cached_headers(data), data.json())
+                dump_cache_into_file(url, get_cached_headers(data), data.json())
                 return data.json()
         except requests.exceptions.HTTPError as err:
             status_code = err.response.status_code
             if status_code == 403:  # это нормально, CCP используют 403-ответ для индикации запретов ingame-доступа
                 # сохраняем информацию в кеше и выходим с тем же кодом ошибки
-                dump_cache_into_file(nm, {"Http-Error": 403}, None)
+                dump_cache_into_file(url, {"Http-Error": 403}, None)
                 raise
         else:
             raise
 
 
-def get_esi_paged_data(access_token, url, nm):
-    cached_data = take_cache_from_file(nm)
+def get_esi_paged_data(access_token, url):
+    cached_data = take_cache_from_file(url)
     if q_industrialist_settings.g_offline_mode:
         # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
         return cached_data["json"] if "json" in cached_data else None
@@ -178,7 +184,7 @@ def get_esi_paged_data(access_token, url, nm):
                 break
             page = page + 1
         if 0 == match_pages:
-            dump_cache_into_file(nm, data_headers, data_json)
+            dump_cache_into_file(url, data_headers, data_json)
             return data_json
         elif len(cached_data["headers"]) == match_pages:
             return cached_data["json"] if "json" in cached_data else None

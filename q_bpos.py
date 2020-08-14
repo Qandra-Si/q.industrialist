@@ -82,13 +82,11 @@ def main(argv):
     # Public information about a character
     character_data = eve_esi_interface.get_esi_data(
         access_token,
-        "characters/{}/".format(character_id),
-        "character")
+        "characters/{}/".format(character_id))
     # Public information about a corporation
     corporation_data = eve_esi_interface.get_esi_data(
         access_token,
-        "corporations/{}/".format(character_data["corporation_id"]),
-        "corporation")
+        "corporations/{}/".format(character_data["corporation_id"]))
     print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
 
@@ -103,16 +101,14 @@ def main(argv):
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/assets/".format(corporation_id),
-        "corp_assets")
+        "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
     corp_blueprints_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/blueprints/".format(corporation_id),
-        "corp_blueprints")
+        "corporations/{}/blueprints/".format(corporation_id))
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 

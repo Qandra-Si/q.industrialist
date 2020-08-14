@@ -86,13 +86,11 @@ def main(argv):
     # Public information about a character
     character_data = eve_esi_interface.get_esi_data(
         access_token,
-        "characters/{}/".format(character_id),
-        "character")
+        "characters/{}/".format(character_id))
     # Public information about a corporation
     corporation_data = eve_esi_interface.get_esi_data(
         access_token,
-        "corporations/{}/".format(character_data["corporation_id"]),
-        "corporation")
+        "corporations/{}/".format(character_data["corporation_id"]))
     print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
 
@@ -106,8 +104,7 @@ def main(argv):
     wallet_data = -1
     # wallet_data = eve_esi_interface.get_esi_data(
     #     access_token,
-    #     "characters/{}/wallet/".format(character_id),
-    #     "wallet")
+    #     "characters/{}/wallet/".format(character_id))
     # print("\n{} has {} ISK".format(character_name, wallet_data))
     # sys.stdout.flush()
 
@@ -115,8 +112,7 @@ def main(argv):
     blueprint_data = []
     # blueprint_data = eve_esi_interface.get_esi_data(
     #     access_token,
-    #     "characters/{}/blueprints/".format(character_id),
-    #     "blueprints")
+    #     "characters/{}/blueprints/".format(character_id))
     # print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
     # sys.stdout.flush()
 
@@ -124,8 +120,7 @@ def main(argv):
     assets_data = []
     # assets_data = eve_esi_interface.get_esi_data(
     #     access_token,
-    #     "characters/{}/assets/".format(character_id),
-    #     "assets")
+    #     "characters/{}/assets/".format(character_id))
     # print("\n{} has {} assets".format(character_name, len(assets_data)))
     # sys.stdout.flush()
 
@@ -137,7 +132,6 @@ def main(argv):
         asset_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "characters/{}/assets/names/".format(character_id),
-            "assets_names",
             json.dumps(ass_named_ids, indent=0, sort_keys=False))
     print("\n{} has {} asset's names".format(character_name, len(asset_names_data)))
     sys.stdout.flush()
@@ -146,32 +140,28 @@ def main(argv):
     fittings_data = []
     # fittings_data = eve_esi_interface.get_esi_data(
     #     access_token,
-    #     "characters/{}/fittings/".format(character_id),
-    #     "fittings")
+    #     "characters/{}/fittings/".format(character_id))
     # print("\n{} has {} fittings".format(character_name, len(fittings_data)))
     # sys.stdout.flush()
 
     # Requires: access token
     # contracts_data = eve_esi_interface.get_esi_data(
     #   access_token,
-    #   "characters/{}/contracts/".format(character_id),
-    #   "contracts")
+    #   "characters/{}/contracts/".format(character_id))
     # print("\n{} has {} contracts".format(character_name, len(contracts_data)))
     # sys.stdout.flush()
 
     # Requires role(s): Factory_Manager
     corp_industry_jobs_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/industry/jobs/".format(corporation_id),
-        "corp_industry_jobs")
+        "corporations/{}/industry/jobs/".format(corporation_id))
     print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
     corp_assets_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/assets/".format(corporation_id),
-        "corp_assets")
+        "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
@@ -182,7 +172,6 @@ def main(argv):
         corp_ass_names_data = eve_esi_interface.get_esi_data(
             access_token,
             "corporations/{}/assets/names/".format(corporation_id),
-            "corp_ass_names",
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
@@ -190,8 +179,7 @@ def main(argv):
     # Requires role(s): Director
     corp_blueprints_data = eve_esi_interface.get_esi_paged_data(
         access_token,
-        "corporations/{}/blueprints/".format(corporation_id),
-        "corp_blueprints")
+        "corporations/{}/blueprints/".format(corporation_id))
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
