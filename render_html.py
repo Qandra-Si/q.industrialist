@@ -1638,14 +1638,14 @@ def dump_bpos_into_report(
             res = res + '<tr>' \
                         '<th scope="row">{num}</th>' \
                         '<td>{nm}</td>' \
-                        '<td>{prc:,.1f}</td>' \
+                        '<td>{prc}</td>' \
                         '<td>{me}</td>' \
                         '<td>{te}</td>' \
                         '<td>{q}</td>' \
                         '</tr>\n'.format(
                             num=num,
                             nm=item["name"],
-                            prc=item["price"] if "price" in item else "",
+                            prc='{:,.1f}'.format(item["price"]) if "price" in item else "",
                             me=item["me"],
                             te=item["te"],
                             q=item["quantity"]
