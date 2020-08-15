@@ -263,19 +263,3 @@ class EveOnlineInterface:
             if not ('access_token' in authz):
                 raise EveOnlineClientError("There is no way to continue working offline (you should authorize at least once)")
         return authz
-
-
-# def get_f_name_debug(f_name):
-#     f_name = '{dir}/.debug_{nm}.json'.format(dir=get_cache_dir(), nm=f_name)
-#     return f_name
-#
-#def dump_debug_into_file(nm, data):
-#    f_name = get_f_name_debug(nm)
-#    s = json.dumps(data, indent=1, sort_keys=False)
-#    Path(get_cache_dir()).mkdir(parents=True, exist_ok=True)
-#    with open(f_name, 'wt+', encoding='utf8') as f:
-#        try:
-#            f.write(s)
-#        finally:
-#            f.close()
-#    return

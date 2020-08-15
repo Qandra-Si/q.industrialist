@@ -5,3 +5,5 @@ from .auth_cache import EveESIAuth  # noqa
 from .eve_esi_client import EveESIClient  # noqa
 from .eve_esi_interface import EveOnlineInterface  # noqa
 from .error import EveOnlineClientError  # noqa
+
+__version__ = '0.6.1'

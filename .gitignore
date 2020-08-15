@@ -143,6 +143,7 @@ dmypy.json
 /.auth_cache
 /auth_cache
 /esi_cache
+/debug
 /*.~json
 /*.html
 /*.csv

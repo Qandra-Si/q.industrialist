@@ -22,73 +22,41 @@ Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
 """
 import sys
-import getopt
-import os
 import json
 import requests
-from pathlib import Path
-
-import q_industrialist_settings
-import eve_esi_tools
-import eve_sde_tools
 
 import eve_esi_interface as esi
+
+import eve_esi_tools
+import eve_sde_tools
+import console_app
+import q_industrialist_settings
 from render_html import dump_assets_tree_into_report
 
+from __init__ import __version__
 
-def main(argv):
+
+def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
-    character_name = None  # for example : Qandra Si
-    signup_new_character = False
-    offline_mode = False
-    workspace_cache_files_dir = '{}/.q_industrialist'.format(str(Path.home()))
-    exit_or_wrong_getopt = None
-    try:
-        opts, args = getopt.getopt(argv, "hp:sd:", ["help", "pilot=", "signup", "offline", "online", "cache_dir="])
-    except getopt.GetoptError:
-        exit_or_wrong_getopt = 2
-    if exit_or_wrong_getopt is None:
-        for opt, arg in opts:
-            if opt in ('-h', "--help"):
-                exit_or_wrong_getopt = 0
-                break
-            elif opt in ("-p", "--pilot"):
-                character_name = arg
-            elif opt in ("-s", "--signup"):
-                signup_new_character = True
-            elif opt in ("--offline"):
-                offline_mode = True
-            elif opt in ("--online"):
-                offline_mode = False
-            elif opt in ("-d", "--cache_dir"):
-                workspace_cache_files_dir = arg
-                if workspace_cache_files_dir[-1:] == '/':
-                    workspace_cache_files_dir = workspace_cache_files_dir[:-1]
-        if (character_name is None) == (signup_new_character == False):  # д.б. либо указано имя, либо флаг регистрации
-            exit_or_wrong_getopt = 0
-    if not (exit_or_wrong_getopt is None):
-        print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
-        print('    or ' + os.path.basename(__file__) + ' --signup')
-        print('Example: ' + os.path.basename(__file__) + ' --pilot="Qandra Si" --offline --cache_dir=/tmp')
-        sys.exit(exit_or_wrong_getopt)
+    argv_prms = console_app.get_argv_prms()
 
     # настройка Eve Online ESI Swagger interface
     auth = esi.EveESIAuth(
-        '{}/auth_cache'.format(workspace_cache_files_dir),
+        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
         debug=True)
     client = esi.EveESIClient(
         auth,
         debug=False,
         logger=True,
-        user_agent=q_industrialist_settings.g_user_agent)
+        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
     interface = esi.EveOnlineInterface(
         client,
         q_industrialist_settings.g_client_scope,
-        cache_dir='{}/esi_cache'.format(workspace_cache_files_dir),
-        offline_mode=offline_mode)
+        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        offline_mode=argv_prms["offline_mode"])
 
-    authz = interface.authenticate(character_name)
+    authz = interface.authenticate(argv_prms["character_name"])
     #access_token = authz["access_token"]
     character_id = authz["character_id"]
     character_name = authz["character_name"]
@@ -150,7 +118,6 @@ def main(argv):
     if len(foreign_structures_forbidden_ids) > 0:
         print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
-    return
 
     # # Public information with list of public structures
     # universe_structures_data = eve_esi_interface.get_esi_data(
@@ -164,12 +131,12 @@ def main(argv):
     # { location1: {items:[item1,item2,...],type_id,location_id},
     #   location2: {items:[item3],type_id} }
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=True)
-    eve_esi_interface.dump_debug_into_file("corp_assets_tree", corp_assets_tree)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
     # которые предназначены для использования в чертежах
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data)
-    eve_esi_interface.dump_debug_into_file("corp_ass_loc_data", corp_ass_loc_data)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Построение дерева asset-ов:
     print("\nBuilding assets tree report...")
@@ -192,4 +159,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

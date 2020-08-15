@@ -1,4 +1,7 @@
-﻿import q_industrialist_settings
+﻿import json
+from pathlib import Path
+
+import q_industrialist_settings
 
 
 def get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
@@ -287,3 +290,15 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
                 roots.append(int(root))  # составные root-ы типа 123456_CorpASG2 сюда не попадают, т.к. не корни
         ass_tree["roots"] = roots
     return ass_tree
+
+
+def dump_debug_into_file(ws_dir, nm, data):
+    f_name = '{dir}/debug/{nm}.json'.format(dir=ws_dir, nm=nm)
+    s = json.dumps(data, indent=1, sort_keys=False)
+    Path('{dir}/debug'.format(dir=ws_dir)).mkdir(parents=True, exist_ok=True)
+    with open(f_name, 'wt+', encoding='utf8') as f:
+        try:
+            f.write(s)
+        finally:
+            f.close()
+    return
