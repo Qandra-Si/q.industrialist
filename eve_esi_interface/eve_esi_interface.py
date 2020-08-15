@@ -8,11 +8,34 @@ from .error import EveOnlineClientError
 from .eve_esi_client import EveESIClient
 
 
-class EveOnlineConfig:
-    def __init__(self, scopes, cache_dir, offline_mode=False):
+class EveOnlineInterface:
+    def __init__(self, client, scopes, cache_dir, offline_mode=False):
+        """ constructor
+
+        :param EveOnlineConfig config: configuration of Eve Online Client
+        """
+        self.__server_url = "https://esi.evetech.net/latest/"
         self.__scopes = scopes
-        self.__cache_dir = cache_dir  # ".q_industrialist"
         self.__offline_mode = offline_mode
+
+        self.__cache_dir = cache_dir  # {tmp_dir}/.esi_cache/
+        self.setup_cache_dir(cache_dir)
+
+        if not isinstance(client, EveESIClient):
+            raise EveOnlineClientError("You should use EveESIClient to configure interface")
+        self.__client = client
+
+    @property
+    def client(self):
+        """ Eve Online ESI Swagger https client implementation
+        """
+        return self.__client
+
+    @property
+    def server_url(self):
+        """ url to ESI Swagger interface (CCP' servers)
+        """
+        return self.__server_url
 
     @property
     def scopes(self):
@@ -26,6 +49,14 @@ class EveOnlineConfig:
         """
         return self.__cache_dir
 
+    def setup_cache_dir(self, cache_dir):
+        """ configures path to directory where esi/http cache files stored
+        """
+        if cache_dir[-1:] == '/':
+            cache_dir = cache_dir[:-1]
+        self.__cache_dir = cache_dir
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
+
     @property
     def offline_mode(self):
         """ flag which says that we are working offline
@@ -37,42 +68,6 @@ class EveOnlineConfig:
         """ flag which says that we are working offline
         """
         return not self.__offline_mode
-
-
-class EveOnlineInterface:
-    def __init__(self, config, client):
-        """ constructor
-
-        :param EveOnlineConfig config: configuration of Eve Online Client
-        """
-        self.__server_url = "https://esi.evetech.net/latest/"
-
-        if not isinstance(config, EveOnlineConfig):
-            raise EveOnlineClientError("You should use EveOnlineConfig to configure interface")
-        self.__config = config
-        Path(self.__config.cache_dir).mkdir(parents=True, exist_ok=True)
-
-        if not isinstance(client, EveESIClient):
-            raise EveOnlineClientError("You should use EveESIClient to configure interface")
-        self.__client = client
-
-    @property
-    def config(self):
-        """ settings with path to directory with cache files and so on
-        """
-        return self.__config
-
-    @property
-    def client(self):
-        """ Eve Online ESI Swagger https client implementation
-        """
-        return self.__client
-
-    @property
-    def server_url(self):
-        """ url to ESI Swagger interface (CCP' servers)
-        """
-        return self.__server_url
 
     def __get_f_name(self, url):
         """ converts urls to filename to store it in filesystem, for example:
@@ -88,10 +83,7 @@ class EveOnlineInterface:
         url = url.replace('=', '-')
         url = url.replace('?', '')
         url = url.replace('&', '.')
-        corrected_dir = self.__config.cache_dir
-        if corrected_dir[-1:] == '/':
-            corrected_dir = corrected_dir[:-1]
-        f_name = '{dir}/.cache_{nm}.json'.format(dir=corrected_dir, nm=url)
+        f_name = '{dir}/.cache_{nm}.json'.format(dir=self.__cache_dir, nm=url)
         return f_name
 
     @staticmethod
@@ -149,7 +141,7 @@ class EveOnlineInterface:
         or returns early retrieved data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__config.offline_mode:
+        if self.__offline_mode:
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             if "Http-Error" in cached_data["headers"]:
                 code = int(cached_data["headers"]["Http-Error"])
@@ -185,7 +177,7 @@ class EveOnlineInterface:
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__config.offline_mode:
+        if self.__offline_mode:
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             return cached_data["json"] if "json" in cached_data else None
         else:
@@ -260,13 +252,13 @@ class EveOnlineInterface:
         :param character_name: pilot' name for signin, or None value for signup new pilot into system
         """
         authz = {} if character_name is None else self.__client.auth_cache.read_cache(character_name)
-        if self.__config.online_mode:
+        if not self.__offline_mode:
             if not ('access_token' in authz) or not ('refresh_token' in authz) or not ('expired' in authz):
-                authz = self.__client.auth(self.__config.scopes)
-            elif not ('scope' in authz) or not self.__client.auth_cache.verify_auth_scope(authz, self.__config.scopes):
-                authz = self.__client.auth(self.__config.scopes, authz["client_id"])
+                authz = self.__client.auth(self.__scopes)
+            elif not ('scope' in authz) or not self.__client.auth_cache.verify_auth_scope(authz, self.__scopes):
+                authz = self.__client.auth(self.__scopes, authz["client_id"])
             elif self.__client.auth_cache.is_timestamp_expired(int(authz["expired"])):
-                authz = self.__client.re_auth(self.__config.scopes, authz)
+                authz = self.__client.re_auth(self.__scopes, authz)
         else:
             if not ('access_token' in authz):
                 raise EveOnlineClientError("There is no way to continue working offline (you should authorize at least once)")

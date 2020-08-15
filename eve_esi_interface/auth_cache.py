@@ -11,6 +11,7 @@ import os
 import getopt
 import sys
 import time
+from pathlib import Path
 
 try:
     from .validate_jwt import validate_eve_jwt
@@ -22,8 +23,9 @@ except ImportError:  # pragma: no cover
 class EveESIAuth:
     def __init__(self, cache_dir, debug=False):
         self.__auth_cache = {}
-        self.__cache_dir = cache_dir  # {tmp_dir}/.auth_cache/
         self.__debug = debug
+        self.__cache_dir = cache_dir
+        self.setup_cache_dir(cache_dir)  # {tmp_dir}/.auth_cache/
 
     @property
     def auth_cache(self):
@@ -58,7 +60,10 @@ class EveESIAuth:
     def setup_cache_dir(self, cache_dir):
         """ configures path to directory where auth cache files stored
         """
+        if cache_dir[-1:] == '/':
+            cache_dir = cache_dir[:-1]
         self.__cache_dir = cache_dir
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
     @property
     def debug(self):
@@ -73,10 +78,7 @@ class EveESIAuth:
         self.__debug = False
 
     def __get_f_name(self, character_name):
-        corrected_dir = self.__cache_dir
-        if corrected_dir[-1:] == '/':
-            corrected_dir = corrected_dir[:-1]
-        f_name = '{dir}/auth_cache.{pilot}.json'.format(dir=corrected_dir, pilot=character_name)
+        f_name = '{dir}/auth_cache.{pilot}.json'.format(dir=self.__cache_dir, pilot=character_name)
         return f_name
 
     def read_cache(self, character_name):

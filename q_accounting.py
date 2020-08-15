@@ -26,6 +26,7 @@ import getopt
 import os
 import json
 import requests
+from pathlib import Path
 
 import q_industrialist_settings
 import eve_esi_tools
@@ -36,11 +37,15 @@ from render_html import dump_assets_tree_into_report
 
 
 def main(argv):
+    # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
+    # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     character_name = None  # for example : Qandra Si
     signup_new_character = False
+    offline_mode = False
+    workspace_cache_files_dir = '{}/.q_industrialist'.format(str(Path.home()))
     exit_or_wrong_getopt = None
     try:
-        opts, args = getopt.getopt(argv, "hp:s", ["help", "pilot=", "signup"])
+        opts, args = getopt.getopt(argv, "hp:sd:", ["help", "pilot=", "signup", "offline", "online", "cache_dir="])
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
     if exit_or_wrong_getopt is None:
@@ -52,21 +57,36 @@ def main(argv):
                 character_name = arg
             elif opt in ("-s", "--signup"):
                 signup_new_character = True
+            elif opt in ("--offline"):
+                offline_mode = True
+            elif opt in ("--online"):
+                offline_mode = False
+            elif opt in ("-d", "--cache_dir"):
+                workspace_cache_files_dir = arg
+                if workspace_cache_files_dir[-1:] == '/':
+                    workspace_cache_files_dir = workspace_cache_files_dir[:-1]
         if (character_name is None) == (signup_new_character == False):  # д.б. либо указано имя, либо флаг регистрации
             exit_or_wrong_getopt = 0
     if not (exit_or_wrong_getopt is None):
         print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
         print('    or ' + os.path.basename(__file__) + ' --signup')
-        print('Example: ' + os.path.basename(__file__) + ' --pilot="Qandra Si"')
+        print('Example: ' + os.path.basename(__file__) + ' --pilot="Qandra Si" --offline --cache_dir=/tmp')
         sys.exit(exit_or_wrong_getopt)
 
-    auth = esi.EveESIAuth('{}/.auth_cache'.format(q_industrialist_settings.g_tmp_directory, debug=True))
-    client = esi.EveESIClient(auth, debug=False, logger=True, user_agent=q_industrialist_settings.g_user_agent)
-    config = esi.EveOnlineConfig(
+    # настройка Eve Online ESI Swagger interface
+    auth = esi.EveESIAuth(
+        '{}/auth_cache'.format(workspace_cache_files_dir),
+        debug=True)
+    client = esi.EveESIClient(
+        auth,
+        debug=False,
+        logger=True,
+        user_agent=q_industrialist_settings.g_user_agent)
+    interface = esi.EveOnlineInterface(
+        client,
         q_industrialist_settings.g_client_scope,
-        cache_dir='{}/.q_industrialist'.format(q_industrialist_settings.g_tmp_directory),
-        offline_mode=q_industrialist_settings.g_offline_mode)
-    interface = esi.EveOnlineInterface(config, client)
+        cache_dir='{}/esi_cache'.format(workspace_cache_files_dir),
+        offline_mode=offline_mode)
 
     authz = interface.authenticate(character_name)
     #access_token = authz["access_token"]
@@ -84,15 +104,13 @@ def main(argv):
     corporation_name = corporation_data["name"]
     print("\n{} is from '{}' corporation".format(character_name, corporation_name))
     sys.stdout.flush()
-    return
 
     sde_type_ids = eve_sde_tools.read_converted("typeIDs")
     sde_inv_names = eve_sde_tools.read_converted("invNames")
     sde_inv_items = eve_sde_tools.read_converted("invItems")
 
     # Requires role(s): Director
-    corp_assets_data = eve_esi_interface.get_esi_paged_data(
-        access_token,
+    corp_assets_data = interface.get_esi_paged_data(
         "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
@@ -102,8 +120,7 @@ def main(argv):
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
     if len(corp_ass_named_ids) > 0:
         # Requires role(s): Director
-        corp_ass_names_data = eve_esi_interface.get_esi_data(
-            access_token,
+        corp_ass_names_data = interface.get_esi_data(
             "corporations/{}/assets/names/".format(corporation_id),
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
@@ -117,8 +134,7 @@ def main(argv):
         # Requires: access token
         for structure_id in foreign_structures_ids:
             try:
-                universe_structure_data = eve_esi_interface.get_esi_data(
-                    access_token,
+                universe_structure_data = interface.get_esi_data(
                     "universe/structures/{}/".format(structure_id))
                 foreign_structures_data.update({str(structure_id): universe_structure_data})
             except requests.exceptions.HTTPError as err:
@@ -134,6 +150,7 @@ def main(argv):
     if len(foreign_structures_forbidden_ids) > 0:
         print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
+    return
 
     # # Public information with list of public structures
     # universe_structures_data = eve_esi_interface.get_esi_data(
