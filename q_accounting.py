@@ -27,10 +27,10 @@ import requests
 
 import eve_esi_interface as esi
 
+import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-import q_industrialist_settings
 from render_html import dump_assets_tree_into_report
 
 from __init__ import __version__
