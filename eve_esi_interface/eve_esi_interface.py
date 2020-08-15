@@ -185,6 +185,7 @@ class EveOnlineInterface:
             # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
             restart = True
             restart_cache = False
+            first_start = True
             while True:
                 if restart:
                     page = 1
@@ -205,6 +206,12 @@ class EveOnlineInterface:
                         len(cached_data["headers"]) >= page) and ("etag" in cached_data["headers"][page-1]) else None
                 page_data = self.__client.send_esi_request_http(data_path, etag)
                 if page_data.status_code == 304:
+                    # ускоренный вывод данных из этого метода - если находимся в цикле загрузке данных с сервера
+                    # и при первом же обращении к первой же странице совпал etag, следовательно весь набор актуален
+                    # и заниматься загрузкой остальных страниц (дожидаясь, а может быть на этот раз именно во время
+                    # загрузки данные обновятся) - нет никакого смысла! (О) - оптимизация! :)
+                    if first_start and 1 == page:
+                        return cached_data["json"] if "json" in cached_data else None
                     # если известны etag-параметры, то все страницы должны совпасть, тогда набор данных
                     # считаем полностью валидным
                     match_pages = match_pages + 1  # noqa
@@ -223,6 +230,7 @@ class EveOnlineInterface:
                         cached_data = None
                         restart = True
                         restart_cache = True
+                        first_start = False
                         continue
                     data_headers.append(self.__get_cached_headers(page_data))  # noqa
                     data_json.extend(page_data.json())  # noqa
@@ -235,10 +243,12 @@ class EveOnlineInterface:
                         # элемента этого набора, то весь набор признаётся невалидным
                         restart = True
                         restart_cache = True
+                        first_start = False
                         continue
                 if page == all_pages:
                     break
                 page = page + 1
+                first_start = False
             if 0 == match_pages:
                 self.__dump_cache_into_file(url, data_headers, data_json)
                 return data_json
