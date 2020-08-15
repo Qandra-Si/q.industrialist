@@ -22,21 +22,19 @@ Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
 """
 import sys
-import getopt
-import os
 import json
-
 import requests
+
+import eve_esi_interface as esi
 
 import q_industrialist_settings
 import q_logist_settings
-import auth_cache
-import shared_flow
 import eve_esi_tools
 import eve_sde_tools
-import eve_esi_interface
-
+import console_app
 from render_html import dump_cynonetwork_into_report
+
+from __init__ import __version__
 
 
 # type_id - тип требуемых данных
@@ -105,50 +103,35 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
     return None
 
 
-def main(argv):
-    character_name = None  # for example : Qandra Si
-    exit_or_wrong_getopt = None
-    try:
-        opts, args = getopt.getopt(argv, "hp:", ["help", "pilot="])
-    except getopt.GetoptError:
-        exit_or_wrong_getopt = 2
-    if exit_or_wrong_getopt is None:
-        for opt, arg in opts:
-            if opt in ('-h', "--help"):
-                exit_or_wrong_getopt = 0
-                break
-            elif opt in ("-p", "--pilot"):
-                character_name = arg
-        if character_name is None:
-            exit_or_wrong_getopt = 0
-    if not (exit_or_wrong_getopt is None):
-        print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
-        sys.exit(exit_or_wrong_getopt)
+def main():
+    # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
+    # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
+    argv_prms = console_app.get_argv_prms()
 
-    cache = auth_cache.read_cache(character_name)
-    if not q_industrialist_settings.g_offline_mode:
-        if not ('access_token' in cache) or not ('refresh_token' in cache) or not ('expired' in cache):
-            cache = shared_flow.auth(q_industrialist_settings.g_client_scope)
-        elif not ('scope' in cache) or not auth_cache.verify_auth_scope(cache, q_industrialist_settings.g_client_scope):
-            cache = shared_flow.auth(q_industrialist_settings.g_client_scope, cache["client_id"])
-        elif auth_cache.is_timestamp_expired(int(cache["expired"])):
-            cache = shared_flow.re_auth(q_industrialist_settings.g_client_scope, cache)
-    else:
-        if not ('access_token' in cache):
-            print("There is no way to continue working offline (you should authorize at least once).")
-            return
+    # настройка Eve Online ESI Swagger interface
+    auth = esi.EveESIAuth(
+        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        debug=True)
+    client = esi.EveESIClient(
+        auth,
+        debug=False,
+        logger=True,
+        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+    interface = esi.EveOnlineInterface(
+        client,
+        q_industrialist_settings.g_client_scope,
+        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        offline_mode=argv_prms["offline_mode"])
 
-    access_token = cache["access_token"]
-    character_id = cache["character_id"]
-    character_name = cache["character_name"]
+    authz = interface.authenticate(argv_prms["character_name"])
+    character_id = authz["character_id"]
+    character_name = authz["character_name"]
 
     # Public information about a character
-    character_data = eve_esi_interface.get_esi_data(
-        access_token,
+    character_data = interface.get_esi_data(
         "characters/{}/".format(character_id))
     # Public information about a corporation
-    corporation_data = eve_esi_interface.get_esi_data(
-        access_token,
+    corporation_data = interface.get_esi_data(
         "corporations/{}/".format(character_data["corporation_id"]))
     print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
@@ -161,8 +144,7 @@ def main(argv):
     sde_inv_positions = eve_sde_tools.read_converted("invPositions")
 
     # Requires role(s): Director
-    corp_assets_data = eve_esi_interface.get_esi_paged_data(
-        access_token,
+    corp_assets_data = interface.get_esi_paged_data(
         "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
@@ -172,8 +154,7 @@ def main(argv):
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
     if len(corp_ass_named_ids) > 0:
         # Requires role(s): Director
-        corp_ass_names_data = eve_esi_interface.get_esi_data(
-            access_token,
+        corp_ass_names_data = interface.get_esi_data(
             "corporations/{}/assets/names/".format(corporation_id),
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
@@ -187,8 +168,7 @@ def main(argv):
         # Requires: access token
         for structure_id in foreign_structures_ids:
             try:
-                universe_structure_data = eve_esi_interface.get_esi_data(
-                    access_token,
+                universe_structure_data = interface.get_esi_data(
                     "universe/structures/{}/".format(structure_id))
                 foreign_structures_data.update({str(structure_id): universe_structure_data})
             except requests.exceptions.HTTPError as err:
@@ -210,7 +190,7 @@ def main(argv):
     # { location1: {items:[item1,item2,...],type_id,location_id},
     #   location2: {items:[item3],type_id} }
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
-    eve_esi_interface.dump_debug_into_file("corp_assets_tree", corp_assets_tree)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
     # Фильтрация (вручную) ассетов, которые расположены на станках циносети
     corp_cynonetwork = {}
@@ -339,7 +319,7 @@ def main(argv):
                         data.update({"error": "no solar system"})
                 corp_cynonetwork.update({str(location_id): data})
             jump_num = jump_num + 1
-    eve_esi_interface.dump_debug_into_file("corp_cynonetwork", corp_cynonetwork)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_cynonetwork", corp_cynonetwork)
 
     print("\nBuilding cyno network report...")
     sys.stdout.flush()
@@ -355,4 +335,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

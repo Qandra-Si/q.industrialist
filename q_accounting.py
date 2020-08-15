@@ -57,7 +57,6 @@ def main():
         offline_mode=argv_prms["offline_mode"])
 
     authz = interface.authenticate(argv_prms["character_name"])
-    #access_token = authz["access_token"]
     character_id = authz["character_id"]
     character_name = authz["character_name"]
 
