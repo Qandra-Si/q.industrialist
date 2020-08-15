@@ -120,8 +120,9 @@ def main():
     for id in stock_all_loc_ids:
         print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
     blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data if
-                         (n['name'][:16] == "[prod] conveyor ") or
-                         ((n['name'][:5] == "WORK ") and (n['name'][7:-2] == "/"))]
+                         (n['name'][:16] == "[prod] conveyor ")
+                         # or ((n['name'][:5] == "WORK ") and (n['name'][7:-2] == "/"))
+                        ]
     for id in blueprint_loc_ids:
         print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
 
