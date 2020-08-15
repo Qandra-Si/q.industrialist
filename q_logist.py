@@ -139,9 +139,9 @@ def main():
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
 
-    sde_inv_names = eve_sde_tools.read_converted("invNames")
-    sde_inv_items = eve_sde_tools.read_converted("invItems")
-    sde_inv_positions = eve_sde_tools.read_converted("invPositions")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_inv_positions = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invPositions")
 
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
@@ -324,6 +324,8 @@ def main():
     print("\nBuilding cyno network report...")
     sys.stdout.flush()
     dump_cynonetwork_into_report(
+        # путь, где будет сохранён отчёт
+        argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_inv_positions,
         # данные, полученные в результате анализа и перекомпоновки входных списков

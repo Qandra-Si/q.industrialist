@@ -27,6 +27,7 @@ class EveESIClient:
         """
         self.__client_callback_url = 'https://localhost/callback/'
         self.__content_type = 'application/x-www-form-urlencoded'
+        # self.__eve_server = 'tranquility'  # eveonline' server
         self.__login_host = 'login.eveonline.com'
         self.__base_auth_url = 'https://login.eveonline.com/v2/oauth/authorize/'
         self.__token_req_url = 'https://login.eveonline.com/v2/oauth/token'
@@ -92,7 +93,8 @@ class EveESIClient:
         return self.__user_agent
 
     def setup_user_agent(self, user_agent):
-        """ configures User-Agent which used in http requests to CCP Servers
+        """ configures User-Agent which used in http requests to CCP Servers, foe example:
+        'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
 
         :param user_agent: format recomendation - '<project_url> Maintainer: <maintainer_name> <maintainer_email>'
         """

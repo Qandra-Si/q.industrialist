@@ -77,10 +77,10 @@ def main():
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
 
-    sde_type_ids = eve_sde_tools.read_converted("typeIDs")
-    sde_bp_materials = eve_sde_tools.read_converted("blueprints")
-    sde_market_groups = eve_sde_tools.read_converted("marketGroups")
-    sde_icon_ids = eve_sde_tools.read_converted("iconIDs")
+    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+    sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
@@ -104,7 +104,7 @@ def main():
     sys.stdout.flush()
 
     found_blueprints = []
-    glf = open('{tmp}/corp_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    glf = open('{dir}/corp_bpo.csv'.format(dir=argv_prms["workspace_cache_files_dir"]), "wt+", encoding='utf8')
     try:
         glf.write('Blueprint\tBase Price\tMaterial Efficiency\tTime Efficiency\n')
         for a in corp_assets_data:
@@ -132,7 +132,7 @@ def main():
     finally:
         glf.close()
 
-    glf = open('{tmp}/corp_absent_bpo.csv'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    glf = open('{dir}/corp_absent_bpo.csv'.format(dir=argv_prms["workspace_cache_files_dir"]), "wt+", encoding='utf8')
     try:
         glf.write('Blueprint\tBase Price\tPresent\tManufacturing Impossible\tAbsent Materials\n')
         bpo_keys = sde_bp_materials.keys()
@@ -154,6 +154,8 @@ def main():
     print("\nBuilding BPOs report...")
     sys.stdout.flush()
     dump_bpos_into_report(
+        # путь, где будет сохранён отчёт
+        argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_market_groups,

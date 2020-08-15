@@ -138,11 +138,8 @@ dmypy.json
 /jquery
 /q_industrialist_settings.py
 /q_logist_settings.py
-/.q_industrialist*/
-/.converted_*.json
-/.auth_cache
-/auth_cache
-/esi_cache
+/.*_cache
+/*_cache
 /debug
 /*.~json
 /*.html

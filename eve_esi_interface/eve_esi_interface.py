@@ -59,13 +59,14 @@ class EveOnlineInterface:
 
     @property
     def offline_mode(self):
-        """ flag which says that we are working offline
+        """ flag which says that we are working offline, so eve_esi_interface will read data from file system
+        (to optimize interaction with CCP servers)
         """
         return self.__offline_mode
 
     @property
     def online_mode(self):
-        """ flag which says that we are working offline
+        """ flag which says that we are working offline, so eve_esi_interface will download & save data from CCP servers
         """
         return not self.__offline_mode
 

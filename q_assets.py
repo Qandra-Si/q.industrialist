@@ -134,9 +134,9 @@ def main():
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
 
-    sde_type_ids = eve_sde_tools.read_converted("typeIDs")
-    sde_inv_names = eve_sde_tools.read_converted("invNames")
-    sde_inv_items = eve_sde_tools.read_converted("invItems")
+    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
 
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
@@ -203,6 +203,8 @@ def main():
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
     dump_assets_tree_into_report(
+        # путь, где будет сохранён отчёт
+        argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_inv_names,

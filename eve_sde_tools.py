@@ -4,18 +4,17 @@ run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py
 """
+import sys
+import os
+import getopt
 import yaml
 import json
-import sys
-
 from yaml import SafeLoader
-
-import q_industrialist_settings
 
 
 # type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
 def get_yaml(type, sub_url, item):
-    f_name = '{tmp}/{type}/{url}'.format(type=type, tmp=q_industrialist_settings.g_tmp_directory, url=sub_url)
+    f_name = '{cwd}/{type}/{url}'.format(type=type, cwd=os.getcwd(), url=sub_url)
     item_to_search = "\n{}\n".format(item)
     with open(f_name, 'r', encoding='utf8') as f:
         contents = f.read()
@@ -38,27 +37,25 @@ def get_yaml(type, sub_url, item):
                 break
         yaml_data = yaml.load(yaml_contents, Loader=SafeLoader)
         return yaml_data
-    return {}
 
 
-def get_source_name(subname, name):
-    return '{tmp}/{type}/{url}'.format(type=2, tmp=q_industrialist_settings.g_tmp_directory, url="sde/{}/{}.yaml".format(subname, name))
+def __get_source_name(subname, name):
+    return '{cwd}/{type}/{url}'.format(type=2, cwd=os.getcwd(), url="sde/{}/{}.yaml".format(subname, name))
 
 
-def get_converted_name(name):
-    return '{dir}/.converted_{nm}.json'.format(dir=q_industrialist_settings.g_tmp_directory, nm=name)
+def __get_converted_name(ws_dir, name):
+    return '{dir}/sde_cache/.converted_{nm}.json'.format(dir=ws_dir, nm=name)
 
 
-def read_converted(name):
-    f_name_json = get_converted_name(name)
+def read_converted(ws_dir, name):
+    f_name_json = __get_converted_name(ws_dir, name)
     with open(f_name_json, 'r', encoding='utf8') as f:
         s = f.read()
         json_data = (json.loads(s))
         return json_data
-    return None
 
 
-def rebuild(subname, name, items_to_stay=None):
+def __rebuild(ws_dir, subname, name, items_to_stay=None):
     keys_to_stay = []
     dicts_to_stay = []
     if not (items_to_stay is None):
@@ -67,8 +64,8 @@ def rebuild(subname, name, items_to_stay=None):
                 keys_to_stay.append(i2s)
             elif isinstance(i2s, dict):
                 dicts_to_stay.append(i2s)
-    f_name_yaml = get_source_name(subname, name)
-    f_name_json = get_converted_name(name)
+    f_name_yaml = __get_source_name(subname, name)
+    f_name_json = __get_converted_name(ws_dir, name)
     with open(f_name_yaml, 'r', encoding='utf8') as f:
         try:
             # yaml
@@ -120,7 +117,7 @@ def rebuild(subname, name, items_to_stay=None):
             f.close()
 
 
-def rebuild_list2dict_by_key(name, key, val=None):
+def __rebuild_list2dict_by_key(ws_dir, name, key, val=None):
     # перечитываем построенный файл и преобразуем его из списка в справочник
     # при этом одно из значений элементов списка выбирается ключём в справочнике,
     # в том числ поддерживается возможность упростить
@@ -128,7 +125,7 @@ def rebuild_list2dict_by_key(name, key, val=None):
     # до
     #  {"key1": val1_2, "key2": val2_2}
     # задав необязательный val-параметр
-    lst = read_converted(name)
+    lst = read_converted(ws_dir, name)
     if not isinstance(lst, list):
         return
     dct = {}
@@ -140,7 +137,7 @@ def rebuild_list2dict_by_key(name, key, val=None):
         else:
             dct.update({str(itm[key]): itm[val]})
     # json
-    f_name_json = get_converted_name(name)
+    f_name_json = __get_converted_name(ws_dir, name)
     s = json.dumps(dct, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
@@ -228,8 +225,8 @@ def get_market_groups_tree(sde_market_groups):
     return groups_tree
 
 
-def rebuild_icons(name):
-    icons = read_converted(name)
+def __rebuild_icons(ws_dir, name):
+    icons = read_converted(ws_dir, name)
     icon_keys = icons.keys()
     for ik in icon_keys:
         icon_file = icons[str(ik)]["iconFile"]
@@ -237,62 +234,82 @@ def rebuild_icons(name):
             icon_file = '{}/{}'.format("Icons/items", icon_file[22:])
             icons[str(ik)]["iconFile"] = icon_file
     # json
-    f_name_json = get_converted_name(name)
+    f_name_json = __get_converted_name(ws_dir, name)
     s = json.dumps(icons, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
 
 
-def clean_positions(name):
-    positions = read_converted(name)
+def __clean_positions(ws_dir, name):
+    positions = read_converted(ws_dir, name)
     positions = [i for i in positions if (i["x"] != 0.0) and (i["y"] != 0.0) and (i["z"] != 0.0)]
     # json
-    f_name_json = get_converted_name(name)
+    f_name_json = __get_converted_name(ws_dir, name)
     s = json.dumps(positions, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
 
 
 def main():  # rebuild .yaml files
+    exit_or_wrong_getopt = None
+    workspace_cache_files_dir = None
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "cache_dir="])
+    except getopt.GetoptError:
+        exit_or_wrong_getopt = 2
+    if exit_or_wrong_getopt is None:
+        for opt, arg in opts:  # noqa
+            if opt in ('-h', "--help"):
+                exit_or_wrong_getopt = 0
+                break
+            elif opt in ("--cache_dir"):
+                workspace_cache_files_dir = arg[:-1] if arg[-1:] == '/' else arg
+        if workspace_cache_files_dir is None:
+            exit_or_wrong_getopt = 0
+    if not (exit_or_wrong_getopt is None):
+        print('Usage: {app} --cache_dir=/tmp\n'.
+            format(app=sys.argv[0]))
+        sys.exit(exit_or_wrong_getopt)
+
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
-    rebuild("bsd", "invPositions", ["itemID", "x", "y", "z"])
-    clean_positions("invPositions")
+    __rebuild(workspace_cache_files_dir, "bsd", "invPositions", ["itemID", "x", "y", "z"])
+    __clean_positions(workspace_cache_files_dir, "invPositions")
     print("Reindexing .converted_invPositions.json file...")
     sys.stdout.flush()
-    rebuild_list2dict_by_key("invPositions", "itemID")
+    __rebuild_list2dict_by_key(workspace_cache_files_dir, "invPositions", "itemID")
 
     print("Rebuilding marketGroups.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
+    __rebuild(workspace_cache_files_dir, "fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
     
     print("Rebuilding iconIDs.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "iconIDs", ["iconFile"])
+    __rebuild(workspace_cache_files_dir, "fsd", "iconIDs", ["iconFile"])
     print("Reindexing .converted_iconIDs.json file...")
-    rebuild_icons("iconIDs")
+    __rebuild_icons(workspace_cache_files_dir, "iconIDs")
     
     print("Rebuilding invNames.yaml file...")
     sys.stdout.flush()
-    rebuild("bsd", "invNames", ["itemID", "itemName"])
+    __rebuild(workspace_cache_files_dir, "bsd", "invNames", ["itemID", "itemName"])
     print("Reindexing .converted_invNames.json file...")
     sys.stdout.flush()
-    rebuild_list2dict_by_key("invNames", "itemID", "itemName")
+    __rebuild_list2dict_by_key(workspace_cache_files_dir, "invNames", "itemID", "itemName")
     
     print("Rebuilding invItems.yaml file...")
     sys.stdout.flush()
-    rebuild("bsd", "invItems", ["itemID", "locationID", "typeID"])
+    __rebuild(workspace_cache_files_dir, "bsd", "invItems", ["itemID", "locationID", "typeID"])
     print("Reindexing .converted_invItems.json file...")
     sys.stdout.flush()
-    rebuild_list2dict_by_key("invItems", "itemID")
+    __rebuild_list2dict_by_key(workspace_cache_files_dir, "invItems", "itemID")
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}])
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}])
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
-    rebuild("fsd", "blueprints", ["activities"])
+    __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities"])
 
 
 def test():

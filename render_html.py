@@ -664,6 +664,7 @@ def dump_corp_assets_tree(
 
 
 def dump_into_report(
+        ws_dir,
         sde_type_ids,
         sde_bp_materials,
         wallet_data,
@@ -673,7 +674,7 @@ def dump_into_report(
         corp_ass_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data):
-    glf = open('{tmp}/report.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    glf = open('{dir}/report.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Workflow")
         dump_wallet(glf, wallet_data)
@@ -769,8 +770,8 @@ def dump_bp_wo_materials(glf, blueprints, type_ids):
 </div>""")
 
 
-def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_materials):
-    glf = open('{tmp}/materials.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+def dump_materials_into_report(ws_dir, sde_type_ids, materials, wo_manufacturing, wo_materials):
+    glf = open('{dir}/materials.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Materials")
         dump_materials(glf, materials, sde_type_ids)
@@ -782,6 +783,7 @@ def dump_materials_into_report(sde_type_ids, materials, wo_manufacturing, wo_mat
 
 
 def dump_assets_tree_into_report(
+        ws_dir,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -790,7 +792,7 @@ def dump_assets_tree_into_report(
         foreign_structures_data,
         corp_ass_loc_data,
         corp_assets_tree):
-    glf = open('{tmp}/assets_tree.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    glf = open('{dir}/assets_tree.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Corp Assets")
         # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
@@ -1502,8 +1504,8 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
 </script>""")
 
 
-def dump_cynonetwork_into_report(sde_inv_positions, corp_cynonetwork):
-    glf = open('{tmp}/cynonetwork.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+def dump_cynonetwork_into_report(ws_dir, sde_inv_positions, corp_cynonetwork):
+    glf = open('{dir}/cynonetwork.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         dump_header(glf, "Cyno Network")
         dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork)
@@ -1575,6 +1577,7 @@ def dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_
 
 
 def dump_bpos_into_report(
+        ws_dir,
         sde_type_ids,
         sde_market_groups,
         sde_icon_ids,
@@ -1655,7 +1658,7 @@ def dump_bpos_into_report(
 </table>"""
         return res
 
-    glf = open('{tmp}/bpos.html'.format(tmp=q_industrialist_settings.g_tmp_directory), "wt+", encoding='utf8')
+    glf = open('{dir}/bpos.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         dump_header(glf, "BPOs")
         glf.write("<div class='container-fluid'>\n")

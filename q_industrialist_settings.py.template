@@ -1,12 +1,16 @@
-﻿# online_mode : download & save data from CCP servers
-# offline_mode : read data from file system (to optimize interaction with CCP servers)
-# tmp_directory example format : 'c:/dev/industrialist'
-# filesystem resources : data located in .3\ & .bootstrap\ & .jquery\ directories
+﻿# filesystem resources : data located in .3\ & .bootstrap\ & .jquery\ directories
 # adopt_for_ri4 : временный параметр, регулирует фильтрацию контейнеров R Initiative 4 и нерешённые Forbidden-проблемы
+# g_client_scope : application scopes, едины для всех приложений проекта
 
-g_eve_server = 'tranquility'  # eveonline' server
-g_user_agent = 'Q.Industrialist v0.5'  # 'https://github.com/Qandra-Si/ Maintainer: Qandra Si qandra.si@gmail.com'
-g_offline_mode = False
 g_use_filesystem_resources = True
 g_adopt_for_ri4 = False
-#please specify:g_tmp_directory = '/full/path/to/generated/files'  # for example : /tmp
+g_client_scope = ["esi-characters.read_blueprints.v1",  # Requires: access token
+                  "esi-wallet.read_character_wallet.v1",  # Requires: access token
+                  "esi-assets.read_assets.v1",  # Requires: access token
+                  # "esi-contracts.read_character_contracts.v1",  # Requires: access token
+                  "esi-fittings.read_fittings.v1",  # Requires: access token
+                  "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
+                  "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
+                  "esi-industry.read_corporation_jobs.v1",  # Requires role(s): Factory_Manager
+                  "esi-universe.read_structures.v1"  # Requires: access token
+                 ]
