@@ -22,69 +22,54 @@ Required application scopes:
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
-import getopt
-import os
 import time
 import tzlocal
-
-import q_industrialist_settings
-import auth_cache
-import shared_flow
-import eve_sde_tools
-import eve_esi_interface
-import render_html
-
 from datetime import datetime
+
+import eve_esi_interface as esi
+
+import eve_esi_tools
+import eve_sde_tools
+import console_app
+import q_industrialist_settings
+from render_html import dump_bpos_into_report
+
+from __init__ import __version__
 
 
 # Current timezone offset                 ]
 g_local_timezone = tzlocal.get_localzone()
 
 
-def main(argv):
-    character_name = None  # for example : Qandra Si
-    exit_or_wrong_getopt = None
-    try:
-        opts, args = getopt.getopt(argv, "hp:", ["help", "pilot="])
-    except getopt.GetoptError:
-        exit_or_wrong_getopt = 2
-    if exit_or_wrong_getopt is None:
-        for opt, arg in opts:
-            if opt in ('-h', "--help"):
-                exit_or_wrong_getopt = 0
-                break
-            elif opt in ("-p", "--pilot"):
-                character_name = arg
-        if character_name is None:
-            exit_or_wrong_getopt = 0
-    if not (exit_or_wrong_getopt is None):
-        print('Usage: ' + os.path.basename(__file__) + ' --pilot=<name>')
-        sys.exit(exit_or_wrong_getopt)
+def main():
+    # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
+    # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
+    argv_prms = console_app.get_argv_prms()
 
-    cache = auth_cache.read_cache(character_name)
-    if not q_industrialist_settings.g_offline_mode:
-        if not ('access_token' in cache) or not ('refresh_token' in cache) or not ('expired' in cache):
-            cache = shared_flow.auth(q_industrialist_settings.g_client_scope)
-        elif not ('scope' in cache) or not auth_cache.verify_auth_scope(cache, q_industrialist_settings.g_client_scope):
-            cache = shared_flow.auth(q_industrialist_settings.g_client_scope, cache["client_id"])
-        elif auth_cache.is_timestamp_expired(int(cache["expired"])):
-            cache = shared_flow.re_auth(q_industrialist_settings.g_client_scope, cache)
-    else:
-        if not ('access_token' in cache):
-            print("There is no way to continue working offline (you should authorize at least once).")
-            return
+    # настройка Eve Online ESI Swagger interface
+    auth = esi.EveESIAuth(
+        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        debug=True)
+    client = esi.EveESIClient(
+        auth,
+        debug=False,
+        logger=True,
+        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+    interface = esi.EveOnlineInterface(
+        client,
+        q_industrialist_settings.g_client_scope,
+        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        offline_mode=argv_prms["offline_mode"])
 
-    access_token = cache["access_token"]
-    character_id = cache["character_id"]
-    character_name = cache["character_name"]
+    authz = interface.authenticate(argv_prms["character_name"])
+    character_id = authz["character_id"]
+    character_name = authz["character_name"]
 
     # Public information about a character
-    character_data = eve_esi_interface.get_esi_data(
-        access_token,
+    character_data = interface.get_esi_data(
         "characters/{}/".format(character_id))
     # Public information about a corporation
-    corporation_data = eve_esi_interface.get_esi_data(
-        access_token,
+    corporation_data = interface.get_esi_data(
         "corporations/{}/".format(character_data["corporation_id"]))
     print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
     sys.stdout.flush()
@@ -98,15 +83,13 @@ def main(argv):
     sde_icon_ids = eve_sde_tools.read_converted("iconIDs")
 
     # Requires role(s): Director
-    corp_assets_data = eve_esi_interface.get_esi_paged_data(
-        access_token,
+    corp_assets_data = interface.get_esi_paged_data(
         "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
-    corp_blueprints_data = eve_esi_interface.get_esi_paged_data(
-        access_token,
+    corp_blueprints_data = interface.get_esi_paged_data(
         "corporations/{}/blueprints/".format(corporation_id))
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
@@ -115,7 +98,7 @@ def main(argv):
     # { group1: {items:[sub1,sub2,...]},
     #   group2: {items:[sub3],parent_id} }
     market_groups_tree = eve_sde_tools.get_market_groups_tree(sde_market_groups)
-    eve_esi_interface.dump_debug_into_file("market_groups_tree", market_groups_tree)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "market_groups_tree", market_groups_tree)
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -170,7 +153,7 @@ def main(argv):
 
     print("\nBuilding BPOs report...")
     sys.stdout.flush()
-    render_html.dump_bpos_into_report(
+    dump_bpos_into_report(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_market_groups,
@@ -188,4 +171,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
