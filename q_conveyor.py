@@ -1,4 +1,4 @@
-﻿""" Q.Industrialist (desktop/mobile)
+﻿""" Q.Conveyor (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at developers.eveonline.com with the scope
@@ -16,6 +16,11 @@ run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py
 >>> python q_industrialist.py
+
+Requires application scopes:
+    * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
+    * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
+    * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
 import json
@@ -26,7 +31,7 @@ import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-from render_html import dump_industrialist_into_report
+from render_html import dump_conveyor_into_report
 
 from __init__ import __version__
 
@@ -70,47 +75,6 @@ def main():
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
-    # Requires: access token
-    wallet_data = interface.get_esi_data(
-        "characters/{}/wallet/".format(character_id))
-    print("\n{} has {} ISK".format(character_name, wallet_data))
-    sys.stdout.flush()
-
-    # Requires: access token
-    blueprint_data = interface.get_esi_data(
-        "characters/{}/blueprints/".format(character_id))
-    print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
-    sys.stdout.flush()
-
-    # Requires: access token
-    assets_data = interface.get_esi_data(
-        "characters/{}/assets/".format(character_id))
-    print("\n{} has {} assets".format(character_name, len(assets_data)))
-    sys.stdout.flush()
-
-    # Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
-    asset_names_data = []
-    ass_named_ids = eve_esi_tools.get_assets_named_ids(assets_data)
-    if len(ass_named_ids) > 0:
-        # Requires: access token
-        asset_names_data = interface.get_esi_data(
-            "characters/{}/assets/names/".format(character_id),
-            json.dumps(ass_named_ids, indent=0, sort_keys=False))
-    print("\n{} has {} asset's names".format(character_name, len(asset_names_data)))
-    sys.stdout.flush()
-
-    # Requires: access token
-    fittings_data = interface.get_esi_data(
-        "characters/{}/fittings/".format(character_id))
-    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
-    sys.stdout.flush()
-
-    # Requires: access token
-    contracts_data = []  # interface.get_esi_data(
-    #   "characters/{}/contracts/".format(character_id))
-    # print("\n{} has {} contracts".format(character_name, len(contracts_data)))
-    # sys.stdout.flush()
-
     # Requires role(s): Factory_Manager
     corp_industry_jobs_data = interface.get_esi_paged_data(
         "corporations/{}/industry/jobs/".format(corporation_id))
@@ -143,39 +107,34 @@ def main():
     corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
 
-    # Построение списка модулей и ресурсов, которые используются в производстве
-    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
-
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
     # которые предназначены для использования в чертежах
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data, containers_filter=None)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Поиск контейнеров, которые участвуют в производстве
-    print("\nSearching industrialist containter ids...")
+    print("\nSearching conveyor containter ids...")
     sys.stdout.flush()
 
     stock_all_loc_ids = [n["item_id"] for n in corp_ass_names_data if n['name'] == "..stock ALL"]
-    # for id in stock_all_loc_ids:
-    #     print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
-    blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data]
-    # for id in blueprint_loc_ids:
-    #     print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
+    for id in stock_all_loc_ids:
+        print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
+    blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data if
+                         (n['name'][:16] == "[prod] conveyor ") or
+                         ((n['name'][:5] == "WORK ") and (n['name'][7:-2] == "/"))]
+    for id in blueprint_loc_ids:
+        print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
 
     print("\nBuilding report...")
     sys.stdout.flush()
 
-    dump_industrialist_into_report(
+    dump_conveyor_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
         # esi данные, загруженные с серверов CCP
-        wallet_data,
-        blueprint_data,
-        assets_data,
-        asset_names_data,
         corp_industry_jobs_data,
         corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков

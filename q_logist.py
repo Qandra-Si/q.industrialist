@@ -133,11 +133,11 @@ def main():
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
         "corporations/{}/".format(character_data["corporation_id"]))
-    print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
-    sys.stdout.flush()
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
+    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+    sys.stdout.flush()
 
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")

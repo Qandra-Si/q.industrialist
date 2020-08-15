@@ -13,14 +13,14 @@ import q_logist_settings
 g_local_timezone = tzlocal.get_localzone()
 
 
-def get_img_src(tp, sz):
+def __get_img_src(tp, sz):
     if q_industrialist_settings.g_use_filesystem_resources:
         return './3/Types/{}_{}.png'.format(tp, sz)
     else:
         return 'http://imageserver.eveonline.com/Type/{}_{}.png'.format(tp, sz)
 
 
-def get_icon_src(icon_id, sde_icon_ids):
+def __get_icon_src(icon_id, sde_icon_ids):
     """
     see: https://forums.eveonline.com/t/eve-online-icons/78457/3
     """
@@ -34,7 +34,7 @@ def get_icon_src(icon_id, sde_icon_ids):
         return ""
 
 
-def dump_header(glf, header_name):
+def __dump_header(glf, header_name):
     glf.write("""
 <!doctype html>
 <html lang="ru">
@@ -65,7 +65,7 @@ def dump_header(glf, header_name):
         )
     )
 
-def dump_footer(glf):
+def __dump_footer(glf):
     # Don't remove line below !
     glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
         dt=datetime.fromtimestamp(time.time(), g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
@@ -78,36 +78,48 @@ def dump_footer(glf):
     glf.write("</body></html>")
 
 
-def dump_wallet(glf, wallet_data):
-    glf.write("""<!-- Button trigger for Wallet Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalWallet">Show Wallet</button>
-<!-- Wallet Modal -->
-<div class="modal fade" id="modalWallet" tabindex="-1" role="dialog" aria-labelledby="modalWalletLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalWalletLabel">Wallet</h4>
-      </div>
-      <div class="modal-body">""")
-    glf.write("{} ISK".format(wallet_data))
-    glf.write("""</div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
+def __dump_any_into_modal_header(glf, name):
+    name_merged = name.replace(' ', '')
+    glf.write(
+        '<!-- Button trigger for {nm} Modal -->\n'
+        '<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modal{nmm}">Show {nm}</button>\n'
+        '<!-- {nm} Modal -->\n'
+        '<div class="modal fade" id="modal{nmm}" tabindex="-1" role="dialog" aria-labelledby="modal{nmm}Label">\n'
+        ' <div class="modal-dialog" role="document">\n'
+        '  <div class="modal-content">\n'
+        '   <div class="modal-header">\n'
+        '    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>\n'
+        '    <h4 class="modal-title" id="modal{nmm}Label">{nm}</h4>\n'
+        '   </div>\n'
+        '   <div class="modal-body">\n'.
+        format(nm=name, nmm=name_merged))
+
+
+def __dump_any_into_modal_footer(glf):
+    glf.write("""
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+    <!-- <button type="button" class="btn btn-primary">Choose</button> -->
+   </div>
   </div>
-</div>""")
+ </div>
+</div>
+""")
 
 
-def get_station_name(id):
+def __dump_wallet(glf, wallet_data):
+    glf.write("{} ISK".format(wallet_data))
+
+
+def __get_station_name(id):
     dict = get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: {}".format(id))
     if "itemName" in dict:
         return dict["itemName"]
     return ""
 
 
-def build_hangar_tree(blueprint_data, assets_data, names_data):
+def __build_hangar_tree(blueprint_data, assets_data, names_data):
     locations = []
     for bp in blueprint_data:
         # location_id
@@ -135,12 +147,12 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
                             break
                     if not found:
                         loc2 = {"id": location_id2, "station_id": ass["location_id"], "level": 0}
-                        name2 = get_station_name(location_id2)
+                        name2 = __get_station_name(location_id2)
                         if name2:
                             loc2.update({"station_name": name2})
                         locations.append(loc2)
         if "station_id" in loc1:  # контейнер с известным id на станции
-            station_name1 = get_station_name(loc1["station_id"])
+            station_name1 = __get_station_name(loc1["station_id"])
             if station_name1:
                 loc1.update({"station_name": station_name1})
             name1 = None
@@ -150,7 +162,7 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
             if not (name1 is None):
                 loc1.update({"item_name": name1})
         if not ("station_id" in loc1):  # станция с известным id
-            name1 = get_station_name(location_id1)
+            name1 = __get_station_name(location_id1)
             if name1:
                 loc1.update({"station_name": name1})
                 loc1.update({"station_id": location_id1})
@@ -159,22 +171,13 @@ def build_hangar_tree(blueprint_data, assets_data, names_data):
     return locations
 
 
-def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
-    glf.write("""<!-- Button trigger for Blueprints Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalBlueprints">Show Blueprints</button>
-<!-- Blueprints Modal -->
-<div class="modal fade" id="modalBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalBlueprintsLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalBlueprintsLabel">Blueprints</h4>
-      </div>
-      <div class="modal-body">
+def __dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
+    glf.write("""
 <!-- BEGIN: collapsable group (stations) -->
-<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+""")
 
-    locations = build_hangar_tree(blueprint_data, assets_data, names_data)
+    locations = __build_hangar_tree(blueprint_data, assets_data, names_data)
     # debug: glf.write("<!-- {} -->\n".format(locations))
     for loc in locations:
         # level : loc["level"] : REQUIRED
@@ -216,7 +219,7 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
             blueprint_name = get_item_name_by_type_id(type_ids, type_id)
             glf.write('<p><img class="icn32" src="{src}"/>{nm}</p>\n'.format(
                 nm=blueprint_name,
-                src=get_img_src(type_id, 32)
+                src=__get_img_src(type_id, 32)
             ))
         glf.write(
             "   </div>\n"
@@ -224,64 +227,56 @@ def dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
             " </div>\n"
         )
 
-    glf.write("""</div>
+    glf.write("""
+</div>
 <!-- END: collapsable group (stations) -->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary">Choose</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+""")
 
 
-def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_materials):
-    if q_industrialist_settings.g_adopt_for_ri4:
-        # временная мера: хардкодим тут код '.res ALL' контейнера
-        tmp_res_src = corp_ass_loc_data["Unlocked"][1032950982419]
-    else:
-        tmp_res_src = {}
+def __dump_corp_blueprints(
+        glf,
+        corp_bp_loc_data,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_ass_loc_data,
+        type_ids,
+        bp_materials,
+        stock_all_loc_ids,
+        blueprint_loc_ids):
+    # формирование списка ресурсов, которые используются в производстве
+    stock_resources = {}
+    if not (stock_all_loc_ids is None):
+        for loc_id in stock_all_loc_ids:
+            loc_flags = corp_ass_loc_data.keys()
+            for loc_flag in loc_flags:
+                __a1 = corp_ass_loc_data[loc_flag]
+                if str(loc_id) in __a1:
+                    __a2 = __a1[str(loc_id)]
+                    for itm in __a2:
+                        if str(itm) in stock_resources:
+                            stock_resources[itm] = stock_resources[itm] + __a2[itm]
+                        else:
+                            stock_resources.update({itm: __a2[itm]})
 
-    glf.write("""<!-- Button trigger for Corp Blueprints Modal -->
-    <button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpBlueprints">Show Corp Blueprints</button>
-    <!-- Corp Blueprints Modal -->
-    <div class="modal fade" id="modalCorpBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalCorpBlueprintsLabel">
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-            <h4 class="modal-title" id="modalCorpBlueprintsLabel">Corp Blueprints</h4>
-          </div>
-          <div class="modal-body">
-    <!-- BEGIN: collapsable group (locations) -->
-    <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+    glf.write("""
+<!-- BEGIN: collapsable group (locations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
     loc_flags = corp_bp_loc_data.keys()
     for loc_flag in loc_flags:
-        loc_ids = corp_bp_loc_data[loc_flag].keys()
+        loc_ids = corp_bp_loc_data[str(loc_flag)].keys()
         for loc in loc_ids:
             loc_id = int(loc)
-            # пока нет возможности считать названия контейнеров, - хардкодим тут
-            loc_name = loc_id
-            if q_industrialist_settings.g_adopt_for_ri4:
-                if loc_id == 1033012626278:
-                    loc_name = "Sideproject"
-                elif loc_id == 1032890037923:
-                    loc_name = "Alexa O'Connor pet project"
-                elif loc_id == 1033063942756:
-                    loc_name = "Alexa O'Connor - Остатки"
-                elif loc_id == 1033675076928:
-                    loc_name = "[prod] conveyor 2"
-                elif loc_id == 1032846295901:
-                    loc_name = "[prod] conveyor 1"
+            if not (blueprint_loc_ids is None):
+                if not (loc_id in blueprint_loc_ids):
+                    continue
+            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
             glf.write(
                 ' <div class="panel panel-default">\n'
                 '  <div class="panel-heading" role="tab" id="headingB{fl}{id}">\n'
                 '   <h4 class="panel-title">\n'
                 '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-                'href="#collapseB{fl}{id}" aria-expanded="true" aria-controls="collapseB{fl}{id}"'
-                '>{fl} - {nm}</a>\n'
+                '       href="#collapseB{fl}{id}" aria-expanded="true" aria-controls="collapseB{fl}{id}">{nm}</a>\n'
                 '   </h4>\n'
                 '  </div>\n'
                 '  <div id="collapseB{fl}{id}" class="panel-collapse collapse" role="tabpanel" '
@@ -292,7 +287,8 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                     nm=loc_name
                 )
             )
-            type_keys = corp_bp_loc_data[loc_flag][loc_id].keys()
+            __bp2 = corp_bp_loc_data[str(loc_flag)][str(loc_id)]
+            type_keys = __bp2.keys()
             materials_summary = {}
             for type_id in type_keys:
                 blueprint_name = get_item_name_by_type_id(type_ids, type_id)
@@ -303,14 +299,14 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                     ' </div>\n'
                     ' <div class="media-body">\n'
                     '  <h4 class="media-heading">{nm}</h4>\n'.format(
-                        src=get_img_src(type_id, 64),
+                        src=__get_img_src(type_id, 64),
                         nm=blueprint_name
                     )
                 )
                 bp_manuf_mats = get_blueprint_manufacturing_materials(bp_materials, type_id)
-                bp_keys = corp_bp_loc_data[loc_flag][loc_id][type_id].keys()
+                bp_keys = __bp2[type_id].keys()
                 for bpk in bp_keys:
-                    bp = corp_bp_loc_data[loc_flag][loc_id][type_id][bpk]
+                    bp = __bp2[type_id][bpk]
                     is_blueprint_copy = bp["cp"]
                     quantity_or_runs = bp["qr"]
                     material_efficiency = bp["me"]
@@ -351,14 +347,14 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                             bpmm_tnm = get_item_name_by_type_id(type_ids, bpmm_tid)
                             # проверка наличия имеющихся ресурсов для постройки по этому БП
                             not_available = bpmmq_me
-                            if m["typeID"] in tmp_res_src:
-                                not_available = 0 if tmp_res_src[m["typeID"]] >= not_available else not_available - tmp_res_src[m["typeID"]]
+                            if m["typeID"] in stock_resources:
+                                not_available = 0 if stock_resources[m["typeID"]] >= not_available else not_available - stock_resources[m["typeID"]]
                             # вывод наименования ресурса
                             glf.write(
                                 '<span style="white-space:nowrap">'
-                                '<img class="icn24" src="{src}"> {q} x {nm} '
+                                '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                                 '</span>\n'.format(
-                                    src=get_img_src(bpmm_tid, 32),
+                                    src=__get_img_src(bpmm_tid, 32),
                                     q=bpmmq_me,
                                     nm=bpmm_tnm
                                 )
@@ -377,9 +373,9 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                             for m in not_enough_materials:
                                 glf.write(
                                     '&nbsp;<span class="label label-warning">'
-                                    '<img class="icn24" src="{src}"> {q} x {nm} '
+                                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                                     '</span>\n'.format(
-                                        src=get_img_src(m["id"], 32),
+                                        src=__get_img_src(m["id"], 32),
                                         q=m["q"],
                                         nm=m["nm"]
                                     )
@@ -389,39 +385,74 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                     ' </div>\n'  # media-body
                     '</div>\n'  # media
                 )
+            # отображение в отчёте summary-информаци по недостающим материалам
             if len(materials_summary) > 0:
                 ms_keys = materials_summary.keys()
                 glf.write(
                     '<hr><div class="media">\n'
                     ' <div class="media-left">\n'
-                    '  <span class="glyphicon glyphicon-alert" aria-hidden="true" style="font-size: 64px;"></span>\n'
+                    '  <span class="glyphicon glyphicon-alert" aria-hidden="false" style="font-size: 64px;"></span>\n'
                     ' </div>\n'
                     ' <div class="media-body">\n'
+                    '  <h4 class="media-heading">Summary materials</h4>\n'
                 )
                 for ms_type_id in ms_keys:
                     glf.write(
                         '<span style="white-space:nowrap">'
-                        '<img class="icn24" src="{src}"> {q} x {nm} '
+                        '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                         '</span>\n'.format(
-                            src=get_img_src(ms_type_id, 32),
+                            src=__get_img_src(ms_type_id, 32),
                             q=materials_summary[ms_type_id],
                             nm=get_item_name_by_type_id(type_ids, ms_type_id)
                         )
                     )
+                not_available_row_num = 1
                 for ms_type_id in ms_keys:
                     not_available = materials_summary[ms_type_id]
-                    if ms_type_id in tmp_res_src:
-                        not_available = 0 if tmp_res_src[ms_type_id] >= not_available else not_available - tmp_res_src[ms_type_id]
+                    if ms_type_id in stock_resources:
+                        not_available = 0 if stock_resources[ms_type_id] >= not_available else not_available - stock_resources[ms_type_id]
                     if not_available > 0:
+                        if not_available_row_num == 1:
+                            glf.write("""
+</br><hr><h4 class="media-heading">Not available materials</h4>
+<table class="table">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <th>Materials</th>
+  <th>Not available</th>
+  <th>In progress</th>
+ </tr>
+</thead>
+<tbody>
+""")
+
+                        jobs = [j for j in corp_industry_jobs_data if
+                                    (j["product_type_id"] == ms_type_id) and
+                                    (j['output_location_id'] in stock_all_loc_ids)]
+                        in_progress = 0
+                        for j in jobs:
+                            in_progress = in_progress + j["runs"]
                         glf.write(
-                            '&nbsp;<span class="label label-warning">'
-                            '<img class="icn24" src="{src}"> {q} x {nm} '
-                            '</span>\n'.format(
-                                src=get_img_src(ms_type_id, 32),
-                                q=not_available,
-                                nm=get_item_name_by_type_id(type_ids, ms_type_id)
-                            )
+                            '<tr>\n'
+                            ' <th scope="row">{num}</th>\n'
+                            ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
+                            ' <td>{q:,d}</td>\n'
+                            ' <td>{inp}</td>\n'
+                            '</tr>'.
+                            format(num=not_available_row_num,
+                                   src=__get_img_src(ms_type_id, 32),
+                                   q=not_available,
+                                   inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
+                                   nm=get_item_name_by_type_id(type_ids, ms_type_id))
                         )
+                        not_available_row_num = not_available_row_num + 1
+                if not_available_row_num != 1:
+                    glf.write("""
+</tbody>
+</table>
+""")
+
                 glf.write(
                     ' </div>\n'
                     '</div>\n'
@@ -432,40 +463,27 @@ def dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, type_ids, bp_
                 " </div>\n"
             )
 
-    glf.write("""</div>
+    glf.write("""
+</div>
 <!-- END: collapsable group (locations) -->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary">Choose</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+""")
 
 
-def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
-    glf.write("""<!-- Button trigger for Corp Assets Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssets">Show Corp Assets</button>
-<!-- Corp Assets Modal -->
-<div class="modal fade" id="modalCorpAssets" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalCorpAssetsLabel">Corp Assets</h4>
-      </div>
-      <div class="modal-body">
+def __dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
+    glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
-<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+""")
 
     loc_flags = corp_ass_loc_data.keys()
     for loc_flag in loc_flags:
-        loc_ids = corp_ass_loc_data[loc_flag].keys()
+        __a1 = corp_ass_loc_data[loc_flag]
+        loc_ids = __a1.keys()
         for loc in loc_ids:
             loc_id = int(loc)
             loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
-            type_keys = corp_ass_loc_data[loc_flag][loc_id].keys()
+            __a2 = __a1[str(loc_id)]
+            type_keys = __a2.keys()
             glf.write(
                 ' <div class="panel panel-default">\n'
                 '  <div class="panel-heading" role="tab" id="headingA{fl}{id}">\n'
@@ -495,9 +513,9 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
                     '  <h4 class="media-heading">{nm} <span class="badge">{q}</span></h4>\n'
                     ' </div>\n'
                     '</div>\n'.format(
-                        src=get_img_src(type_id, 32),
+                        src=__get_img_src(type_id, 32),
                         nm=item_name,
-                        q=corp_ass_loc_data[loc_flag][loc_id][type_id]
+                        q=__a2[type_id]
                     )
                 )
             glf.write(
@@ -506,19 +524,13 @@ def dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
                 " </div>\n"
             )
 
-    glf.write("""</div>
+    glf.write("""
+</div>
 <!-- END: collapsable group (locations) -->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary">Choose</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+""")
 
 
-def represents_int(s):
+def __represents_int(s):
     try:
         int(s)
         return True
@@ -526,7 +538,7 @@ def represents_int(s):
         return False
 
 
-def dump_corp_assets_tree_nested(
+def __dump_corp_assets_tree_nested(
         glf,
         location_id,
         corp_assets_data,
@@ -540,7 +552,7 @@ def dump_corp_assets_tree_nested(
     loc_name = None
     itm_dict = None
     foreign = False
-    loc_is_not_virtual = represents_int(location_id)
+    loc_is_not_virtual = __represents_int(location_id)
     if loc_is_not_virtual and (int(location_id) < 1000000000000):
         if str(location_id) in sde_inv_names:
             loc_name = sde_inv_names[str(location_id)]
@@ -583,7 +595,7 @@ def dump_corp_assets_tree_nested(
         '  <h4 class="media-heading">{where}{what}{q}</h4>\n'
         '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'.
         format(
-            img='<img class="media-object icn32" src="{src}">'.format(src=get_img_src(type_id, 32)) if not (type_id is None) else "",
+            img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
             what='<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
             id=location_id,
@@ -594,7 +606,7 @@ def dump_corp_assets_tree_nested(
     )
     if not (items is None):
         for itm in items:
-            dump_corp_assets_tree_nested(
+            __dump_corp_assets_tree_nested(
                 glf,
                 itm,
                 corp_assets_data,
@@ -610,7 +622,7 @@ def dump_corp_assets_tree_nested(
     )
 
 
-def dump_corp_assets_tree(
+def __dump_corp_assets_tree(
         glf,
         corp_assets_data,
         corp_assets_tree,
@@ -619,17 +631,7 @@ def dump_corp_assets_tree(
         sde_type_ids,
         sde_inv_names,
         sde_inv_items):
-    glf.write("""<!-- Button trigger for Corp Assets Tree Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalCorpAssetsTree">Show Corp Assets Tree</button>
-<!-- Corp Assets Tree Modal -->
-<div class="modal fade" id="modalCorpAssetsTree" tabindex="-1" role="dialog" aria-labelledby="modalCorpAssetsTreeLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalCorpAssetsTreeLabel">Corp Assets Tree</h4>
-      </div>
-      <div class="modal-body">
+    glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
   <ul class="media-list">
@@ -638,7 +640,7 @@ def dump_corp_assets_tree(
     if "roots" in corp_assets_tree:
         roots = corp_assets_tree["roots"]
         for loc_id in roots:
-            dump_corp_assets_tree_nested(
+            __dump_corp_assets_tree_nested(
                 glf,
                 loc_id,
                 corp_assets_data,
@@ -653,17 +655,10 @@ def dump_corp_assets_tree(
   </ul>
 </div>
 <!-- END: collapsable group (locations) -->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary">Choose</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+""")
 
 
-def dump_into_report(
+def dump_industrialist_into_report(
         ws_dir,
         sde_type_ids,
         sde_bp_materials,
@@ -671,113 +666,85 @@ def dump_into_report(
         blueprint_data,
         assets_data,
         asset_names_data,
+        corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
-        corp_bp_loc_data):
+        corp_bp_loc_data,
+        stock_all_loc_ids,
+        blueprint_loc_ids):
     glf = open('{dir}/report.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "Workflow")
-        dump_wallet(glf, wallet_data)
-        dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
-        dump_corp_blueprints(glf, corp_bp_loc_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials)
-        dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
-        dump_footer(glf)
+        __dump_header(glf, "Workflow")
+
+        __dump_any_into_modal_header(glf, "Wallet")
+        __dump_wallet(glf, wallet_data)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_any_into_modal_header(glf, "Blueprints")
+        __dump_blueprints(glf, blueprint_data, assets_data, asset_names_data, sde_type_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_any_into_modal_header(glf, "Corp Blueprints")
+        __dump_corp_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_any_into_modal_header(glf, "Corp Assets")
+        __dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_footer(glf)
     finally:
         glf.close()
 
 
-def dump_materials(glf, materials, type_ids):
-    glf.write("""<!-- Button trigger for all Possible Materials Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalAllPossibleMaterials">Show all Possible Materials</button>
-<!-- All Possible Modal -->
-<div class="modal fade" id="modalAllPossibleMaterials" tabindex="-1" role="dialog" aria-labelledby="modalAllPossibleMaterialsLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalAllPossibleMaterialsLabel">All Possible Materials</h4>
-      </div>
-      <div class="modal-body">""")
+def __dump_materials(glf, materials, type_ids):
     for type_id in materials:
         sid = str(type_id)
         if not (sid in type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
-    glf.write("""</div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=__get_img_src(type_id, 32), nm=material_name, tp=type_id))
 
 
-def dump_bp_wo_manufacturing(glf, blueprints, type_ids):
-    glf.write("""<!-- Button trigger for Impossible to Produce Blueprints Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalImpossible2ProduceBlueprints">Show Impossible to Produce Blueprints</button>
-<!-- Impossible to Produce Blueprints Modal -->
-<div class="modal fade" id="modalImpossible2ProduceBlueprints" tabindex="-1" role="dialog" aria-labelledby="modalImpossible2ProduceBlueprintsLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalImpossible2ProduceBlueprintsLabel">Impossible to Produce Blueprints</h4>
-      </div>
-      <div class="modal-body">""")
+def __dump_bp_wo_manufacturing(glf, blueprints, type_ids):
     for type_id in blueprints:
         sid = str(type_id)
         if not (sid in type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src="{src}">{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
-    glf.write("""</div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+        glf.write('<p><img src="{src}">{nm} ({tp})</p>\n'.format(src=__get_img_src(type_id, 32), nm=material_name, tp=type_id))
 
 
-def dump_bp_wo_materials(glf, blueprints, type_ids):
-    glf.write("""<!-- Button trigger for Blueprints without Materials Modal -->
-<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modalBlueprintsWithoutMaterials">Show Blueprints without Materials</button>
-<!-- Blueprints without Materials Modal -->
-<div class="modal fade" id="modalBlueprintsWithoutMaterials" tabindex="-1" role="dialog" aria-labelledby="modalBlueprintsWithoutMaterialsLabel">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="modalBlueprintsWithoutMaterialsLabel">Blueprints without Materials</h4>
-      </div>
-      <div class="modal-body">""")
+def __dump_bp_wo_materials(glf, blueprints, type_ids):
     for type_id in blueprints:
         sid = str(type_id)
         if not (sid in type_ids):
             material_name = sid
         else:
             material_name = type_ids[sid]["name"]["en"]
-        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=get_img_src(type_id, 32), nm=material_name, tp=type_id))
-    glf.write("""</div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>""")
+        glf.write('<p><img src="{src}"/>{nm} ({tp})</p>\n'.format(src=__get_img_src(type_id, 32), nm=material_name, tp=type_id))
 
 
 def dump_materials_into_report(ws_dir, sde_type_ids, materials, wo_manufacturing, wo_materials):
     glf = open('{dir}/materials.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "Materials")
-        dump_materials(glf, materials, sde_type_ids)
-        dump_bp_wo_manufacturing(glf, wo_manufacturing, sde_type_ids)
-        dump_bp_wo_materials(glf, wo_materials, sde_type_ids)
-        dump_footer(glf)
+        __dump_header(glf, "Materials")
+
+        __dump_any_into_modal_header(glf, "All Possible Materials")
+        __dump_materials(glf, materials, sde_type_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_any_into_modal_header(glf, "Impossible to Produce Blueprints")
+        __dump_bp_wo_manufacturing(glf, wo_manufacturing, sde_type_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_any_into_modal_header(glf, "Blueprints without Materials")
+        __dump_bp_wo_materials(glf, wo_materials, sde_type_ids)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_footer(glf)
     finally:
         glf.close()
 
@@ -794,15 +761,18 @@ def dump_assets_tree_into_report(
         corp_assets_tree):
     glf = open('{dir}/assets_tree.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "Corp Assets")
-        # dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
-        dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items)
-        dump_footer(glf)
+        __dump_header(glf, "Corp Assets")
+
+        __dump_any_into_modal_header(glf, "Corp Assets")
+        __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        __dump_any_into_modal_footer(glf)
+
+        __dump_footer(glf)
     finally:
         glf.close()
 
 
-def get_route_signalling_type(level):
+def __get_route_signalling_type(level):
     if level == 0:
         return "success"
     elif level == 1:
@@ -811,7 +781,7 @@ def get_route_signalling_type(level):
         return "danger"
 
 
-def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
+def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     glf.write("""
 <style>
 .dropdown-submenu {
@@ -955,7 +925,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 # to_name = system_name
                 human_readable = human_readable + " &rarr; " + system_name
             route_signalling_level = max(route_signalling_level, route_place["signalling_level"])
-        route_signalling_type = get_route_signalling_type(route_signalling_level)
+        route_signalling_type = __get_route_signalling_type(route_signalling_level)
         # ---
         glf.write(
             '<div class="panel panel-{signal} pn-cyno-net" cynonet="{cnn}">\n'
@@ -984,7 +954,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     '    <div id="prgrCynoRoute{cnn}_{pt}" class="progress-bar progress-bar-{signal} signal" role="progressbar" style="width:{width}%">{nm}</div>\n'.
                     format(width=progress_width,
                            nm=system_name,
-                           signal=get_route_signalling_type(route_place["signalling_level"]),
+                           signal=__get_route_signalling_type(route_place["signalling_level"]),
                            cnn=cynonetwork_num,
                            pt=progress_times
                     ))
@@ -1177,7 +1147,7 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                           format(comma=',' if not last_route else ']',
                                  rn=route_num,
                                  nm=system_name,
-                                 signal=get_route_signalling_type(route_place["signalling_level"]),
+                                 signal=__get_route_signalling_type(route_place["signalling_level"]),
                                  ni=nitrogen_isotope_num,
                                  hy=hydrogen_isotope_num,
                                  ox=oxygen_isotope_num,
@@ -1507,14 +1477,14 @@ def dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
 def dump_cynonetwork_into_report(ws_dir, sde_inv_positions, corp_cynonetwork):
     glf = open('{dir}/cynonetwork.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "Cyno Network")
-        dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork)
-        dump_footer(glf)
+        __dump_header(glf, "Cyno Network")
+        __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork)
+        __dump_footer(glf)
     finally:
         glf.close()
 
 
-def dump_market_groups_tree_nested(
+def __dump_market_groups_tree_nested(
         group_id,
         sde_market_groups,
         sde_icon_ids,
@@ -1529,7 +1499,7 @@ def dump_market_groups_tree_nested(
     sub_glf = ''
     if "items" in market_groups_tree[str(group_id)]:
         for group_id in market_groups_tree[str(group_id)]["items"]:
-            sub_glf = sub_glf + dump_market_groups_tree_nested(
+            sub_glf = sub_glf + __dump_market_groups_tree_nested(
                 group_id,
                 sde_market_groups,
                 sde_icon_ids,
@@ -1547,7 +1517,7 @@ def dump_market_groups_tree_nested(
           '{tbl}{sub}' \
           ' </div>\n' \
           '</div>\n'.format(
-            img='<img class="media-object icn32" src="{src}">'.format(src=get_icon_src(icon_id, sde_icon_ids)),
+            img='<img class="media-object icn32" src="{src}">'.format(src=__get_icon_src(icon_id, sde_icon_ids)),
             nm=sde_group["nameID"]["en"],
             tbl=tbl_glf,
             sub=sub_glf
@@ -1555,7 +1525,7 @@ def dump_market_groups_tree_nested(
     return glf
 
 
-def dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, market_data_printer):
+def __dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, market_data_printer):
     glf.write("""<ul class="media-list">
  <li class="media">""")
 
@@ -1563,7 +1533,7 @@ def dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_
         roots = market_groups_tree["roots"]
         for group_id in roots:
             glf.write(
-                dump_market_groups_tree_nested(
+                __dump_market_groups_tree_nested(
                     group_id,
                     sde_market_groups,
                     sde_icon_ids,
@@ -1660,14 +1630,93 @@ def dump_bpos_into_report(
 
     glf = open('{dir}/bpos.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        dump_header(glf, "BPOs")
+        __dump_header(glf, "BPOs")
         glf.write("<div class='container-fluid'>\n")
-        dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, blueprints_printer)
+        __dump_market_groups_tree(glf, sde_market_groups, sde_icon_ids, market_groups_tree, market_data, blueprints_printer)
         glf.write("</div>\n")
-        dump_footer(glf)
+        __dump_footer(glf)
     finally:
         glf.close()
 
 
-if __name__ == "__main__":
-    main()
+def __dump_corp_conveyor(
+        glf,
+        corp_bp_loc_data,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_ass_loc_data,
+        sde_type_ids,
+        sde_bp_materials,
+        stock_all_loc_ids,
+        blueprint_loc_ids):
+    glf.write("""
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-tasks" aria-hidden="true"></span></a>
+  </div>
+
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+      </ul>
+    </li>
+
+    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <div class="form-group">
+     <input type="text" class="form-control" placeholder="Item" disabled>
+    </div>
+    <button type="button" class="btn btn-default disabled">Search</button>
+   </form>
+  </div>
+ </div>
+</nav>
+<div class="container-fluid">
+""")
+
+    __dump_corp_blueprints(
+        glf,
+        corp_bp_loc_data,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_ass_loc_data,
+        sde_type_ids,
+        sde_bp_materials,
+        stock_all_loc_ids,
+        blueprint_loc_ids)
+
+    glf.write("""
+</div>""")
+
+
+def dump_conveyor_into_report(
+        ws_dir,
+        sde_type_ids,
+        sde_bp_materials,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_ass_loc_data,
+        corp_bp_loc_data,
+        stock_all_loc_ids,
+        blueprint_loc_ids):
+    glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    try:
+        __dump_header(glf, "Conveyor")
+        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, stock_all_loc_ids, blueprint_loc_ids)
+        #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        __dump_footer(glf)
+    finally:
+        glf.close()

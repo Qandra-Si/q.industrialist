@@ -1,10 +1,8 @@
 ﻿import json
 from pathlib import Path
 
-import q_industrialist_settings
 
-
-def get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
+def __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
     for bp in corp_industry_jobs_data:
         if blueprint_id == bp["blueprint_id"]:
             return bp["status"]
@@ -19,19 +17,18 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
     for bp in corp_blueprints_data:
         loc_flag = str(bp["location_flag"])
         loc_id = int(bp["location_id"])
-        if q_industrialist_settings.g_adopt_for_ri4:
-            if not (loc_id in [1033012626278, 1032890037923, 1033063942756, 1033675076928, 1032846295901]):
-                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
         # { "CorpSAG6": {} }
-        if not (loc_flag in corp_bp_loc_data):
-            corp_bp_loc_data.update({loc_flag: {}})
+        if not (str(loc_flag) in corp_bp_loc_data):
+            corp_bp_loc_data.update({str(loc_flag): {}})
+        __bp1 = corp_bp_loc_data[str(loc_flag)]
         # { "CorpSAG6": { "1033160348166": {} } }
-        if not (loc_id in corp_bp_loc_data[loc_flag]):
-            corp_bp_loc_data[loc_flag].update({loc_id: {}})
+        if not (str(loc_id) in __bp1):
+            __bp1.update({str(loc_id): {}})
+        __bp2 = __bp1[str(loc_id)]
         # { "CorpSAG6": { "1033160348166": { "30014": {} } } }
         type_id = int(bp["type_id"])
-        if not (type_id in corp_bp_loc_data[loc_flag][loc_id]):
-            corp_bp_loc_data[loc_flag][loc_id].update({type_id: {}})
+        if not (type_id in __bp2):
+            __bp2.update({type_id: {}})
         # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": {} } } } }
         quantity = int(bp["quantity"])
         blueprint_id = int(bp["item_id"])
@@ -39,7 +36,7 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
         bp_type = 'c' if is_blueprint_copy else 'o'
         material_efficiency = int(bp["material_efficiency"])
         time_efficiency = int(bp["time_efficiency"])
-        bp_status = get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id)
+        bp_status = __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id)
         bp_key = '{bpt}_{me}_{te}_{st}'.format(
             bpt=bp_type,
             me=material_efficiency,
@@ -48,8 +45,8 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
         runs = int(bp["runs"])
         quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
         # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } } }
-        if not (bp_key in corp_bp_loc_data[loc_flag][loc_id][type_id]):
-            corp_bp_loc_data[loc_flag][loc_id][type_id].update({bp_key: {
+        if not (bp_key in __bp2[type_id]):
+            __bp2[type_id].update({bp_key: {
                 "cp": is_blueprint_copy,
                 "me": material_efficiency,
                 "te": time_efficiency,
@@ -58,10 +55,10 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
                 "itm": []
             }})
         elif is_blueprint_copy:
-            corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] = \
-            corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["qr"] + quantity_or_runs
+            __bp2[type_id][bp_key]["qr"] = \
+            __bp2[type_id][bp_key]["qr"] + quantity_or_runs
         # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } } }
-        corp_bp_loc_data[loc_flag][loc_id][type_id][bp_key]["itm"].append({
+        __bp2[type_id][bp_key]["itm"].append({
             "id": int(bp["item_id"]),
             "q": quantity,
             "r": runs
@@ -82,20 +79,23 @@ def get_corp_ass_loc_data(corp_assets_data, containers_filter=None):
         if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
         loc_id = int(a["location_id"])
-        if not (containers_filter is None) and (containers_filter.count(loc_id) == 0):
-            continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
+        if not (containers_filter is None):
+            if not (loc_id in containers_filter):
+                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
         quantity = int(a["quantity"])
-        # { "DroneBay": {} }
-        if not (loc_flag in corp_ass_loc_data):
-            corp_ass_loc_data.update({loc_flag: {}})
-        # { "DroneBay": { "1033692665735": {} } }
-        if not (loc_id in corp_ass_loc_data[loc_flag]):
-            corp_ass_loc_data[loc_flag].update({loc_id: {}})
-        # { "DroneBay": { "1033692665735": { "2488": { "q":? } } } }
-        if not (type_id in corp_ass_loc_data[loc_flag][loc_id]):
-            corp_ass_loc_data[loc_flag][loc_id].update({type_id: quantity})
+        # { "CorpSAG6": {} }
+        if not (str(loc_flag) in corp_ass_loc_data):
+            corp_ass_loc_data.update({str(loc_flag): {}})
+        __a1 = corp_ass_loc_data[str(loc_flag)]
+        # { "CorpSAG6": {"1033692665735": {} } }
+        if not (str(loc_id) in __a1):
+            __a1.update({str(loc_id): {}})
+        __a2 = __a1[str(loc_id)]
+        # { "CorpSAG6": {"1033692665735": { "2488": <quantity> } } }
+        if not (type_id in __a2):
+            __a2.update({type_id: quantity})
         else:
-            corp_ass_loc_data[loc_flag][loc_id][type_id] = quantity + corp_ass_loc_data[loc_flag][loc_id][type_id]
+            __a2[type_id] = quantity + __a2[type_id]
     return corp_ass_loc_data
 
 

@@ -71,11 +71,11 @@ def main():
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
         "corporations/{}/".format(character_data["corporation_id"]))
-    print("\n{} is from '{}' corporation".format(character_name, corporation_data["name"]))
-    sys.stdout.flush()
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
+    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+    sys.stdout.flush()
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
