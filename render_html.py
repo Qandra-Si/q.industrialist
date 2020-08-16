@@ -313,6 +313,7 @@ def __dump_corp_blueprints(
                     time_efficiency = bp["te"]
                     blueprint_status = bp["st"]
                     glf.write(
+                        '<span class="qind-blueprints-{status}">'
                         '<span class="label label-{cpc}">{cpn}</span>'
                         '&nbsp;<span class="label label-success">{me} {te}</span>'
                         '&nbsp;<span class="badge">{qr}</span>\n'.format(
@@ -320,20 +321,24 @@ def __dump_corp_blueprints(
                             cpc='default' if is_blueprint_copy else 'info',
                             cpn='copy' if is_blueprint_copy else 'original',
                             me=material_efficiency,
-                            te=time_efficiency
+                            te=time_efficiency,
+                            status=blueprint_status if not (blueprint_status is None) else ""
                         )
                     )
                     if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
                         if (blueprint_status == "active") or (blueprint_status == "delivered") or (blueprint_status == "ready"):
-                            glf.write('&nbsp;<span class="label label-info">{}</span></br>\n'.format(blueprint_status))
+                            glf.write('&nbsp;<span class="label label-info">{}</span>'.format(blueprint_status))
                         elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
-                            glf.write('&nbsp;<span class="label label-warning">{}</span></br>\n'.format(blueprint_status))
+                            glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
                         else:
-                            glf.write('&nbsp;<span class="label label-danger">{}</span></br>\n'.format(blueprint_status))
+                            glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
+                        glf.write('</br></span>\n')
                     elif bp_manuf_mats is None:
-                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span></br>\n')
+                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
+                        glf.write('</br></span>\n')
                     else:
-                        glf.write('</br><div>\n')  # div(materials)
+                        glf.write('</br></span>\n')
+                        glf.write('<div class="qind-materials-used">\n')  # div(materials)
                         not_enough_materials = []
                         for m in bp_manuf_mats:
                             bpmmq = int(m["quantity"]) * quantity_or_runs
@@ -394,6 +399,7 @@ def __dump_corp_blueprints(
                     '  <span class="glyphicon glyphicon-alert" aria-hidden="false" style="font-size: 64px;"></span>\n'
                     ' </div>\n'
                     ' <div class="media-body">\n'
+                    '  <div class="qind-materials-used">'
                     '  <h4 class="media-heading">Summary materials</h4>\n'
                 )
                 for ms_type_id in ms_keys:
@@ -406,6 +412,7 @@ def __dump_corp_blueprints(
                             nm=get_item_name_by_type_id(type_ids, ms_type_id)
                         )
                     )
+                glf.write('<hr></div>\n')  # qind-materials-used
                 not_available_row_num = 1
                 for ms_type_id in ms_keys:
                     not_available = materials_summary[ms_type_id]
@@ -414,7 +421,7 @@ def __dump_corp_blueprints(
                     if not_available > 0:
                         if not_available_row_num == 1:
                             glf.write("""
-</br><hr><h4 class="media-heading">Not available materials</h4>
+<h4 class="media-heading">Not available materials</h4>
 <table class="table">
 <thead>
  <tr>
@@ -1667,7 +1674,9 @@ def __dump_corp_conveyor(
     <li class="dropdown">
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
       <ul class="dropdown-menu">
-       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+       <li><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
+       <li><a id="btnToggleMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMaterials"></span> Show used materials</a></li>
+       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
@@ -1699,7 +1708,119 @@ def __dump_corp_conveyor(
         blueprint_loc_ids)
 
     glf.write("""
-</div>""")
+<div id="legend-block">
+ <hr>
+ <h4>Legend</h4>
+ <p>
+  <span class="label label-default">copy</span>&nbsp;<span class="label label-success">2 4</span>&nbsp;<span
+   class="badge">150</span> - blueprints <strong>copies</strong> with <strong>2</strong> material efficiency and
+   <strong>4</strong> time efficiency with total of <strong>150</strong> runs.
+ </p>
+ <p>
+  <span class="label label-info">original</span>&nbsp;<span class="label label-success">10 20</span>&nbsp;<span
+   class="badge">2</span>&nbsp;<span class="label label-info">active</span> - <strong>two</strong>
+   <strong>original</strong> blueprints with <strong>10</strong> material efficiency and <strong>20</strong> time efficiency,
+   production is currently <strong>active</strong>.
+ </p>
+ <p>
+""")
+    glf.write('<span style="white-space:nowrap"><img class="icn24" src="{src}"> 30 x Ice Harvester I </span>'
+              '&nbsp;<span class="label label-warning"><img class="icn24" src="{src}"> 6 x Ice Harvester I </span>&nbsp;-'
+              '&nbsp;<strong>30</strong> items used in the production, the items are missing <strong>6</strong>.'.
+              format(src=__get_img_src(16278, 32)))
+    glf.write("""
+ </p>
+</div>
+</div>
+<script>
+  // Conveyor Options storage (prepare)
+  ls = window.localStorage;
+
+  // Conveyor Options storage (init)
+  function resetOptionsMenuToDefault() {
+    if (!ls.getItem('Show Legend')) {
+      ls.setItem('Show Legend', 1);
+    }
+    if (!ls.getItem('Show Active')) {
+      ls.setItem('Show Active', 1);
+    }
+    if (!ls.getItem('Show Materials')) {
+      ls.setItem('Show Materials', 1);
+    }
+  }
+  // Conveyor Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#imgShowLegend').removeClass('hidden');
+    else
+      $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Active');
+    if (show == 1)
+      $('#imgShowActive').removeClass('hidden');
+    else
+      $('#imgShowActive').addClass('hidden');
+    show = ls.getItem('Show Materials');
+    if (show == 1)
+      $('#imgShowMaterials').removeClass('hidden');
+    else
+      $('#imgShowMaterials').addClass('hidden');
+  }
+  // Conveyor Options storage (rebuild body components)
+  function rebuildBody() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#legend-block').removeClass('hidden');
+    else
+      $('#legend-block').addClass('hidden');
+    show = ls.getItem('Show Active');
+    $('span.qind-blueprints-active').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    show = ls.getItem('Show Materials');
+    $('div.qind-materials-used').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+  }
+  // Conveyor Options menu and submenu setup
+  $(document).ready(function(){
+    $('#btnToggleLegend').on('click', function () {
+      show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
+      ls.setItem('Show Legend', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleActive').on('click', function () {
+      show = (ls.getItem('Show Active') == 1) ? 0 : 1;
+      ls.setItem('Show Active', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleMaterials').on('click', function () {
+      show = (ls.getItem('Show Materials') == 1) ? 0 : 1;
+      ls.setItem('Show Materials', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildBody();
+  });
+</script>
+""")
 
 
 def dump_conveyor_into_report(
