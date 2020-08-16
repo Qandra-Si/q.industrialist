@@ -341,17 +341,21 @@ def __dump_corp_blueprints(
                         glf.write('<div class="qind-materials-used">\n')  # div(materials)
                         not_enough_materials = []
                         for m in bp_manuf_mats:
-                            bpmmq = int(m["quantity"]) * quantity_or_runs
-                            bpmmq_me = bpmmq
-                            if material_efficiency > 0:
-                                _me = int(100 - material_efficiency)
-                                bpmmq_me = int((bpmmq * _me) / 100)
-                                if 0 != ((bpmmq * _me) % 100):
-                                    bpmmq_me = bpmmq_me + 1
+                            bp_manuf_need_all = 0
+                            for __bp3 in __bp2[type_id][bpk]["itm"]:
+                                quantity_or_runs = __bp3["r"] if is_blueprint_copy else __bp3["q"] if __bp3["q"] > 0 else 1
+                                __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
+                                __need = __used  # поправка на эффективнсть материалов
+                                if material_efficiency > 0:
+                                    __me = int(100 - material_efficiency)
+                                    __need = int((__used * __me) / 100)
+                                    if 0 != ((__used * __me) % 100):
+                                        __need = __need + 1
+                                bp_manuf_need_all = bp_manuf_need_all + __need
                             bpmm_tid = int(m["typeID"])
                             bpmm_tnm = get_item_name_by_type_id(type_ids, bpmm_tid)
                             # проверка наличия имеющихся ресурсов для постройки по этому БП
-                            not_available = bpmmq_me
+                            not_available = bp_manuf_need_all
                             if m["typeID"] in stock_resources:
                                 not_available = 0 if stock_resources[m["typeID"]] >= not_available else not_available - stock_resources[m["typeID"]]
                             # вывод наименования ресурса
@@ -360,7 +364,7 @@ def __dump_corp_blueprints(
                                 '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                                 '</span>\n'.format(
                                     src=__get_img_src(bpmm_tid, 32),
-                                    q=bpmmq_me,
+                                    q=bp_manuf_need_all,
                                     nm=bpmm_tnm
                                 )
                             )
@@ -369,10 +373,11 @@ def __dump_corp_blueprints(
                                 not_enough_materials.append({"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm})
                             # сохраняем материалы для производства в список их суммарного кол-ва
                             if m["typeID"] in materials_summary:
-                                materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bpmmq_me
+                                materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bp_manuf_need_all
                             else:
-                                materials_summary.update({m["typeID"]: bpmmq_me})
+                                materials_summary.update({m["typeID"]: bp_manuf_need_all})
                         glf.write('</div>\n')  # div(materials)
+                        # отображение списка материалов, которых не хватает
                         if len(not_enough_materials) > 0:
                             glf.write('<div>\n')  # div(not_enough_materials)
                             for m in not_enough_materials:
