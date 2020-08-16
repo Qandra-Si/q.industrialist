@@ -349,7 +349,11 @@ def __dump_corp_blueprints(
                                 __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
                                 __need = __used  # поправка на эффективнсть материалов
                                 if material_efficiency > 0:
-                                    __me = int(100 - material_efficiency)
+                                    # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+                                    # см. 1 x run: http://prntscr.com/u0g07w
+                                    # см. 4 x run: http://prntscr.com/u0g0cd
+                                    # см. экономия материалов: http://prntscr.com/u0g11u
+                                    __me = int(100 - material_efficiency - 1 - 4.2)
                                     __need = int((__used * __me) / 100)
                                     if 0 != ((__used * __me) % 100):
                                         __need = __need + 1
