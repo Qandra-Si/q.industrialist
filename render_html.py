@@ -244,7 +244,8 @@ def __dump_corp_blueprints(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
-        blueprint_loc_ids):
+        blueprint_loc_ids,
+        enable_copy_to_clipboard=False):
     # формирование списка ресурсов, которые используются в производстве
     stock_resources = {}
     if not (stock_all_loc_ids is None):
@@ -474,10 +475,16 @@ def __dump_corp_blueprints(
                             in_progress = 0
                             for j in jobs:
                                 in_progress = in_progress + j["runs"]
+                            __item_name = get_item_name_by_type_id(sde_type_ids, ms_type_id)
+                            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                                '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
+                                '  aria-hidden="true"></span></a>'. \
+                                format(nm=__item_name)
                             glf.write(
                                 '<tr>\n'
                                 ' <th scope="row">{num}</th>\n'
-                                ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
+                                ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
                                 ' <td>{q:,d}</td>\n'
                                 ' <td>{inp}</td>\n'
                                 '</tr>'.
@@ -485,7 +492,8 @@ def __dump_corp_blueprints(
                                        src=__get_img_src(ms_type_id, 32),
                                        q=not_available,
                                        inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
-                                       nm=get_item_name_by_type_id(sde_type_ids, ms_type_id))
+                                       nm=__item_name,
+                                       clbrd=__copy2clpbrd)
                             )
                             not_available_row_num = not_available_row_num + 1
                 if not_available_row_num != 1:
@@ -1741,7 +1749,8 @@ def __dump_corp_conveyor(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
-        blueprint_loc_ids)
+        blueprint_loc_ids,
+        enable_copy_to_clipboard=True)
 
     glf.write("""
 <div id="legend-block">
@@ -1854,6 +1863,36 @@ def __dump_corp_conveyor(
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     rebuildBody();
+    // Working with clipboard
+    $('a.qind-copy-btn').each(function() {
+      $(this).tooltip();
+    })
+    $('a.qind-copy-btn').bind('click', function () {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($(this).attr('data-copy')).select();
+      try {
+        success = document.execCommand("copy");
+        if (success) {
+          $(this).trigger('copied', ['Copied!']);
+        }
+      } finally {
+        $temp.remove();
+      }
+    });
+    $('a.qind-copy-btn').bind('copied', function(event, message) {
+      $(this).attr('title', message)
+        .tooltip('fixTitle')
+        .tooltip('show')
+        .attr('title', "Copy to clipboard")
+        .tooltip('fixTitle');
+    });
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+      // какой-то код ...
+      $('a.qind-copy-btn').each(function() {
+        $(this).addClass('hidden');
+      })
+    }
   });
 </script>
 """)

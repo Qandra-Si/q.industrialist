@@ -141,6 +141,7 @@ dmypy.json
 /.*_cache
 /*_cache
 /debug
+/.q_industrialist
 /*.~json
 /*.html
 /*.csv
