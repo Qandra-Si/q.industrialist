@@ -69,6 +69,7 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     # Requires: access token
     wallet_data = interface.get_esi_data(
@@ -171,6 +172,7 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         wallet_data,
         blueprint_data,

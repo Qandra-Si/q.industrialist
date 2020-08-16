@@ -5,6 +5,7 @@ import math
 from datetime import datetime
 from eve_sde_tools import get_yaml
 from eve_sde_tools import get_item_name_by_type_id
+from eve_sde_tools import get_basis_market_group_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
 
 import q_industrialist_settings
@@ -239,8 +240,9 @@ def __dump_corp_blueprints(
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
-        type_ids,
-        bp_materials,
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids):
     # формирование списка ресурсов, которые используются в производстве
@@ -291,7 +293,7 @@ def __dump_corp_blueprints(
             type_keys = __bp2.keys()
             materials_summary = {}
             for type_id in type_keys:
-                blueprint_name = get_item_name_by_type_id(type_ids, type_id)
+                blueprint_name = get_item_name_by_type_id(sde_type_ids, type_id)
                 glf.write(
                     '<div class="media">\n'
                     ' <div class="media-left">\n'
@@ -303,7 +305,7 @@ def __dump_corp_blueprints(
                         nm=blueprint_name
                     )
                 )
-                bp_manuf_mats = get_blueprint_manufacturing_materials(bp_materials, type_id)
+                bp_manuf_mats = get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
                 bp_keys = __bp2[type_id].keys()
                 for bpk in bp_keys:
                     bp = __bp2[type_id][bpk]
@@ -353,7 +355,7 @@ def __dump_corp_blueprints(
                                         __need = __need + 1
                                 bp_manuf_need_all = bp_manuf_need_all + __need
                             bpmm_tid = int(m["typeID"])
-                            bpmm_tnm = get_item_name_by_type_id(type_ids, bpmm_tid)
+                            bpmm_tnm = get_item_name_by_type_id(sde_type_ids, bpmm_tid)
                             # проверка наличия имеющихся ресурсов для постройки по этому БП
                             not_available = bp_manuf_need_all
                             if m["typeID"] in stock_resources:
@@ -398,6 +400,16 @@ def __dump_corp_blueprints(
             # отображение в отчёте summary-информаци по недостающим материалам
             if len(materials_summary) > 0:
                 ms_keys = materials_summary.keys()
+                # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+                # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
+                material_groups = {}
+                for ms_type_id in ms_keys:
+                    __quantity = materials_summary[ms_type_id]
+                    __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, ms_type_id)
+                    if str(__market_group) in material_groups:
+                        material_groups[str(__market_group)].update({ms_type_id: __quantity})
+                    else:
+                        material_groups.update({str(__market_group): {ms_type_id: __quantity}})
                 glf.write(
                     '<hr><div class="media">\n'
                     ' <div class="media-left">\n'
@@ -414,20 +426,26 @@ def __dump_corp_blueprints(
                         '</span>\n'.format(
                             src=__get_img_src(ms_type_id, 32),
                             q=materials_summary[ms_type_id],
-                            nm=get_item_name_by_type_id(type_ids, ms_type_id)
+                            nm=get_item_name_by_type_id(sde_type_ids, ms_type_id)
                         )
                     )
                 glf.write('<hr></div>\n')  # qind-materials-used
+                # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
                 not_available_row_num = 1
-                for ms_type_id in ms_keys:
-                    not_available = materials_summary[ms_type_id]
-                    if ms_type_id in stock_resources:
-                        not_available = 0 if stock_resources[ms_type_id] >= not_available else not_available - stock_resources[ms_type_id]
-                    if not_available > 0:
-                        if not_available_row_num == 1:
-                            glf.write("""
+                ms_groups = material_groups.keys()
+                for ms_group_id in ms_groups:
+                    ms_keys = material_groups[ms_group_id].keys()
+                    group_diplayed = False
+                    for ms_type_id in ms_keys:
+                        not_available = material_groups[ms_group_id][ms_type_id]
+                        if ms_type_id in stock_resources:
+                            not_available = 0 if stock_resources[ms_type_id] >= not_available else \
+                                not_available - stock_resources[ms_type_id]
+                        if not_available > 0:
+                            if not_available_row_num == 1:
+                                glf.write("""
 <h4 class="media-heading">Not available materials</h4>
-<table class="table">
+<table class="table table-condensed">
 <thead>
  <tr>
   <th style="width:40px;">#</th>
@@ -438,33 +456,39 @@ def __dump_corp_blueprints(
 </thead>
 <tbody>
 """)
-
-                        jobs = [j for j in corp_industry_jobs_data if
-                                    (j["product_type_id"] == ms_type_id) and
-                                    (j['output_location_id'] in stock_all_loc_ids)]
-                        in_progress = 0
-                        for j in jobs:
-                            in_progress = in_progress + j["runs"]
-                        glf.write(
-                            '<tr>\n'
-                            ' <th scope="row">{num}</th>\n'
-                            ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
-                            ' <td>{q:,d}</td>\n'
-                            ' <td>{inp}</td>\n'
-                            '</tr>'.
-                            format(num=not_available_row_num,
-                                   src=__get_img_src(ms_type_id, 32),
-                                   q=not_available,
-                                   inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
-                                   nm=get_item_name_by_type_id(type_ids, ms_type_id))
-                        )
-                        not_available_row_num = not_available_row_num + 1
+                            if not group_diplayed:
+                                __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
+                                glf.write(
+                                    '<tr>\n'
+                                    ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}--></td>\n'
+                                    '</tr>'.
+                                    format(nm=__grp_name, id=ms_group_id))
+                                group_diplayed = True
+                            jobs = [j for j in corp_industry_jobs_data if
+                                        (j["product_type_id"] == ms_type_id) and
+                                        (j['output_location_id'] in stock_all_loc_ids)]
+                            in_progress = 0
+                            for j in jobs:
+                                in_progress = in_progress + j["runs"]
+                            glf.write(
+                                '<tr>\n'
+                                ' <th scope="row">{num}</th>\n'
+                                ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
+                                ' <td>{q:,d}</td>\n'
+                                ' <td>{inp}</td>\n'
+                                '</tr>'.
+                                format(num=not_available_row_num,
+                                       src=__get_img_src(ms_type_id, 32),
+                                       q=not_available,
+                                       inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
+                                       nm=get_item_name_by_type_id(sde_type_ids, ms_type_id))
+                            )
+                            not_available_row_num = not_available_row_num + 1
                 if not_available_row_num != 1:
                     glf.write("""
 </tbody>
 </table>
 """)
-
                 glf.write(
                     ' </div>\n'
                     '</div>\n'
@@ -674,6 +698,7 @@ def dump_industrialist_into_report(
         ws_dir,
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         wallet_data,
         blueprint_data,
         assets_data,
@@ -697,7 +722,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_corp_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_corp_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -1659,6 +1684,7 @@ def __dump_corp_conveyor(
         corp_ass_loc_data,
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids):
     glf.write("""
@@ -1709,6 +1735,7 @@ def __dump_corp_conveyor(
         corp_ass_loc_data,
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids)
 
@@ -1832,6 +1859,7 @@ def dump_conveyor_into_report(
         ws_dir,
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
@@ -1841,7 +1869,7 @@ def dump_conveyor_into_report(
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
         #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         __dump_footer(glf)
     finally:

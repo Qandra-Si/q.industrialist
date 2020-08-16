@@ -155,6 +155,44 @@ def get_item_name_by_type_id(type_ids, type_id):
     return name
 
 
+def get_market_group_by_type_id(type_ids, type_id):
+    if not (str(type_id) in type_ids):
+        return None
+    type_dict = type_ids[str(type_id)]
+    if "marketGroupID" in type_dict:
+        return type_dict["marketGroupID"]
+    return None
+
+
+def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
+    group_id = get_market_group_by_type_id(type_ids, type_id)
+    if group_id is None:
+        return None
+    __group_id = group_id
+    while True:
+        if __group_id in [211,  # Ammunition & Charges
+                          9,   # Ship Equipment
+                          157,  # Drones
+                          533,  # Materials
+                          1035,  # Components
+                          1872,  # Research Equipment
+                          4,  # Ships
+                          943,  # Ship Modifications
+                          1112,  # Subsystems
+                          1659,  # Special Edition Assets
+                          2158,  # Structure Equipment
+                          2203,  # Structure Modifications
+                          477,  # Structures
+                          19  # Trade Goods
+                         ]:
+            return __group_id
+        if "parentGroupID" in market_groups[str(__group_id)]:
+            __group_id = market_groups[str(__group_id)]["parentGroupID"]
+        else:
+            break
+    return group_id
+
+
 def get_blueprint_manufacturing_materials(blueprints, type_id):
     if not (str(type_id) in blueprints):
         return None

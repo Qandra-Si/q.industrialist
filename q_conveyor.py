@@ -74,6 +74,7 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     # Requires role(s): Factory_Manager
     corp_industry_jobs_data = interface.get_esi_paged_data(
@@ -135,6 +136,7 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
         corp_ass_names_data,
