@@ -2008,7 +2008,6 @@ def __dump_corp_accounting_nested(
                     break
         if not __filter_found:
             return
-        print(root["region"], filter_flags, root["flags"])
         glf.write('<h2>{rgn}<!--{id}--></h2>\n'.format(rgn=root["region"], id=root_id))
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
