@@ -1896,35 +1896,18 @@ def __dump_corp_accounting_nested_tbl(
         glf,
         loc_id,
         loc_dict,
-        sde_type_ids,
-        filter_flags):
-    h3_and_table_printed = False
-    if "items" in loc_dict:
-        __itms_keys = loc_dict["items"].keys()
-        for __loc_id in __itms_keys:
-            itm_dict = loc_dict["items"][str(__loc_id)]
-            # отбрасываем элементы не по фильтру (например нет списка "delivery")
-            __filter_found = filter_flags is None
-            if not __filter_found:
-                for __filter in filter_flags:
-                    if __filter in itm_dict:
-                        __filter_found = True
-                        break
-            if not __filter_found:
-                continue
-            # пишем заголовок таблицы (название системы)
-            if not h3_and_table_printed:
-                h3_and_table_printed = True
-                __loc_name = loc_dict["loc_name"]
-                __foreign = loc_dict["foreign"]
-                if __loc_name is None:
-                    __loc_name = loc_id
-                glf.write(
-                    '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
-                        format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
-                               id=loc_id,
-                               foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
-                glf.write("""
+        sde_type_ids):
+    # пишем заголовок таблицы (название системы)
+    __loc_name = loc_dict["loc_name"]
+    __foreign = loc_dict["foreign"]
+    if __loc_name is None:
+        __loc_name = loc_id
+    glf.write(
+        '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
+            format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
+                   id=loc_id,
+                   foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
+    glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
 <thead>
@@ -1937,6 +1920,10 @@ def __dump_corp_accounting_nested_tbl(
 </thead>
 <tbody>
 """)
+    if "items" in loc_dict:
+        __itms_keys = loc_dict["items"].keys()
+        for __loc_id in __itms_keys:
+            itm_dict = loc_dict["items"][str(__loc_id)]
             # получаем данные по текущему справочнику
             loc_name = itm_dict["loc_name"]
             foreign = itm_dict["foreign"]
@@ -1962,18 +1949,16 @@ def __dump_corp_accounting_nested_tbl(
                     group_dict = itm_dict["delivery"][str(group_id)]
                     glf.write('<tr>'
                               ' <th scope="row">{num}</th>\n'
-                              ' <td>{nm}{tag}</td>'
+                              ' <td>{nm}&nbsp;<small><span class="label label-success">delivery</span></small></td>'
                               ' <td align="right">{cost:,.1f}</td>'
                               ' <td align="right">{volume:,.1f}</td>'
                               '</tr>'.
                               format(num=row_id,
                                      nm=group_dict["group"],
                                      cost=group_dict["cost"],
-                                     volume=group_dict["volume"],
-                                     tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else'&nbsp;<small><span class="label label-success">delivery</span></small>'))
+                                     volume=group_dict["volume"]))
                     row_id = row_id + 1
-    if h3_and_table_printed:
-        glf.write("""
+    glf.write("""
 </tbody>
  </table>
 </div>
@@ -1984,32 +1969,22 @@ def __dump_corp_accounting_nested(
         glf,
         root_id,
         root,
-        sde_type_ids,
-        filter_flags):
+        sde_type_ids):
     if "region" in root:
-        __filter_found = filter_flags is None
-        if not __filter_found:
-            for __filter in filter_flags:
-                if ("flags" in root) and (root["flags"].count(__filter) > 0):
-                    __filter_found = True
-                    break
-        if not __filter_found:
-            return
         glf.write('<h2>{rgn}<!--{id}--></h2>\n'.format(rgn=root["region"], id=root_id))
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
             system = root["systems"][str(loc_id)]
-            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, filter_flags)
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids)
     else:
         glf.write('<h2>???</h2>\n')
-        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, filter_flags)
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids)
 
 
 def __dump_corp_accounting(
         glf,
         sde_type_ids,
-        corp_accounting_tree,
-        filter_flags):
+        corp_accounting_tree):
     glf.write("""
     <nav class="navbar navbar-default">
      <div class="container-fluid">
@@ -2054,8 +2029,7 @@ def __dump_corp_accounting(
             glf,
             root,
             corp_accounting_tree[str(root)],
-            sde_type_ids,
-            filter_flags)
+            sde_type_ids)
 
     glf.write("""
 </div>
@@ -2064,14 +2038,12 @@ def __dump_corp_accounting(
 
 def dump_accounting_into_report(
         ws_dir,
-        name,
         sde_type_ids,
-        corp_accounting_tree,
-        filter_flags=None):
-    glf = open('{dir}/{nm}.html'.format(dir=ws_dir, nm=name.lower()), "wt+", encoding='utf8')
+        corp_accounting_tree):
+    glf = open('{dir}/accounting.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        __dump_header(glf, name)
-        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_tree, filter_flags)
+        __dump_header(glf, "Accounting")
+        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_tree)
         __dump_footer(glf)
     finally:
         glf.close()

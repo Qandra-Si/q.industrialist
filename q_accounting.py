@@ -216,13 +216,10 @@ def main():
     dump_accounting_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
-        "Accounting",
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_accounting_tree,
-        # настройки работы метода
-        filter_flags=None)
+        corp_accounting_tree)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")
