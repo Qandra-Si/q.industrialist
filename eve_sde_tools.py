@@ -189,7 +189,7 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
         if "parentGroupID" in market_groups[str(__group_id)]:
             __group_id = market_groups[str(__group_id)]["parentGroupID"]
         else:
-            break
+            return __group_id
     return group_id
 
 

@@ -1910,7 +1910,7 @@ def __dump_corp_accounting_nested_tbl(
             __filter_found = filter_flags is None
             if not __filter_found:
                 for __filter in filter_flags:
-                    if __filter in itm_dict:
+                    if __filter in itm_dict["flags"]:
                         __filter_found = True
                         break
             if not __filter_found:
@@ -1924,9 +1924,9 @@ def __dump_corp_accounting_nested_tbl(
                     __loc_name = loc_id
                 glf.write(
                     '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
-                        format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
-                               id=loc_id,
-                               foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
+                    format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
+                           id=loc_id,
+                           foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
                 glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
@@ -1959,22 +1959,32 @@ def __dump_corp_accounting_nested_tbl(
                        img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
                        what='&nbsp;<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else ""))
             row_id = 1
-            if "delivery" in itm_dict:
-                __d_keys = itm_dict["delivery"].keys()
-                for group_id in __d_keys:
-                    group_dict = itm_dict["delivery"][str(group_id)]
-                    glf.write('<tr>'
-                              ' <th scope="row">{num}</th>\n'
-                              ' <td>{nm}{tag}</td>'
-                              ' <td align="right">{cost:,.1f}</td>'
-                              ' <td align="right">{volume:,.1f}</td>'
-                              '</tr>'.
-                              format(num=row_id,
-                                     nm=group_dict["group"],
-                                     cost=group_dict["cost"],
-                                     volume=group_dict["volume"],
-                                     tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else '&nbsp;<small><span class="label label-success">delivery</span></small>'))
-                    row_id = row_id + 1
+            if "flags" in itm_dict:
+                __f_keys = itm_dict["flags"].keys()
+                for __flag in __f_keys:  # "CorpDeliveries"
+                    # отбрасываем элементы не по фильтру (например нет списка "delivery")
+                    __filter_found = filter_flags is None
+                    if not __filter_found and (0 != filter_flags.count(__flag)):
+                        __filter_found = True
+                    if not __filter_found:
+                        continue
+                    # выводим информацию по содержимому location (группы товаров)
+                    __flag_dict = itm_dict["flags"][str(__flag)]
+                    __g_keys = __flag_dict.keys()
+                    for __group_id in __g_keys:
+                        __group_dict = __flag_dict[str(__group_id)]
+                        glf.write('<tr>'
+                                  ' <th scope="row">{num}</th>\n'
+                                  ' <td>{nm}{tag}</td>'
+                                  ' <td align="right">{cost:,.1f}</td>'
+                                  ' <td align="right">{volume:,.1f}</td>'
+                                  '</tr>'.
+                                  format(num=row_id,
+                                         nm=__group_dict["group"],
+                                         cost=__group_dict["cost"],
+                                         volume=__group_dict["volume"],
+                                         tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else '&nbsp;<small><span class="label label-success">delivery</span></small>'))
+                        row_id = row_id + 1
     if h3_and_table_printed:
         glf.write("""
 </tbody>
@@ -1998,6 +2008,7 @@ def __dump_corp_accounting_nested(
                     break
         if not __filter_found:
             return
+        print(root["region"], filter_flags, root["flags"])
         glf.write('<h2>{rgn}<!--{id}--></h2>\n'.format(rgn=root["region"], id=root_id))
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
@@ -2078,7 +2089,7 @@ def __dump_corp_accounting(
                   ' <td align="right">{volume:,.1f}</td>'
                   ' <td align="center">'.
                   format(num=row_num,
-                         nm=__key,  # "delivery"
+                         nm=__key,  # "CorpDeliveries"
                          cost=__stat_dict["cost"],
                          volume=__stat_dict["volume"]))
         # подсчёт общей статистики
@@ -2093,7 +2104,7 @@ def __dump_corp_accounting(
                 root,
                 corp_accounting_tree[str(root)],
                 sde_type_ids,
-                [__key])  # ["delivery"]
+                [__key])  # ["CorpDeliveries"]
         __dump_any_into_modal_footer(glf)
         glf.write('</td>'
                   '</tr>\n')

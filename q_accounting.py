@@ -47,7 +47,7 @@ def __build_accounting(
         corp_assets_data):
     if not ("roots" in corp_assets_tree):
         return None
-    corp_accounting_stat = {"delivery": {"cost": 0, "volume": 0}}
+    corp_accounting_stat = {}
     corp_accounting_tree = {}
     __roots = corp_assets_tree["roots"]
     for loc_id in __roots:
@@ -73,29 +73,39 @@ def __build_accounting(
                     corp_ass_names_data,
                     foreign_structures_data)
                 __ca3 = __ca2["items"][__itm]
-                __ca3.update({"loc_name": loc_name, "foreign": foreign})
+                __ca3.update({"loc_name": loc_name, "foreign": foreign, "flags": {}})
                 for a in corp_assets_data:
                     if str(a["location_id"]) == __itm:
-                        if a["location_flag"] == "CorpDeliveries":
-                            if __ca1["flags"].count("delivery") == 0:
-                                __ca1["flags"].append("delivery")
-                            group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, a["type_id"])
-                            if not ("delivery" in __ca3):
-                                __ca3.update({"delivery": {}})
-                            __ca4 = __ca3["delivery"]
-                            if not (str(group_id) in __ca4):
-                                __ca4.update({str(group_id): {"group": sde_market_groups[str(group_id)]["nameID"]["en"], "volume": 0, "cost": 0}})
-                                __ca5 = __ca4[str(group_id)]
-                                __type_dict = sde_type_ids[str(a["type_id"])]
-                                if "basePrice" in __type_dict:
-                                    __sum = __type_dict["basePrice"] * a["quantity"]
-                                    __ca5["cost"] = __ca5["cost"] + __sum
-                                    corp_accounting_stat["delivery"]["cost"] = corp_accounting_stat["delivery"]["cost"] + __sum
-                                if "volume" in __type_dict:
-                                    __sum = __type_dict["volume"] * a["quantity"]
-                                    __ca5["volume"] = __ca5["volume"] + __sum
-                                    corp_accounting_stat["delivery"]["volume"] = corp_accounting_stat["delivery"]["volume"] + __sum
-
+                        __location_flag = a["location_flag"]
+                        __type_id = a["type_id"]
+                        __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                        if __group_id is None:
+                            continue
+                        if __ca1["flags"].count(__location_flag) == 0:
+                            __ca1["flags"].append(__location_flag)
+                        __ca4 = __ca3["flags"]
+                        if not (__location_flag in __ca4):
+                            __ca4.update({__location_flag: {}})
+                        __ca5 = __ca4[__location_flag]
+                        if __group_id is None:
+                            print(__location_flag, __type_id, a)
+                        if not (str(__group_id) in __ca5):
+                            __ca5.update({str(__group_id): {"group": sde_market_groups[str(__group_id)]["nameID"]["en"],
+                                                            "volume": 0,
+                                                            "cost": 0}})
+                        if not (__location_flag in corp_accounting_stat):
+                            corp_accounting_stat.update({__location_flag: {"volume": 0, "cost": 0}})
+                        __cas1 = corp_accounting_stat[__location_flag]
+                        __ca6 = __ca5[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
+                        __type_dict = sde_type_ids[str(__type_id)]
+                        if "basePrice" in __type_dict:
+                            __sum = __type_dict["basePrice"] * a["quantity"]
+                            __ca6["cost"] = __ca6["cost"] + __sum
+                            __cas1["cost"] = __cas1["cost"] + __sum
+                        if "volume" in __type_dict:
+                            __sum = __type_dict["volume"] * a["quantity"]
+                            __ca6["volume"] = __ca6["volume"] + __sum
+                            __cas1["volume"] = __cas1["volume"] + __sum
         else:
             corp_accounting_tree.update({str(loc_id): {"loc_name": loc_name, "foreign": foreign}})
     return corp_accounting_stat, corp_accounting_tree
