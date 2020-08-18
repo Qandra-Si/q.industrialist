@@ -309,6 +309,11 @@ def main():  # rebuild .yaml files
             format(app=sys.argv[0]))
         sys.exit(exit_or_wrong_getopt)
 
+    print("Rebuilding typeIDs.yaml file...")
+    sys.stdout.flush()
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
+    return
+
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "bsd", "invPositions", ["itemID", "x", "y", "z"])
@@ -343,7 +348,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}])
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()

@@ -7,6 +7,7 @@ from eve_sde_tools import get_yaml
 from eve_sde_tools import get_item_name_by_type_id
 from eve_sde_tools import get_basis_market_group_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
+from eve_esi_tools import get_assets_location_name
 
 import q_industrialist_settings
 import q_logist_settings
@@ -578,14 +579,6 @@ def __dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
 """)
 
 
-def __represents_int(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
-
-
 def __dump_corp_assets_tree_nested(
         glf,
         location_id,
@@ -596,33 +589,13 @@ def __dump_corp_assets_tree_nested(
         sde_type_ids,
         sde_inv_names,
         sde_inv_items):
-    # constellation_name = None
-    loc_name = None
+    region_id, region_name, loc_name, foreign = get_assets_location_name(
+        location_id,
+        sde_inv_names,
+        sde_inv_items,
+        corp_ass_names_data,
+        foreign_structures_data)
     itm_dict = None
-    foreign = False
-    loc_is_not_virtual = __represents_int(location_id)
-    if loc_is_not_virtual and (int(location_id) < 1000000000000):
-        if str(location_id) in sde_inv_names:
-            loc_name = sde_inv_names[str(location_id)]
-            if str(location_id) in sde_inv_items:
-                root_item = sde_inv_items[str(location_id)]
-                if root_item["typeID"] == 5:  # Solar System
-                    # constellation_name = sde_inv_names[str(root_item["locationID"])]
-                    constellation_item = sde_inv_items[str(root_item["locationID"])]  # Constellation
-                    region_name = sde_inv_names[str(constellation_item["locationID"])]
-                    loc_name = '{} {}'.format(region_name, loc_name)
-    else:
-        if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":
-            loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])
-        else:
-            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
-            if loc_name is None:
-                loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
-                foreign = False if loc_name is None else True
-            # if itm_dict is None:
-            #     itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
-            # if not (itm_dict is None):
-            #     loc_name = itm_dict["location_flag"]
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
     items = loc_dict["items"] if "items" in loc_dict else None
@@ -1914,6 +1887,191 @@ def dump_conveyor_into_report(
         __dump_header(glf, "Conveyor")
         __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
         #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        __dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def __dump_corp_accounting_nested_tbl(
+        glf,
+        loc_id,
+        loc_dict,
+        sde_type_ids,
+        filter_flags):
+    h3_and_table_printed = False
+    if "items" in loc_dict:
+        __itms_keys = loc_dict["items"].keys()
+        for __loc_id in __itms_keys:
+            itm_dict = loc_dict["items"][str(__loc_id)]
+            # отбрасываем элементы не по фильтру (например нет списка "delivery")
+            __filter_found = filter_flags is None
+            if not __filter_found:
+                for __filter in filter_flags:
+                    if __filter in itm_dict:
+                        __filter_found = True
+                        break
+            if not __filter_found:
+                continue
+            # пишем заголовок таблицы (название системы)
+            if not h3_and_table_printed:
+                h3_and_table_printed = True
+                __loc_name = loc_dict["loc_name"]
+                __foreign = loc_dict["foreign"]
+                if __loc_name is None:
+                    __loc_name = loc_id
+                glf.write(
+                    '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
+                        format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
+                               id=loc_id,
+                               foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
+                glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <th>Items</th>
+  <th style="text-align: right;">Cost, ISK</th>
+  <th style="text-align: right;">Volume, m&sup3;</th>
+ </tr>
+</thead>
+<tbody>
+""")
+            # получаем данные по текущему справочнику
+            loc_name = itm_dict["loc_name"]
+            foreign = itm_dict["foreign"]
+            type_id = itm_dict["type_id"]
+            if loc_name is None:
+                loc_name = loc_id
+            glf.write(
+                '<tr><td colspan="4">'
+                '<div class="media">'
+                ' <div class="media-left">{img}</div>'
+                ' <div class="media-body"><strong>{where}</strong>{what}{foreign}<!--{id}--></div>'
+                '</div>'
+                '</td></tr>\n'.
+                format(where='{} '.format(loc_name) if not (loc_name is None) else "",
+                       id=__loc_id,
+                       foreign='&nbsp;<small><span class="label label-warning">foreign</span></small>' if foreign else "",
+                       img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
+                       what='&nbsp;<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else ""))
+            row_id = 1
+            if "delivery" in itm_dict:
+                __d_keys = itm_dict["delivery"].keys()
+                for group_id in __d_keys:
+                    group_dict = itm_dict["delivery"][str(group_id)]
+                    glf.write('<tr>'
+                              ' <th scope="row">{num}</th>\n'
+                              ' <td>{nm}{tag}</td>'
+                              ' <td align="right">{cost:,.1f}</td>'
+                              ' <td align="right">{volume:,.1f}</td>'
+                              '</tr>'.
+                              format(num=row_id,
+                                     nm=group_dict["group"],
+                                     cost=group_dict["cost"],
+                                     volume=group_dict["volume"],
+                                     tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else'&nbsp;<small><span class="label label-success">delivery</span></small>'))
+                    row_id = row_id + 1
+    if h3_and_table_printed:
+        glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+
+
+def __dump_corp_accounting_nested(
+        glf,
+        root_id,
+        root,
+        sde_type_ids,
+        filter_flags):
+    if "region" in root:
+        __filter_found = filter_flags is None
+        if not __filter_found:
+            for __filter in filter_flags:
+                if ("flags" in root) and (root["flags"].count(__filter) > 0):
+                    __filter_found = True
+                    break
+        if not __filter_found:
+            return
+        glf.write('<h2>{rgn}<!--{id}--></h2>\n'.format(rgn=root["region"], id=root_id))
+        __sys_keys = root["systems"].keys()
+        for loc_id in __sys_keys:
+            system = root["systems"][str(loc_id)]
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, filter_flags)
+    else:
+        glf.write('<h2>???</h2>\n')
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, filter_flags)
+
+
+def __dump_corp_accounting(
+        glf,
+        sde_type_ids,
+        corp_accounting_tree,
+        filter_flags):
+    glf.write("""
+    <nav class="navbar navbar-default">
+     <div class="container-fluid">
+      <div class="navbar-header">
+       <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+       </button>
+       <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-list-alt" aria-hidden="true"></span></a>
+      </div>
+
+      <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+       <ul class="nav navbar-nav">
+        <li class="dropdown">
+         <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
+          <ul class="dropdown-menu">
+           <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+          </ul>
+        </li>
+
+        <li class="disabled"><a data-target="#" role="button">Problems</a></li>
+       </ul>
+       <form class="navbar-form navbar-right">
+        <div class="form-group">
+         <input type="text" class="form-control" placeholder="Item" disabled>
+        </div>
+        <button type="button" class="btn btn-default disabled">Search</button>
+       </form>
+      </div>
+     </div>
+    </nav>
+    <div class="container-fluid">
+    """)
+
+    __roots = corp_accounting_tree.keys()
+    for root in __roots:
+        __dump_corp_accounting_nested(
+            glf,
+            root,
+            corp_accounting_tree[str(root)],
+            sde_type_ids,
+            filter_flags)
+
+    glf.write("""
+</div>
+""")
+
+
+def dump_accounting_into_report(
+        ws_dir,
+        name,
+        sde_type_ids,
+        corp_accounting_tree,
+        filter_flags=None):
+    glf = open('{dir}/{nm}.html'.format(dir=ws_dir, nm=name.lower()), "wt+", encoding='utf8')
+    try:
+        __dump_header(glf, name)
+        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_tree, filter_flags)
         __dump_footer(glf)
     finally:
         glf.close()

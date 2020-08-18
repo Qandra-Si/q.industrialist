@@ -1,4 +1,4 @@
-﻿""" Q.Accounting (desktop/mobile)
+﻿""" Q.Delivery (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at developers.eveonline.com with the scope
@@ -211,18 +211,18 @@ def main():
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Построение дерева asset-ов:
-    print("\nBuilding accounting report...")
+    print("\nBuilding delivery report...")
     sys.stdout.flush()
     dump_accounting_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
-        "Accounting",
+        "Delivery",
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_accounting_tree,
         # настройки работы метода
-        filter_flags=None)
+        filter_flags=["delivery"])
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

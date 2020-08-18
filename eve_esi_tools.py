@@ -257,6 +257,8 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
             itm = ass_tree[item_id]
             if not ("location_id" in itm):
                 itm["location_id"] = virt_root
+            if not ("type_id" in itm):
+                itm["type_id"] = a["type_id"]
     # дополняем дерево сведениями о станциях, не принадлежащих корпорации (всё равно,
     # что добавить в список NPC-станции)
     foreign_station_ids = foreign_structures_data.keys()
@@ -301,3 +303,43 @@ def dump_debug_into_file(ws_dir, nm, data):
         finally:
             f.close()
     return
+
+
+def __represents_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+def get_assets_location_name(
+        location_id,
+        sde_inv_names,
+        sde_inv_items,
+        corp_ass_names_data,
+        foreign_structures_data):
+    region_id = None
+    region_name = None
+    loc_name = None
+    foreign = False
+    loc_is_not_virtual = __represents_int(location_id)
+    if loc_is_not_virtual and (int(location_id) < 1000000000000):
+        if str(location_id) in sde_inv_names:
+            loc_name = sde_inv_names[str(location_id)]
+            if str(location_id) in sde_inv_items:
+                root_item = sde_inv_items[str(location_id)]
+                if root_item["typeID"] == 5:  # Solar System
+                    # constellation_name = sde_inv_names[str(root_item["locationID"])]
+                    constellation_item = sde_inv_items[str(root_item["locationID"])]  # Constellation
+                    region_id = constellation_item["locationID"]
+                    region_name = sde_inv_names[str(region_id)]
+    else:
+        if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":
+            loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])
+        else:
+            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
+            if loc_name is None:
+                loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
+                foreign = False if loc_name is None else True
+    return region_id, region_name, loc_name, foreign
