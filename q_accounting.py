@@ -47,6 +47,7 @@ def __build_accounting(
         corp_assets_data):
     if not ("roots" in corp_assets_tree):
         return None
+    corp_accounting_stat = {"delivery": {"cost": 0, "volume": 0}}
     corp_accounting_tree = {}
     __roots = corp_assets_tree["roots"]
     for loc_id in __roots:
@@ -87,13 +88,17 @@ def __build_accounting(
                                 __ca5 = __ca4[str(group_id)]
                                 __type_dict = sde_type_ids[str(a["type_id"])]
                                 if "basePrice" in __type_dict:
-                                    __ca5["cost"] = __ca5["cost"] + __type_dict["basePrice"] * a["quantity"]
+                                    __sum = __type_dict["basePrice"] * a["quantity"]
+                                    __ca5["cost"] = __ca5["cost"] + __sum
+                                    corp_accounting_stat["delivery"]["cost"] = corp_accounting_stat["delivery"]["cost"] + __sum
                                 if "volume" in __type_dict:
-                                    __ca5["volume"] = __ca5["volume"] + __type_dict["volume"] * a["quantity"]
+                                    __sum = __type_dict["volume"] * a["quantity"]
+                                    __ca5["volume"] = __ca5["volume"] + __sum
+                                    corp_accounting_stat["delivery"]["volume"] = corp_accounting_stat["delivery"]["volume"] + __sum
 
         else:
             corp_accounting_tree.update({str(loc_id): {"loc_name": loc_name, "foreign": foreign}})
-    return corp_accounting_tree
+    return corp_accounting_stat, corp_accounting_tree
 
 
 def main():
@@ -194,7 +199,7 @@ def main():
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
     # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
-    corp_accounting_tree = __build_accounting(
+    corp_accounting_stat, corp_accounting_tree = __build_accounting(
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -203,6 +208,7 @@ def main():
         foreign_structures_data,
         corp_assets_tree,
         corp_assets_data)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_stat", corp_accounting_stat)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_tree", corp_accounting_tree)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
@@ -219,6 +225,7 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_accounting_stat,
         corp_accounting_tree)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

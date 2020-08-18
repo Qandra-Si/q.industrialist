@@ -80,11 +80,11 @@ def __dump_footer(glf):
     glf.write("</body></html>")
 
 
-def __dump_any_into_modal_header(glf, name):
+def __dump_any_into_modal_header(glf, name, btn_size="btn-lg", btn_nm=None):
     name_merged = name.replace(' ', '')
     glf.write(
         '<!-- Button trigger for {nm} Modal -->\n'
-        '<button type="button" class="btn btn-primary btn-lg" data-toggle="modal" data-target="#modal{nmm}">Show {nm}</button>\n'
+        '<button type="button" class="btn btn-primary {btn_sz}" data-toggle="modal" data-target="#modal{nmm}">{btn_nm}</button>\n'
         '<!-- {nm} Modal -->\n'
         '<div class="modal fade" id="modal{nmm}" tabindex="-1" role="dialog" aria-labelledby="modal{nmm}Label">\n'
         ' <div class="modal-dialog" role="document">\n'
@@ -94,7 +94,10 @@ def __dump_any_into_modal_header(glf, name):
         '    <h4 class="modal-title" id="modal{nmm}Label">{nm}</h4>\n'
         '   </div>\n'
         '   <div class="modal-body">\n'.
-        format(nm=name, nmm=name_merged))
+        format(nm=name,
+               nmm=name_merged,
+               btn_sz=btn_size,
+               btn_nm='Show {nm}'.format(nm=name) if btn_nm is None else btn_nm))
 
 
 def __dump_any_into_modal_footer(glf):
@@ -1896,18 +1899,35 @@ def __dump_corp_accounting_nested_tbl(
         glf,
         loc_id,
         loc_dict,
-        sde_type_ids):
-    # пишем заголовок таблицы (название системы)
-    __loc_name = loc_dict["loc_name"]
-    __foreign = loc_dict["foreign"]
-    if __loc_name is None:
-        __loc_name = loc_id
-    glf.write(
-        '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
-            format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
-                   id=loc_id,
-                   foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
-    glf.write("""
+        sde_type_ids,
+        filter_flags):
+    h3_and_table_printed = False
+    if "items" in loc_dict:
+        __itms_keys = loc_dict["items"].keys()
+        for __loc_id in __itms_keys:
+            itm_dict = loc_dict["items"][str(__loc_id)]
+            # отбрасываем элементы не по фильтру (например нет списка "delivery")
+            __filter_found = filter_flags is None
+            if not __filter_found:
+                for __filter in filter_flags:
+                    if __filter in itm_dict:
+                        __filter_found = True
+                        break
+            if not __filter_found:
+                continue
+            # пишем заголовок таблицы (название системы)
+            if not h3_and_table_printed:
+                h3_and_table_printed = True
+                __loc_name = loc_dict["loc_name"]
+                __foreign = loc_dict["foreign"]
+                if __loc_name is None:
+                    __loc_name = loc_id
+                glf.write(
+                    '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
+                        format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
+                               id=loc_id,
+                               foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
+                glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
 <thead>
@@ -1920,10 +1940,6 @@ def __dump_corp_accounting_nested_tbl(
 </thead>
 <tbody>
 """)
-    if "items" in loc_dict:
-        __itms_keys = loc_dict["items"].keys()
-        for __loc_id in __itms_keys:
-            itm_dict = loc_dict["items"][str(__loc_id)]
             # получаем данные по текущему справочнику
             loc_name = itm_dict["loc_name"]
             foreign = itm_dict["foreign"]
@@ -1949,16 +1965,18 @@ def __dump_corp_accounting_nested_tbl(
                     group_dict = itm_dict["delivery"][str(group_id)]
                     glf.write('<tr>'
                               ' <th scope="row">{num}</th>\n'
-                              ' <td>{nm}&nbsp;<small><span class="label label-success">delivery</span></small></td>'
+                              ' <td>{nm}{tag}</td>'
                               ' <td align="right">{cost:,.1f}</td>'
                               ' <td align="right">{volume:,.1f}</td>'
                               '</tr>'.
                               format(num=row_id,
                                      nm=group_dict["group"],
                                      cost=group_dict["cost"],
-                                     volume=group_dict["volume"]))
+                                     volume=group_dict["volume"],
+                                     tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else '&nbsp;<small><span class="label label-success">delivery</span></small>'))
                     row_id = row_id + 1
-    glf.write("""
+    if h3_and_table_printed:
+        glf.write("""
 </tbody>
  </table>
 </div>
@@ -1969,21 +1987,31 @@ def __dump_corp_accounting_nested(
         glf,
         root_id,
         root,
-        sde_type_ids):
+        sde_type_ids,
+        filter_flags):
     if "region" in root:
+        __filter_found = filter_flags is None
+        if not __filter_found:
+            for __filter in filter_flags:
+                if ("flags" in root) and (root["flags"].count(__filter) > 0):
+                    __filter_found = True
+                    break
+        if not __filter_found:
+            return
         glf.write('<h2>{rgn}<!--{id}--></h2>\n'.format(rgn=root["region"], id=root_id))
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
             system = root["systems"][str(loc_id)]
-            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids)
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, filter_flags)
     else:
         glf.write('<h2>???</h2>\n')
-        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids)
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, filter_flags)
 
 
 def __dump_corp_accounting(
         glf,
         sde_type_ids,
+        corp_accounting_stat,
         corp_accounting_tree):
     glf.write("""
     <nav class="navbar navbar-default">
@@ -2023,13 +2051,67 @@ def __dump_corp_accounting(
     <div class="container-fluid">
     """)
 
-    __roots = corp_accounting_tree.keys()
-    for root in __roots:
-        __dump_corp_accounting_nested(
-            glf,
-            root,
-            corp_accounting_tree[str(root)],
-            sde_type_ids)
+    glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <th>Locations</th>
+  <th style="text-align: right;">Cost, ISK</th>
+  <th style="text-align: right;">Volume, m&sup3;</th>
+  <th style="text-align: center;">Details</th>
+ </tr>
+</thead>
+<tbody>
+""")
+    row_num = 1
+    __summary_cost = 0
+    __summary_volume = 0
+    __stat_keys = corp_accounting_stat.keys()
+    for __key in __stat_keys:
+        __stat_dict = corp_accounting_stat[str(__key)]
+        glf.write('<tr>'
+                  ' <th scope="row">{num}</th>\n'
+                  ' <td>{nm}</td>'
+                  ' <td align="right">{cost:,.1f}</td>'
+                  ' <td align="right">{volume:,.1f}</td>'
+                  ' <td align="center">'.
+                  format(num=row_num,
+                         nm=__key,  # "delivery"
+                         cost=__stat_dict["cost"],
+                         volume=__stat_dict["volume"]))
+        # подсчёт общей статистики
+        __summary_cost = __summary_cost + __stat_dict["cost"]
+        __summary_volume = __summary_volume + __stat_dict["volume"]
+        # добавление details на страницу
+        __dump_any_into_modal_header(glf, __key, "btn-xs", "details&hellip;")
+        __roots = corp_accounting_tree.keys()
+        for root in __roots:
+            __dump_corp_accounting_nested(
+                glf,
+                root,
+                corp_accounting_tree[str(root)],
+                sde_type_ids,
+                [__key])  # ["delivery"]
+        __dump_any_into_modal_footer(glf)
+        glf.write('</td>'
+                  '</tr>\n')
+        row_num = row_num + 1
+    glf.write('<tr>'
+              ' <th></th>\n'
+              ' <td><strong>summary</strong></td>\n'
+              ' <td align="right"><strong>{cost:,.1f}</strong></td>'
+              ' <td align="right"><strong>{volume:,.1f}</strong></td>'
+              ' <td></td>'
+              '</tr>'.
+              format(cost=__summary_cost,
+                     volume=__summary_volume))
+    glf.write("""
+</tbody>
+ </table>
+</div>
+""")
 
     glf.write("""
 </div>
@@ -2039,11 +2121,12 @@ def __dump_corp_accounting(
 def dump_accounting_into_report(
         ws_dir,
         sde_type_ids,
+        corp_accounting_stat,
         corp_accounting_tree):
     glf = open('{dir}/accounting.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Accounting")
-        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_tree)
+        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_stat, corp_accounting_tree)
         __dump_footer(glf)
     finally:
         glf.close()
