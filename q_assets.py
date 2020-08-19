@@ -181,6 +181,11 @@ def main():
         print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
+    # Public information about market prices
+    eve_market_prices_data = interface.get_esi_data("markets/prices/")
+    print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+    sys.stdout.flush()
+
     # # Public information with list of public structures
     # universe_structures_data = eve_esi_interface.get_esi_data(
     #     access_token,
@@ -194,11 +199,6 @@ def main():
     #   location2: {items:[item3],type_id} }
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=True)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
-
-    # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
-    # которые предназначены для использования в чертежах
-    corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Построение дерева asset-ов:
     print("\nBuilding assets tree report...")
@@ -215,8 +215,8 @@ def main():
         corp_assets_data,
         corp_ass_names_data,
         foreign_structures_data,
+        eve_market_prices_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
         corp_assets_tree)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

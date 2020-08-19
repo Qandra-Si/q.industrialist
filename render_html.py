@@ -589,6 +589,7 @@ def __dump_corp_assets_tree_nested(
         corp_assets_tree,
         corp_ass_names_data,
         foreign_structures_data,
+        eve_market_prices_data,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -606,7 +607,7 @@ def __dump_corp_assets_tree_nested(
     items = loc_dict["items"] if "items" in loc_dict else None
     nested_quantity = None
     items_quantity = None
-    cost = None
+    base_price = None
     volume = None
     if not (items is None):
         nested_quantity = len(items)
@@ -617,16 +618,17 @@ def __dump_corp_assets_tree_nested(
         if str(type_id) in sde_type_ids:
             __type_dict = sde_type_ids[str(type_id)]
             if "basePrice" in __type_dict:
-                cost = __type_dict["basePrice"] * items_quantity
+                base_price = __type_dict["basePrice"] * items_quantity
             if "volume" in __type_dict:
                 volume = __type_dict["volume"] * items_quantity
+    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
     glf.write(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
         ' <div class="media-body">\n'
         '  <h4 class="media-heading">{where}{what}{iq}{nq}</h4>\n'
         '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'
-        '  {grp}{cost}{volume}\n'.
+        '  {grp}{base}{average}{adjusted}{volume}\n'.
         format(
             img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
@@ -637,7 +639,9 @@ def __dump_corp_assets_tree_nested(
             loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else "",
             foreign='<br/><span class="label label-warning">foreign</span>' if foreign else "",
             grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[str(group_id)]["nameID"]["en"]) if not (group_id is None) else "",
-            cost='</br>{:,.1f} ISK'.format(cost) if not (cost is None) else "",
+            base='</br>base: {:,.1f} ISK'.format(base_price) if not (base_price is None) else "",
+            average='</br>average: {:,.1f} ISK'.format(__price_dict["average_price"]*items_quantity) if not (items_quantity is None) and not (__price_dict is None) and ("average_price" in __price_dict) else "",
+            adjusted='</br>adjusted: {:,.1f} ISK'.format(__price_dict["adjusted_price"]*items_quantity) if not (items_quantity is None) and not (__price_dict is None) and ("adjusted_price" in __price_dict) else "",
             volume='</br>{:,.1f} m&sup3'.format(volume) if not (volume is None) else ""
         )
     )
@@ -650,6 +654,7 @@ def __dump_corp_assets_tree_nested(
                 corp_assets_tree,
                 corp_ass_names_data,
                 foreign_structures_data,
+                eve_market_prices_data,
                 sde_type_ids,
                 sde_inv_names,
                 sde_inv_items,
@@ -666,6 +671,7 @@ def __dump_corp_assets_tree(
         corp_assets_tree,
         corp_ass_names_data,
         foreign_structures_data,
+        eve_market_prices_data,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -686,6 +692,7 @@ def __dump_corp_assets_tree(
                 corp_assets_tree,
                 corp_ass_names_data,
                 foreign_structures_data,
+                eve_market_prices_data,
                 sde_type_ids,
                 sde_inv_names,
                 sde_inv_items,
@@ -799,14 +806,14 @@ def dump_assets_tree_into_report(
         corp_assets_data,
         corp_ass_names_data,
         foreign_structures_data,
-        corp_ass_loc_data,
+        eve_market_prices_data,
         corp_assets_tree):
     glf = open('{dir}/assets_tree.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Corp Assets")
 
         __dump_any_into_modal_header(glf, "Corp Assets")
-        __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items, sde_market_groups)
+        __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, eve_market_prices_data, sde_type_ids, sde_inv_names, sde_inv_items, sde_market_groups)
         __dump_any_into_modal_footer(glf)
 
         __dump_footer(glf)
