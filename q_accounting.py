@@ -87,8 +87,6 @@ def __build_accounting(
                         if not (__location_flag in __ca4):
                             __ca4.update({__location_flag: {}})
                         __ca5 = __ca4[__location_flag]
-                        if __group_id is None:
-                            print(__location_flag, __type_id, a)
                         if not (str(__group_id) in __ca5):
                             __ca5.update({str(__group_id): {"group": sde_market_groups[str(__group_id)]["nameID"]["en"],
                                                             "volume": 0,
