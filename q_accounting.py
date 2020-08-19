@@ -158,7 +158,7 @@ def __build_accounting_station(
                 __ca3_station,
                 corp_accounting_stat)
             __build_accounting_nested(
-                int(loc_id),
+                a["item_id"],
                 sde_type_ids,
                 sde_market_groups,
                 eve_market_prices_data,
