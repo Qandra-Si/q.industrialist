@@ -80,8 +80,8 @@ def __dump_footer(glf):
     glf.write("</body></html>")
 
 
-def __dump_any_into_modal_header(glf, name, btn_size="btn-lg", btn_nm=None):
-    name_merged = name.replace(' ', '')
+def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", btn_nm=None):
+    name_merged = name.replace(' ', '') if unique_id is None else unique_id
     glf.write(
         '<!-- Button trigger for {nm} Modal -->\n'
         '<button type="button" class="btn btn-primary {btn_sz}" data-toggle="modal" data-target="#modal{nmm}">{btn_nm}</button>\n'
@@ -591,7 +591,8 @@ def __dump_corp_assets_tree_nested(
         foreign_structures_data,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items):
+        sde_inv_items,
+        sde_market_groups):
     region_id, region_name, loc_name, foreign = get_assets_location_name(
         location_id,
         sde_inv_names,
@@ -601,31 +602,43 @@ def __dump_corp_assets_tree_nested(
     itm_dict = None
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
+    group_id = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
     items = loc_dict["items"] if "items" in loc_dict else None
-    quantity = None
+    nested_quantity = None
+    items_quantity = None
+    cost = None
+    volume = None
     if not (items is None):
-        quantity = len(items)
-    else:
-        if itm_dict is None:
-            itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
-        if not (itm_dict is None):
-            quantity = itm_dict["quantity"]
+        nested_quantity = len(items)
     if itm_dict is None:
         itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+    if not (itm_dict is None):
+        items_quantity = itm_dict["quantity"]
+        if str(type_id) in sde_type_ids:
+            __type_dict = sde_type_ids[str(type_id)]
+            if "basePrice" in __type_dict:
+                cost = __type_dict["basePrice"] * items_quantity
+            if "volume" in __type_dict:
+                volume = __type_dict["volume"] * items_quantity
     glf.write(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
         ' <div class="media-body">\n'
-        '  <h4 class="media-heading">{where}{what}{q}</h4>\n'
-        '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'.
+        '  <h4 class="media-heading">{where}{what}{iq}{nq}</h4>\n'
+        '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'
+        '  {grp}{cost}{volume}\n'.
         format(
             img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
             what='<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
             id=location_id,
-            q=' <span class="badge">{}</span>'.format(quantity) if not (quantity is None) and (quantity > 1) else "",
+            nq=' <span class="badge">{}</span>'.format(items_quantity) if not (items_quantity is None) and (items_quantity > 1) else "",
+            iq=' <span class="label label-info">{}</span>'.format(nested_quantity) if not (nested_quantity is None) and (nested_quantity > 1) else "",
             loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else "",
-            foreign='<br/><span class="label label-warning">foreign</span>' if foreign else ""
+            foreign='<br/><span class="label label-warning">foreign</span>' if foreign else "",
+            grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[str(group_id)]["nameID"]["en"]) if not (group_id is None) else "",
+            cost='</br>{:,.1f} ISK'.format(cost) if not (cost is None) else "",
+            volume='</br>{:,.1f} m&sup3'.format(volume) if not (volume is None) else ""
         )
     )
     if not (items is None):
@@ -639,7 +652,8 @@ def __dump_corp_assets_tree_nested(
                 foreign_structures_data,
                 sde_type_ids,
                 sde_inv_names,
-                sde_inv_items)
+                sde_inv_items,
+                sde_market_groups)
     glf.write(
         ' </div>\n'
         '</div>\n'
@@ -654,7 +668,8 @@ def __dump_corp_assets_tree(
         foreign_structures_data,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items):
+        sde_inv_items,
+        sde_market_groups):
     glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
@@ -673,7 +688,8 @@ def __dump_corp_assets_tree(
                 foreign_structures_data,
                 sde_type_ids,
                 sde_inv_names,
-                sde_inv_items)
+                sde_inv_items,
+                sde_market_groups)
 
     glf.write("""    </li>
   </ul>
@@ -779,6 +795,7 @@ def dump_assets_tree_into_report(
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
+        sde_market_groups,
         corp_assets_data,
         corp_ass_names_data,
         foreign_structures_data,
@@ -789,7 +806,7 @@ def dump_assets_tree_into_report(
         __dump_header(glf, "Corp Assets")
 
         __dump_any_into_modal_header(glf, "Corp Assets")
-        __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items)
+        __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, sde_type_ids, sde_inv_names, sde_inv_items, sde_market_groups)
         __dump_any_into_modal_footer(glf)
 
         __dump_footer(glf)
@@ -1919,14 +1936,12 @@ def __dump_corp_accounting_nested_tbl(
             if not h3_and_table_printed:
                 h3_and_table_printed = True
                 __loc_name = loc_dict["loc_name"]
-                __foreign = loc_dict["foreign"]
                 if __loc_name is None:
                     __loc_name = loc_id
                 glf.write(
-                    '<h3>{where}</strong>{foreign}<!--{id}--></h3>\n'.
+                    '<h3>{where}</strong><!--{id}--></h3>\n'.
                     format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
-                           id=loc_id,
-                           foreign='&nbsp;<span class="label label-warning">foreign</span>' if __foreign else ""))
+                           id=loc_id))
                 glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
@@ -1943,6 +1958,7 @@ def __dump_corp_accounting_nested_tbl(
             # получаем данные по текущему справочнику
             loc_name = itm_dict["loc_name"]
             foreign = itm_dict["foreign"]
+            forbidden = itm_dict["forbidden"] if "forbidden" in itm_dict else False
             type_id = itm_dict["type_id"]
             if loc_name is None:
                 loc_name = loc_id
@@ -1950,12 +1966,13 @@ def __dump_corp_accounting_nested_tbl(
                 '<tr><td colspan="4">'
                 '<div class="media">'
                 ' <div class="media-left">{img}</div>'
-                ' <div class="media-body"><strong>{where}</strong>{what}{foreign}<!--{id}--></div>'
+                ' <div class="media-body"><strong>{where}</strong>{what}{foreign}{forbidden}<!--{id}--></div>'
                 '</div>'
                 '</td></tr>\n'.
                 format(where='{} '.format(loc_name) if not (loc_name is None) else "",
                        id=__loc_id,
                        foreign='&nbsp;<small><span class="label label-warning">foreign</span></small>' if foreign else "",
+                       forbidden='&nbsp;<small><span class="label label-danger">forbidden</span></small>' if forbidden else "",
                        img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
                        what='&nbsp;<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else ""))
             row_id = 1
@@ -2021,8 +2038,7 @@ def __dump_corp_accounting_nested(
 def __dump_corp_accounting(
         glf,
         sde_type_ids,
-        corp_accounting_stat,
-        corp_accounting_tree):
+        corps_accounting):
     glf.write("""
     <nav class="navbar navbar-default">
      <div class="container-fluid">
@@ -2060,7 +2076,6 @@ def __dump_corp_accounting(
     </nav>
     <div class="container-fluid">
     """)
-
     glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed table-hover">
@@ -2075,54 +2090,67 @@ def __dump_corp_accounting(
 </thead>
 <tbody>
 """)
-    row_num = 1
-    __summary_cost = 0
-    __summary_volume = 0
-    __stat_keys = corp_accounting_stat.keys()
-    for __key in __stat_keys:
-        __stat_dict = corp_accounting_stat[str(__key)]
-        glf.write('<tr>'
-                  ' <th scope="row">{num}</th>\n'
-                  ' <td>{nm}</td>'
-                  ' <td align="right">{cost:,.1f}</td>'
-                  ' <td align="right">{volume:,.1f}</td>'
-                  ' <td align="center">'.
-                  format(num=row_num,
-                         nm=__key,  # "CorpDeliveries"
-                         cost=__stat_dict["cost"],
-                         volume=__stat_dict["volume"]))
-        # подсчёт общей статистики
-        __summary_cost = __summary_cost + __stat_dict["cost"]
-        __summary_volume = __summary_volume + __stat_dict["volume"]
-        # добавление details на страницу
-        __dump_any_into_modal_header(glf, __key, "btn-xs", "details&hellip;")
-        __roots = corp_accounting_tree.keys()
-        for root in __roots:
-            __dump_corp_accounting_nested(
+
+    __corp_keys = corps_accounting.keys()
+    for corporation_id in __corp_keys:
+        __corp = corps_accounting[str(corporation_id)]
+        glf.write('<tr class="active">'
+                  ' <td colspan="5"><span class="text-primary"><strong>{nm}</strong></span></td>'
+                  '</tr>\n'.
+                  format(nm=__corp["corporation"]))
+        row_num = 1
+        __summary_cost = 0
+        __summary_volume = 0
+        __stat_keys = __corp["stat"].keys()
+        for __key in __stat_keys:
+            __stat_dict = __corp["stat"][str(__key)]
+            glf.write('<tr>'
+                      ' <th scope="row">{num}</th>\n'
+                      ' <td>{nm}</td>'
+                      ' <td align="right">{cost:,.1f}</td>'
+                      ' <td align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(num=row_num,
+                             nm=__key,  # "CorpDeliveries"
+                             cost=__stat_dict["cost"],
+                             volume=__stat_dict["volume"]))
+            # подсчёт общей статистики
+            __summary_cost = __summary_cost + __stat_dict["cost"]
+            __summary_volume = __summary_volume + __stat_dict["volume"]
+            # добавление details на страницу
+            __dump_any_into_modal_header(
                 glf,
-                root,
-                corp_accounting_tree[str(root)],
-                sde_type_ids,
-                [__key])  # ["CorpDeliveries"]
-        __dump_any_into_modal_footer(glf)
-        glf.write('</td>'
-                  '</tr>\n')
-        row_num = row_num + 1
-    glf.write('<tr>'
-              ' <th></th>\n'
-              ' <td><strong>summary</strong></td>\n'
-              ' <td align="right"><strong>{cost:,.1f}</strong></td>'
-              ' <td align="right"><strong>{volume:,.1f}</strong></td>'
-              ' <td></td>'
-              '</tr>'.
-              format(cost=__summary_cost,
-                     volume=__summary_volume))
+                '<span class="text-primary">{}</span> {}'.format(__corp["corporation"], __key),
+                '{}_{}'.format(corporation_id, __key),
+                "btn-xs",
+                "details&hellip;")
+            __roots = __corp["tree"].keys()
+            for root in __roots:
+                __dump_corp_accounting_nested(
+                    glf,
+                    root,
+                    __corp["tree"][str(root)],
+                    sde_type_ids,
+                    [__key])  # ["CorpDeliveries"]
+            __dump_any_into_modal_footer(glf)
+            glf.write('</td>'
+                      '</tr>\n')
+            row_num = row_num + 1
+        glf.write('<tr>'
+                  ' <th></th>\n'
+                  ' <td><strong>summary</strong></td>\n'
+                  ' <td align="right"><strong>{cost:,.1f}</strong></td>'
+                  ' <td align="right"><strong>{volume:,.1f}</strong></td>'
+                  ' <td></td>'
+                  '</tr>'.
+                  format(cost=__summary_cost,
+                         volume=__summary_volume))
+
     glf.write("""
 </tbody>
  </table>
 </div>
 """)
-
     glf.write("""
 </div>
 """)
@@ -2131,12 +2159,11 @@ def __dump_corp_accounting(
 def dump_accounting_into_report(
         ws_dir,
         sde_type_ids,
-        corp_accounting_stat,
-        corp_accounting_tree):
+        corps_accounting):
     glf = open('{dir}/accounting.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Accounting")
-        __dump_corp_accounting(glf, sde_type_ids, corp_accounting_stat, corp_accounting_tree)
+        __dump_corp_accounting(glf, sde_type_ids, corps_accounting)
         __dump_footer(glf)
     finally:
         glf.close()

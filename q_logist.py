@@ -123,7 +123,7 @@ def main():
         cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
         offline_mode=argv_prms["offline_mode"])
 
-    authz = interface.authenticate(argv_prms["character_name"])
+    authz = interface.authenticate(argv_prms["character_names"][0])
     character_id = authz["character_id"]
     character_name = authz["character_name"]
 

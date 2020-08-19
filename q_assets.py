@@ -118,7 +118,7 @@ def main():
         cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
         offline_mode=argv_prms["offline_mode"])
 
-    authz = interface.authenticate(argv_prms["character_name"])
+    authz = interface.authenticate(argv_prms["character_names"][0])
     character_id = authz["character_id"]
     character_name = authz["character_name"]
 
@@ -137,6 +137,7 @@ def main():
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
@@ -209,6 +210,7 @@ def main():
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
+        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         corp_ass_names_data,
