@@ -40,6 +40,7 @@ def __build_accounting_append(
         __quantity,
         __group_id,
         __group_name,
+        eve_market_prices_data,
         sde_type_ids,
         __cas1_stat_flag,
         __ca5_station_flag):
@@ -47,8 +48,17 @@ def __build_accounting_append(
         __ca5_station_flag.update({str(__group_id): {"group": __group_name, "volume": 0, "cost": 0}})
     __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
     __type_dict = sde_type_ids[str(__type_id)]
-    if "basePrice" in __type_dict:
-        __sum = __type_dict["basePrice"] * __quantity
+    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+    __price = None
+    if not (__price_dict is None):
+        if "average_price" in __price_dict:
+            __price = __price_dict["average_price"]
+        elif "adjusted_price" in __price_dict:
+            __price = __price_dict["adjusted_price"]
+    elif "basePrice" in __type_dict:
+        __price = __type_dict["basePrice"]
+    if not (__price is None):
+        __sum = __price * __quantity
         __ca6_group["cost"] += __sum
         __cas1_stat_flag["cost"] += __sum
     if "volume" in __type_dict:
@@ -61,6 +71,7 @@ def __build_accounting_nested(
         itm_id,
         sde_type_ids,
         sde_market_groups,
+        eve_market_prices_data,
         corp_assets_tree,
         corp_assets_data,
         __cas1_stat_flag,
@@ -77,6 +88,7 @@ def __build_accounting_nested(
                 __quantity,
                 __group_id,
                 sde_market_groups[str(__group_id)]["nameID"]["en"],
+                eve_market_prices_data,
                 sde_type_ids,
                 __cas1_stat_flag,
                 __ca5_station_flag)
@@ -88,6 +100,7 @@ def __build_accounting_nested(
                     __itm_id,
                     sde_type_ids,
                     sde_market_groups,
+                    eve_market_prices_data,
                     corp_assets_tree,
                     corp_assets_data,
                     __cas1_stat_flag,
@@ -133,6 +146,7 @@ def __build_accounting_station(
         corp_assets_tree,
         sde_type_ids,
         sde_market_groups,
+        eve_market_prices_data,
         __ca1_region,
         __ca3_station):
     for a in corp_assets_data:
@@ -147,6 +161,7 @@ def __build_accounting_station(
                 int(loc_id),
                 sde_type_ids,
                 sde_market_groups,
+                eve_market_prices_data,
                 corp_assets_tree,
                 corp_assets_data,
                 __cas1_stat_flag,
@@ -158,6 +173,7 @@ def __build_accounting(
         sde_inv_names,
         sde_inv_items,
         sde_market_groups,
+        eve_market_prices_data,
         corp_ass_names_data,
         foreign_structures_data,
         foreign_structures_forbidden_ids,
@@ -212,6 +228,7 @@ def __build_accounting(
                                     1,
                                     __group_id,
                                     sde_market_groups[str(__group_id)]["nameID"]["en"],
+                                    eve_market_prices_data,
                                     sde_type_ids,
                                     __cas1_stat_flag,
                                     __ca5_station_flag)
@@ -223,6 +240,7 @@ def __build_accounting(
                     corp_assets_tree,
                     sde_type_ids,
                     sde_market_groups,
+                    eve_market_prices_data,
                     __ca1_region,
                     __ca3_station)
         else:
@@ -255,6 +273,7 @@ def __build_accounting(
                 corp_assets_tree,
                 sde_type_ids,
                 sde_market_groups,
+                eve_market_prices_data,
                 __ca1_region,
                 __ca3_station)
     return corp_accounting_stat, corp_accounting_tree
@@ -270,7 +289,41 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
+    """
+    === Сведения по рассчёту цены ===
+    
+    Данные из .yaml:
+    36:
+     basePrice: 32.0
+     groupID: 18
+     iconID: 401
+     marketGroupID: 1857
+     name:
+      en: Mexallon
+     portionSize: 1
+     published: true
+     volume: 0.01
+    ---
+    Данные из https://esi.evetech.net/ui/#/Market/get_markets_prices :
+    {
+     "adjusted_price": 44.1,
+     "average_price": 92.64,
+     "type_id": 36
+    }
+    ---
+    Ситуация на рынке https://image.prntscr.com/image/0Oqy5FlqRniAstG2wvSd7A.png :
+    Sell: 85 ISK
+    Buy: 88.64 ISK
+    ----
+    Текущая стоимость, которую показывает Евка https://image.prntscr.com/image/-8liCZ8TRHWIaSpZ6Kzhew.png :
+    92.6 ISK
+    ---
+    Полезная информация https://www.reddit.com/r/Eve/comments/5zegqw/how_does_ccp_calculate_averageadjusted_price/ :
+    adjusted_price - средняя за 28 дней
+    """
+
     corps_accounting = {}
+    eve_market_prices_data = None
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -345,6 +398,12 @@ def main():
             print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
         sys.stdout.flush()
 
+        if eve_market_prices_data is None:
+            # Public information about market prices
+            eve_market_prices_data = interface.get_esi_data("markets/prices/")
+            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+            sys.stdout.flush()
+
         # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
         # элементов, в виде:
         # { location1: {items:[item1,item2,...],type_id,location_id},
@@ -353,11 +412,14 @@ def main():
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
 
         # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
+        print("\nBuilding {} accounting tree and stat...".format(corporation_name))
+        sys.stdout.flush()
         corp_accounting_stat, corp_accounting_tree = __build_accounting(
             sde_type_ids,
             sde_inv_names,
             sde_inv_items,
             sde_market_groups,
+            eve_market_prices_data,
             corp_ass_names_data,
             foreign_structures_data,
             foreign_structures_forbidden_ids,
