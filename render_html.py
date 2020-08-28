@@ -1,6 +1,7 @@
 ﻿import time
 import tzlocal
 import math
+import re
 
 from datetime import datetime
 from eve_sde_tools import get_yaml
@@ -621,7 +622,10 @@ def __dump_corp_assets_tree_nested(
                 base_price = __type_dict["basePrice"] * items_quantity
             if "volume" in __type_dict:
                 volume = __type_dict["volume"] * items_quantity
-    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
+    if type_id is None:
+        __price_dict = None
+    else:
+        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
     glf.write(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
@@ -1898,6 +1902,15 @@ def __dump_corp_conveyor(
 """)
 
 
+__g_pattern_c2s1 = re.compile(r'(.)([A-Z][a-z]+)')
+__g_pattern_c2s2 = re.compile(r'([a-z0-9])([A-Z])')
+
+
+def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
+  name = __g_pattern_c2s1.sub(r'\1_\2', name)
+  return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
+
+
 def dump_conveyor_into_report(
         ws_dir,
         sde_type_ids,
@@ -2007,7 +2020,9 @@ def __dump_corp_accounting_nested_tbl(
                                          nm=__group_dict["group"],
                                          cost=__group_dict["cost"],
                                          volume=__group_dict["volume"],
-                                         tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else '&nbsp;<small><span class="label label-success">delivery</span></small>'))
+                                         tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
+                                             '&nbsp;<small><span class="label label-default">{flag}</span></small>'.
+                                             format(flag=__camel_to_snake(str(__flag)))))
                         row_id = row_id + 1
     if h3_and_table_printed:
         glf.write("""
@@ -2148,10 +2163,27 @@ def __dump_corp_accounting(
                   ' <td><strong>summary</strong></td>\n'
                   ' <td align="right"><strong>{cost:,.1f}</strong></td>'
                   ' <td align="right"><strong>{volume:,.1f}</strong></td>'
-                  ' <td></td>'
-                  '</tr>'.
+                  ' <td align="center">'.
                   format(cost=__summary_cost,
                          volume=__summary_volume))
+        # добавление details в summary
+        __dump_any_into_modal_header(
+            glf,
+            '<span class="text-primary">{}</span>'.format(__corp["corporation"]),
+            '{}_all'.format(corporation_id),
+            "btn-xs",
+            "details&hellip;")
+        __roots = __corp["tree"].keys()
+        for root in __roots:
+            __dump_corp_accounting_nested(
+                glf,
+                root,
+                __corp["tree"][str(root)],
+                sde_type_ids,
+                None)
+        __dump_any_into_modal_footer(glf)
+        glf.write('</td>'
+                  '</tr>\n')
 
     glf.write("""
 </tbody>

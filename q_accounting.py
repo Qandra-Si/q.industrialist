@@ -153,6 +153,8 @@ def __build_accounting_station(
         __ca3_station):
     for a in corp_assets_data:
         if int(a["location_id"]) == int(loc_id):
+            if a["type_id"] == 16159:  # EVE Alliance (пропускаем, бесполезная инфа, есть есть только в профиле СЕО)
+                continue
             __location_flag = a["location_flag"]
             __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
                 __location_flag,
@@ -247,9 +249,11 @@ def __build_accounting(
                     __ca3_station)
         else:
             # не удалось получить сведения о регионе, - это неспроста, скорее всего на эту стуктуру у корпы forbidden
+            __region_id = None
             if int(loc_id) in foreign_structures_forbidden_ids:
+                __region_id = 0  # "(none)"
                 __ca1_region, __ca2_system = __build_accounting_register_region(
-                    0,  # "(none)"
+                    __region_id,
                     "Forbidden",
                     0,
                     "(no data)",
@@ -258,8 +262,9 @@ def __build_accounting(
                 __ca3_station = __ca2_system["items"][str(loc_id)]
                 __ca3_station.update({"loc_name": str(loc_id), "foreign": True, "forbidden": True, "flags": {}})
             else:
+                __region_id = 3006  # "Unknown"
                 __ca1_region, __ca2_system = __build_accounting_register_region(
-                    3006,  # "Unknown"
+                    __region_id,
                     "Unknown",
                     0,
                     "(no data)",
@@ -278,6 +283,9 @@ def __build_accounting(
                 eve_market_prices_data,
                 __ca1_region,
                 __ca3_station)
+            # возможная ситуация - в список попал, но не добавился EVE Alliance маркер, который есть только у СЕО
+            if len(__ca1_region["flags"]) == 0:
+                del corp_accounting_tree[str(__region_id)]
     return corp_accounting_stat, corp_accounting_tree
 
 
