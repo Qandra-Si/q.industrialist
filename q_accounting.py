@@ -44,6 +44,8 @@ def __build_accounting_append(
         sde_type_ids,
         __cas1_stat_flag,
         __ca5_station_flag):
+    if __group_id == 2:  # Blueprints & Reactions (пропускаем)
+        return
     if not (str(__group_id) in __ca5_station_flag):
         __ca5_station_flag.update({str(__group_id): {"group": __group_name, "volume": 0, "cost": 0}})
     __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
