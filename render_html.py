@@ -334,8 +334,10 @@ def __dump_corp_blueprints(
                         )
                     )
                     if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
-                        if (blueprint_status == "active") or (blueprint_status == "delivered") or (blueprint_status == "ready"):
+                        if (blueprint_status == "active") or (blueprint_status == "delivered"):
                             glf.write('&nbsp;<span class="label label-info">{}</span>'.format(blueprint_status))
+                        elif blueprint_status == "ready":
+                            glf.write('&nbsp;<span class="label label-success">{}</span>'.format(blueprint_status))
                         elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
                             glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
                         else:
@@ -2446,8 +2448,10 @@ def __dump_corp_blueprints(
             __status = ""
             if "st" in __blueprint_dict:  # [ active, cancelled, delivered, paused, ready, reverted ]
                 __blueprint_status = __blueprint_dict["st"]
-                if (__blueprint_status == "active") or (__blueprint_status == "delivered") or (__blueprint_status == "ready"):
+                if (__blueprint_status == "active") or (__blueprint_status == "delivered"):
                     __status = '&nbsp;<span class="label label-info">{}</span>'.format(__blueprint_status)
+                elif __blueprint_status == "ready":
+                    __status = '&nbsp;<span class="label label-success">{}</span>'.format(__blueprint_status)
                 elif (__blueprint_status == "cancelled") or (__blueprint_status == "paused") or (__blueprint_status == "reverted"):
                     __status = '&nbsp;<span class="label label-warning">{}</span>'.format(__blueprint_status)
                 else:
@@ -2494,7 +2498,7 @@ def __dump_corp_blueprints(
  </p>
  <p>
   <span class="label label-info">active</span>, <span class="label label-info">delivered</span>,
-  <span class="label label-info">ready</span>, <span class="label label-warning">cancelled</span>,
+  <span class="label label-success">ready</span>, <span class="label label-warning">cancelled</span>,
   <span class="label label-warning">paused</span>, <span class="label label-warning">reverted</span> - all possible
   <strong>statuses</strong> of blueprints that are in industry mode.
  </p>
