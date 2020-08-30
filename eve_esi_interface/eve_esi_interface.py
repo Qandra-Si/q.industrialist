@@ -217,7 +217,6 @@ class EveOnlineInterface:
                     match_pages = match_pages + 1  # noqa
                     if 1 == page:
                         all_pages = len(cached_data["headers"])
-                        last_modified = cached_data["headers"][page-1]["last-modified"]
                 else:
                     if match_pages > 0:  # noqa
                         # если какая-либо страница посреди набора данных не совпала с ранее известным etag, то весь набор
@@ -236,9 +235,7 @@ class EveOnlineInterface:
                     data_json.extend(page_data.json())  # noqa
                     if 1 == page:
                         all_pages = int(page_data.headers["X-Pages"]) if "X-Pages" in page_data.headers else 1
-                        last_modified = page_data.headers["Last-Modified"]
-                    elif (last_modified != page_data.headers["Last-Modified"]) and (  # noqa
-                          all_pages != page_data.headers["X-Pages"]):  # noqa
+                    elif (int(all_pages) != int(page_data.headers["X-Pages"])):  # noqa
                         # если в процессе загрузки данных, изменился last-modified или num-pages у
                         # элемента этого набора, то весь набор признаётся невалидным
                         restart = True
