@@ -2364,3 +2364,270 @@ def dump_accounting_into_report(
         __dump_footer(glf)
     finally:
         glf.close()
+
+
+def __dump_corp_blueprints(
+        glf,
+        corps_blueprints):
+    glf.write("""
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-duplicate" aria-hidden="true"></span></a>
+  </div>
+
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show price tags</a></li>
+       <li><a id="btnToggleWithStatuses" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowWithStatuses"></span> Show only industry jobs</a></li>
+       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+      </ul>
+    </li>
+
+    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <div class="form-group">
+     <input type="text" class="form-control" placeholder="Item" disabled>
+    </div>
+    <button type="button" class="btn btn-default disabled">Search</button>
+   </form>
+  </div>
+ </div>
+</nav>
+<div class="container-fluid">
+""")
+    __corp_keys = corps_blueprints.keys()
+    for corporation_id in __corp_keys:
+        __corp = corps_blueprints[str(corporation_id)]
+        glf.write('<div class="panel panel-primary">\n'
+                  ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'.
+                  format(nm=__corp["corporation"]))
+        glf.write("""
+<div class="panel-body">
+ <div class="table-responsive">
+  <table class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Blueprint</th>
+  <th>ME</th>
+  <th>TE</th>
+  <th>Qty</th>
+  <th>Price, ISK</th>
+  <th>Location</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        row_num = 1
+        __summary_cost = 0
+        for __blueprint_dict in __corp["blueprints"]:
+            # выясняем сколько стоит один чертёж?
+            __price = ""
+            if "average_price" in __blueprint_dict:
+                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-primary">A</span></sup>'.format(cost=__blueprint_dict["average_price"])
+            elif "adjusted_price" in __blueprint_dict:
+                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-info">J</span></sup>'.format(cost=__blueprint_dict["adjusted_price"])
+            elif "base_price" in __blueprint_dict:
+                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
+            # проверяем работки по текущему чертежу?
+            __status = ""
+            if "st" in __blueprint_dict:  # [ active, cancelled, delivered, paused, ready, reverted ]
+                __blueprint_status = __blueprint_dict["st"]
+                if (__blueprint_status == "active") or (__blueprint_status == "delivered") or (__blueprint_status == "ready"):
+                    __status = '&nbsp;<span class="label label-info">{}</span>'.format(__blueprint_status)
+                elif (__blueprint_status == "cancelled") or (__blueprint_status == "paused") or (__blueprint_status == "reverted"):
+                    __status = '&nbsp;<span class="label label-warning">{}</span>'.format(__blueprint_status)
+                else:
+                    __status = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_status)
+            # вывод в таблицу информацию о чертеже
+            glf.write('<tr class="{qind_cl}">'
+                      ' <th scope="row">{num}</th>\n'
+                      ' <td>{nm}{st}</td>'
+                      ' <td>{me}</td>'
+                      ' <td>{te}</td>'
+                      ' <td>{q}</td>'
+                      ' <td align="right">{price}</td>'
+                      ' <td><small>{loc}</small></td>'
+                      '</tr>\n'.
+                      format(num=row_num,
+                             nm=__blueprint_dict["name"],
+                             st=__status,
+                             qind_cl="qind-bp-nonjob" if not __status else "qind-bp-job",
+                             me=__blueprint_dict["me"],
+                             te=__blueprint_dict["te"],
+                             q=__blueprint_dict["q"],
+                             price=__price,
+                             loc=__blueprint_dict["loc"]))
+            # подсчёт общей статистики
+            # __summary_cost = __summary_cost + __stat_dict["cost"]
+            row_num = row_num + 1
+        glf.write("""
+</tbody>
+   </table>
+  </div>
+ </div>
+</div>
+""")
+
+    glf.write("""
+<div id="legend-block">
+ <hr>
+ <h4>Legend</h4>
+ <p>
+  <span class="label label-primary">A</span>, <span class="label label-info">J</span>, <span class="label label-default">B</span> - <strong>price tags</strong>
+  to indicate type of market' price. There are <span class="label label-primary">A</span> average price (<i>current market price</i>),
+  and <span class="label label-info">J</span> adjusted price (<i>average over the last 28 days</i>) and <span class="label label-default">B</span>
+  base price (<i>standart CCP item price</i>).
+ </p>
+ <p>
+  <span class="label label-info">active</span>, <span class="label label-info">delivered</span>,
+  <span class="label label-info">ready</span>, <span class="label label-warning">cancelled</span>,
+  <span class="label label-warning">paused</span>, <span class="label label-warning">reverted</span> - all possible
+  <strong>statuses</strong> of blueprints that are in industry mode.
+ </p>
+</div>
+
+<script>
+  // Accounting Options storage (prepare)
+  ls = window.localStorage;
+
+  // Accounting Options storage (init)
+  function resetOptionsMenuToDefault() {
+    if (!ls.getItem('Show Legend')) {
+      ls.setItem('Show Legend', 1);
+    }
+    if (!ls.getItem('Show Price Tags')) {
+      ls.setItem('Show Price Tags', 1);
+    }
+    if (!ls.getItem('Show With Statuses')) {
+      ls.setItem('Show With Statuses', 0);
+    }
+  }
+  // Accounting Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#imgShowLegend').removeClass('hidden');
+    else
+      $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Price Tags');
+    if (show == 1)
+      $('#imgShowPriceTags').removeClass('hidden');
+    else
+      $('#imgShowPriceTags').addClass('hidden');
+    show = ls.getItem('Show With Statuses');
+    if (show == 1)
+      $('#imgShowWithStatuses').removeClass('hidden');
+    else
+      $('#imgShowWithStatuses').addClass('hidden');
+  }
+  // Accounting Options storage (rebuild body components)
+  function rebuildBody() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#legend-block').removeClass('hidden');
+    else
+      $('#legend-block').addClass('hidden');
+    show = ls.getItem('Show Price Tags');
+    $('sup.qind-price-tag').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    show = ls.getItem('Show With Statuses');
+    $('tr.qind-bp-nonjob').each(function() {
+      if (show == 1)
+        $(this).addClass('hidden');
+      else
+        $(this).removeClass('hidden');
+    })
+  }
+  // Accounting Options menu and submenu setup
+  $(document).ready(function(){
+    $('#btnToggleLegend').on('click', function () {
+      show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
+      ls.setItem('Show Legend', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnTogglePriceTags').on('click', function () {
+      show = (ls.getItem('Show Price Tags') == 1) ? 0 : 1;
+      ls.setItem('Show Price Tags', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleWithStatuses').on('click', function () {
+      show = (ls.getItem('Show With Statuses') == 1) ? 0 : 1;
+      ls.setItem('Show With Statuses', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildBody();
+    // Working with clipboard
+    $('a.qind-copy-btn').each(function() {
+      $(this).tooltip();
+    })
+    $('a.qind-copy-btn').bind('click', function () {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($(this).attr('data-copy')).select();
+      try {
+        success = document.execCommand("copy");
+        if (success) {
+          $(this).trigger('copied', ['Copied!']);
+        }
+      } finally {
+        $temp.remove();
+      }
+    });
+    $('a.qind-copy-btn').bind('copied', function(event, message) {
+      $(this).attr('title', message)
+        .tooltip('fixTitle')
+        .tooltip('show')
+        .attr('title', "Copy to clipboard")
+        .tooltip('fixTitle');
+    });
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+      // какой-то код ...
+      $('a.qind-copy-btn').each(function() {
+        $(this).addClass('hidden');
+      })
+    }
+  });
+</script>
+""")
+
+
+def dump_blueprints_into_report(
+        ws_dir,
+        corps_blueprints):
+    glf = open('{dir}/blueprints.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    try:
+        __dump_header(glf, "Blueprints")
+        __dump_corp_blueprints(glf, corps_blueprints)
+        __dump_footer(glf)
+    finally:
+        glf.close()

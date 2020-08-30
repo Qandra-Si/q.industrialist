@@ -94,7 +94,7 @@ def main():
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
-    # Построение дерева merket-групп с элементами, в виде:
+    # Построение дерева market-групп с элементами, в виде:
     # { group1: {items:[sub1,sub2,...]},
     #   group2: {items:[sub3],parent_id} }
     market_groups_tree = eve_sde_tools.get_market_groups_tree(sde_market_groups)
