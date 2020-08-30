@@ -43,9 +43,15 @@ def __build_accounting_append(
         eve_market_prices_data,
         sde_type_ids,
         __cas1_stat_flag,
-        __ca5_station_flag):
-    if __group_id == 2:  # Blueprints & Reactions (пропускаем)
-        return
+        __ca5_station_flag,
+        skip_certain_groups,
+        process_only_specified_groups):
+    if not (skip_certain_groups is None):
+        if __group_id in skip_certain_groups:  # напр. Blueprints & Reactions (пропускаем)
+            return
+    if not (process_only_specified_groups is None):
+        if not (__group_id in process_only_specified_groups):  # напр. Blueprints & Reactions (обрабатываем)
+            return
     if not (str(__group_id) in __ca5_station_flag):
         __ca5_station_flag.update({str(__group_id): {"group": __group_name, "volume": 0, "cost": 0}})
     __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
@@ -77,7 +83,9 @@ def __build_accounting_nested(
         corp_assets_tree,
         corp_assets_data,
         __cas1_stat_flag,
-        __ca5_station_flag):
+        __ca5_station_flag,
+        skip_certain_groups,
+        process_only_specified_groups):
     __item_dict = next((a for a in corp_assets_data if a['item_id'] == int(itm_id)), None)
     if not (__item_dict is None):
         __type_id = int(__item_dict["type_id"])
@@ -93,7 +101,9 @@ def __build_accounting_nested(
                 eve_market_prices_data,
                 sde_type_ids,
                 __cas1_stat_flag,
-                __ca5_station_flag)
+                __ca5_station_flag,
+                skip_certain_groups,
+                process_only_specified_groups)
     if str(itm_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(itm_id)]
         if "items" in __cat1:
@@ -106,7 +116,9 @@ def __build_accounting_nested(
                     corp_assets_tree,
                     corp_assets_data,
                     __cas1_stat_flag,
-                    __ca5_station_flag)
+                    __ca5_station_flag,
+                    skip_certain_groups,
+                    process_only_specified_groups)
     return
 
 
@@ -150,7 +162,9 @@ def __build_accounting_station(
         sde_market_groups,
         eve_market_prices_data,
         __ca1_region,
-        __ca3_station):
+        __ca3_station,
+        skip_certain_groups,
+        process_only_specified_groups):
     for a in corp_assets_data:
         if int(a["location_id"]) == int(loc_id):
             if a["type_id"] == 16159:  # EVE Alliance (пропускаем, бесполезная инфа, есть есть только в профиле СЕО)
@@ -169,7 +183,90 @@ def __build_accounting_station(
                 corp_assets_tree,
                 corp_assets_data,
                 __cas1_stat_flag,
-                __ca5_station_flag)
+                __ca5_station_flag,
+                skip_certain_groups,
+                process_only_specified_groups)
+
+
+def __build_accounting_blueprints_nested(
+        __item_id,
+        sde_type_ids,
+        sde_market_groups,
+        eve_market_prices_data,
+        corp_assets_tree,
+        corp_assets_data,
+        corp_accounting_stat,
+        __ca1_region,
+        __ca3_station):
+    __ca5_station_flag = __cas1_stat_flag = None
+    __item_dict = next((a for a in corp_assets_data if a['item_id'] == int(__item_id)), None)
+    if not (__item_dict is None):
+        __type_id = int(__item_dict["type_id"])
+        __quantity = int(__item_dict["quantity"])
+        # __location_flag = __item_dict["location_flag"]
+        __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+        if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
+            # регистрируем регион и станцию, на которой обнаружены blueprint
+            if __ca5_station_flag is None:
+                __location_flag = "BlueprintsReactions"
+                __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
+                    __location_flag,
+                    __ca1_region,
+                    __ca3_station,
+                    corp_accounting_stat)
+                __cas1_stat_flag.update({"omit_in_summary": True})
+            # добавляем в статистику информацию по blueprint-у
+            __build_accounting_append(
+                __type_id,
+                __quantity,
+                __group_id,
+                sde_market_groups[str(__group_id)]["nameID"]["en"],
+                eve_market_prices_data,
+                sde_type_ids,
+                __cas1_stat_flag,
+                __ca5_station_flag,
+                None,  # в статистику попадают все группы, но следующий фильтр ограничит...
+                [2])  # ...обработку только Blueprints and Reactions
+    if str(__item_id) in corp_assets_tree:
+        __cat1 = corp_assets_tree[str(__item_id)]
+        if "items" in __cat1:
+            for __nested_item_id in __cat1["items"]:
+                __build_accounting_blueprints_nested(
+                    __nested_item_id,
+                    sde_type_ids,
+                    sde_market_groups,
+                    eve_market_prices_data,
+                    corp_assets_tree,
+                    corp_assets_data,
+                    corp_accounting_stat,
+                    __ca1_region,
+                    __ca3_station)
+
+
+def __build_accounting_blueprints(
+        loc_id,
+        corp_assets_data,
+        corp_accounting_stat,
+        corp_assets_tree,
+        sde_type_ids,
+        sde_market_groups,
+        eve_market_prices_data,
+        __ca1_region,
+        __ca3_station):
+    # на текущей станции получаем все item-ы и собираем сводную статистику по Blueprints & Reactions
+    for __item_dict in corp_assets_data:
+        if int(__item_dict["location_id"]) != int(loc_id):
+            continue
+        __build_accounting_blueprints_nested(
+            __item_dict['item_id'],
+            sde_type_ids,
+            sde_market_groups,
+            eve_market_prices_data,
+            corp_assets_tree,
+            corp_assets_data,
+            corp_accounting_stat,
+            __ca1_region,
+            __ca3_station)
 
 
 def __build_accounting(
@@ -235,9 +332,24 @@ def __build_accounting(
                                     eve_market_prices_data,
                                     sde_type_ids,
                                     __cas1_stat_flag,
-                                    __ca5_station_flag)
+                                    __ca5_station_flag,
+                                    [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
+                                    None)  # Обрабатываем все остальные типы и группы имущества
                 # на текущей станции получаем все location_flag и собираем сводную статистику по каждой группе
                 __build_accounting_station(
+                    itm,
+                    corp_assets_data,
+                    corp_accounting_stat,
+                    corp_assets_tree,
+                    sde_type_ids,
+                    sde_market_groups,
+                    eve_market_prices_data,
+                    __ca1_region,
+                    __ca3_station,
+                    [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
+                    None)  # Обрабатываем все остальные типы и группы имущества
+                # с Blueprints & Reactions работаем индивидуально! (добавляем их в отдельную виртуальную группу)
+                __build_accounting_blueprints(
                     itm,
                     corp_assets_data,
                     corp_accounting_stat,
@@ -282,7 +394,9 @@ def __build_accounting(
                 sde_market_groups,
                 eve_market_prices_data,
                 __ca1_region,
-                __ca3_station)
+                __ca3_station,
+                [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
+                None)  # Обрабатываем все остальные типы и группы имущества
             # возможная ситуация - в список попал, но не добавился EVE Alliance маркер, который есть только у СЕО
             if len(__ca1_region["flags"]) == 0:
                 del corp_accounting_tree[str(__region_id)]

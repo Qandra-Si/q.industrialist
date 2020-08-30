@@ -2012,7 +2012,7 @@ def __dump_corp_accounting_nested_tbl(
                     __g_keys = __flag_dict.keys()
                     for __group_id in __g_keys:
                         __group_dict = __flag_dict[str(__group_id)]
-                        glf.write('<tr>'
+                        glf.write('<tr{color}>'
                                   ' <th scope="row">{num}</th>\n'
                                   ' <td>{nm}{tag}</td>'
                                   ' <td align="right">{cost:,.1f}</td>'
@@ -2024,7 +2024,8 @@ def __dump_corp_accounting_nested_tbl(
                                          volume=__group_dict["volume"],
                                          tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
                                              '&nbsp;<small><span class="label label-default">{flag}</span></small>'.
-                                             format(flag=__camel_to_snake(str(__flag)))))
+                                             format(flag=__camel_to_snake(str(__flag))),
+                                         color=' style="color:green;"' if __flag == "BlueprintsReactions" else ""))
                         row_id = row_id + 1
     if h3_and_table_printed:
         glf.write("""
@@ -2032,6 +2033,33 @@ def __dump_corp_accounting_nested_tbl(
  </table>
 </div>
 """)
+
+
+def __dump_corp_accounting_details(
+        glf,
+        __key,
+        corporation_name,
+        corporation_id,
+        __corp_tree,
+        sde_type_ids):
+    __dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> {key}'.format(nm=corporation_name,
+                                                              key="" if __key is None else __key),
+        '{nm}_{key}'.format(nm=corporation_id,
+                            key="all" if __key is None else __key),
+        "btn-xs",
+        "details&hellip;")
+    __roots = __corp_tree.keys()
+    __filter = None if __key is None else [__key]
+    for root in __roots:
+        __dump_corp_accounting_nested(
+            glf,
+            root,
+            __corp_tree[str(root)],
+            sde_type_ids,
+            __filter)  # ["CorpDeliveries"]
+    __dump_any_into_modal_footer(glf)
 
 
 def __dump_corp_accounting_nested(
@@ -2081,6 +2109,7 @@ def __dump_corp_accounting(
         <li class="dropdown">
          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
           <ul class="dropdown-menu">
+           <li><a id="btnToggleBlueprints" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBlueprints"></span> Show blueprints and reactions</a></li>
            <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
            <li role="separator" class="divider"></li>
            <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -2128,6 +2157,8 @@ def __dump_corp_accounting(
         __stat_keys = __corp["stat"].keys()
         for __key in __stat_keys:
             __stat_dict = __corp["stat"][str(__key)]
+            if ("omit_in_summary" in __stat_dict) and __stat_dict["omit_in_summary"]:
+                continue
             glf.write('<tr>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}</td>'
@@ -2142,50 +2173,64 @@ def __dump_corp_accounting(
             __summary_cost = __summary_cost + __stat_dict["cost"]
             __summary_volume = __summary_volume + __stat_dict["volume"]
             # добавление details на страницу
-            __dump_any_into_modal_header(
+            __dump_corp_accounting_details(
                 glf,
-                '<span class="text-primary">{}</span> {}'.format(__corp["corporation"], __key),
-                '{}_{}'.format(corporation_id, __key),
-                "btn-xs",
-                "details&hellip;")
-            __roots = __corp["tree"].keys()
-            for root in __roots:
-                __dump_corp_accounting_nested(
-                    glf,
-                    root,
-                    __corp["tree"][str(root)],
-                    sde_type_ids,
-                    [__key])  # ["CorpDeliveries"]
-            __dump_any_into_modal_footer(glf)
+                __key,
+                __corp["corporation"],
+                corporation_id,
+                __corp["tree"],
+                sde_type_ids)
             glf.write('</td>'
                       '</tr>\n')
             row_num = row_num + 1
+        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                        '  aria-hidden="true"></span></a>'. \
+                        format(cost=__summary_cost)
         glf.write('<tr>'
                   ' <th></th>\n'
-                  ' <td><strong>summary</strong></td>\n'
-                  ' <td align="right"><strong>{cost:,.1f}</strong></td>'
+                  ' <td><strong>Summary</strong></td>\n'
+                  ' <td align="right"><strong>{cost:,.1f}{clbrd}</strong></td>'
                   ' <td align="right"><strong>{volume:,.1f}</strong></td>'
                   ' <td align="center">'.
                   format(cost=__summary_cost,
-                         volume=__summary_volume))
+                         volume=__summary_volume,
+                         clbrd=__copy2clpbrd))
         # добавление details в summary
-        __dump_any_into_modal_header(
+        __dump_corp_accounting_details(
             glf,
-            '<span class="text-primary">{}</span>'.format(__corp["corporation"]),
-            '{}_all'.format(corporation_id),
-            "btn-xs",
-            "details&hellip;")
-        __roots = __corp["tree"].keys()
-        for root in __roots:
-            __dump_corp_accounting_nested(
-                glf,
-                root,
-                __corp["tree"][str(root)],
-                sde_type_ids,
-                None)
-        __dump_any_into_modal_footer(glf)
+            None,
+            __corp["corporation"],
+            corporation_id,
+            __corp["tree"],
+            sde_type_ids)
         glf.write('</td>'
                   '</tr>\n')
+        # добавление в подвал (под summary) информацию об omitted-категориях (такая у нас Blueprints & Reactions)
+        # повторно запускаем цикл
+        for __key in __stat_keys:
+            __stat_dict = __corp["stat"][str(__key)]
+            if not ("omit_in_summary" in __stat_dict) or not __stat_dict["omit_in_summary"]:
+                continue
+            glf.write('<tr class="qind-blueprints-stat">'
+                      ' <th></th>\n'
+                      ' <td style="color:green;">{nm}</td>'
+                      ' <td style="color:green;" align="right">{cost:,.1f}</td>'
+                      ' <td style="color:green;" align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(nm=__key,  # "BlueprintsReactions"
+                             cost=__stat_dict["cost"],
+                             volume=__stat_dict["volume"]))
+            # добавление details на страницу
+            __dump_corp_accounting_details(
+                glf,
+                __key,
+                __corp["corporation"],
+                corporation_id,
+                __corp["tree"],
+                sde_type_ids)
+            glf.write('</td>'
+                      '</tr>\n')
 
     glf.write("""
 </tbody>
@@ -2193,7 +2238,118 @@ def __dump_corp_accounting(
 </div>
 """)
     glf.write("""
+<div id="legend-block">
+ <hr>
+ <h4>Legend</h4>
+ <p>
+  <small><span class="label label-warning">foreign</span></small> - the station or structure is owned by another corporation.
+ </p>
+ <p>
+  <small><span class="label label-danger">forbidden</span></small> - now there is no access to the station or structure.
+ </p>
+ <p>
+  <small><span class="label label-default">corp_deliveries</span>, <span class="label label-default">office_folder</span>,&hellip;</small> - locations of items.
+ </p>
+""")
+    glf.write("""
 </div>
+<script>
+  // Accounting Options storage (prepare)
+  ls = window.localStorage;
+
+  // Accounting Options storage (init)
+  function resetOptionsMenuToDefault() {
+    if (!ls.getItem('Show Legend')) {
+      ls.setItem('Show Legend', 1);
+    }
+    if (!ls.getItem('Show Blueprints')) {
+      ls.setItem('Show Blueprints', 1);
+    }
+  }
+  // Accounting Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#imgShowLegend').removeClass('hidden');
+    else
+      $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Blueprints');
+    if (show == 1)
+      $('#imgShowBlueprints').removeClass('hidden');
+    else
+      $('#imgShowBlueprints').addClass('hidden');
+  }
+  // Accounting Options storage (rebuild body components)
+  function rebuildBody() {
+    show = ls.getItem('Show Legend');
+    if (show == 1)
+      $('#legend-block').removeClass('hidden');
+    else
+      $('#legend-block').addClass('hidden');
+    show = ls.getItem('Show Blueprints');
+    $('tr.qind-blueprints-stat').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+  }
+  // Accounting Options menu and submenu setup
+  $(document).ready(function(){
+    $('#btnToggleLegend').on('click', function () {
+      show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
+      ls.setItem('Show Legend', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleBlueprints').on('click', function () {
+      show = (ls.getItem('Show Blueprints') == 1) ? 0 : 1;
+      ls.setItem('Show Blueprints', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildBody();
+    // Working with clipboard
+    $('a.qind-copy-btn').each(function() {
+      $(this).tooltip();
+    })
+    $('a.qind-copy-btn').bind('click', function () {
+      var $temp = $("<input>");
+      $("body").append($temp);
+      $temp.val($(this).attr('data-copy')).select();
+      try {
+        success = document.execCommand("copy");
+        if (success) {
+          $(this).trigger('copied', ['Copied!']);
+        }
+      } finally {
+        $temp.remove();
+      }
+    });
+    $('a.qind-copy-btn').bind('copied', function(event, message) {
+      $(this).attr('title', message)
+        .tooltip('fixTitle')
+        .tooltip('show')
+        .attr('title', "Copy to clipboard")
+        .tooltip('fixTitle');
+    });
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+      // какой-то код ...
+      $('a.qind-copy-btn').each(function() {
+        $(this).addClass('hidden');
+      })
+    }
+  });
+</script>
 """)
 
 
