@@ -455,6 +455,7 @@ def __dump_corp_blueprints(
                             if not_available_row_num == 1:
                                 glf.write("""
 <h4 class="media-heading">Not available materials</h4>
+<div class="table-responsive">
 <table class="table table-condensed">
 <thead>
  <tr>
@@ -505,6 +506,7 @@ def __dump_corp_blueprints(
                     glf.write("""
 </tbody>
 </table>
+</div>
 """)
                 glf.write(
                     ' </div>\n'
