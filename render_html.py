@@ -2549,7 +2549,7 @@ def __dump_corp_blueprints_tbl(
                 elif "solar" in __loc_dict:
                     __location_name = __loc_dict["solar"]
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="{qind_cl} qind-loc" loc="{loc}"{job}>'
+            glf.write('<tr class="qind-bp-row" loc="{loc}"{job}>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}{st}{act}</td>'
                       ' <td>{me}</td>'
@@ -2563,7 +2563,6 @@ def __dump_corp_blueprints_tbl(
                              st=__status,
                              act=__activity,
                              job="" if __blueprint_activity is None else ' job="{}"'.format(__blueprint_activity),
-                             qind_cl="qind-bp-nonjob" if not __status else "qind-bp-job",
                              me=__blueprint_dict["me"],
                              te=__blueprint_dict["te"],
                              q=__blueprint_dict["q"],
@@ -2679,6 +2678,28 @@ def __dump_corp_blueprints_tbl(
       })
     }
   }
+  // Blueprints filter method (to rebuild body components)
+  function isBlueprintVisible(el, loc, unused, job) {
+    _res = 1;
+    _loc = el.attr('loc');
+    _job = el.attr('job');
+    _res = (loc && (_loc != loc)) ? 0 : 1;
+    if (_res && (unused == 0)) {
+      if (_job === undefined)
+        _res = 0;
+    }
+    if (_res && (!(_job === undefined))) {
+      if (job == 13)
+        _res = 0;
+      else if (job == 12)
+        _res = 1;
+      else if ((job == _job) || (job == 3) && (_job == 4) || (job == 9) && (_job == 11))
+        _res = 1;
+      else
+        _res = 0;
+    }
+    return _res;
+  }
   // Blueprints Options storage (rebuild body components)
   function rebuildBody() {
     show = ls.getItem('Show Legend');
@@ -2693,41 +2714,16 @@ def __dump_corp_blueprints_tbl(
       else
         $(this).addClass('hidden');
     })
+    loc = ls.getItem('Show Only Location');
+    unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
-    if (job == 12) {
-      $('tr.qind-bp-job').each(function() { $(this).removeClass('hidden'); })
-    }
-    else if (job == 13) {
-      $('tr.qind-bp-job').each(function() { $(this).addClass('hidden'); })
-    }
-    else {
-      $('tr.qind-bp-job').each(function() { 
-        _job = $(this).attr('job');
-        if ((job == _job) || (job == 3) && (_job == 4) || (job == 9) && (_job == 11))
-          $(this).removeClass('hidden');
-        else
-          $(this).addClass('hidden');
-      })
-    }
-    show = ls.getItem('Show Unused Blueprints');
-    $('tr.qind-bp-nonjob').each(function() {
+    $('tr.qind-bp-row').each(function() {
+      show = isBlueprintVisible($(this), loc, unused, job);
       if (show == 1)
         $(this).removeClass('hidden');
       else
         $(this).addClass('hidden');
     })
-    loc = ls.getItem('Show Only Location');
-    if (!loc) {
-      $('tr.qind-loc').each(function() { $(this).removeClass('hidden'); })
-    } else {
-      $('tr.qind-loc').each(function() {
-        _loc = $(this).attr('loc');
-        if (loc == _loc)
-          $(this).removeClass('hidden');
-        else
-          $(this).addClass('hidden');
-      })
-    }
   }
   // Blueprints Options menu and submenu setup
   $(document).ready(function(){
