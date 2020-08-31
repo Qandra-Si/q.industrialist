@@ -2368,7 +2368,7 @@ def dump_accounting_into_report(
         glf.close()
 
 
-def __dump_corp_blueprints(
+def __dump_corp_blueprints_tbl(
         glf,
         corps_blueprints):
     glf.write("""
@@ -2631,7 +2631,7 @@ def dump_blueprints_into_report(
     glf = open('{dir}/blueprints.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Blueprints")
-        __dump_corp_blueprints(glf, corps_blueprints)
+        __dump_corp_blueprints_tbl(glf, corps_blueprints)
         __dump_footer(glf)
     finally:
         glf.close()
