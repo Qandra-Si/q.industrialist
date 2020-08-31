@@ -458,7 +458,7 @@ def __dump_corp_blueprints(
                                 glf.write("""
 <h4 class="media-heading">Not available materials</h4>
 <div class="table-responsive">
-<table class="table table-condensed">
+<table class="table table-condensed table-hover">
 <thead>
  <tr>
   <th style="width:40px;">#</th>
