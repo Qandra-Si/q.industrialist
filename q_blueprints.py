@@ -163,6 +163,7 @@ def main():
             eve_market_prices_data,
             sde_bp_materials,
             sde_type_ids)
+        corp_blueprints.sort(key=lambda bp: bp["name"])
 
         corps_blueprints.update({str(corporation_id): {
             "corporation": corporation_name,

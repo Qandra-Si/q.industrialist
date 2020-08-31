@@ -2543,6 +2543,11 @@ def __dump_corp_blueprints_tbl(
  <hr>
  <h4>Legend</h4>
  <p>
+  <strong>ME</strong> - Material Efficiency, <strong>TE</strong> - Time Efficiency, <strong>Qty</strong> - blueprints
+  quantity if it is a stack of blueprint originals fresh from the market (e.g. no activities performed
+  on them yet), <strong>Price</strong> - price for one blueprint.
+ </p>
+ <p>
   <span class="label label-primary">A</span>, <span class="label label-info">J</span>, <span class="label label-default">B</span> - <strong>price tags</strong>
   to indicate type of market' price. There are <span class="label label-primary">A</span> average price (<i>current market price</i>),
   and <span class="label label-info">J</span> adjusted price (<i>average over the last 28 days</i>) and <span class="label label-default">B</span>
