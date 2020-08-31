@@ -52,7 +52,7 @@ def __dump_header(glf, header_name):
 </style>
 """)
     glf.write(
-        ' <title>Q.Industrialist - {nm}</title>\n'
+        ' <title>{nm} - Q.Industrialist</title>\n'
         ' <link rel="stylesheet" href="{bs_css}">\n'
         '</head>\n'
         '<body>\n'
