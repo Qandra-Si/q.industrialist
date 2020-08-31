@@ -2551,7 +2551,7 @@ def __dump_corp_blueprints_tbl(
             # вывод в таблицу информацию о чертеже
             glf.write('<tr class="qind-bp-row" loc="{loc}"{job}>'
                       ' <th scope="row">{num}</th>\n'
-                      ' <td>{nm}{st}{act}</td>'
+                      ' <td><small>{nm}</small>{st}{act}</td>'
                       ' <td>{me}</td>'
                       ' <td>{te}</td>'
                       ' <td>{q}</td>'
