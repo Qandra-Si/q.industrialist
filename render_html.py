@@ -2371,6 +2371,24 @@ def dump_accounting_into_report(
 def __dump_corp_blueprints_tbl(
         glf,
         corps_blueprints):
+    __corp_keys = corps_blueprints.keys()
+    # составляем список locations, где могут лежать чертежи, с тем чтобы сделать возможность группировать их по locations
+    used_location_names = []
+    for corporation_id in __corp_keys:
+        __corp = corps_blueprints[str(corporation_id)]
+        __loc_keys = __corp["locations"].keys()
+        for __loc_key in __loc_keys:
+            __loc_dict = __corp["locations"][str(__loc_key)]
+            if "station" in __loc_dict:
+                __location_name = __loc_dict["station"]
+            elif "solar" in __loc_dict:
+                __location_name = __loc_dict["solar"]
+            else:
+                __location_name = __loc_key
+            if used_location_names.count(__location_name) == 0:
+                used_location_names.append(__location_name)
+    used_location_names.sort()
+
     glf.write("""
 <style>
 .dropdown-submenu {
@@ -2400,7 +2418,6 @@ def __dump_corp_blueprints_tbl(
     <li class="dropdown">
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
       <ul class="dropdown-menu">
-
        <li class="dropdown-submenu">
          <a class="options-submenu" data-target="#" role="button">Industry jobs <mark id="lbSelJob"></mark><span class="caret"></span></a>
          <ul class="dropdown-menu">
@@ -2424,7 +2441,24 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
     </li>
+    
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Locations <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+""")
+    for loc_name in used_location_names:
+        glf.write(
+            '<li><a id="btnSelLoc" loc="{nm}" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-selloc" aria-hidden="true" loc="{nm}"></span> {nm}</a></li>\n'.
+            format(nm=loc_name)
+        )
+    glf.write("""
+       <li role="separator" class="divider"></li>
+       <li><a id="btnToggleShowAllLocations" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAllLocations"></span> Show all locations</a></li>
+      </ul>
+    </li>
+""")
 
+    glf.write("""
     <li class="disabled"><a data-target="#" role="button">Problems</a></li>
    </ul>
    <form class="navbar-form navbar-right">
@@ -2438,7 +2472,6 @@ def __dump_corp_blueprints_tbl(
 </nav>
 <div class="container-fluid">
 """)
-    __corp_keys = corps_blueprints.keys()
     for corporation_id in __corp_keys:
         __corp = corps_blueprints[str(corporation_id)]
         glf.write('<div class="panel panel-primary">\n'
@@ -2506,8 +2539,17 @@ def __dump_corp_blueprints_tbl(
                     __activity = '&nbsp;<span class="label label-success">reaction</span>'  # Reaction
                 else:
                     __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_activity)
+            # определяем местоположение чертежа
+            __location_id = __blueprint_dict["loc"]
+            __location_name = __location_id
+            if str(__location_id) in __corp["locations"]:
+                __loc_dict = __corp["locations"][str(__location_id)]
+                if "station" in __loc_dict:
+                    __location_name = __loc_dict["station"]
+                elif "solar" in __loc_dict:
+                    __location_name = __loc_dict["solar"]
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="{qind_cl}"{job}>'
+            glf.write('<tr class="{qind_cl} qind-loc" loc="{loc}"{job}>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}{st}{act}</td>'
                       ' <td>{me}</td>'
@@ -2526,7 +2568,7 @@ def __dump_corp_blueprints_tbl(
                              te=__blueprint_dict["te"],
                              q=__blueprint_dict["q"],
                              price=__price,
-                             loc=__blueprint_dict["loc"]))
+                             loc=__location_name))
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
@@ -2622,6 +2664,20 @@ def __dump_corp_blueprints_tbl(
         $(this).addClass('hidden');
     })
     $('#lbSelJob').html(g_job_activities[job]);
+    loc = ls.getItem('Show Only Location');
+    if (!loc) {
+      $('span.qind-img-selloc').each(function() { $(this).addClass('hidden'); })
+      $('#imgShowAllLocations').removeClass('hidden');
+    } else {
+      $('#imgShowAllLocations').addClass('hidden');
+      $('span.qind-img-selloc').each(function() {
+        _loc = $(this).attr('loc');
+        if (loc == _loc)
+          $(this).removeClass('hidden');
+        else
+          $(this).addClass('hidden');
+      })
+    }
   }
   // Blueprints Options storage (rebuild body components)
   function rebuildBody() {
@@ -2660,6 +2716,18 @@ def __dump_corp_blueprints_tbl(
       else
         $(this).addClass('hidden');
     })
+    loc = ls.getItem('Show Only Location');
+    if (!loc) {
+      $('tr.qind-loc').each(function() { $(this).removeClass('hidden'); })
+    } else {
+      $('tr.qind-loc').each(function() {
+        _loc = $(this).attr('loc');
+        if (loc == _loc)
+          $(this).removeClass('hidden');
+        else
+          $(this).addClass('hidden');
+      })
+    }
   }
   // Blueprints Options menu and submenu setup
   $(document).ready(function(){
@@ -2689,6 +2757,17 @@ def __dump_corp_blueprints_tbl(
     $('#btnToggleUnusedBlueprints').on('click', function () {
       show = (ls.getItem('Show Unused Blueprints') == 1) ? 0 : 1;
       ls.setItem('Show Unused Blueprints', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleShowAllLocations').on('click', function () {
+      ls.removeItem('Show Only Location');
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('a#btnSelLoc').on('click', function() {
+      loc = $(this).attr('loc');
+      ls.setItem('Show Only Location', loc);
       rebuildOptionsMenu();
       rebuildBody();
     });

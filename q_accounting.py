@@ -23,7 +23,6 @@ Required application scopes:
 """
 import json
 import sys
-
 import requests
 
 import console_app
@@ -480,6 +479,12 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
+        if eve_market_prices_data is None:
+            # Public information about market prices
+            eve_market_prices_data = interface.get_esi_data("markets/prices/")
+            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+            sys.stdout.flush()
+
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
@@ -521,12 +526,6 @@ def main():
         if len(foreign_structures_forbidden_ids) > 0:
             print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
         sys.stdout.flush()
-
-        if eve_market_prices_data is None:
-            # Public information about market prices
-            eve_market_prices_data = interface.get_esi_data("markets/prices/")
-            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-            sys.stdout.flush()
 
         # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
         # элементов, в виде:

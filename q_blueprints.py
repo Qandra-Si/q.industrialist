@@ -23,6 +23,8 @@ Required application scopes:
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
 """
 import sys
+import json
+import requests
 
 import eve_esi_interface as esi
 
@@ -36,13 +38,17 @@ from __init__ import __version__
 
 
 def __build_blueprints(
-        corp_assets_data,
         corp_blueprints_data,
         corp_industry_jobs_data,
         eve_market_prices_data,
-        sde_bp_materials,
-        sde_type_ids):
+        sde_type_ids,
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data):
     blueprints = []
+    blueprints_locations = {}
     for __blueprint_dict in corp_blueprints_data:
         # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
         # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
@@ -54,6 +60,7 @@ def __build_blueprints(
         __blueprint_id = __blueprint_dict["item_id"]
         __type_id = __blueprint_dict["type_id"]
         __type_desc = sde_type_ids[str(__type_id)]
+        __location_id = __blueprint_dict["location_id"]
         __blueprint = {
             "item_id": __blueprint_id,
             "type_id": __type_id,
@@ -61,7 +68,8 @@ def __build_blueprints(
             "me": __blueprint_dict["material_efficiency"],
             "te": __blueprint_dict["time_efficiency"],
             "q": 1 if __quantity == -1 else __quantity,
-            "loc": __blueprint_dict["location_id"]
+            "loc": __location_id,
+            "flag": __blueprint_dict["location_flag"]
         }
         # если чертёж в единичном экземпляре, не stacked, смотрим что с ним происходит? (jobs?)
         if __quantity == -1:
@@ -82,9 +90,41 @@ def __build_blueprints(
                 __blueprint.update({"base_price": __type_desc["basePrice"]})
         elif "basePrice" in __type_desc:
             __blueprint.update({"base_price": __type_desc["basePrice"]})
+        # осуществляем поиск местоположения чертежа
+        if not (str(__location_id) in blueprints_locations):
+            __root_location_id = __prev_location_id = int(__location_id)
+            __assets_roots = corp_assets_tree["roots"]
+            while True:
+                if __root_location_id in __assets_roots:
+                    break
+                if str(__root_location_id) in corp_assets_tree:
+                    a = corp_assets_tree[str(__root_location_id)]
+                    if "location_id" in a:
+                        __prev_location_id = int(__root_location_id)
+                        __root_location_id = int(a["location_id"])
+                    else:
+                        break
+            # определяем регион и солнечную систему, где расположен чертёж
+            region_id, region_name, loc_name, __dummy0 = eve_esi_tools.get_assets_location_name(
+                int(__root_location_id),
+                sde_inv_names,
+                sde_inv_items,
+                corp_ass_names_data,
+                foreign_structures_data)
+            if not (region_id is None):
+                __loc_dict = {"region_id": region_id, "region": region_name, "solar": loc_name}
+                if __prev_location_id != __root_location_id:
+                    __dummy1, __dummy2, loc_name, foreign = eve_esi_tools.get_assets_location_name(
+                        int(__prev_location_id),
+                        sde_inv_names,
+                        sde_inv_items,
+                        corp_ass_names_data,
+                        foreign_structures_data)
+                    __loc_dict.update({"station": loc_name, "foreign": foreign})
+                blueprints_locations.update({str(__location_id): __loc_dict})
         # добавляем собранную информацию в список чертежей
         blueprints.append(__blueprint)
-    return blueprints
+    return blueprints, blueprints_locations
 
 
 def main():
@@ -93,7 +133,8 @@ def main():
     argv_prms = console_app.get_argv_prms()
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
 
     corps_blueprints = {}
     eve_market_prices_data = None
@@ -129,6 +170,12 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
+        if eve_market_prices_data is None:
+            # Public information about market prices
+            eve_market_prices_data = interface.get_esi_data("markets/prices/")
+            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+            sys.stdout.flush()
+
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
@@ -147,27 +194,68 @@ def main():
         print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
         sys.stdout.flush()
 
-        if eve_market_prices_data is None:
-            # Public information about market prices
-            eve_market_prices_data = interface.get_esi_data("markets/prices/")
-            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-            sys.stdout.flush()
+        # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        corp_ass_names_data = []
+        corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+        if len(corp_ass_named_ids) > 0:
+            # Requires role(s): Director
+            corp_ass_names_data = interface.get_esi_data(
+                "corporations/{}/assets/names/".format(corporation_id),
+                json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+        sys.stdout.flush()
+
+        # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+        foreign_structures_data = {}
+        foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+        foreign_structures_forbidden_ids = []
+        if len(foreign_structures_ids) > 0:
+            # Requires: access token
+            for structure_id in foreign_structures_ids:
+                try:
+                    universe_structure_data = interface.get_esi_data(
+                        "universe/structures/{}/".format(structure_id))
+                    foreign_structures_data.update({str(structure_id): universe_structure_data})
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                        foreign_structures_forbidden_ids.append(structure_id)
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+        print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+        if len(foreign_structures_forbidden_ids) > 0:
+            print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
+        sys.stdout.flush()
+
+        # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+        # элементов, в виде:
+        # { location1: {items:[item1,item2,...],type_id,location_id},
+        #   location2: {items:[item3],type_id} }
+        corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
 
         # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
         print("\nBuilding {} blueprints stat...".format(corporation_name))
         sys.stdout.flush()
-        corp_blueprints = __build_blueprints(
-            corp_assets_data,
+        corp_blueprints, blueprints_locations = __build_blueprints(
             corp_blueprints_data,
             corp_industry_jobs_data,
             eve_market_prices_data,
-            sde_bp_materials,
-            sde_type_ids)
+            sde_type_ids,
+            sde_inv_names,
+            sde_inv_items,
+            corp_assets_tree,
+            corp_ass_names_data,
+            foreign_structures_data)
         corp_blueprints.sort(key=lambda bp: bp["name"])
 
         corps_blueprints.update({str(corporation_id): {
             "corporation": corporation_name,
-            "blueprints": corp_blueprints
+            "blueprints": corp_blueprints,
+            "locations": blueprints_locations
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_blueprints", corps_blueprints)
