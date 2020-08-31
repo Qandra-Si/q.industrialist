@@ -67,7 +67,10 @@ def __build_blueprints(
         if __quantity == -1:
             __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(__blueprint_id)), None)
             if not (__job_dict is None):
-                __blueprint.update({"st": __job_dict["status"]})
+                __blueprint.update({
+                    "st": __job_dict["status"],
+                    "act": __job_dict["activity_id"]
+                })
         # выясняем стоимость чертежа
         __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
         if not (__price_dict is None):

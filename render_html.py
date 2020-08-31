@@ -2372,6 +2372,17 @@ def __dump_corp_blueprints_tbl(
         glf,
         corps_blueprints):
     glf.write("""
+<style>
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu .dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -1px;
+}
+</style>
+
 <nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
@@ -2389,8 +2400,25 @@ def __dump_corp_blueprints_tbl(
     <li class="dropdown">
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
       <ul class="dropdown-menu">
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Industry jobs <mark id="lbSelJob"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li class="dropdown-header">[Industry activities]</li>
+           <li><a id="btnSelJob" job="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="1"></span> Manufacturing only</a></li>
+           <li><a id="btnSelJob" job="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="3"></span> Research TE &amp; ME only</a></li>
+           <li><a id="btnSelJob" job="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="5"></span> Copying only</a></li>
+           <li><a id="btnSelJob" job="7" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="7"></span> Reverse Engineering only</a></li>
+           <li><a id="btnSelJob" job="8" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="8"></span> Invention only</a></li>
+           <li><a id="btnSelJob" job="9" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="9"></span> Reactions only</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnSelJob" job="12" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="12"></span> Show all</a></li>
+           <li><a id="btnSelJob" job="13" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="13"></span> Hide all</a></li>
+         </ul>
+       </li>
+       <li><a id="btnToggleUnusedBlueprints" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUnusedBlueprints"></span> Show unused blueprints</a></li>
+
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show price tags</a></li>
-       <li><a id="btnToggleWithStatuses" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowWithStatuses"></span> Show only industry jobs</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -2446,20 +2474,42 @@ def __dump_corp_blueprints_tbl(
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
             # проверяем работки по текущему чертежу?
             __status = ""
-            if "st" in __blueprint_dict:  # [ active, cancelled, delivered, paused, ready, reverted ]
+            __activity = ""
+            __blueprint_activity = None
+            if "st" in __blueprint_dict:
+                # [ active, cancelled, delivered, paused, ready, reverted ]
                 __blueprint_status = __blueprint_dict["st"]
                 if (__blueprint_status == "active") or (__blueprint_status == "delivered"):
-                    __status = '&nbsp;<span class="label label-info">{}</span>'.format(__blueprint_status)
+                    __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
                 elif __blueprint_status == "ready":
                     __status = '&nbsp;<span class="label label-success">{}</span>'.format(__blueprint_status)
                 elif (__blueprint_status == "cancelled") or (__blueprint_status == "paused") or (__blueprint_status == "reverted"):
                     __status = '&nbsp;<span class="label label-warning">{}</span>'.format(__blueprint_status)
                 else:
                     __status = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_status)
+                # [1..6] : https://support.eveonline.com/hc/en-us/articles/203210272-Activities-and-Job-Types
+                # [0,1,3,4,5,7,8,11, +9?] : https://github.com/esi/esi-issues/issues/894
+                __blueprint_activity = __blueprint_dict["act"]
+                if __blueprint_activity == 1:
+                    __activity = '&nbsp;<span class="label label-primary">manufacturing</span>'  # Manufacturing
+                elif __blueprint_activity == 3:
+                    __activity = '&nbsp;<span class="label label-info">te</span>'  # Science
+                elif __blueprint_activity == 4:
+                    __activity = '&nbsp;<span class="label label-info">me</span>'  # Science
+                elif __blueprint_activity == 5:
+                    __activity = '&nbsp;<span class="label label-info">copying</span>'  # Science
+                elif __blueprint_activity == 7:
+                    __activity = '&nbsp;<span class="label label-info">reverse</span>'  # Science
+                elif __blueprint_activity == 8:
+                    __activity = '&nbsp;<span class="label label-info">invention</span>'  # Science
+                elif (__blueprint_activity == 9) or (__blueprint_activity == 11):
+                    __activity = '&nbsp;<span class="label label-success">reaction</span>'  # Reaction
+                else:
+                    __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_activity)
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="{qind_cl}">'
+            glf.write('<tr class="{qind_cl}"{job}>'
                       ' <th scope="row">{num}</th>\n'
-                      ' <td>{nm}{st}</td>'
+                      ' <td>{nm}{st}{act}</td>'
                       ' <td>{me}</td>'
                       ' <td>{te}</td>'
                       ' <td>{q}</td>'
@@ -2469,6 +2519,8 @@ def __dump_corp_blueprints_tbl(
                       format(num=row_num,
                              nm=__blueprint_dict["name"],
                              st=__status,
+                             act=__activity,
+                             job="" if __blueprint_activity is None else ' job="{}"'.format(__blueprint_activity),
                              qind_cl="qind-bp-nonjob" if not __status else "qind-bp-job",
                              me=__blueprint_dict["me"],
                              te=__blueprint_dict["te"],
@@ -2497,18 +2549,34 @@ def __dump_corp_blueprints_tbl(
   base price (<i>standart CCP item price</i>).
  </p>
  <p>
-  <span class="label label-info">active</span>, <span class="label label-info">delivered</span>,
+  <span class="label label-default">active</span>, <span class="label label-default">delivered</span>,
   <span class="label label-success">ready</span>, <span class="label label-warning">cancelled</span>,
   <span class="label label-warning">paused</span>, <span class="label label-warning">reverted</span> - all possible
   <strong>statuses</strong> of blueprints that are in industry mode.
  </p>
+ <p>
+  <span class="label label-primary">manufacturing</span> - manufacturing industry activity.</br>
+  <span class="label label-info">te</span>, 
+  <span class="label label-info">me</span>, 
+  <span class="label label-info">copying</span>, 
+  <span class="label label-info">reverse</span>, 
+  <span class="label label-info">invention</span> - science industry activities.</br> 
+  <span class="label label-success">reaction</span> - reaction industry activity.
+ </p>
 </div>
 
 <script>
-  // Accounting Options storage (prepare)
+  // Blueprints Options dictionaries
+  var g_job_activities = [
+    '', 'Manufacturing', '', 'Research TE &amp; ME', '', 'Copying', '',
+    'Reverse Engineering', 'Invention', 'Reactions', '', '',
+    'Show', 'Hide'
+  ];
+
+  // Blueprints Options storage (prepare)
   ls = window.localStorage;
 
-  // Accounting Options storage (init)
+  // Blueprints Options storage (init)
   function resetOptionsMenuToDefault() {
     if (!ls.getItem('Show Legend')) {
       ls.setItem('Show Legend', 1);
@@ -2516,11 +2584,14 @@ def __dump_corp_blueprints_tbl(
     if (!ls.getItem('Show Price Tags')) {
       ls.setItem('Show Price Tags', 1);
     }
-    if (!ls.getItem('Show With Statuses')) {
-      ls.setItem('Show With Statuses', 0);
+    if (!ls.getItem('Show Unused Blueprints')) {
+      ls.setItem('Show Unused Blueprints', 1);
+    }
+    if (!ls.getItem('Show Industry Jobs')) {
+      ls.setItem('Show Industry Jobs', 12);
     }
   }
-  // Accounting Options storage (rebuild menu components)
+  // Blueprints Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
     show = ls.getItem('Show Legend');
     if (show == 1)
@@ -2532,13 +2603,22 @@ def __dump_corp_blueprints_tbl(
       $('#imgShowPriceTags').removeClass('hidden');
     else
       $('#imgShowPriceTags').addClass('hidden');
-    show = ls.getItem('Show With Statuses');
+    show = ls.getItem('Show Unused Blueprints');
     if (show == 1)
-      $('#imgShowWithStatuses').removeClass('hidden');
+      $('#imgShowUnusedBlueprints').removeClass('hidden');
     else
-      $('#imgShowWithStatuses').addClass('hidden');
+      $('#imgShowUnusedBlueprints').addClass('hidden');
+    job = ls.getItem('Show Industry Jobs');
+    $('span.qind-img-seljob').each(function() {
+      _job = $(this).attr('job');
+      if (job == _job)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    $('#lbSelJob').html(g_job_activities[job]);
   }
-  // Accounting Options storage (rebuild body components)
+  // Blueprints Options storage (rebuild body components)
   function rebuildBody() {
     show = ls.getItem('Show Legend');
     if (show == 1)
@@ -2552,16 +2632,43 @@ def __dump_corp_blueprints_tbl(
       else
         $(this).addClass('hidden');
     })
-    show = ls.getItem('Show With Statuses');
+    job = ls.getItem('Show Industry Jobs');
+    if (job == 12) {
+      $('tr.qind-bp-job').each(function() { $(this).removeClass('hidden'); })
+    }
+    else if (job == 13) {
+      $('tr.qind-bp-job').each(function() { $(this).addClass('hidden'); })
+    }
+    else {
+      $('tr.qind-bp-job').each(function() { 
+        _job = $(this).attr('job');
+        if ((job == _job) || (job == 3) && (_job == 4) || (job == 9) && (_job == 11))
+          $(this).removeClass('hidden');
+        else
+          $(this).addClass('hidden');
+      })
+    }
+    show = ls.getItem('Show Unused Blueprints');
     $('tr.qind-bp-nonjob').each(function() {
       if (show == 1)
-        $(this).addClass('hidden');
-      else
         $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
     })
   }
-  // Accounting Options menu and submenu setup
+  // Blueprints Options menu and submenu setup
   $(document).ready(function(){
+    $('.dropdown-submenu a.options-submenu').on("click", function(e){
+      $(this).next('ul').toggle();
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    $('a#btnSelJob').on('click', function() {
+      job = $(this).attr('job');
+      ls.setItem('Show Industry Jobs', job);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
     $('#btnToggleLegend').on('click', function () {
       show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
       ls.setItem('Show Legend', show);
@@ -2574,9 +2681,9 @@ def __dump_corp_blueprints_tbl(
       rebuildOptionsMenu();
       rebuildBody();
     });
-    $('#btnToggleWithStatuses').on('click', function () {
-      show = (ls.getItem('Show With Statuses') == 1) ? 0 : 1;
-      ls.setItem('Show With Statuses', show);
+    $('#btnToggleUnusedBlueprints').on('click', function () {
+      show = (ls.getItem('Show Unused Blueprints') == 1) ? 0 : 1;
+      ls.setItem('Show Unused Blueprints', show);
       rebuildOptionsMenu();
       rebuildBody();
     });
