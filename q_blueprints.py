@@ -21,6 +21,7 @@ Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
+    * esi-contracts.read_corporation_contracts.v1 - Requires: access token
 """
 import sys
 import json
@@ -186,6 +187,12 @@ def main():
         corp_blueprints_data = interface.get_esi_paged_data(
             "corporations/{}/blueprints/".format(corporation_id))
         print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): access token
+        corp_contracts_data = interface.get_esi_paged_data(
+            "corporations/{}/contracts/".format(corporation_id))
+        print("\n'{}' corporation has {} contracts".format(corporation_name, len(corp_contracts_data)))
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager
