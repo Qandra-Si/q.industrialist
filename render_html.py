@@ -2434,13 +2434,15 @@ def __dump_corp_blueprints_tbl(
            <li role="separator" class="divider"></li>
            <li><a id="btnSelJob" job="12" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="12"></span> Show all</a></li>
            <li><a id="btnSelJob" job="13" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-seljob" aria-hidden="true" job="13"></span> Hide all</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnToggleUnusedBlueprints" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUnusedBlueprints"></span> Show unused blueprints</a></li>
          </ul>
        </li>
-       <li><a id="btnToggleUnusedBlueprints" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUnusedBlueprints"></span> Show unused blueprints</a></li>
 
-       <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show price tags</a></li>
-       <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show place</a></li>
-       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
+       <li><a id="btnTogglePriceVals" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceVals"></span> Show Price column</a></li>
+       <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show Price tags</a></li>
+       <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
+       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show Legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
@@ -2536,7 +2538,7 @@ def __dump_corp_blueprints_tbl(
   <th class="hvr-icon-fade" id="thSortSel" col="1">ME<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="hvr-icon-fade" id="thSortSel" col="2">TE<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="hvr-icon-fade" id="thSortSel" col="3">Qty<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
-  <th class="hvr-icon-fade" id="thSortSel" col="4">Price, ISK<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="qind-td-prc hvr-icon-fade" id="thSortSel" col="4">Price, ISK<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="hvr-icon-fade" id="thSortSel" col="5">Location<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-plc hvr-icon-fade" id="thSortSel" col="6">Place<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
  </tr>
@@ -2612,7 +2614,7 @@ def __dump_corp_blueprints_tbl(
                       ' <td>{me}</td>'
                       ' <td>{te}</td>'
                       ' <td>{q}</td>'
-                      ' <td align="right" x-data="{iprice}">{price}</td>'
+                      ' <td class="qind-td-prc" align="right" x-data="{iprice}">{price}</td>'
                       ' <td><small>{loc}</small></td>'
                       ' <td class="qind-td-plc"><small>{plc}</small></td>'
                       '</tr>\n'.
@@ -2730,6 +2732,9 @@ def __dump_corp_blueprints_tbl(
     if (!ls.getItem('Show Legend')) {
       ls.setItem('Show Legend', 1);
     }
+    if (!ls.getItem('Show Price Vals')) {
+      ls.setItem('Show Price Vals', 1);
+    }
     if (!ls.getItem('Show Price Tags')) {
       ls.setItem('Show Price Tags', 1);
     }
@@ -2750,6 +2755,11 @@ def __dump_corp_blueprints_tbl(
       $('#imgShowLegend').removeClass('hidden');
     else
       $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Price Vals');
+    if (show == 1)
+      $('#imgShowPriceVals').removeClass('hidden');
+    else
+      $('#imgShowPriceVals').addClass('hidden');
     show = ls.getItem('Show Price Tags');
     if (show == 1)
       $('#imgShowPriceTags').removeClass('hidden');
@@ -2830,6 +2840,13 @@ def __dump_corp_blueprints_tbl(
       $('#legend-block').removeClass('hidden');
     else
       $('#legend-block').addClass('hidden');
+    show = ls.getItem('Show Price Vals');
+    $('.qind-td-prc').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     show = ls.getItem('Show Price Tags');
     $('sup.qind-price-tag').each(function() {
       if (show == 1)
@@ -2878,6 +2895,12 @@ def __dump_corp_blueprints_tbl(
     $('#btnToggleLegend').on('click', function () {
       show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
       ls.setItem('Show Legend', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnTogglePriceVals').on('click', function () {
+      show = (ls.getItem('Show Price Vals') == 1) ? 0 : 1;
+      ls.setItem('Show Price Vals', show);
       rebuildOptionsMenu();
       rebuildBody();
     });
