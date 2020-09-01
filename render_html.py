@@ -2436,6 +2436,7 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnToggleUnusedBlueprints" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUnusedBlueprints"></span> Show unused blueprints</a></li>
 
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show price tags</a></li>
+       <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show place</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -2470,26 +2471,58 @@ def __dump_corp_blueprints_tbl(
   </div>
  </div>
 </nav>
+
+<style>
+.hvr-icon-fade {
+  display--: inline-block;
+  vertical-align: middle;
+  -webkit-transform: perspective(1px) translateZ(0);
+  transform: perspective(1px) translateZ(0);
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0);
+}
+.hvr-icon-fade .hvr-icon {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-transition-duration: 0.5s;
+  transition-duration: 0.5s;
+  -webkit-transition-property: color;
+  transition-property: color;
+}
+.hvr-icon {
+  color: #D6E0EE;
+  top: 2px;
+  left: 3px;
+  font-size: smaller;
+}
+.hvr-icon-fade:hover .hvr-icon, .hvr-icon-fade:focus .hvr-icon, .hvr-icon-fade:active .hvr-icon {
+  color: #0F9E5E;
+}
+.hvr-icon-sel {
+  color: #999999;
+}
+</style>
+
 <div class="container-fluid">
 """)
     for corporation_id in __corp_keys:
         __corp = corps_blueprints[str(corporation_id)]
         glf.write('<div class="panel panel-primary">\n'
-                  ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'.
-                  format(nm=__corp["corporation"]))
+                  ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'
+                  '  <div class="panel-body">\n'
+                  '   <div class="table-responsive">\n'
+                  '    <table id="tbl{id}" class="table table-condensed table-hover">\n'.
+                  format(nm=__corp["corporation"], id=corporation_id))
         glf.write("""
-<div class="panel-body">
- <div class="table-responsive">
-  <table class="table table-condensed table-hover">
 <thead>
  <tr>
   <th>#</th>
-  <th>Blueprint</th>
-  <th>ME</th>
-  <th>TE</th>
-  <th>Qty</th>
-  <th>Price, ISK</th>
-  <th>Location</th>
+  <th class="hvr-icon-fade" id="thSortSel" col="0">Blueprint<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="hvr-icon-fade" id="thSortSel" col="1">ME<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="hvr-icon-fade" id="thSortSel" col="2">TE<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="hvr-icon-fade" id="thSortSel" col="3">Qty<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="hvr-icon-fade" id="thSortSel" col="4">Price, ISK<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="hvr-icon-fade" id="thSortSel" col="5">Location<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="qind-td-plc hvr-icon-fade" id="thSortSel" col="6">Place<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
  </tr>
 </thead>
 <tbody>
@@ -2499,12 +2532,16 @@ def __dump_corp_blueprints_tbl(
         for __blueprint_dict in __corp["blueprints"]:
             # выясняем сколько стоит один чертёж?
             __price = ""
+            __fprice = ""
             if "average_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-primary">A</span></sup>'.format(cost=__blueprint_dict["average_price"])
+                __fprice = '{:.1f}'.format(__blueprint_dict["average_price"])
             elif "adjusted_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-info">J</span></sup>'.format(cost=__blueprint_dict["adjusted_price"])
+                __fprice = '{:.1f}'.format(__blueprint_dict["adjusted_price"])
             elif "base_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
+                __fprice = '{:.1f}'.format(__blueprint_dict["base_price"])
             # проверяем работки по текущему чертежу?
             __status = ""
             __activity = ""
@@ -2548,15 +2585,20 @@ def __dump_corp_blueprints_tbl(
                     __location_name = __loc_dict["station"]
                 elif "solar" in __loc_dict:
                     __location_name = __loc_dict["solar"]
+            # определяем ангар и коробку, где лежит чертёж
+            __place = __blueprint_dict["flag"]
+            if __place[:-1] == "CorpSAG":
+                __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="qind-bp-row" loc="{loc}"{job}>'
+            glf.write('<tr class="qind-bp-row"{job}>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td><small>{nm}</small>{st}{act}</td>'
                       ' <td>{me}</td>'
                       ' <td>{te}</td>'
                       ' <td>{q}</td>'
-                      ' <td align="right">{price}</td>'
+                      ' <td align="right" x-data="{iprice}">{price}</td>'
                       ' <td><small>{loc}</small></td>'
+                      ' <td class="qind-td-plc"><small>{plc}</small></td>'
                       '</tr>\n'.
                       format(num=row_num,
                              nm=__blueprint_dict["name"],
@@ -2567,7 +2609,9 @@ def __dump_corp_blueprints_tbl(
                              te=__blueprint_dict["te"],
                              q=__blueprint_dict["q"],
                              price=__price,
-                             loc=__location_name))
+                             iprice=__fprice,
+                             loc=__location_name,
+                             plc=__place))
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
@@ -2618,9 +2662,38 @@ def __dump_corp_blueprints_tbl(
     'Reverse Engineering', 'Invention', 'Reactions', '', '',
     'Show', 'Hide'
   ];
+  var g_tbl_col_types = [0,1,1,1,2,0,0]; // 0:str, 1:num, 2:x-data
 
   // Blueprints Options storage (prepare)
   ls = window.localStorage;
+
+  // Blueprints table sorter
+  function sortTable(table, order, what, typ) {
+    var asc = order > 0;
+    var col = 'td:eq('+what.toString()+')';
+    var tbody = table.find('tbody');
+    tbody.find('tr').sort(function(a, b) {
+      var keyA, keyB;
+      if (typ == 2) {
+        keyA = parseFloat($(col, a).attr('x-data'));
+        keyB = parseFloat($(col, b).attr('x-data'));
+        if (isNaN(keyA)) keyA = 0;
+        if (isNaN(keyB)) keyB = 0;
+      }
+      else {
+        keyA = $(col, a).text();
+        keyB = $(col, b).text();
+        if (typ == 1) {
+          keyA = parseInt(keyA, 10);
+          keyB = parseInt(keyB, 10);
+        } 
+      }
+      if (asc)
+        return (keyA > keyB) ? 1 : 0;
+      else
+        return (keyA > keyB) ? 0 : 1;
+    }).appendTo(tbody);
+  }
 
   // Blueprints Options storage (init)
   function resetOptionsMenuToDefault() {
@@ -2629,6 +2702,9 @@ def __dump_corp_blueprints_tbl(
     }
     if (!ls.getItem('Show Price Tags')) {
       ls.setItem('Show Price Tags', 1);
+    }
+    if (!ls.getItem('Show Place')) {
+      ls.setItem('Show Place', 0);
     }
     if (!ls.getItem('Show Unused Blueprints')) {
       ls.setItem('Show Unused Blueprints', 1);
@@ -2649,6 +2725,11 @@ def __dump_corp_blueprints_tbl(
       $('#imgShowPriceTags').removeClass('hidden');
     else
       $('#imgShowPriceTags').addClass('hidden');
+    show = ls.getItem('Show Place');
+    if (show == 1)
+      $('#imgShowPlace').removeClass('hidden');
+    else
+      $('#imgShowPlace').addClass('hidden');
     show = ls.getItem('Show Unused Blueprints');
     if (show == 1)
       $('#imgShowUnusedBlueprints').removeClass('hidden');
@@ -2681,7 +2762,7 @@ def __dump_corp_blueprints_tbl(
   // Blueprints filter method (to rebuild body components)
   function isBlueprintVisible(el, loc, unused, job) {
     _res = 1;
-    _loc = el.attr('loc');
+    _loc = el.find('td:eq(5)').text();
     _job = el.attr('job');
     _res = (loc && (_loc != loc)) ? 0 : 1;
     if (_res && (unused == 0)) {
@@ -2714,6 +2795,13 @@ def __dump_corp_blueprints_tbl(
       else
         $(this).addClass('hidden');
     })
+    show = ls.getItem('Show Place');
+    $('.qind-td-plc').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     loc = ls.getItem('Show Only Location');
     unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
@@ -2723,6 +2811,13 @@ def __dump_corp_blueprints_tbl(
         $(this).removeClass('hidden');
       else
         $(this).addClass('hidden');
+    })
+    $('table').each(function() {
+      col = table.attr('sort_col');
+      if (!(col === undefinded)) {
+        order = table.attr('sort_order');
+        sortTable($(this),order,col,g_tbl_col_types[col]);
+      }
     })
   }
   // Blueprints Options menu and submenu setup
@@ -2750,6 +2845,12 @@ def __dump_corp_blueprints_tbl(
       rebuildOptionsMenu();
       rebuildBody();
     });
+    $('#btnTogglePlace').on('click', function () {
+      show = (ls.getItem('Show Place') == 1) ? 0 : 1;
+      ls.setItem('Show Place', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
     $('#btnToggleUnusedBlueprints').on('click', function () {
       show = (ls.getItem('Show Unused Blueprints') == 1) ? 0 : 1;
       ls.setItem('Show Unused Blueprints', show);
@@ -2766,6 +2867,42 @@ def __dump_corp_blueprints_tbl(
       ls.setItem('Show Only Location', loc);
       rebuildOptionsMenu();
       rebuildBody();
+    });
+    $('th#thSortSel').on('click', function() {
+      var col = $(this).attr('col');
+      var table = $(this).closest('table');
+      var thead = table.find('thead');
+      var sort = table.attr('sort_col');
+      var order = table.attr('sort_order');
+      thead.find('th').each(function() {
+        _col = $(this).attr('col');
+        var icn = $(this).find('span');
+        if (col == _col) {
+          if (sort === undefined)
+            order = 1;
+          else if (sort == col)
+            order = -order;
+          else
+            order = 1;
+          icn.removeClass('glyphicon-sort');
+          if (order == 1) {
+            icn.removeClass('glyphicon-sort-by-attributes-alt');
+            icn.addClass('glyphicon-sort-by-attributes');
+          } else {
+            icn.removeClass('glyphicon-sort-by-attributes');
+            icn.addClass('glyphicon-sort-by-attributes-alt');
+          }
+          icn.addClass('hvr-icon-sel');
+          table.attr('sort_col', col);
+          table.attr('sort_order', order);
+        } else if (!(sort === undefined)) {
+          icn.removeClass('glyphicon-sort-by-attributes');
+          icn.removeClass('glyphicon-sort-by-attributes-alt');
+          icn.addClass('glyphicon-sort');
+          icn.removeClass('hvr-icon-sel');
+        }
+      })
+      sortTable(table,order,col,g_tbl_col_types[col]);
     });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
