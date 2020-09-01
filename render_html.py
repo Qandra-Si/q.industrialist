@@ -2503,16 +2503,27 @@ def __dump_corp_blueprints_tbl(
 </style>
 
 <div class="container-fluid">
+ <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
 """)
+    first_time = True
     for corporation_id in __corp_keys:
         __corp = corps_blueprints[str(corporation_id)]
-        glf.write('<div class="panel panel-primary">\n'
-                  ' <div class="panel-heading"><h3 class="panel-title">{nm}</h3></div>\n'
-                  '  <div class="panel-body">\n'
-                  '   <div class="table-responsive">\n'
-                  '    <table id="tbl{id}" class="table table-condensed table-hover">\n'.
-                  format(nm=__corp["corporation"], id=corporation_id))
+        glf.write('  <div class="panel panel-primary">\n'
+                  '   <div class="panel-heading" role="tab">\n'
+                  '    <h3 class="panel-title">\n'
+                  '     <a role="button" data-toggle="collapse" data-parent="#accordion" href="#pn{id}" aria-expanded="true" aria-controls="pn{id}">{nm}</a>\n'
+                  '    </h3>\n'
+                  '   </div>\n'
+                  '   <div id="pn{id}" class="panel-collapse collapse{vsbl}" role="tabpanel" aria-labelledby="heading{id}">\n'.
+                  format(nm=__corp["corporation"],
+                         id=corporation_id,
+                         vsbl=" in" if first_time else "")
+        )
+        first_time = False
         glf.write("""
+    <div class="panel-body">
+     <div class="table-responsive">
+      <table class="table table-condensed table-hover">
 <thead>
  <tr>
   <th>#</th>
@@ -2615,15 +2626,19 @@ def __dump_corp_blueprints_tbl(
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
+
         glf.write("""
 </tbody>
-   </table>
-  </div>
- </div>
-</div>
+      </table>
+     </div> <!--table-responsive-->
+    </div> <!--panel-body-->
+   </div> <!--panel-collapse-->
+  </div> <!--panel-->
 """)
 
     glf.write("""
+ </div> <!--accordion-->
+
 <div id="legend-block">
  <hr>
  <h4>Legend</h4>
