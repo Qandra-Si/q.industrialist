@@ -2399,6 +2399,9 @@ def __dump_corp_blueprints_tbl(
   left: 100%;
   margin-top: -1px;
 }
+.btn.btn-default:disabled{
+  color: #aaa;
+}
 </style>
 
 <nav class="navbar navbar-default">
@@ -2460,13 +2463,15 @@ def __dump_corp_blueprints_tbl(
 """)
 
     glf.write("""
-    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
    </ul>
-   <form class="navbar-form navbar-right">
-    <div class="form-group">
-     <input type="text" class="form-control" placeholder="Item" disabled>
+
+   <form id="frmFilter" class="navbar-form navbar-right">
+    <div class="input-group">
+     <input id="edFilter" type="text" class="form-control" placeholder="What?">
+      <span class="input-group-btn">
+       <button id="btnFilter" class="btn btn-default" type="button" disabled>Filter</button>
+      </span>
     </div>
-    <button type="button" class="btn btn-default disabled">Search</button>
    </form>
   </div>
  </div>
@@ -2678,6 +2683,7 @@ def __dump_corp_blueprints_tbl(
     'Show', 'Hide'
   ];
   var g_tbl_col_types = [0,1,1,1,2,0,0]; // 0:str, 1:num, 2:x-data
+  var g_tbl_filter = null;
 
   // Blueprints Options storage (prepare)
   ls = window.localStorage;
@@ -2709,6 +2715,15 @@ def __dump_corp_blueprints_tbl(
         return (keyA > keyB) ? 0 : 1;
     }).appendTo(tbody);
   }
+
+  // Disable function
+  jQuery.fn.extend({
+    disable: function(state) {
+      return this.each(function() {
+        this.disabled = state;
+      });
+    }
+  });
 
   // Blueprints Options storage (init)
   function resetOptionsMenuToDefault() {
@@ -2794,6 +2809,18 @@ def __dump_corp_blueprints_tbl(
       else
         _res = 0;
     }
+    if (_res && (!(g_tbl_filter === null))) {
+      var txt = el.find('td:eq(0)').text().toLowerCase();
+      _res = txt.includes(g_tbl_filter);
+      if (!_res) {
+        txt = el.find('td:eq(5)').text().toLowerCase();
+        _res = txt.includes(g_tbl_filter);
+        if (!_res) {
+          txt = el.find('td:eq(6)').text().toLowerCase();
+          _res = txt.includes(g_tbl_filter);
+        }
+      }
+    }
     return _res;
   }
   // Blueprints Options storage (rebuild body components)
@@ -2828,8 +2855,8 @@ def __dump_corp_blueprints_tbl(
         $(this).addClass('hidden');
     })
     $('table').each(function() {
-      col = table.attr('sort_col');
-      if (!(col === undefinded)) {
+      col = $(this).attr('sort_col');
+      if (!(col === undefined)) {
         order = table.attr('sort_order');
         sortTable($(this),order,col,g_tbl_col_types[col]);
       }
@@ -2919,6 +2946,26 @@ def __dump_corp_blueprints_tbl(
       })
       sortTable(table,order,col,g_tbl_col_types[col]);
     });
+    $('#edFilter').on('keypress', function (e) {
+      if (e.which == 13)
+        $('#btnFilter').click();
+    })
+    $('#edFilter').on('change', function () {
+      var what = $('#edFilter').val();
+      $('#btnFilter').disable(what.length == 0);
+      $('#btnFilter').click();
+    });
+    $('#btnFilter').on('click', function () {
+      var what = $('#edFilter').val();
+      if (what.length == 0)
+        g_tbl_filter = null;
+      else
+        g_tbl_filter = what.toLowerCase();
+      rebuildBody();
+    });
+    $("#frmFilter").submit(function(e) {
+      e.preventDefault();
+    });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
@@ -2929,36 +2976,6 @@ def __dump_corp_blueprints_tbl(
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     rebuildBody();
-    // Working with clipboard
-    $('a.qind-copy-btn').each(function() {
-      $(this).tooltip();
-    })
-    $('a.qind-copy-btn').bind('click', function () {
-      var $temp = $("<input>");
-      $("body").append($temp);
-      $temp.val($(this).attr('data-copy')).select();
-      try {
-        success = document.execCommand("copy");
-        if (success) {
-          $(this).trigger('copied', ['Copied!']);
-        }
-      } finally {
-        $temp.remove();
-      }
-    });
-    $('a.qind-copy-btn').bind('copied', function(event, message) {
-      $(this).attr('title', message)
-        .tooltip('fixTitle')
-        .tooltip('show')
-        .attr('title', "Copy to clipboard")
-        .tooltip('fixTitle');
-    });
-    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
-      // какой-то код ...
-      $('a.qind-copy-btn').each(function() {
-        $(this).addClass('hidden');
-      })
-    }
   });
 </script>
 """)
