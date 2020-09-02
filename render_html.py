@@ -2648,6 +2648,8 @@ tr.qind-bp-row {
             row_num = row_num + 1
 
         glf.write("""
+</tbody>
+<tfoot>
 <tr class="qind-summary" style="font-weight:bold;">
  <th></th>
  <td align="right" colspan="3">Summary</td>
@@ -2657,7 +2659,7 @@ tr.qind-bp-row {
  <td class="qind-td-plc"></td>
  <td class="qind-td-box"></td>
 </tr>
-</tbody>
+</tfoot>
       </table>
      </div> <!--table-responsive-->
     </div> <!--panel-body-->
@@ -2722,7 +2724,7 @@ tr.qind-bp-row {
     var asc = order > 0;
     var col = 'td:eq('+what.toString()+')';
     var tbody = table.find('tbody');
-    tbody.find('tr').sort(function(a, b) {
+    tbody.find('tr.qind-bp-row').sort(function(a, b) {
       var keyA, keyB;
       if (typ == 2) {
         keyA = parseFloat($(col, a).attr('x-data'));
