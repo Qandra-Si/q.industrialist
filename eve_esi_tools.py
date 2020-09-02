@@ -17,6 +17,10 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
     for bp in corp_blueprints_data:
         loc_id = int(bp["location_id"])
         blueprint_id = int(bp["item_id"])
+        # особенность : чертежи могут отсутствовать в assets по указанному location_id, при этом чертёж будет в
+        # blueprints, но его location_id будет указывать на станцию, а не на контейнер, в то же время в industrial
+        # jobs этот же самый чертёж будет находиться в списке и иметь blueprint_location_id который указывает на
+        # искомый контейнер
         __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(blueprint_id)), None)
         if not (__job_dict is None):
             loc_id = __job_dict["blueprint_location_id"]

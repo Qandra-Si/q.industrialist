@@ -76,9 +76,16 @@ def __build_blueprints(
         if __quantity == -1:
             __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(__blueprint_id)), None)
             if not (__job_dict is None):
+                # особенность : чертежи могут отсутствовать в assets по указанному location_id, при этом чертёж будет в
+                # blueprints, но его location_id будет указывать на станцию, а не на контейнер, в то же время в
+                # industrial jobs этот же самый чертёж будет находиться в списке и иметь blueprint_location_id который
+                # указывает на искомый контейнер
+                __location_id = __job_dict["blueprint_location_id"]
+                # сохранение информации о текущей работе, ведущейся с использованием чертежа
                 __blueprint.update({
                     "st": __job_dict["status"],
-                    "act": __job_dict["activity_id"]
+                    "act": __job_dict["activity_id"],
+                    "loc": __location_id  # переопределяем!!!
                 })
         # выясняем стоимость чертежа
         __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
@@ -93,6 +100,10 @@ def __build_blueprints(
             __blueprint.update({"base_price": __type_desc["basePrice"]})
         # осуществляем поиск местоположения чертежа
         if not (str(__location_id) in blueprints_locations):
+            # получение название контейнера (названия ingame задают игроки)
+            __loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == __location_id), None)
+            __loc_dict = {"name": __loc_name}
+            # получение информации о регионе, солнечной системе и т.п. (поиск исходного root-а)
             __root_location_id = __prev_location_id = int(__location_id)
             __assets_roots = corp_assets_tree["roots"]
             while True:
@@ -113,7 +124,7 @@ def __build_blueprints(
                 corp_ass_names_data,
                 foreign_structures_data)
             if not (region_id is None):
-                __loc_dict = {"region_id": region_id, "region": region_name, "solar": loc_name}
+                __loc_dict.update({"region_id": region_id, "region": region_name, "solar": loc_name})
                 if __prev_location_id != __root_location_id:
                     __dummy1, __dummy2, loc_name, foreign = eve_esi_tools.get_assets_location_name(
                         int(__prev_location_id),

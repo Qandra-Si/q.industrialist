@@ -2440,6 +2440,7 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnTogglePriceVals" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceVals"></span> Show Price column</a></li>
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show Price tags</a></li>
        <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
+       <li><a id="btnToggleBox" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBox"></span> Show Box column</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleExpand" data-target="#" role="button">Expand all tables</a></li>
        <li><a id="btnToggleCollapse" data-target="#" role="button">Collapse all tables</a></li>
@@ -2508,6 +2509,9 @@ def __dump_corp_blueprints_tbl(
 .hvr-icon-sel {
   color: #999999;
 }
+tr.qind-bp-row {
+  font-size: small;
+}
 </style>
 
 <div class="container-fluid">
@@ -2542,6 +2546,7 @@ def __dump_corp_blueprints_tbl(
   <th class="qind-td-prc hvr-icon-fade" id="thSortSel" col="4">Price, ISK<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="hvr-icon-fade" id="thSortSel" col="5">Location<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-plc hvr-icon-fade" id="thSortSel" col="6">Place<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="qind-td-box hvr-icon-fade" id="thSortSel" col="7">Box<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
  </tr>
 </thead>
 <tbody>
@@ -2598,12 +2603,17 @@ def __dump_corp_blueprints_tbl(
             # определяем местоположение чертежа
             __location_id = __blueprint_dict["loc"]
             __location_name = __location_id
+            __location_box = ""
             if str(__location_id) in __corp["locations"]:
+                # определяем название станции или солнечной системы, где лежит чертёж
                 __loc_dict = __corp["locations"][str(__location_id)]
                 if "station" in __loc_dict:
                     __location_name = __loc_dict["station"]
                 elif "solar" in __loc_dict:
                     __location_name = __loc_dict["solar"]
+                # определяем название контейнера, где лежит чертёж (названия ingame задают игроки)
+                if not (__loc_dict["name"] is None):
+                    __location_box = __loc_dict["name"]
             # определяем ангар и коробку, где лежит чертёж
             __place = __blueprint_dict["flag"]
             if __place[:-1] == "CorpSAG":
@@ -2611,13 +2621,14 @@ def __dump_corp_blueprints_tbl(
             # вывод в таблицу информацию о чертеже
             glf.write('<tr class="qind-bp-row"{job}>'
                       ' <th scope="row">{num}</th>\n'
-                      ' <td><small>{nm}</small>{st}{act}</td>'
+                      ' <td>{nm}{st}{act}</td>'
                       ' <td align="right">{me}</td>'
                       ' <td align="right">{te}</td>'
                       ' <td align="right">{q}</td>'
                       ' <td class="qind-td-prc" align="right" x-data="{iprice}">{price}</td>'
-                      ' <td><small>{loc}</small></td>'
-                      ' <td class="qind-td-plc"><small>{plc}</small></td>'
+                      ' <td>{loc}</td>'
+                      ' <td class="qind-td-plc">{plc}</td>'
+                      ' <td class="qind-td-box">{box}</td>'
                       '</tr>\n'.
                       format(num=row_num,
                              nm=__blueprint_dict["name"],
@@ -2630,7 +2641,8 @@ def __dump_corp_blueprints_tbl(
                              price=__price,
                              iprice=__fprice,
                              loc=__location_name,
-                             plc=__place))
+                             plc=__place,
+                             box=__location_box))
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
@@ -2643,6 +2655,7 @@ def __dump_corp_blueprints_tbl(
  <td class="qind-td-prc" align="right"></td>
  <td></td>
  <td class="qind-td-plc"></td>
+ <td class="qind-td-box"></td>
 </tr>
 </tbody>
       </table>
@@ -2661,7 +2674,8 @@ def __dump_corp_blueprints_tbl(
  <p>
   <strong>ME</strong> - Material Efficiency, <strong>TE</strong> - Time Efficiency, <strong>Qty</strong> - blueprints
   quantity if it is a stack of blueprint originals fresh from the market (e.g. no activities performed
-  on them yet), <strong>Price</strong> - price for one blueprint.
+  on them yet), <strong>Price</strong> - price for one blueprint, <strong>Location</strong>, <strong>Place</strong> and
+  <strong>Box</strong> - detailed location of blueprint.
  </p>
  <p>
   <span class="label label-primary">A</span>, <span class="label label-info">J</span>, <span class="label label-default">B</span> - <strong>price tags</strong>
@@ -2693,7 +2707,7 @@ def __dump_corp_blueprints_tbl(
     'Reverse Engineering', 'Invention', 'Reactions', '', '',
     'Show', 'Hide'
   ];
-  var g_tbl_col_types = [0,1,1,1,2,0,0]; // 0:str, 1:num, 2:x-data
+  var g_tbl_col_types = [0,1,1,1,2,0,0,0]; // 0:str, 1:num, 2:x-data
   var g_tbl_filter = null;
 
   // Blueprints Options storage (prepare)
@@ -2754,6 +2768,9 @@ def __dump_corp_blueprints_tbl(
     if (!ls.getItem('Show Place')) {
       ls.setItem('Show Place', 0);
     }
+    if (!ls.getItem('Show Box')) {
+      ls.setItem('Show Box', 0);
+    }
     if (!ls.getItem('Show Unused Blueprints')) {
       ls.setItem('Show Unused Blueprints', 1);
     }
@@ -2783,6 +2800,11 @@ def __dump_corp_blueprints_tbl(
       $('#imgShowPlace').removeClass('hidden');
     else
       $('#imgShowPlace').addClass('hidden');
+    show = ls.getItem('Show Box');
+    if (show == 1)
+      $('#imgShowBox').removeClass('hidden');
+    else
+      $('#imgShowBox').addClass('hidden');
     show = ls.getItem('Show Unused Blueprints');
     if (show == 1)
       $('#imgShowUnusedBlueprints').removeClass('hidden');
@@ -2841,6 +2863,10 @@ def __dump_corp_blueprints_tbl(
         if (!_res) {
           txt = el.find('td:eq(6)').text().toLowerCase();
           _res = txt.includes(g_tbl_filter);
+          if (!_res) {
+            txt = el.find('td:eq(7)').text().toLowerCase();
+            _res = txt.includes(g_tbl_filter);
+          }
         }
       }
     }
@@ -2869,6 +2895,13 @@ def __dump_corp_blueprints_tbl(
     })
     show = ls.getItem('Show Place');
     $('.qind-td-plc').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    show = ls.getItem('Show Box');
+    $('.qind-td-box').each(function() {
       if (show == 1)
         $(this).removeClass('hidden');
       else
@@ -2942,6 +2975,12 @@ def __dump_corp_blueprints_tbl(
     $('#btnTogglePlace').on('click', function () {
       show = (ls.getItem('Show Place') == 1) ? 0 : 1;
       ls.setItem('Show Place', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleBox').on('click', function () {
+      show = (ls.getItem('Show Box') == 1) ? 0 : 1;
+      ls.setItem('Show Box', show);
       rebuildOptionsMenu();
       rebuildBody();
     });
