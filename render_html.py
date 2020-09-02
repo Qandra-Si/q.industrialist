@@ -270,6 +270,7 @@ def __dump_corp_blueprints(
 <!-- BEGIN: collapsable group (locations) -->
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
+    first_time = True
     loc_flags = corp_bp_loc_data.keys()
     for loc_flag in loc_flags:
         loc_ids = corp_bp_loc_data[str(loc_flag)].keys()
@@ -287,14 +288,16 @@ def __dump_corp_blueprints(
                 '       href="#collapseB{fl}{id}" aria-expanded="true" aria-controls="collapseB{fl}{id}">{nm}</a>\n'
                 '   </h4>\n'
                 '  </div>\n'
-                '  <div id="collapseB{fl}{id}" class="panel-collapse collapse" role="tabpanel" '
+                '  <div id="collapseB{fl}{id}" class="panel-collapse collapse{vsbl}" role="tabpanel" '
                 'aria-labelledby="headingB{fl}{id}">\n'
                 '   <div class="panel-body">\n'.format(
                     fl=loc_flag,
                     id=loc_id,
-                    nm=loc_name
+                    nm=loc_name,
+                    vsbl=" in" if first_time else ""
                 )
             )
+            first_time = False
             __bp2 = corp_bp_loc_data[str(loc_flag)][str(loc_id)]
             type_keys = __bp2.keys()
             materials_summary = {}
