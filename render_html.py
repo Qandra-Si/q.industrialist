@@ -2609,9 +2609,9 @@ def __dump_corp_blueprints_tbl(
             glf.write('<tr class="qind-bp-row"{job}>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td><small>{nm}</small>{st}{act}</td>'
-                      ' <td>{me}</td>'
-                      ' <td>{te}</td>'
-                      ' <td>{q}</td>'
+                      ' <td align="right">{me}</td>'
+                      ' <td align="right">{te}</td>'
+                      ' <td align="right">{q}</td>'
                       ' <td class="qind-td-prc" align="right" x-data="{iprice}">{price}</td>'
                       ' <td><small>{loc}</small></td>'
                       ' <td class="qind-td-plc"><small>{plc}</small></td>'
@@ -2633,6 +2633,14 @@ def __dump_corp_blueprints_tbl(
             row_num = row_num + 1
 
         glf.write("""
+<tr class="qind-summary" style="font-weight:bold;">
+ <th></th>
+ <td align="right" colspan="3">Summary</td>
+ <td align="right"></td>
+ <td class="qind-td-prc" align="right"></td>
+ <td></td>
+ <td class="qind-td-plc"></td>
+</tr>
 </tbody>
       </table>
      </div> <!--table-responsive-->
@@ -2688,6 +2696,10 @@ def __dump_corp_blueprints_tbl(
   // Blueprints Options storage (prepare)
   ls = window.localStorage;
 
+  // Tools & Utils
+  function numLikeEve(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
   // Blueprints table sorter
   function sortTable(table, order, what, typ) {
     var asc = order > 0;
@@ -2862,19 +2874,29 @@ def __dump_corp_blueprints_tbl(
     loc = ls.getItem('Show Only Location');
     unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
-    $('tr.qind-bp-row').each(function() {
-      show = isBlueprintVisible($(this), loc, unused, job);
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
     $('table').each(function() {
+      _summary_qty = 0;
+      _summary_price = 0.0;
+      // filtering
+      $(this).find('tr.qind-bp-row').each(function() {
+        show = isBlueprintVisible($(this), loc, unused, job);
+        if (show == 1) {
+          $(this).removeClass('hidden');
+          _summary_qty += parseInt($(this).find('td:eq(3)').text(),10);
+          _summary_price += parseFloat($(this).find('td:eq(4)').attr('x-data'));
+        } else
+          $(this).addClass('hidden');
+      })
+      // sorting
       col = $(this).attr('sort_col');
       if (!(col === undefined)) {
-        order = table.attr('sort_order');
+        order = $(this).attr('sort_order');
         sortTable($(this),order,col,g_tbl_col_types[col]);
       }
+      // summary
+      tr_summary = $(this).find('tr.qind-summary');
+      tr_summary.find('td:eq(1)').html(_summary_qty);
+      tr_summary.find('td:eq(2)').html(numLikeEve(_summary_price.toFixed(1)));
     })
   }
   // Blueprints Options menu and submenu setup
