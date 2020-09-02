@@ -131,7 +131,7 @@ class EveOnlineInterface:
 
     @staticmethod
     def __esi_raise_for_status(code, message):
-        """ generates HTTPError to emulate 403 exceptions when working in offline mode
+        """ generates HTTPError to emulate 403, 404 exceptions when working in offline mode
         """
         rsp = requests.Response()
         rsp.status_code = code
@@ -169,6 +169,10 @@ class EveOnlineInterface:
                 if status_code == 403:  # это нормально, CCP используют 403-ответ для индикации запретов ingame-доступа
                     # сохраняем информацию в кеше и выходим с тем же кодом ошибки
                     self.__dump_cache_into_file(url, {"Http-Error": 403}, None)
+                    raise
+                elif status_code == 404:  # это нормально, CCP используют 404-ответ для индикации "нет данных" ingame-доступа
+                    # сохраняем информацию в кеше и выходим с тем же кодом ошибки
+                    self.__dump_cache_into_file(url, {"Http-Error": 404}, None)
                     raise
             except:
                 raise
