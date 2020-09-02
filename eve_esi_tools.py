@@ -15,23 +15,21 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
     """
     corp_bp_loc_data = {}
     for bp in corp_blueprints_data:
-        loc_flag = str(bp["location_flag"])
         loc_id = int(bp["location_id"])
-        # { "CorpSAG6": {} }
-        if not (str(loc_flag) in corp_bp_loc_data):
-            corp_bp_loc_data.update({str(loc_flag): {}})
-        __bp1 = corp_bp_loc_data[str(loc_flag)]
-        # { "CorpSAG6": { "1033160348166": {} } }
-        if not (str(loc_id) in __bp1):
-            __bp1.update({str(loc_id): {}})
-        __bp2 = __bp1[str(loc_id)]
-        # { "CorpSAG6": { "1033160348166": { "30014": {} } } }
+        blueprint_id = int(bp["item_id"])
+        __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(blueprint_id)), None)
+        if not (__job_dict is None):
+            loc_id = __job_dict["blueprint_location_id"]
+        # { "1033160348166": {} }
+        if not (str(loc_id) in corp_bp_loc_data):
+            corp_bp_loc_data.update({str(loc_id): {}})
+        __bp2 = corp_bp_loc_data[str(loc_id)]
+        # { "1033160348166": { "30014": {} } }
         type_id = int(bp["type_id"])
         if not (type_id in __bp2):
             __bp2.update({type_id: {}})
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": {} } } } }
+        # { "1033160348166": { "30014": { "o_10_20": {} } } }
         quantity = int(bp["quantity"])
-        blueprint_id = int(bp["item_id"])
         is_blueprint_copy = quantity < -1
         bp_type = 'c' if is_blueprint_copy else 'o'
         material_efficiency = int(bp["material_efficiency"])
@@ -44,7 +42,7 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
             st="" if bp_status is None else bp_status[:2])
         runs = int(bp["runs"])
         quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } } }
+        # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } }
         if not (bp_key in __bp2[type_id]):
             __bp2[type_id].update({bp_key: {
                 "cp": is_blueprint_copy,
@@ -56,7 +54,7 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
             }})
         elif is_blueprint_copy:
             __bp2[type_id][bp_key]["qr"] = __bp2[type_id][bp_key]["qr"] + quantity_or_runs
-        # { "CorpSAG6": { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } } }
+        # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } }
         __bp2[type_id][bp_key]["itm"].append({
             "id": int(bp["item_id"]),
             "q": quantity,

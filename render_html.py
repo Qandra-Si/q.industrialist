@@ -271,257 +271,254 @@ def __dump_corp_blueprints(
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
 
     first_time = True
-    loc_flags = corp_bp_loc_data.keys()
-    for loc_flag in loc_flags:
-        loc_ids = corp_bp_loc_data[str(loc_flag)].keys()
-        for loc in loc_ids:
-            loc_id = int(loc)
-            if not (blueprint_loc_ids is None):
-                if not (loc_id in blueprint_loc_ids):
-                    continue
-            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
+    loc_ids = corp_bp_loc_data.keys()
+    for loc in loc_ids:
+        loc_id = int(loc)
+        if not (blueprint_loc_ids is None):
+            if not (loc_id in blueprint_loc_ids):
+                continue
+        loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
+        glf.write(
+            ' <div class="panel panel-default">\n'
+            '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
+            '   <h4 class="panel-title">\n'
+            '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
+            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{nm}</a>\n'
+            '   </h4>\n'
+            '  </div>\n'
+            '  <div id="collapseB{id}" class="panel-collapse collapse{vsbl}" role="tabpanel" '
+            'aria-labelledby="headingB{id}">\n'
+            '   <div class="panel-body">\n'.format(
+                id=loc_id,
+                nm=loc_name,
+                vsbl=" in" if first_time else ""
+            )
+        )
+        first_time = False
+        __bp2 = corp_bp_loc_data[str(loc_id)]
+        type_keys = __bp2.keys()
+        materials_summary = {}
+        for type_id in type_keys:
+            blueprint_name = get_item_name_by_type_id(sde_type_ids, type_id)
             glf.write(
-                ' <div class="panel panel-default">\n'
-                '  <div class="panel-heading" role="tab" id="headingB{fl}{id}">\n'
-                '   <h4 class="panel-title">\n'
-                '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-                '       href="#collapseB{fl}{id}" aria-expanded="true" aria-controls="collapseB{fl}{id}">{nm}</a>\n'
-                '   </h4>\n'
-                '  </div>\n'
-                '  <div id="collapseB{fl}{id}" class="panel-collapse collapse{vsbl}" role="tabpanel" '
-                'aria-labelledby="headingB{fl}{id}">\n'
-                '   <div class="panel-body">\n'.format(
-                    fl=loc_flag,
-                    id=loc_id,
-                    nm=loc_name,
-                    vsbl=" in" if first_time else ""
+                '<div class="media">\n'
+                ' <div class="media-left">\n'
+                '  <img class="media-object icn64" src="{src}" alt="{nm}">\n'
+                ' </div>\n'
+                ' <div class="media-body">\n'
+                '  <h4 class="media-heading">{nm}</h4>\n'.format(
+                    src=__get_img_src(type_id, 64),
+                    nm=blueprint_name
                 )
             )
-            first_time = False
-            __bp2 = corp_bp_loc_data[str(loc_flag)][str(loc_id)]
-            type_keys = __bp2.keys()
-            materials_summary = {}
-            for type_id in type_keys:
-                blueprint_name = get_item_name_by_type_id(sde_type_ids, type_id)
+            bp_manuf_mats = get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
+            bp_keys = __bp2[type_id].keys()
+            for bpk in bp_keys:
+                bp = __bp2[type_id][bpk]
+                is_blueprint_copy = bp["cp"]
+                quantity_or_runs = bp["qr"]
+                material_efficiency = bp["me"]
+                time_efficiency = bp["te"]
+                blueprint_status = bp["st"]
                 glf.write(
-                    '<div class="media">\n'
-                    ' <div class="media-left">\n'
-                    '  <img class="media-object icn64" src="{src}" alt="{nm}">\n'
-                    ' </div>\n'
-                    ' <div class="media-body">\n'
-                    '  <h4 class="media-heading">{nm}</h4>\n'.format(
-                        src=__get_img_src(type_id, 64),
-                        nm=blueprint_name
+                    '<span class="qind-blueprints-{status}">'
+                    '<span class="label label-{cpc}">{cpn}</span>'
+                    '&nbsp;<span class="label label-success">{me} {te}</span>'
+                    '&nbsp;<span class="badge">{qr}</span>\n'.format(
+                        qr=quantity_or_runs,
+                        cpc='default' if is_blueprint_copy else 'info',
+                        cpn='copy' if is_blueprint_copy else 'original',
+                        me=material_efficiency,
+                        te=time_efficiency,
+                        status=blueprint_status if not (blueprint_status is None) else ""
                     )
                 )
-                bp_manuf_mats = get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
-                bp_keys = __bp2[type_id].keys()
-                for bpk in bp_keys:
-                    bp = __bp2[type_id][bpk]
-                    is_blueprint_copy = bp["cp"]
-                    quantity_or_runs = bp["qr"]
-                    material_efficiency = bp["me"]
-                    time_efficiency = bp["te"]
-                    blueprint_status = bp["st"]
-                    glf.write(
-                        '<span class="qind-blueprints-{status}">'
-                        '<span class="label label-{cpc}">{cpn}</span>'
-                        '&nbsp;<span class="label label-success">{me} {te}</span>'
-                        '&nbsp;<span class="badge">{qr}</span>\n'.format(
-                            qr=quantity_or_runs,
-                            cpc='default' if is_blueprint_copy else 'info',
-                            cpn='copy' if is_blueprint_copy else 'original',
-                            me=material_efficiency,
-                            te=time_efficiency,
-                            status=blueprint_status if not (blueprint_status is None) else ""
-                        )
-                    )
-                    if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
-                        if (blueprint_status == "active") or (blueprint_status == "delivered"):
-                            glf.write('&nbsp;<span class="label label-info">{}</span>'.format(blueprint_status))
-                        elif blueprint_status == "ready":
-                            glf.write('&nbsp;<span class="label label-success">{}</span>'.format(blueprint_status))
-                        elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
-                            glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
-                        else:
-                            glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
-                        glf.write('</br></span>\n')
-                    elif bp_manuf_mats is None:
-                        glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
-                        glf.write('</br></span>\n')
+                if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
+                    if (blueprint_status == "active") or (blueprint_status == "delivered"):
+                        glf.write('&nbsp;<span class="label label-info">{}</span>'.format(blueprint_status))
+                    elif blueprint_status == "ready":
+                        glf.write('&nbsp;<span class="label label-success">{}</span>'.format(blueprint_status))
+                    elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
+                        glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
                     else:
-                        glf.write('</br></span>\n')
-                        glf.write('<div class="qind-materials-used">\n')  # div(materials)
-                        not_enough_materials = []
-                        for m in bp_manuf_mats:
-                            bp_manuf_need_all = 0
-                            for __bp3 in __bp2[type_id][bpk]["itm"]:
-                                quantity_or_runs = __bp3["r"] if is_blueprint_copy else __bp3["q"] if __bp3["q"] > 0 else 1
-                                __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
-                                __need = __used  # поправка на эффективнсть материалов
-                                if material_efficiency > 0:
-                                    # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-                                    # см. 1 x run: http://prntscr.com/u0g07w
-                                    # см. 4 x run: http://prntscr.com/u0g0cd
-                                    # см. экономия материалов: http://prntscr.com/u0g11u
-                                    __me = int(100 - material_efficiency - 1 - 4.2)
-                                    __need = int((__used * __me) / 100)
-                                    if 0 != ((__used * __me) % 100):
-                                        __need = __need + 1
-                                bp_manuf_need_all = bp_manuf_need_all + __need
-                            bpmm_tid = int(m["typeID"])
-                            bpmm_tnm = get_item_name_by_type_id(sde_type_ids, bpmm_tid)
-                            # проверка наличия имеющихся ресурсов для постройки по этому БП
-                            not_available = bp_manuf_need_all
-                            if m["typeID"] in stock_resources:
-                                not_available = 0 if stock_resources[m["typeID"]] >= not_available else not_available - stock_resources[m["typeID"]]
-                            # вывод наименования ресурса
+                        glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
+                    glf.write('</br></span>\n')
+                elif bp_manuf_mats is None:
+                    glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
+                    glf.write('</br></span>\n')
+                else:
+                    glf.write('</br></span>\n')
+                    glf.write('<div class="qind-materials-used">\n')  # div(materials)
+                    not_enough_materials = []
+                    for m in bp_manuf_mats:
+                        bp_manuf_need_all = 0
+                        for __bp3 in __bp2[type_id][bpk]["itm"]:
+                            quantity_or_runs = __bp3["r"] if is_blueprint_copy else __bp3["q"] if __bp3["q"] > 0 else 1
+                            __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
+                            __need = __used  # поправка на эффективнсть материалов
+                            if material_efficiency > 0:
+                                # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+                                # см. 1 x run: http://prntscr.com/u0g07w
+                                # см. 4 x run: http://prntscr.com/u0g0cd
+                                # см. экономия материалов: http://prntscr.com/u0g11u
+                                __me = int(100 - material_efficiency - 1 - 4.2)
+                                __need = int((__used * __me) / 100)
+                                if 0 != ((__used * __me) % 100):
+                                    __need = __need + 1
+                            bp_manuf_need_all = bp_manuf_need_all + __need
+                        bpmm_tid = int(m["typeID"])
+                        bpmm_tnm = get_item_name_by_type_id(sde_type_ids, bpmm_tid)
+                        # проверка наличия имеющихся ресурсов для постройки по этому БП
+                        not_available = bp_manuf_need_all
+                        if m["typeID"] in stock_resources:
+                            not_available = 0 if stock_resources[m["typeID"]] >= not_available else not_available - stock_resources[m["typeID"]]
+                        # вывод наименования ресурса
+                        glf.write(
+                            '<span style="white-space:nowrap">'
+                            '<img class="icn24" src="{src}"> {q:,d} x {nm} '
+                            '</span>\n'.format(
+                                src=__get_img_src(bpmm_tid, 32),
+                                q=bp_manuf_need_all,
+                                nm=bpmm_tnm
+                            )
+                        )
+                        # сохраняем недостающее кол-во материалов для производства по этому чертежу
+                        if not_available > 0:
+                            not_enough_materials.append({"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm})
+                        # сохраняем материалы для производства в список их суммарного кол-ва
+                        if m["typeID"] in materials_summary:
+                            materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bp_manuf_need_all
+                        else:
+                            materials_summary.update({m["typeID"]: bp_manuf_need_all})
+                    glf.write('</div>\n')  # div(materials)
+                    # отображение списка материалов, которых не хватает
+                    if len(not_enough_materials) > 0:
+                        glf.write('<div>\n')  # div(not_enough_materials)
+                        for m in not_enough_materials:
                             glf.write(
-                                '<span style="white-space:nowrap">'
+                                '&nbsp;<span class="label label-warning">'
                                 '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                                 '</span>\n'.format(
-                                    src=__get_img_src(bpmm_tid, 32),
-                                    q=bp_manuf_need_all,
-                                    nm=bpmm_tnm
+                                    src=__get_img_src(m["id"], 32),
+                                    q=m["q"],
+                                    nm=m["nm"]
                                 )
                             )
-                            # сохраняем недостающее кол-во материалов для производства по этому чертежу
-                            if not_available > 0:
-                                not_enough_materials.append({"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm})
-                            # сохраняем материалы для производства в список их суммарного кол-ва
-                            if m["typeID"] in materials_summary:
-                                materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bp_manuf_need_all
-                            else:
-                                materials_summary.update({m["typeID"]: bp_manuf_need_all})
-                        glf.write('</div>\n')  # div(materials)
-                        # отображение списка материалов, которых не хватает
-                        if len(not_enough_materials) > 0:
-                            glf.write('<div>\n')  # div(not_enough_materials)
-                            for m in not_enough_materials:
-                                glf.write(
-                                    '&nbsp;<span class="label label-warning">'
-                                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
-                                    '</span>\n'.format(
-                                        src=__get_img_src(m["id"], 32),
-                                        q=m["q"],
-                                        nm=m["nm"]
-                                    )
-                                )
-                            glf.write('</div>\n')  # div(not_enough_materials)
+                        glf.write('</div>\n')  # div(not_enough_materials)
+            glf.write(
+                ' </div>\n'  # media-body
+                '</div>\n'  # media
+            )
+        # отображение в отчёте summary-информаци по недостающим материалам
+        if len(materials_summary) > 0:
+            ms_keys = materials_summary.keys()
+            # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+            # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
+            material_groups = {}
+            for ms_type_id in ms_keys:
+                __quantity = materials_summary[ms_type_id]
+                __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, ms_type_id)
+                if str(__market_group) in material_groups:
+                    material_groups[str(__market_group)].update({ms_type_id: __quantity})
+                else:
+                    material_groups.update({str(__market_group): {ms_type_id: __quantity}})
+            glf.write(
+                '<hr><div class="media">\n'
+                ' <div class="media-left">\n'
+                '  <span class="glyphicon glyphicon-alert" aria-hidden="false" style="font-size: 64px;"></span>\n'
+                ' </div>\n'
+                ' <div class="media-body">\n'
+                '  <div class="qind-materials-used">'
+                '  <h4 class="media-heading">Summary materials</h4>\n'
+            )
+            for ms_type_id in ms_keys:
                 glf.write(
-                    ' </div>\n'  # media-body
-                    '</div>\n'  # media
-                )
-            # отображение в отчёте summary-информаци по недостающим материалам
-            if len(materials_summary) > 0:
-                ms_keys = materials_summary.keys()
-                # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
-                # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
-                material_groups = {}
-                for ms_type_id in ms_keys:
-                    __quantity = materials_summary[ms_type_id]
-                    __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, ms_type_id)
-                    if str(__market_group) in material_groups:
-                        material_groups[str(__market_group)].update({ms_type_id: __quantity})
-                    else:
-                        material_groups.update({str(__market_group): {ms_type_id: __quantity}})
-                glf.write(
-                    '<hr><div class="media">\n'
-                    ' <div class="media-left">\n'
-                    '  <span class="glyphicon glyphicon-alert" aria-hidden="false" style="font-size: 64px;"></span>\n'
-                    ' </div>\n'
-                    ' <div class="media-body">\n'
-                    '  <div class="qind-materials-used">'
-                    '  <h4 class="media-heading">Summary materials</h4>\n'
-                )
-                for ms_type_id in ms_keys:
-                    glf.write(
-                        '<span style="white-space:nowrap">'
-                        '<img class="icn24" src="{src}"> {q:,d} x {nm} '
-                        '</span>\n'.format(
-                            src=__get_img_src(ms_type_id, 32),
-                            q=materials_summary[ms_type_id],
-                            nm=get_item_name_by_type_id(sde_type_ids, ms_type_id)
-                        )
+                    '<span style="white-space:nowrap">'
+                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
+                    '</span>\n'.format(
+                        src=__get_img_src(ms_type_id, 32),
+                        q=materials_summary[ms_type_id],
+                        nm=get_item_name_by_type_id(sde_type_ids, ms_type_id)
                     )
-                glf.write('<hr></div>\n')  # qind-materials-used
-                # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
-                not_available_row_num = 1
-                ms_groups = material_groups.keys()
-                for ms_group_id in ms_groups:
-                    ms_keys = material_groups[ms_group_id].keys()
-                    group_diplayed = False
-                    for ms_type_id in ms_keys:
-                        not_available = material_groups[ms_group_id][ms_type_id]
-                        if ms_type_id in stock_resources:
-                            not_available = 0 if stock_resources[ms_type_id] >= not_available else \
-                                not_available - stock_resources[ms_type_id]
-                        if not_available > 0:
-                            if not_available_row_num == 1:
-                                glf.write("""
+                )
+            glf.write('<hr></div>\n')  # qind-materials-used
+            # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
+            not_available_row_num = 1
+            ms_groups = material_groups.keys()
+            for ms_group_id in ms_groups:
+                ms_keys = material_groups[ms_group_id].keys()
+                group_diplayed = False
+                for ms_type_id in ms_keys:
+                    not_available = material_groups[ms_group_id][ms_type_id]
+                    if ms_type_id in stock_resources:
+                        not_available = 0 if stock_resources[ms_type_id] >= not_available else \
+                            not_available - stock_resources[ms_type_id]
+                    if not_available > 0:
+                        if not_available_row_num == 1:
+                            glf.write("""
 <h4 class="media-heading">Not available materials</h4>
 <div class="table-responsive">
 <table class="table table-condensed table-hover">
 <thead>
- <tr>
-  <th style="width:40px;">#</th>
-  <th>Materials</th>
-  <th>Not available</th>
-  <th>In progress</th>
- </tr>
+<tr>
+<th style="width:40px;">#</th>
+<th>Materials</th>
+<th>Not available</th>
+<th>In progress</th>
+</tr>
 </thead>
 <tbody>
 """)
-                            if not group_diplayed:
-                                __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
-                                glf.write(
-                                    '<tr>\n'
-                                    ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}--></td>\n'
-                                    '</tr>'.
-                                    format(nm=__grp_name, id=ms_group_id))
-                                group_diplayed = True
-                            jobs = [j for j in corp_industry_jobs_data if
-                                        (j["product_type_id"] == ms_type_id) and
-                                        (j['output_location_id'] in stock_all_loc_ids)]
-                            in_progress = 0
-                            for j in jobs:
-                                in_progress = in_progress + j["runs"]
-                            __item_name = get_item_name_by_type_id(sde_type_ids, ms_type_id)
-                            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
-                                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
-                                '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
-                                '  aria-hidden="true"></span></a>'. \
-                                format(nm=__item_name)
+                        if not group_diplayed:
+                            __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
                             glf.write(
                                 '<tr>\n'
-                                ' <th scope="row">{num}</th>\n'
-                                ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                                ' <td>{q:,d}</td>\n'
-                                ' <td>{inp}</td>\n'
+                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}--></td>\n'
                                 '</tr>'.
-                                format(num=not_available_row_num,
-                                       src=__get_img_src(ms_type_id, 32),
-                                       q=not_available,
-                                       inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
-                                       nm=__item_name,
-                                       clbrd=__copy2clpbrd)
-                            )
-                            not_available_row_num = not_available_row_num + 1
-                if not_available_row_num != 1:
-                    glf.write("""
+                                format(nm=__grp_name, id=ms_group_id))
+                            group_diplayed = True
+                        jobs = [j for j in corp_industry_jobs_data if
+                                    (j["product_type_id"] == ms_type_id) and
+                                    (j['output_location_id'] in stock_all_loc_ids)]
+                        in_progress = 0
+                        for j in jobs:
+                            in_progress = in_progress + j["runs"]
+                        __item_name = get_item_name_by_type_id(sde_type_ids, ms_type_id)
+                        __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
+                            '  aria-hidden="true"></span></a>'. \
+                            format(nm=__item_name)
+                        glf.write(
+                            '<tr>\n'
+                            ' <th scope="row">{num}</th>\n'
+                            ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
+                            ' <td>{q:,d}</td>\n'
+                            ' <td>{inp}</td>\n'
+                            '</tr>'.
+                            format(num=not_available_row_num,
+                                   src=__get_img_src(ms_type_id, 32),
+                                   q=not_available,
+                                   inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
+                                   nm=__item_name,
+                                   clbrd=__copy2clpbrd)
+                        )
+                        not_available_row_num = not_available_row_num + 1
+            if not_available_row_num != 1:
+                glf.write("""
 </tbody>
 </table>
 </div>
 """)
-                glf.write(
-                    ' </div>\n'
-                    '</div>\n'
-                )
             glf.write(
-                "   </div>\n"
-                "  </div>\n"
-                " </div>\n"
+                ' </div>\n'
+                '</div>\n'
             )
+        glf.write(
+            "   </div>\n"
+            "  </div>\n"
+            " </div>\n"
+        )
 
     glf.write("""
 </div>
@@ -1735,8 +1732,6 @@ def __dump_corp_conveyor(
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
     </li>
-
-    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
    </ul>
    <form class="navbar-form navbar-right">
     <div class="form-group">
