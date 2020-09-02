@@ -2440,6 +2440,9 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnTogglePriceVals" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceVals"></span> Show Price column</a></li>
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show Price tags</a></li>
        <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnToggleExpand" data-target="#" role="button">Expand all tables</a></li>
+       <li><a id="btnToggleCollapse" data-target="#" role="button">Collapse all tables</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show Legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -2917,6 +2920,12 @@ def __dump_corp_blueprints_tbl(
       ls.setItem('Show Legend', show);
       rebuildOptionsMenu();
       rebuildBody();
+    });
+    $('#btnToggleExpand').on('click', function () {
+      $('div.panel-collapse').each(function(){ $(this).addClass('in'); });
+    });
+    $('#btnToggleCollapse').on('click', function () {
+      $('div.panel-collapse').each(function(){ $(this).removeClass('in'); });
     });
     $('#btnTogglePriceVals').on('click', function () {
       show = (ls.getItem('Show Price Vals') == 1) ? 0 : 1;
