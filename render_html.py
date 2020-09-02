@@ -2724,7 +2724,7 @@ tr.qind-bp-row {
     var asc = order > 0;
     var col = 'td:eq('+what.toString()+')';
     var tbody = table.find('tbody');
-    tbody.find('tr.qind-bp-row').sort(function(a, b) {
+    tbody.find('tr').sort(function(a, b) {
       var keyA, keyB;
       if (typ == 2) {
         keyA = parseFloat($(col, a).attr('x-data'));
