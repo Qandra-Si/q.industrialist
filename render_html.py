@@ -2731,6 +2731,7 @@ tr.qind-bp-row {
         keyB = parseFloat($(col, b).attr('x-data'));
         if (isNaN(keyA)) keyA = 0;
         if (isNaN(keyB)) keyB = 0;
+        return asc ? (keyA - keyB) : (keyB - keyA);
       }
       else {
         keyA = $(col, a).text();
@@ -2738,12 +2739,12 @@ tr.qind-bp-row {
         if (typ == 1) {
           keyA = parseInt(keyA, 10);
           keyB = parseInt(keyB, 10);
+          return asc ? (keyA - keyB) : (keyB - keyA);
         } 
       }
-      if (asc)
-        return (keyA > keyB) ? 1 : 0;
-      else
-        return (keyA > keyB) ? 0 : 1;
+      _res = (keyA < keyB) ? -1 : ((keyA > keyB) ? 1 : 0);
+      if (asc) _res = -_res;
+      return _res;
     }).appendTo(tbody);
   }
 
@@ -2839,7 +2840,7 @@ tr.qind-bp-row {
   // Blueprints filter method (to rebuild body components)
   function isBlueprintVisible(el, loc, unused, job) {
     _res = 1;
-    _loc = el.find('td:eq(5)').text();
+    _loc = el.find('td').eq(5).text();
     _job = el.attr('job');
     _res = (loc && (_loc != loc)) ? 0 : 1;
     if (_res && (unused == 0)) {
@@ -2857,16 +2858,16 @@ tr.qind-bp-row {
         _res = 0;
     }
     if (_res && (!(g_tbl_filter === null))) {
-      var txt = el.find('td:eq(0)').text().toLowerCase();
+      var txt = el.find('td').eq(0).text().toLowerCase();
       _res = txt.includes(g_tbl_filter);
       if (!_res) {
-        txt = el.find('td:eq(5)').text().toLowerCase();
+        txt = el.find('td').eq(5).text().toLowerCase();
         _res = txt.includes(g_tbl_filter);
         if (!_res) {
-          txt = el.find('td:eq(6)').text().toLowerCase();
+          txt = el.find('td').eq(6).text().toLowerCase();
           _res = txt.includes(g_tbl_filter);
           if (!_res) {
-            txt = el.find('td:eq(7)').text().toLowerCase();
+            txt = el.find('td').eq(7).text().toLowerCase();
             _res = txt.includes(g_tbl_filter);
           }
         }
@@ -2920,8 +2921,8 @@ tr.qind-bp-row {
         show = isBlueprintVisible($(this), loc, unused, job);
         if (show == 1) {
           $(this).removeClass('hidden');
-          _summary_qty += parseInt($(this).find('td:eq(3)').text(),10);
-          _summary_price += parseFloat($(this).find('td:eq(4)').attr('x-data'));
+          _summary_qty += parseInt($(this).find('td').eq(3).text(),10);
+          _summary_price += parseFloat($(this).find('td').eq(4).attr('x-data'));
         } else
           $(this).addClass('hidden');
       })
@@ -2933,8 +2934,8 @@ tr.qind-bp-row {
       }
       // summary
       tr_summary = $(this).find('tr.qind-summary');
-      tr_summary.find('td:eq(1)').html(_summary_qty);
-      tr_summary.find('td:eq(2)').html(numLikeEve(_summary_price.toFixed(1)));
+      tr_summary.find('td').eq(1).html(_summary_qty);
+      tr_summary.find('td').eq(2).html(numLikeEve(_summary_price.toFixed(1)));
     })
   }
   // Blueprints Options menu and submenu setup
