@@ -173,6 +173,8 @@ def __build_blueprints(
     # debug contracts only: blueprints = []
     # debug contracts only: blueprints_locations = {}
 
+    # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
+    # ищем публичные контракты типа "обмен предметами"
     for __contract_items_dict in corp_contract_items_data:
         __contract_id_key = __contract_items_dict.keys()
         for __contract_id in __contract_id_key:

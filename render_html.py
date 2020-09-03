@@ -2443,6 +2443,7 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnToggleBox" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBox"></span> Show Box column</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleShowContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowContracts"></span> Show Contracts</a></li>
+       <li><a id="btnToggleShowFinishedContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowFinishedContracts"></span> Show Finished Contracts</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleExpand" data-target="#" role="button">Expand all tables</a></li>
        <li><a id="btnToggleCollapse" data-target="#" role="button">Collapse all tables</a></li>
@@ -2575,6 +2576,7 @@ tr.qind-bp-row {
             __status = ""
             __activity = ""
             __blueprint_activity = None
+            __blueprint_contract_activity = None
             if "st" in __blueprint_dict:
                 # [ active, cancelled, delivered, paused, ready, reverted ]
                 __blueprint_status = __blueprint_dict["st"]
@@ -2611,8 +2613,8 @@ tr.qind-bp-row {
                 __blueprint_status = __blueprint_dict["cntrct_typ"]
                 __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
                 # [ outstanding, in_progress, finished_issuer, finished_contractor, finished, cancelled, rejected, failed, deleted, reversed ]
-                __blueprint_activity = __blueprint_dict["cntrct_sta"]
-                __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_activity)
+                __blueprint_contract_activity = __blueprint_dict["cntrct_sta"]
+                __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
             # определяем местоположение чертежа
             __location_id = __blueprint_dict["loc"]
             __location_name = __location_id
@@ -2648,7 +2650,7 @@ tr.qind-bp-row {
                              st=__status,
                              act=__activity,
                              job="" if __blueprint_activity is None else ' job="{}"'.format(__blueprint_activity),
-                             cntrct=" cntrct" if "cntrct_sta" in __blueprint_dict else "",
+                             cntrct="" if __blueprint_contract_activity is None else ' cntrct="{}"'.format(__blueprint_contract_activity),
                              me=__blueprint_dict["me"] if "me" in __blueprint_dict else "",
                              te=__blueprint_dict["te"] if "te" in __blueprint_dict else "",
                              q=__blueprint_dict["q"],
@@ -2664,9 +2666,18 @@ tr.qind-bp-row {
         glf.write("""
 </tbody>
 <tfoot>
-<tr class="qind-summary" style="font-weight:bold;">
+<tr class="qind-summary-assets" style="font-weight:bold;">
  <th></th>
- <td align="right" colspan="3">Summary</td>
+ <td align="right" colspan="3">Summary (assets)</td>
+ <td align="right"></td>
+ <td class="qind-td-prc" align="right"></td>
+ <td></td>
+ <td class="qind-td-plc"></td>
+ <td class="qind-td-box"></td>
+</tr>
+<tr class="qind-summary-contracts" style="font-weight:bold;">
+ <th></th>
+ <td align="right" colspan="3">Summary (contracts)</td>
  <td align="right"></td>
  <td class="qind-td-prc" align="right"></td>
  <td></td>
@@ -2810,6 +2821,9 @@ tr.qind-bp-row {
     if (!ls.getItem('Show Contracts')) {
       ls.setItem('Show Contracts', 1);
     }
+    if (!ls.getItem('Show Finished Contracts')) {
+      ls.setItem('Show Finished Contracts', 1);
+    }
   }
   // Blueprints Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
@@ -2823,6 +2837,11 @@ tr.qind-bp-row {
       $('#imgShowContracts').removeClass('hidden');
     else
       $('#imgShowContracts').addClass('hidden');
+    show = ls.getItem('Show Finished Contracts');
+    if (show == 1)
+      $('#imgShowFinishedContracts').removeClass('hidden');
+    else
+      $('#imgShowFinishedContracts').addClass('hidden');
     show = ls.getItem('Show Price Vals');
     if (show == 1)
       $('#imgShowPriceVals').removeClass('hidden');
@@ -2873,29 +2892,32 @@ tr.qind-bp-row {
     }
   }
   // Blueprints filter method (to rebuild body components)
-  function isBlueprintVisible(el, loc, unused, job, cntrct) {
+  function isBlueprintVisible(el, loc, unused, job, cntrct, cntrct_fin) {
     _res = 1;
     _loc = el.find('td').eq(5).text();
     _job = el.attr('job');
+    _cntrct = el.attr('cntrct');
     _res = (loc && (_loc != loc)) ? 0 : 1;
-    if (_res && (unused == 0)) {
-      if (_job === undefined)
+    if (!(_cntrct === undefined)) {
+      if (_res && (cntrct == 0))
         _res = 0;
-    }
-    if (_res && (cntrct == 0)) {
-      _cntrct = el.attr('cntrct');
-      if (!(_cntrct === undefined))
+      if (_res && (cntrct_fin == 0) && (_cntrct == "finished"))
         _res = 0;
-    }
-    if (_res && (!(_job === undefined))) {
-      if (job == 13)
-        _res = 0;
-      else if (job == 12)
-        _res = 1;
-      else if ((job == _job) || (job == 3) && (_job == 4) || (job == 9) && (_job == 11))
-        _res = 1;
-      else
-        _res = 0;
+    } else {
+      if (_res && (unused == 0)) {
+        if (_job === undefined)
+          _res = 0;
+      }
+      if (_res && (!(_job === undefined))) {
+        if (job == 13)
+          _res = 0;
+        else if (job == 12)
+          _res = 1;
+        else if ((job == _job) || (job == 3) && (_job == 4) || (job == 9) && (_job == 11))
+          _res = 1;
+        else
+          _res = 0;
+      }
     }
     if (_res && (!(g_tbl_filter === null))) {
       var txt = el.find('td').eq(0).text().toLowerCase();
@@ -2954,16 +2976,25 @@ tr.qind-bp-row {
     unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
     cntrct = ls.getItem('Show Contracts');
+    cntrct_fin = ls.getItem('Show Finished Contracts');
     $('table').each(function() {
-      _summary_qty = 0;
-      _summary_price = 0.0;
+      _summary_a_qty = 0;
+      _summary_a_price = 0.0;
+      _summary_c_qty = 0;
+      _summary_c_price = 0.0;
       // filtering
       $(this).find('tr.qind-bp-row').each(function() {
-        show = isBlueprintVisible($(this), loc, unused, job, cntrct);
+        show = isBlueprintVisible($(this), loc, unused, job, cntrct, cntrct_fin);
         if (show == 1) {
           $(this).removeClass('hidden');
-          _summary_qty += parseInt($(this).find('td').eq(3).text(),10);
-          _summary_price += parseFloat($(this).find('td').eq(4).attr('x-data'));
+          _cntrct = $(this).attr('cntrct');
+          if (_cntrct === undefined) {
+            _summary_a_qty += parseInt($(this).find('td').eq(3).text(),10);
+            _summary_a_price += parseFloat($(this).find('td').eq(4).attr('x-data'));
+          } else {
+            _summary_c_qty += parseInt($(this).find('td').eq(3).text(),10);
+            _summary_c_price += parseFloat($(this).find('td').eq(4).attr('x-data'));
+          }
         } else
           $(this).addClass('hidden');
       })
@@ -2973,10 +3004,14 @@ tr.qind-bp-row {
         order = $(this).attr('sort_order');
         sortTable($(this),order,col,g_tbl_col_types[col]);
       }
-      // summary
-      tr_summary = $(this).find('tr.qind-summary');
-      tr_summary.find('td').eq(1).html(_summary_qty);
-      tr_summary.find('td').eq(2).html(numLikeEve(_summary_price.toFixed(1)));
+      // summary (assets)
+      tr_summary = $(this).find('tr.qind-summary-assets');
+      tr_summary.find('td').eq(1).html(_summary_a_qty);
+      tr_summary.find('td').eq(2).html(numLikeEve(_summary_a_price.toFixed(1)));
+      // summary (contracts)
+      tr_summary = $(this).find('tr.qind-summary-contracts');
+      tr_summary.find('td').eq(1).html(_summary_c_qty);
+      tr_summary.find('td').eq(2).html(numLikeEve(_summary_c_price.toFixed(1)));
     })
   }
   // Blueprints Options menu and submenu setup
@@ -3001,6 +3036,12 @@ tr.qind-bp-row {
     $('#btnToggleShowContracts').on('click', function () {
       show = (ls.getItem('Show Contracts') == 1) ? 0 : 1;
       ls.setItem('Show Contracts', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleShowFinishedContracts').on('click', function () {
+      show = (ls.getItem('Show Finished Contracts') == 1) ? 0 : 1;
+      ls.setItem('Show Finished Contracts', show);
       rebuildOptionsMenu();
       rebuildBody();
     });
