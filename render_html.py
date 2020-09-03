@@ -2442,6 +2442,8 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
        <li><a id="btnToggleBox" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBox"></span> Show Box column</a></li>
        <li role="separator" class="divider"></li>
+       <li><a id="btnToggleShowContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowContracts"></span> Show Contracts</a></li>
+       <li role="separator" class="divider"></li>
        <li><a id="btnToggleExpand" data-target="#" role="button">Expand all tables</a></li>
        <li><a id="btnToggleCollapse" data-target="#" role="button">Collapse all tables</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show Legend</a></li>
@@ -2566,6 +2568,9 @@ tr.qind-bp-row {
             elif "base_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
                 __fprice = '{:.1f}'.format(__blueprint_dict["base_price"])
+            elif "price" in __blueprint_dict:
+                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-danger">C</span></sup>'.format(cost=__blueprint_dict["price"])
+                __fprice = '{:.1f}'.format(__blueprint_dict["price"])
             # проверяем работки по текущему чертежу?
             __status = ""
             __activity = ""
@@ -2600,6 +2605,14 @@ tr.qind-bp-row {
                     __activity = '&nbsp;<span class="label label-success">reaction</span>'  # Reaction
                 else:
                     __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_activity)
+            # проверяем сведения по контракту, если чертёж прямо сейчас продаётся
+            elif "cntrct_sta" in __blueprint_dict:
+                # [ unknown, item_exchange, auction, courier, loan ]
+                __blueprint_status = __blueprint_dict["cntrct_typ"]
+                __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
+                # [ outstanding, in_progress, finished_issuer, finished_contractor, finished, cancelled, rejected, failed, deleted, reversed ]
+                __blueprint_activity = __blueprint_dict["cntrct_sta"]
+                __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_activity)
             # определяем местоположение чертежа
             __location_id = __blueprint_dict["loc"]
             __location_name = __location_id
@@ -2619,7 +2632,7 @@ tr.qind-bp-row {
             if __place[:-1] == "CorpSAG":
                 __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="qind-bp-row"{job}>'
+            glf.write('<tr class="qind-bp-row"{job}{cntrct}>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}{st}{act}</td>'
                       ' <td align="right">{me}</td>'
@@ -2635,8 +2648,9 @@ tr.qind-bp-row {
                              st=__status,
                              act=__activity,
                              job="" if __blueprint_activity is None else ' job="{}"'.format(__blueprint_activity),
-                             me=__blueprint_dict["me"],
-                             te=__blueprint_dict["te"],
+                             cntrct=" cntrct" if "cntrct_sta" in __blueprint_dict else "",
+                             me=__blueprint_dict["me"] if "me" in __blueprint_dict else "",
+                             te=__blueprint_dict["te"] if "te" in __blueprint_dict else "",
                              q=__blueprint_dict["q"],
                              price=__price,
                              iprice=__fprice,
@@ -2680,10 +2694,11 @@ tr.qind-bp-row {
   <strong>Box</strong> - detailed location of blueprint.
  </p>
  <p>
-  <span class="label label-primary">A</span>, <span class="label label-info">J</span>, <span class="label label-default">B</span> - <strong>price tags</strong>
+  <span class="label label-primary">A</span>, <span class="label label-info">J</span>, <span class="label label-default">B</span>,
+  <span class="label label-danger">C</span> - <strong>price tags</strong>,
   to indicate type of market' price. There are <span class="label label-primary">A</span> average price (<i>current market price</i>),
-  and <span class="label label-info">J</span> adjusted price (<i>average over the last 28 days</i>) and <span class="label label-default">B</span>
-  base price (<i>standart CCP item price</i>).
+  and <span class="label label-info">J</span> adjusted price (<i>average over the last 28 days</i>), <span class="label label-default">B</span>
+  base price (<i>standart CCP item price</i>) and <span class="label label-danger">C</span> - contract price.
  </p>
  <p>
   <span class="label label-default">active</span>, <span class="label label-default">delivered</span>,
@@ -2691,6 +2706,16 @@ tr.qind-bp-row {
   <span class="label label-warning">paused</span>, <span class="label label-warning">reverted</span> - all possible
   <strong>statuses</strong> of blueprints that are in industry mode.
  </p>
+  <span class="label label-danger">outstanding</span>,
+  <span class="label label-danger">in_progress</span>,
+  <span class="label label-danger">finished_issuer</span>,
+  <span class="label label-danger">finished_contractor</span>,
+  <span class="label label-danger">finished</span>,
+  <span class="label label-danger">cancelled</span>,
+  <span class="label label-danger">rejected</span>,
+  <span class="label label-danger">failed</span>,
+  <span class="label label-danger">deleted</span>,
+  <span class="label label-danger">reversed</span> - all possible <strong>statuses</strong> of current contracts.
  <p>
   <span class="label label-primary">manufacturing</span> - manufacturing industry activity.</br>
   <span class="label label-info">te</span>, 
@@ -2739,6 +2764,8 @@ tr.qind-bp-row {
         if (typ == 1) {
           keyA = parseInt(keyA, 10);
           keyB = parseInt(keyB, 10);
+          if (isNaN(keyA)) keyA = 0;
+          if (isNaN(keyB)) keyB = 0;
           return asc ? (keyA - keyB) : (keyB - keyA);
         } 
       }
@@ -2780,6 +2807,9 @@ tr.qind-bp-row {
     if (!ls.getItem('Show Industry Jobs')) {
       ls.setItem('Show Industry Jobs', 12);
     }
+    if (!ls.getItem('Show Contracts')) {
+      ls.setItem('Show Contracts', 1);
+    }
   }
   // Blueprints Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
@@ -2788,6 +2818,11 @@ tr.qind-bp-row {
       $('#imgShowLegend').removeClass('hidden');
     else
       $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Contracts');
+    if (show == 1)
+      $('#imgShowContracts').removeClass('hidden');
+    else
+      $('#imgShowContracts').addClass('hidden');
     show = ls.getItem('Show Price Vals');
     if (show == 1)
       $('#imgShowPriceVals').removeClass('hidden');
@@ -2838,13 +2873,18 @@ tr.qind-bp-row {
     }
   }
   // Blueprints filter method (to rebuild body components)
-  function isBlueprintVisible(el, loc, unused, job) {
+  function isBlueprintVisible(el, loc, unused, job, cntrct) {
     _res = 1;
     _loc = el.find('td').eq(5).text();
     _job = el.attr('job');
     _res = (loc && (_loc != loc)) ? 0 : 1;
     if (_res && (unused == 0)) {
       if (_job === undefined)
+        _res = 0;
+    }
+    if (_res && (cntrct == 0)) {
+      _cntrct = el.attr('cntrct');
+      if (!(_cntrct === undefined))
         _res = 0;
     }
     if (_res && (!(_job === undefined))) {
@@ -2913,12 +2953,13 @@ tr.qind-bp-row {
     loc = ls.getItem('Show Only Location');
     unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
+    cntrct = ls.getItem('Show Contracts');
     $('table').each(function() {
       _summary_qty = 0;
       _summary_price = 0.0;
       // filtering
       $(this).find('tr.qind-bp-row').each(function() {
-        show = isBlueprintVisible($(this), loc, unused, job);
+        show = isBlueprintVisible($(this), loc, unused, job, cntrct);
         if (show == 1) {
           $(this).removeClass('hidden');
           _summary_qty += parseInt($(this).find('td').eq(3).text(),10);
@@ -2954,6 +2995,12 @@ tr.qind-bp-row {
     $('#btnToggleLegend').on('click', function () {
       show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
       ls.setItem('Show Legend', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleShowContracts').on('click', function () {
+      show = (ls.getItem('Show Contracts') == 1) ? 0 : 1;
+      ls.setItem('Show Contracts', show);
       rebuildOptionsMenu();
       rebuildBody();
     });

@@ -38,13 +38,73 @@ from render_html import dump_blueprints_into_report
 from __init__ import __version__
 
 
+def __push_location_into_blueprints_locations(
+        __location_id,
+        blueprints_locations,
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data):
+    if not (str(__location_id) in blueprints_locations):
+        # получение название контейнера (названия ingame задают игроки)
+        __loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == __location_id), None)
+        __loc_dict = {"name": __loc_name}
+        # получение информации о регионе, солнечной системе и т.п. (поиск исходного root-а)
+        __root_location_id = __prev_location_id = int(__location_id)
+        __assets_roots = corp_assets_tree["roots"]
+        while True:
+            if __root_location_id in __assets_roots:
+                break
+            if str(__root_location_id) in corp_assets_tree:
+                a = corp_assets_tree[str(__root_location_id)]
+                if "location_id" in a:
+                    __prev_location_id = int(__root_location_id)
+                    __root_location_id = int(a["location_id"])
+                else:
+                    break
+            else:
+                # корня нет (нет ассетов в Jita, но контракт там есть)
+                # переходим к поиску по sde-items, см. https://docs.esi.evetech.net/docs/asset_location_id
+                if __root_location_id > 64000000:
+                    break
+                if str(__root_location_id) in sde_inv_items:
+                    i = sde_inv_items[str(__root_location_id)]
+                    if "locationID" in i:
+                        if i["locationID"] < 30000000:
+                            break
+                        __prev_location_id = int(__root_location_id)
+                        __root_location_id = int(i["locationID"])
+        # определяем регион и солнечную систему, где расположен чертёж
+        region_id, region_name, loc_name, __dummy0 = eve_esi_tools.get_assets_location_name(
+            int(__root_location_id),
+            sde_inv_names,
+            sde_inv_items,
+            corp_ass_names_data,
+            foreign_structures_data)
+        if not (region_id is None):
+            __loc_dict.update({"region_id": region_id, "region": region_name, "solar": loc_name})
+            if __prev_location_id != __root_location_id:
+                __dummy1, __dummy2, loc_name, foreign = eve_esi_tools.get_assets_location_name(
+                    int(__prev_location_id),
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_ass_names_data,
+                    foreign_structures_data)
+                __loc_dict.update({"station": loc_name, "foreign": foreign})
+            blueprints_locations.update({str(__location_id): __loc_dict})
+
+
 def __build_blueprints(
         corp_blueprints_data,
         corp_industry_jobs_data,
         eve_market_prices_data,
+        corp_contracts_data,
+        corp_contract_items_data,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
+        sde_market_groups,
         corp_assets_tree,
         corp_ass_names_data,
         foreign_structures_data):
@@ -99,43 +159,70 @@ def __build_blueprints(
         elif "basePrice" in __type_desc:
             __blueprint.update({"base_price": __type_desc["basePrice"]})
         # осуществляем поиск местоположения чертежа
-        if not (str(__location_id) in blueprints_locations):
-            # получение название контейнера (названия ingame задают игроки)
-            __loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == __location_id), None)
-            __loc_dict = {"name": __loc_name}
-            # получение информации о регионе, солнечной системе и т.п. (поиск исходного root-а)
-            __root_location_id = __prev_location_id = int(__location_id)
-            __assets_roots = corp_assets_tree["roots"]
-            while True:
-                if __root_location_id in __assets_roots:
-                    break
-                if str(__root_location_id) in corp_assets_tree:
-                    a = corp_assets_tree[str(__root_location_id)]
-                    if "location_id" in a:
-                        __prev_location_id = int(__root_location_id)
-                        __root_location_id = int(a["location_id"])
-                    else:
-                        break
-            # определяем регион и солнечную систему, где расположен чертёж
-            region_id, region_name, loc_name, __dummy0 = eve_esi_tools.get_assets_location_name(
-                int(__root_location_id),
-                sde_inv_names,
-                sde_inv_items,
-                corp_ass_names_data,
-                foreign_structures_data)
-            if not (region_id is None):
-                __loc_dict.update({"region_id": region_id, "region": region_name, "solar": loc_name})
-                if __prev_location_id != __root_location_id:
-                    __dummy1, __dummy2, loc_name, foreign = eve_esi_tools.get_assets_location_name(
-                        int(__prev_location_id),
-                        sde_inv_names,
-                        sde_inv_items,
-                        corp_ass_names_data,
-                        foreign_structures_data)
-                    __loc_dict.update({"station": loc_name, "foreign": foreign})
-                blueprints_locations.update({str(__location_id): __loc_dict})
+        __push_location_into_blueprints_locations(
+            __location_id,
+            blueprints_locations,
+            sde_inv_names,
+            sde_inv_items,
+            corp_assets_tree,
+            corp_ass_names_data,
+            foreign_structures_data)
         # добавляем собранную информацию в список чертежей
         blueprints.append(__blueprint)
+
+    # debug contracts only: blueprints = []
+    # debug contracts only: blueprints_locations = {}
+
+    for __contract_items_dict in corp_contract_items_data:
+        __contract_id_key = __contract_items_dict.keys()
+        for __contract_id in __contract_id_key:
+            __items = __contract_items_dict[str(__contract_id)]
+            for __items_dict in __items:
+                # пропускаем отклонения от нормы, а также контракты на покупку, а не на продажу
+                if not ("is_included" in __items_dict):
+                   continue
+                elif not bool(__items_dict["is_included"]):
+                   continue
+                __type_id = __items_dict["type_id"]
+                __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
+                    # raw_qauntity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
+                    # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
+                    if "raw_qauntity" in  __items_dict:
+                        __raw_qauntity = __items_dict["raw_qauntity"]
+                        if __raw_qauntity == -2:
+                            continue
+                    # получение данных по чертежу, находящемуся в продаже
+                    __quantity = __items_dict["quantity"]
+                    __type_desc = sde_type_ids[str(__type_id)]
+                    # получение общих данных данных по контракту
+                    __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
+                    __location_id = __contract_dict["start_location_id"]
+                    __blueprint = {
+                        "item_id": __items_dict["record_id"],
+                        "type_id": __type_id,
+                        "name": __type_desc["name"]["en"],
+                        # "me": None,
+                        # "te": None,
+                        "q": __quantity,
+                        "loc": __location_id,
+                        "flag": __contract_dict["title"],
+                        "price": __contract_dict["price"],
+                        "cntrct_sta": __contract_dict["status"],
+                        "cntrct_typ": __contract_dict["type"]
+                    }
+                    # осуществляем поиск местоположения чертежа
+                    __push_location_into_blueprints_locations(
+                        __location_id,
+                        blueprints_locations,
+                        sde_inv_names,
+                        sde_inv_items,
+                        corp_assets_tree,
+                        corp_ass_names_data,
+                        foreign_structures_data)
+                    # добавляем собранную информацию в список чертежей
+                    blueprints.append(__blueprint)
+
     return blueprints, blueprints_locations
 
 
@@ -147,6 +234,7 @@ def main():
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     corps_blueprints = {}
     eve_market_prices_data = None
@@ -200,12 +288,6 @@ def main():
         print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
         sys.stdout.flush()
 
-        # Requires role(s): access token
-        corp_contracts_data = interface.get_esi_paged_data(
-            "corporations/{}/contracts/".format(corporation_id))
-        print("\n'{}' corporation has {} contracts".format(corporation_name, len(corp_contracts_data)))
-        sys.stdout.flush()
-
         # Requires role(s): Factory_Manager
         corp_industry_jobs_data = interface.get_esi_paged_data(
             "corporations/{}/industry/jobs/".format(corporation_id))
@@ -248,6 +330,48 @@ def main():
             print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
         sys.stdout.flush()
 
+        # Requires role(s): access token
+        corp_contracts_data = interface.get_esi_paged_data(
+            "corporations/{}/contracts/".format(corporation_id))
+        print("\n'{}' corporation has {} contracts".format(corporation_name, len(corp_contracts_data)))
+        sys.stdout.flush()
+
+        # Получение подробной информации о каждому из контракту в списке
+        corp_contract_items_data = []
+        corp_contract_items_len = 0
+        corp_contract_items_not_found = []
+        if len(corp_contracts_data) > 0:
+            # Requires: access token
+            for c in corp_contracts_data:
+                # для удалённых контрактов нельзя загрузить items (см. ниже 404-ошибку), поэтому пропускаем запись
+                if c["status"] == "deleted":
+                    continue
+                # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
+                # ищем публичные контракты типа "обмен предметами"
+                if (c["availability"] != "public") or (c["type"] != "item_exchange"):
+                    continue
+                contract_id = c["contract_id"]
+                try:
+                    __contract_items = interface.get_esi_data(
+                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id))
+                    corp_contract_items_len += len(__contract_items)
+                    corp_contract_items_data.append({str(contract_id): __contract_items})
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # это нормально, что часть доп.инфы по контрактам может быть не найдена!
+                        corp_contract_items_not_found.append(contract_id)
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
+
+        print("\n'{}' corporation has {} items in contracts".format(corporation_name, corp_contract_items_len))
+        if len(corp_contract_items_not_found) > 0:
+            print("\n'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+        sys.stdout.flush()
+
         # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
         # элементов, в виде:
         # { location1: {items:[item1,item2,...],type_id,location_id},
@@ -262,9 +386,12 @@ def main():
             corp_blueprints_data,
             corp_industry_jobs_data,
             eve_market_prices_data,
+            corp_contracts_data,
+            corp_contract_items_data,
             sde_type_ids,
             sde_inv_names,
             sde_inv_items,
+            sde_market_groups,
             corp_assets_tree,
             corp_ass_names_data,
             foreign_structures_data)
