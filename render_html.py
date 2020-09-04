@@ -965,8 +965,10 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     for cn in q_logist_settings.g_cynonetworks:
         cynonetwork_num = cynonetwork_num + 1
         cn_route = cn["route"]
-        # from_name = ""
-        # to_name = ""
+        from_id = cn_route[0]
+        from_name = corp_cynonetwork[str(from_id)]["solar_system"]
+        to_id = cn_route[-1]
+        to_name = corp_cynonetwork[str(to_id)]["solar_system"]
         url = ""
         human_readable = ""
         route_signalling_level = 0
@@ -1023,7 +1025,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     ))
             progress_times = progress_times + 1
         glf.write("""   </div>
-   <table class="table">
+   <table class="table qind-tbl-cynonet">
     <thead>
      <tr>
       <th>#</th>
@@ -1130,7 +1132,137 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                         ly='Distance: <strong>{:0.3f} ly</strong>'.format(lightyears) if not (lightyears is None) else ""
                     ))
             row_num = row_num + 1
-        glf.write("""    </tbody>
+        glf.write("""
+    </tbody>
+    <tfoot>
+     <tr>
+      <td colspan="2"></td>
+      <td colspan="5">
+""")
+        # добавляем диалоговое окно, в котором будет видно что именно не хватает на маршруте, и в каком количестве?
+        __dump_any_into_modal_header(
+            glf,
+            'What''s missing on the route <span class="text-primary">{f} &rarr; {t}</span>?'.format(f=from_name,t=to_name),
+            'NotEnough{cnn}'.format(cnn=cynonetwork_num),
+            "btn-sm",
+            "Not enough&hellip;")
+        # формируем содержимое модального диалога
+        glf.write("""
+<div class="table-responsive">
+ <table class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Solar System</th>
+  <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
+           src="https://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
+           src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
+  <th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        # выводим сводную информацию
+        row_num = 1
+        badger_num_ne_summary = 0
+        venture_num_ne_summary = 0
+        exp_cargohold_num_ne_summary = 0
+        cargohold_rigs_num_ne_summary = 0
+        indus_cyno_gen_num_ne_summary = 0
+        liquid_ozone_num_ne_summary = 0
+        for location_id in cn_route:
+            route_place = corp_cynonetwork[str(location_id)]
+            system_name = route_place["solar_system"]
+            if not ("error" in route_place) or (route_place["error"] != "no data"):
+                badger_num = route_place["badger"]
+                venture_num = route_place["venture"]
+                liquid_ozone_num = route_place["liquid_ozone"]
+                indus_cyno_gen_num = route_place["indus_cyno_gen"]
+                exp_cargohold_num = route_place["exp_cargohold"]
+                cargohold_rigs_num = route_place["cargohold_rigs"]
+                #---
+                badger_num_ne = 11 - badger_num if badger_num <= 11 else 0
+                venture_num_ne = 11 - venture_num if venture_num <= 11 else 0
+                exp_cargohold_num_ne = 11 - exp_cargohold_num if exp_cargohold_num <= 11 else 0
+                cargohold_rigs_num_ne = 33 - cargohold_rigs_num if cargohold_rigs_num <= 33 else 0
+                indus_cyno_gen_num_ne = 11 - indus_cyno_gen_num if indus_cyno_gen_num <= 11 else 0
+                liquid_ozone_num_ne = 950*11 - liquid_ozone_num if liquid_ozone_num <= (950*11) else 0
+                #---
+                badger_num_ne_summary += badger_num_ne
+                venture_num_ne_summary += venture_num_ne
+                exp_cargohold_num_ne_summary += exp_cargohold_num_ne
+                cargohold_rigs_num_ne_summary += cargohold_rigs_num_ne
+                indus_cyno_gen_num_ne_summary += indus_cyno_gen_num_ne
+                liquid_ozone_num_ne_summary += liquid_ozone_num_ne
+                glf.write(
+                    '<tr id="rowNotEnough{cnn}_{num}" system="{nm}">\n'
+                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <td>{bne:,d}</td>\n'
+                    ' <td>{vne:,d} / {chne:,d} / {chrne:,d}</td>\n'
+                    ' <td>{icgne:,d}</td><td>{lone:,d}</td>\n'
+                    ' <td class="nitrogen"></td>\n'
+                    ' <td class="hydrogen"></td>\n'
+                    ' <td class="oxygen"></td>\n'
+                    ' <td class="helium"></td>\n'
+                    '</tr>'.
+                    format(num=row_num,
+                           cnn=cynonetwork_num,
+                           nm=system_name,
+                           bne=badger_num_ne,
+                           vne=venture_num_ne,
+                           chne=exp_cargohold_num_ne,
+                           chrne=cargohold_rigs_num_ne,
+                           icgne=indus_cyno_gen_num_ne,
+                           lone=liquid_ozone_num_ne
+                    ))
+            else:
+                glf.write(
+                    '<tr>\n'
+                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    '</tr>'.
+                    format(num=row_num,
+                           nm=system_name))
+            row_num = row_num + 1
+        # формируем footer модального диалога (формируем summary по недостающим материалам)
+        glf.write("""
+</tbody>
+<tfoot>
+""")
+        glf.write(
+            '<tr id="rowNotEnoughSummary{cnn}" style="font-weight:bold;">\n'
+            ' <td colspan="2" align="right">Summary (not enough):</td>\n'
+            ' <td>{b:,d}</td>\n'
+            ' <td>{v:,d} / {ch:,d} / {chr:,d}</td>\n'
+            ' <td>{icg:,d}</td><td>{lo:,d}</td>\n'
+            ' <td class="nitrogen"></td>\n'
+            ' <td class="hydrogen"></td>\n'
+            ' <td class="oxygen"></td>\n'
+            ' <td class="helium"></td>\n'
+            '</tr>'.
+            format(cnn=cynonetwork_num,
+                   b=badger_num_ne_summary,
+                   v=venture_num_ne_summary,
+                   ch=exp_cargohold_num_ne_summary,
+                   chr=cargohold_rigs_num_ne_summary,
+                   icg=indus_cyno_gen_num_ne_summary,
+                   lo=liquid_ozone_num_ne_summary)
+        )
+        glf.write("""
+</tfoot>
+ </table>
+</div>
+""")
+        # закрываем footer модального диалога
+        __dump_any_into_modal_footer(glf)
+
+        glf.write("""
+      </td>
+      </tr>
+    </tfoot>
    </table>
   </div>
  </div>""")
@@ -1375,41 +1507,82 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     //TODO:var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
     var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
     var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
-    $('tr.active td').each(function() {
-      ly = $(this).attr('lightyears');
-      if (ly) {
-        ly = parseFloat(ly);
-        var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
-        var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
-        var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
-        var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
-        cn_num = $(this).attr('cynonet');
-        rt_num = $(this).attr('route');
-        times = null
-        contents = null
-        for (var rt of contentsCynoNetwork[cn_num-1][1]) {
-          if (rt[0] == rt_num) {
-            contents = [rt[4],rt[5],rt[6],rt[7]]
-            times = [parseInt(rt[4]/nitrogen_used), parseInt(rt[5]/hydrogen_used),
-                     parseInt(rt[6]/oxygen_used), parseInt(rt[7]/helium_used)];
-            break;
+    $('table.qind-tbl-cynonet').each(function() {
+      var table = $(this);
+      var tbody = table.find('tbody');
+      var not_enough_summary = [0,0,0,0];
+      var not_enough_cn_num = null;
+      tbody.find('tr.active td').each(function() {
+        ly = $(this).attr('lightyears');
+        if (ly) {
+          ly = parseFloat(ly);
+          var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
+          var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
+          var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
+          var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
+          not_enough_cn_num = cn_num = $(this).attr('cynonet');
+          rt_num = $(this).attr('route');
+          times = null
+          contents = null
+          for (var rt of contentsCynoNetwork[cn_num-1][1]) {
+            if (rt[0] == rt_num) {
+              contents = [rt[4],rt[5],rt[6],rt[7]]
+              times = [parseInt(rt[4]/nitrogen_used), parseInt(rt[5]/hydrogen_used),
+                       parseInt(rt[6]/oxygen_used), parseInt(rt[7]/helium_used)];
+              break;
+            }
+          }
+          $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
+                        '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
+                        '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
+                        '<span class="helium"><strong>' + helium_used + '</strong> He</span>');
+          if (times && contents) {
+            if (contents[0]) {
+              $('#niCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[0]+' Rhea jumps">'+numLikeEve(contents[0])+'</abbr>');
+              var not_enough = (contents[0] >= (nitrogen_used * 11)) ? 0 : ((nitrogen_used * 11) - contents[0]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(5).html(numLikeEve(not_enough));
+              not_enough_summary[0] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(5).html(numLikeEve(nitrogen_used * 11));
+              not_enough_summary[0] += nitrogen_used * 11;
+            }
+            if (contents[1]) {
+              $('#hyCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[1]+' Nomad jumps">'+numLikeEve(contents[1])+'</abbr>');
+              var not_enough = (contents[1] >= (hydrogen_used * 11)) ? 0 : ((hydrogen_used * 11) - contents[1]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(6).html(numLikeEve(not_enough));
+              not_enough_summary[1] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(6).html(numLikeEve(hydrogen_used * 11));
+              not_enough_summary[1] += hydrogen_used * 11;
+            }
+            if (contents[2]) {
+              $('#oxCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[2]+' Anshar jumps">'+numLikeEve(contents[2])+'</abbr>');
+              var not_enough = (contents[2] >= (oxygen_used * 11)) ? 0 : ((oxygen_used * 11) - contents[2]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(7).html(numLikeEve(not_enough));
+              not_enough_summary[2] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(7).html(numLikeEve(oxygen_used * 11));
+              not_enough_summary[2] += hydrogen_used * 11;
+            }
+            if (contents[3]) {
+              $('#heCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[3]+' Ark jumps">'+numLikeEve(contents[3])+'</abbr>');
+              var not_enough = (contents[3] >= (helium_used * 11)) ? 0 : ((helium_used * 11) - contents[3]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(8).html(numLikeEve(not_enough));
+              not_enough_summary[3] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(8).html(numLikeEve(helium_used * 11));
+              not_enough_summary[3] += helium_used * 11;
+            }
           }
         }
-        $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
-                      '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
-                      '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
-                      '<span class="helium"><strong>' + helium_used + '</strong> He</span>');
-        if (times && contents) {
-          if (contents[0])
-            $('#niCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[0]+' Rhea jumps">'+numLikeEve(contents[0])+'</abbr>');
-          if (contents[1])
-            $('#hyCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[1]+' Nomad jumps">'+numLikeEve(contents[1])+'</abbr>');
-          if (contents[2])
-            $('#oxCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[2]+' Anshar jumps">'+numLikeEve(contents[2])+'</abbr>');
-          if (contents[3])
-            $('#heCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[3]+' Ark jumps">'+numLikeEve(contents[3])+'</abbr>');
-        }
-      }
+      });
+      var tr_summary = $('#rowNotEnoughSummary'+not_enough_cn_num.toString());
+      for (var i = 0; i < 4; ++i)
+        tr_summary.find('td').eq(5+i).html(numLikeEve(not_enough_summary[i]));
     });
     if (!ship) { // show all
       for (var t of usedIsotopeTags) {
