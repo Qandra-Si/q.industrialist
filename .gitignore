@@ -145,3 +145,4 @@ dmypy.json
 /*.~json
 /*.html
 /*.csv
+/q_blueprints_settings.py

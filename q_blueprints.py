@@ -148,16 +148,15 @@ def __build_blueprints(
                     "loc": __location_id  # переопределяем!!!
                 })
         # выясняем стоимость чертежа
-        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
-        if not (__price_dict is None):
-            if "average_price" in __price_dict:
-                __blueprint.update({"average_price": __price_dict["average_price"]})
-            elif "adjusted_price" in __price_dict:
-                __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
-            elif "basePrice" in __type_desc:
-                __blueprint.update({"base_price": __type_desc["basePrice"]})
-        elif "basePrice" in __type_desc:
+        if "basePrice" in __type_desc:
             __blueprint.update({"base_price": __type_desc["basePrice"]})
+        else:
+            __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+            if not (__price_dict is None):
+                if "average_price" in __price_dict:
+                    __blueprint.update({"average_price": __price_dict["average_price"]})
+                elif "adjusted_price" in __price_dict:
+                    __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
         # осуществляем поиск местоположения чертежа
         __push_location_into_blueprints_locations(
             __location_id,

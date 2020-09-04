@@ -12,6 +12,7 @@ from eve_esi_tools import get_assets_location_name
 
 import q_industrialist_settings
 import q_logist_settings
+import q_blueprints_settings
 
 g_local_timezone = tzlocal.get_localzone()
 
@@ -81,24 +82,31 @@ def __dump_footer(glf):
     glf.write("</body></html>")
 
 
-def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", btn_nm=None):
+def __dump_any_into_modal_header_wo_button(glf, name, unique_id=None, modal_size=None):
     name_merged = name.replace(' ', '') if unique_id is None else unique_id
     glf.write(
-        '<!-- Button trigger for {nm} Modal -->\n'
-        '<button type="button" class="btn btn-primary {btn_sz}" data-toggle="modal" data-target="#modal{nmm}">{btn_nm}</button>\n'
         '<!-- {nm} Modal -->\n'
         '<div class="modal fade" id="modal{nmm}" tabindex="-1" role="dialog" aria-labelledby="modal{nmm}Label">\n'
-        ' <div class="modal-dialog" role="document">\n'
+        ' <div class="modal-dialog{mdl_sz}" role="document">\n'
         '  <div class="modal-content">\n'
         '   <div class="modal-header">\n'
         '    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>\n'
         '    <h4 class="modal-title" id="modal{nmm}Label">{nm}</h4>\n'
         '   </div>\n'
         '   <div class="modal-body">\n'.
+        format(nm=name, nmm=name_merged, mdl_sz='' if modal_size is None else ' {}'.format(modal_size)))
+
+
+def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", btn_nm=None):
+    name_merged = name.replace(' ', '') if unique_id is None else unique_id
+    glf.write(
+        '<!-- Button trigger for {nm} Modal -->\n'
+        '<button type="button" class="btn btn-primary {btn_sz}" data-toggle="modal" data-target="#modal{nmm}">{btn_nm}</button>\n'.
         format(nm=name,
                nmm=name_merged,
                btn_sz=btn_size,
                btn_nm='Show {nm}'.format(nm=name) if btn_nm is None else btn_nm))
+    __dump_any_into_modal_header_wo_button(glf, name, unique_id, modal_size=None)
 
 
 def __dump_any_into_modal_footer(glf):
@@ -2539,6 +2547,181 @@ def dump_accounting_into_report(
         glf.close()
 
 
+def __dump_corp_blueprints_sales(
+        glf,
+        corps_blueprints):
+    __corp_keys = corps_blueprints.keys()
+    # составляем список locations, где могут лежать чертежи, с тем чтобы сделать возможность группировать их по locations
+    used_location_names = []
+    for corporation_id in __corp_keys:
+        if not (int(corporation_id) in q_blueprints_settings.g_sale_of_blueprint["corporation_id"]):
+            continue
+        __corp = corps_blueprints[str(corporation_id)]
+        # название станций и звёздных систем
+        __loc_keys = __corp["locations"].keys()
+        for __loc_key in __loc_keys:
+            __loc_dict = __corp["locations"][str(__loc_key)]
+            if "station" in __loc_dict:
+                __location_name = __loc_dict["station"]
+            elif "solar" in __loc_dict:
+                __location_name = __loc_dict["solar"]
+            else:
+                __location_name = __loc_key
+            __used_name = next((n for n in used_location_names if n['name'] == __location_name), None)
+            # определяем ангары, где лежат чертёжи
+            for __blueprint_dict in __corp["blueprints"]:
+                if __blueprint_dict["loc"] != int(__loc_key):
+                    continue
+                if "st" in __blueprint_dict:  # пропускаем чертежы, над которым выполяются какие-либо работы
+                    continue
+                if "cntrct_sta" in __blueprint_dict:  # пропускаем places из контрактов (там не ангары, а ingame комментарии)
+                    continue
+                __type_id = __blueprint_dict["type_id"]
+                if not (__used_name is None):  # в окно sales чертежи одного типа многократно не добавляются
+                    if __used_name["types"].count(__type_id) > 0:
+                        continue
+                __blueprint_id = __blueprint_dict["item_id"]
+                __place = __blueprint_dict["flag"]
+                if __place[:-1] == "CorpSAG":
+                    __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+                # добавляем в список обнаруженных мест, локацию с ангарами (исключая локации только с контрактами)
+                if __used_name is None:
+                    __used_name = {"name": __location_name, "places": [__place], "ids": [], "types": []}
+                    used_location_names.append(__used_name)
+                elif __used_name["places"].count(__place) == 0:
+                    __used_name["places"].append(__place)
+                __used_name["ids"].append(__blueprint_id)
+                __used_name["types"].append(__type_id)
+            if not (__used_name is None):
+                __used_name["places"].sort()
+    used_location_names = sorted(used_location_names, key=lambda x: x['name'])
+
+    # формируем dropdown список, где можон будет выбрать локации и ангары
+    glf.write("""
+<div id="ddSales" class="dropdown">
+  <button class="btn btn-default dropdown-toggle" type="button" id="ddSalesMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+    <span class="qind-lb-dd">Choose Place&hellip;</span>
+    <span class="caret"></span>
+  </button>
+  <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+""")
+    first_time = True
+    for __used_name in used_location_names:
+        if not first_time:
+            glf.write('<li role="separator" class="divider"></li>\n')
+        first_time = False
+        glf.write('<li class="dropdown-header">{nm}</li>\n'.format(nm=__used_name["name"]))
+        for __place in __used_name["places"]:
+            glf.write('<li><a href="#" loc="{nm}">{pl}</a></li>\n'.format(nm=__used_name["name"], pl=__place))
+    glf.write("""
+  </ul>
+</div>
+
+<style>
+#tblSales tr {
+  font-size: small;
+}
+</style>
+
+<div class="table-responsive">
+ <table id="tblSales" class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Blueprint</th>
+  <th class="hidden"></th>
+  <th class="hidden"></th>
+  <th>Price</th>
+  <th>Contract</th>
+ </tr>
+</thead>
+<tbody>
+""")
+
+    row_num = 1
+    for corporation_id in __corp_keys:
+        if not (int(corporation_id) in q_blueprints_settings.g_sale_of_blueprint["corporation_id"]):
+            continue
+        __corp = corps_blueprints[str(corporation_id)]
+        __loc_keys = __corp["locations"].keys()
+        for __loc_key in __loc_keys:
+            __loc_dict = __corp["locations"][str(__loc_key)]
+            if "station" in __loc_dict:
+                __location_name = __loc_dict["station"]
+            elif "solar" in __loc_dict:
+                __location_name = __loc_dict["solar"]
+            else:
+                __location_name = __loc_key
+            __used_name = next((n for n in used_location_names if n['name'] == __location_name), None)
+            if __used_name is None:
+                continue
+            # определяем ангары, где лежат чертёжи
+            __corp_blueprints = __corp["blueprints"]
+            for __blueprint_dict in __corp_blueprints:
+                if not __blueprint_dict["item_id"] in __used_name["ids"]:
+                    continue
+                __place = __blueprint_dict["flag"]
+                if __place[:-1] == "CorpSAG":
+                    __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+                __me = __blueprint_dict["me"]
+                __te = __blueprint_dict["te"]
+                __type_id = __blueprint_dict["type_id"]
+                __price = ""
+                # выясняем сколько стоит чертёж?
+                if "base_price" in __blueprint_dict:
+                    __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
+                elif "average_price" in __blueprint_dict:
+                    __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-primary">A</span></sup>'.format(cost=__blueprint_dict["average_price"])
+                elif "adjusted_price" in __blueprint_dict:
+                    __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-info">J</span></sup>'.format(cost=__blueprint_dict["adjusted_price"])
+                # выясняем список текущих контрактов по чертежу
+                __contracts = [b for b in __corp_blueprints if (b['type_id'] == __type_id) and ("cntrct_sta" in b)]
+
+                __contracts_summary = ""
+                for __cntrct_dict in __contracts:
+                    # [ unknown, item_exchange, auction, courier, loan ]
+                    __blueprint_status = __cntrct_dict["cntrct_typ"]
+                    __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
+                    # [ outstanding, in_progress, finished_issuer, finished_contractor, finished, cancelled, rejected, failed, deleted, reversed ]
+                    __blueprint_contract_activity = __cntrct_dict["cntrct_sta"]
+                    __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
+                    # summary по контракту
+                    if __contracts_summary:
+                        __contracts_summary += '</br>\n'
+                    __contracts_summary += \
+                        '{prc:,.1f}{st}{act}'. \
+                        format(prc=__cntrct_dict["price"],
+                               st=__status,
+                               act=__activity)
+                # формируем строку таблицы - найден нужный чертёж в ассетах
+                glf.write(
+                    '<tr>'
+                    '<th scope="row">{num}</th>'
+                    '<td>{nm} <span class="label label-{lbclr}">{me} {te}</span></td>'
+                    '<td class="hidden">{loc}</td>'
+                    '<td class="hidden">{pl}</td>'
+                    '<td align="right">{prc}</td>'
+                    '<td>{cntrct}</td>'
+                    '</tr>\n'.
+                    format(num=row_num,
+                           nm=__blueprint_dict["name"],
+                           me=__me,
+                           te=__te,
+                           lbclr="success" if (__me == 10) and (__te == 20) else "warning",
+                           loc=__location_name,
+                           pl=__place,
+                           prc=__price,
+                           cntrct=__contracts_summary)
+                )
+                row_num = row_num + 1
+
+    glf.write("""
+</tbody>     
+ </table>
+</div>     
+""")
+
+
 def __dump_corp_blueprints_tbl(
         glf,
         corps_blueprints):
@@ -2643,6 +2826,8 @@ def __dump_corp_blueprints_tbl(
 """)
 
     glf.write("""
+
+    <li><a data-target="#modalSales" role="button" data-toggle="modal">Sales</a></li>
    </ul>
 
    <form id="frmFilter" class="navbar-form navbar-right">
@@ -2733,15 +2918,15 @@ tr.qind-bp-row {
             # выясняем сколько стоит один чертёж?
             __price = ""
             __fprice = ""
-            if "average_price" in __blueprint_dict:
+            if "base_price" in __blueprint_dict:
+                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
+                __fprice = '{:.1f}'.format(__blueprint_dict["base_price"])
+            elif "average_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-primary">A</span></sup>'.format(cost=__blueprint_dict["average_price"])
                 __fprice = '{:.1f}'.format(__blueprint_dict["average_price"])
             elif "adjusted_price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-info">J</span></sup>'.format(cost=__blueprint_dict["adjusted_price"])
                 __fprice = '{:.1f}'.format(__blueprint_dict["adjusted_price"])
-            elif "base_price" in __blueprint_dict:
-                __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-default">B</span></sup>'.format(cost=__blueprint_dict["base_price"])
-                __fprice = '{:.1f}'.format(__blueprint_dict["base_price"])
             elif "price" in __blueprint_dict:
                 __price = '{cost:,.1f} <sup class="qind-price-tag"><span class="label label-danger">C</span></sup>'.format(cost=__blueprint_dict["price"])
                 __fprice = '{:.1f}'.format(__blueprint_dict["price"])
@@ -2867,7 +3052,20 @@ tr.qind-bp-row {
 
     glf.write("""
  </div> <!--accordion-->
+""")
 
+    # создаём заголовок модального окна, где будем показывать список чертежей для продажи
+    __dump_any_into_modal_header_wo_button(
+        glf,
+        'Sales of blueprints',
+        'Sales',
+        'modal-lg')
+    # формируем содержимое модального диалога
+    __dump_corp_blueprints_sales(glf, corps_blueprints)
+    # закрываем footer модального диалога
+    __dump_any_into_modal_footer(glf)
+
+    glf.write("""
 <div id="legend-block">
  <hr>
  <h4>Legend</h4>
@@ -3186,6 +3384,32 @@ tr.qind-bp-row {
       tr_summary.find('td').eq(1).html(_summary_c_qty);
       tr_summary.find('td').eq(2).html(numLikeEve(_summary_c_price.toFixed(1)));
     })
+    // filtering sales
+    var sales_loc_name = ls.getItem('Sales Location');
+    var sales_place = ls.getItem('Sales Place');
+    $('#tblSales').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = true;
+      if (!(sales_loc_name === null)) {
+        show = sales_loc_name == tr.find('td').eq(1).text();
+        if (show)
+          show = sales_place == tr.find('td').eq(2).text();
+      }
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  // Blueprints Dropdown menu setup
+  function rebuildSalesDropdown() {
+    var sales_loc_name = ls.getItem('Sales Location');
+    var sales_place = ls.getItem('Sales Place');
+    if (!(sales_loc_name === null)) {
+      var btn = $('#ddSalesMenu');
+      btn.find('span.qind-lb-dd').html(sales_loc_name + ' <mark>' + sales_place + '</mark>');
+      btn.val(sales_place);
+    }
   }
   // Blueprints Options menu and submenu setup
   $(document).ready(function(){
@@ -3321,6 +3545,15 @@ tr.qind-bp-row {
     $("#frmFilter").submit(function(e) {
       e.preventDefault();
     });
+    $('#ddSales').on('click', 'li a', function () {
+      var li_a = $(this);
+      var loc_name = li_a.attr('loc');
+      var place = li_a.text();
+      ls.setItem('Sales Location', loc_name);
+      ls.setItem('Sales Place', place);
+      rebuildSalesDropdown();
+      rebuildBody();
+    });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
@@ -3330,6 +3563,7 @@ tr.qind-bp-row {
     // first init
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
+    rebuildSalesDropdown();
     rebuildBody();
   });
 </script>
