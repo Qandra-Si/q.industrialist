@@ -247,7 +247,7 @@ def __dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 """)
 
 
-def __dump_conveyor_blueprints(
+def __dump_blueprints_list_with_materials(
         glf,
         corp_bp_loc_data,
         corp_industry_jobs_data,
@@ -259,6 +259,8 @@ def __dump_conveyor_blueprints(
         stock_all_loc_ids,
         blueprint_loc_ids,
         enable_copy_to_clipboard=False):
+    # инициализация списка материалов, которых не хватает в производстве
+    stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
     stock_resources = {}
     if not (stock_all_loc_ids is None):
@@ -469,6 +471,13 @@ def __dump_conveyor_blueprints(
                         not_available = 0 if stock_resources[ms_type_id] >= not_available else \
                             not_available - stock_resources[ms_type_id]
                     if not_available > 0:
+                        # формирование выходного списка недостающих материалов
+                        __stock_ne = next((ne for ne in stock_not_enough_materials if ne['id'] == ms_type_id), None)
+                        if __stock_ne is None:
+                            stock_not_enough_materials.append({"id": ms_type_id, "q": not_available})
+                        else:
+                            __stock_ne["q"] += not_available
+                        # вывод сведений в отчёт
                         if not_available_row_num == 1:
                             glf.write("""
 <h4 class="media-heading">Not available materials</h4>
@@ -539,6 +548,8 @@ def __dump_conveyor_blueprints(
 </div>
 <!-- END: collapsable group (locations) -->
 """)
+
+    return stock_not_enough_materials
 
 
 def __dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
@@ -756,7 +767,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_conveyor_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -1884,6 +1895,151 @@ def dump_bpos_into_report(
         glf.close()
 
 
+def __dump_conveyor_stock_all(
+        glf,
+        corp_industry_jobs_data,
+        corp_ass_loc_data,
+        materials_for_bps,
+        research_materials_for_bps,
+        sde_type_ids,
+        sde_market_groups,
+        stock_all_loc_ids,
+        stock_not_enough_materials):
+    if stock_all_loc_ids is None:
+        return
+    # формирование списка ресурсов, которые используются в производстве
+    stock_resources = {}
+    loc_flags = corp_ass_loc_data.keys()
+    for loc_flag in loc_flags:
+        __a1 = corp_ass_loc_data[loc_flag]
+        for loc_id in __a1:
+            if not (int(loc_id) in stock_all_loc_ids):
+                continue
+            __a2 = __a1[str(loc_id)]
+            __a2_keys = __a2.keys()
+            for __a3 in __a2_keys:
+                __type_id = int(__a3)
+                __quantity = __a2[__type_id]
+                # определяем группу, которой принадлежат материалы
+                __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if str(__market_group) in stock_resources:
+                    __stock_group = stock_resources[str(__market_group)]
+                else:
+                    __group_name = sde_market_groups[str(__market_group)]["nameID"]["en"] if str(__market_group) in sde_market_groups else None  # устарел sde?
+                    if not (__group_name is None):
+                        __stock_group = {"name": __group_name, "items": []}
+                        stock_resources.update({str(__market_group): __stock_group})
+                    else:
+                        __stock_group = {"name": "Unknown", "items": []}
+                        stock_resources.update({"0": __stock_group})
+                # пополняем список материалов в группе
+                __resource_dict = next((r for r in __stock_group["items"] if r['id'] == __type_id), None)
+                if __resource_dict is None:
+                    __name = sde_type_ids[str(__type_id)]["name"]["en"] if str(__type_id) in sde_type_ids else str(__type_id)
+                    __resource_dict = {"id": __type_id,
+                                       "name": __name,
+                                       "q": __quantity}
+                    __stock_group["items"].append(__resource_dict)
+                else:
+                    __resource_dict["q"] += __quantity
+    # пополняем список ресурсом записями с недостающим (отсутствующим количеством)
+    for ne in stock_not_enough_materials:
+        __type_id = ne["id"]
+        # определяем группу, которой принадлежат материалы
+        __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+        if str(__market_group) in stock_resources:
+            __stock_group = stock_resources[str(__market_group)]
+        else:
+            __stock_group = {"name": sde_market_groups[str(__market_group)]["nameID"]["en"], "items": []}
+            stock_resources.update({str(__market_group): __stock_group})
+        __resource_dict = next((r for r in __stock_group["items"] if r['id'] == __type_id), None)
+        # пополняем список материалов в группе
+        if __resource_dict is None:
+            __name = sde_type_ids[str(__type_id)]["name"]["en"] if str(__type_id) in sde_type_ids else str(__type_id)
+            __resource_dict = {"id": __type_id,
+                               "name": __name,
+                               "q": 0}
+            __stock_group["items"].append(__resource_dict)
+
+    # сортируем материалы по названию
+    stock_keys = stock_resources.keys()
+    for stock_key in stock_keys:
+        stock_resources[str(stock_key)]["items"].sort(key=lambda r: r["name"])
+
+    glf.write("""
+<style>
+#tblStockAll tr {
+  font-size: small;
+}
+</style>
+
+<div class="table-responsive">
+ <table id="tblStockAll" class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Item</th>
+  <th>In stock</th>
+  <th>Not available</th>
+  <th>In progress</th>
+ </tr>
+</thead>
+<tbody>""")
+
+    row_num = 1
+    stock_keys = stock_resources.keys()
+    for stock_key in stock_keys:
+        __group_dict = stock_resources[str(stock_key)]
+        glf.write(
+            '<tr>\n'
+            ' <td class="active" colspan="5"><strong>{nm}</strong></td>\n'
+            '</tr>'.
+            format(nm=__group_dict["name"]))
+        for __resource_dict in __group_dict["items"]:
+            __type_id = __resource_dict["id"]
+            __quantity = __resource_dict["q"]
+            # получаем статистику по текущим работам, считаем сколько производится этих материалов?
+            jobs = [j for j in corp_industry_jobs_data if
+                    (j["product_type_id"] == __type_id) and
+                    (j['output_location_id'] in stock_all_loc_ids)]
+            in_progress = 0
+            for j in jobs:
+                in_progress = in_progress + j["runs"]
+            # получаем статистику по недостающим материалам
+            not_enough = next((ne for ne in stock_not_enough_materials if ne['id'] == __type_id), None)
+            # проверяем списки метариалов, используемых в исследованиях и производстве
+            material_tag = ""
+            if __type_id in materials_for_bps:
+                pass
+            elif __type_id in research_materials_for_bps:
+                material_tag = ' <span class="label label-warning">research material</span></small>'
+            else:
+                material_tag = ' <span class="label label-danger">non material</span></small>'
+            # формируем строку таблицы - найден нужный чертёж в ассетах
+            glf.write(
+                '<tr>'
+                '<th scope="row">{num}</th>'
+                '<td>{nm}{mat_tag}</td>'
+                '<td align="right">{q}</td>'
+                '<td align="right">{ne}</td>'
+                '<td align="right">{ip}</td>'
+                '</tr>\n'.
+                format(num=row_num,
+                       nm=__resource_dict["name"],
+                       mat_tag=material_tag,
+                       q="" if __quantity == 0 else '{:,d}'.format(__quantity),
+                       ne="" if not_enough is None else '{:,d}'.format(not_enough["q"]),
+                       ip="" if in_progress == 0 else '{:,d}'.format(in_progress))
+            )
+            row_num = row_num + 1
+
+    glf.write("""
+</tbody>     
+ </table>     
+</div>     
+""")
+
+
 def __dump_corp_conveyor(
         glf,
         corp_bp_loc_data,
@@ -1894,7 +2050,9 @@ def __dump_corp_conveyor(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
-        blueprint_loc_ids):
+        blueprint_loc_ids,
+        materials_for_bps,
+        research_materials_for_bps):
     glf.write("""
 <nav class="navbar navbar-default">
  <div class="container-fluid">
@@ -1920,6 +2078,7 @@ def __dump_corp_conveyor(
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
     </li>
+    <li><a data-target="#modalStockAll" role="button" data-toggle="modal">Stock All</a></li>
    </ul>
    <form class="navbar-form navbar-right">
     <div class="form-group">
@@ -1933,7 +2092,7 @@ def __dump_corp_conveyor(
 <div class="container-fluid">
 """)
 
-    __dump_conveyor_blueprints(
+    stock_not_enough_materials = __dump_blueprints_list_with_materials(
         glf,
         corp_bp_loc_data,
         corp_industry_jobs_data,
@@ -1945,6 +2104,25 @@ def __dump_corp_conveyor(
         stock_all_loc_ids,
         blueprint_loc_ids,
         enable_copy_to_clipboard=True)
+
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    __dump_any_into_modal_header_wo_button(
+        glf,
+        next((n["name"] for n in corp_ass_names_data if n['item_id'] == stock_all_loc_ids[0]), 'Stock ALL'),
+        'StockAll')
+    # формируем содержимое модального диалога
+    __dump_conveyor_stock_all(
+        glf,
+        corp_industry_jobs_data,
+        corp_ass_loc_data,
+        materials_for_bps,
+        research_materials_for_bps,
+        sde_type_ids,
+        sde_market_groups,
+        stock_all_loc_ids,
+        stock_not_enough_materials)
+    # закрываем footer модального диалога
+    __dump_any_into_modal_footer(glf)
 
     glf.write("""
 <div id="legend-block">
@@ -2111,11 +2289,13 @@ def dump_conveyor_into_report(
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
-        blueprint_loc_ids):
+        blueprint_loc_ids,
+        materials_for_bps,
+        research_materials_for_bps):
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, materials_for_bps, research_materials_for_bps)
         #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         __dump_footer(glf)
     finally:

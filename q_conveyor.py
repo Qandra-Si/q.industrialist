@@ -76,6 +76,10 @@ def main():
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
+    # Построение списка модулей и ресурсов, которые используются в производстве
+    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
+    research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
+
     # Requires role(s): Factory_Manager
     corp_industry_jobs_data = interface.get_esi_paged_data(
         "corporations/{}/industry/jobs/".format(corporation_id))
@@ -144,7 +148,9 @@ def main():
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
-        blueprint_loc_ids)
+        blueprint_loc_ids,
+        materials_for_bps,
+        research_materials_for_bps)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

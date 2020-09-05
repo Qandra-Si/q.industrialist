@@ -237,6 +237,22 @@ def get_materials_for_blueprints(sde_bp_materials):
     return materials_for_bps
 
 
+def get_research_materials_for_blueprints(sde_bp_materials):
+    """
+    Построение списка модулей и ресурсов, которые используются в производстве
+    """
+    research_materials_for_bps = []
+    for bp in sde_bp_materials:
+        if "research_material" in sde_bp_materials[bp]["activities"]:
+            if "materials" in sde_bp_materials[bp]["activities"]["research_material"]:
+                for m in sde_bp_materials[bp]["activities"]["research_material"]["materials"]:
+                    if "typeID" in m:
+                        type_id = int(m["typeID"])
+                        if 0 == research_materials_for_bps.count(type_id):
+                            research_materials_for_bps.append(type_id)
+    return research_materials_for_bps
+
+
 def get_market_groups_tree_root(groups_tree, group_id):
     if not (str(group_id) in groups_tree):
         return group_id
