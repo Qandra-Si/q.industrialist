@@ -12,6 +12,7 @@ import sys
 import base64
 import hashlib
 import secrets
+import time
 
 from .auth_cache import EveESIAuth
 from .error import EveOnlineClientError
@@ -199,6 +200,7 @@ class EveESIClient:
         res = None
         try:
             proxy_error_times = 0
+            throttle_error_times = 0
             while True:
                 if body is None:
                     res = requests.get(uri, headers=headers)
@@ -237,6 +239,16 @@ class EveESIClient:
                     # пять раз пытаемся повторить отправку сломанного запроса (часто случается
                     # при подключении через 3G-модем)
                     proxy_error_times = proxy_error_times + 1
+                    continue
+                elif (res.status_code in [520]) and (throttle_error_times < self.__attempts_to_reconnect):
+                    # возможная ситация: сервер детектирует спам-запросы (на гитхабе написано, что порог
+                    # срабатывания находится около 20 запросов в 10 секунд от одного персонажа), см. подробнее
+                    # здесь: https://github.com/esi/esi-issues/issues/636#issuecomment-342150532
+                    print(res.json())
+                    # 520 Server Error: status code 520 for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                    # {'error': 'ConStopSpamming, details: {"remainingTime": 12038505}'}
+                    throttle_error_times = throttle_error_times + 1
+                    time.sleep(5)
                     continue
                 res.raise_for_status()
                 break
