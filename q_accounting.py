@@ -44,7 +44,8 @@ def __build_accounting_append(
         __cas1_stat_flag,
         __ca5_station_flag,
         skip_certain_groups,
-        process_only_specified_groups):
+        process_only_specified_groups,
+        prefer_base_price):
     if not (skip_certain_groups is None):
         if __group_id in skip_certain_groups:  # напр. Blueprints & Reactions (пропускаем)
             return
@@ -55,15 +56,20 @@ def __build_accounting_append(
         __ca5_station_flag.update({str(__group_id): {"group": __group_name, "volume": 0, "cost": 0}})
     __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
     __type_dict = sde_type_ids[str(__type_id)]
-    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
     __price = None
-    if not (__price_dict is None):
-        if "average_price" in __price_dict:
-            __price = __price_dict["average_price"]
-        elif "adjusted_price" in __price_dict:
-            __price = __price_dict["adjusted_price"]
-    elif "basePrice" in __type_dict:
+    if prefer_base_price and ("basePrice" in __type_dict):
         __price = __type_dict["basePrice"]
+    if __price is None:
+        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+        if not (__price_dict is None):
+            if "average_price" in __price_dict:
+                __price = __price_dict["average_price"]
+            elif "adjusted_price" in __price_dict:
+                __price = __price_dict["adjusted_price"]
+            elif "basePrice" in __type_dict:
+                __price = __type_dict["basePrice"]
+        elif "basePrice" in __type_dict:
+            __price = __type_dict["basePrice"]
     if not (__price is None):
         __sum = __price * __quantity
         __ca6_group["cost"] += __sum
@@ -102,7 +108,8 @@ def __build_accounting_nested(
                 __cas1_stat_flag,
                 __ca5_station_flag,
                 skip_certain_groups,
-                process_only_specified_groups)
+                process_only_specified_groups,
+                False)
     if str(itm_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(itm_id)]
         if "items" in __cat1:
@@ -214,7 +221,8 @@ def __build_accounting_blueprints_nested(
                     __ca3_station,
                     corp_accounting_stat)
                 __cas1_stat_flag.update({"omit_in_summary": True})
-            # добавляем в статистику информацию по blueprint-у
+            # определяем, является ли чертёж БПО или БПЦ? (для БПО предпочтительная цена : base_price, для БПЦ : average_price и adjusted_price)
+            __is_blueprint_copy = ("is_blueprint_copy" in __item_dict) and bool(__item_dict["is_blueprint_copy"])
             __build_accounting_append(
                 __type_id,
                 __quantity,
@@ -225,7 +233,8 @@ def __build_accounting_blueprints_nested(
                 __cas1_stat_flag,
                 __ca5_station_flag,
                 None,  # в статистику попадают все группы, но следующий фильтр ограничит...
-                [2])  # ...обработку только Blueprints and Reactions
+                [2],   # ...обработку только Blueprints and Reactions
+                not __is_blueprint_copy)  # у БПЦ-чертежей base_price отражает действительность лучше
     if str(__item_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(__item_id)]
         if "items" in __cat1:
@@ -333,7 +342,8 @@ def __build_accounting(
                                     __cas1_stat_flag,
                                     __ca5_station_flag,
                                     [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
-                                    None)  # Обрабатываем все остальные типы и группы имущества
+                                    None, # Обрабатываем все остальные типы и группы имущества
+                                    False)
                 # на текущей станции получаем все location_flag и собираем сводную статистику по каждой группе
                 __build_accounting_station(
                     itm,
