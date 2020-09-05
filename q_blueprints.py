@@ -118,8 +118,13 @@ def __build_blueprints(
         __is_blueprint_copy = __quantity == -2
         if __is_blueprint_copy:
             continue
-        __blueprint_id = __blueprint_dict["item_id"]
         __type_id = __blueprint_dict["type_id"]
+        __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+        # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
+        # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+        if __group_id != 2:  # Blueprints & Reactions
+            continue
+        __blueprint_id = __blueprint_dict["item_id"]
         __type_desc = sde_type_ids[str(__type_id)]
         __location_id = __blueprint_dict["location_id"]
         __blueprint = {

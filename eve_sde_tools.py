@@ -164,6 +164,18 @@ def get_market_group_by_type_id(type_ids, type_id):
     return None
 
 
+def get_root_market_group_by_type_id(type_ids, market_groups, type_id):
+    group_id = get_market_group_by_type_id(type_ids, type_id)
+    if group_id is None:
+        return None
+    __group_id = group_id
+    while True:
+        if "parentGroupID" in market_groups[str(__group_id)]:
+            __group_id = market_groups[str(__group_id)]["parentGroupID"]
+        else:
+            return __group_id
+
+
 def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
     group_id = get_market_group_by_type_id(type_ids, type_id)
     if group_id is None:
