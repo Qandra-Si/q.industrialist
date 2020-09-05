@@ -247,7 +247,7 @@ def __dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 """)
 
 
-def __dump_corp_blueprints(
+def __dump_conveyor_blueprints(
         glf,
         corp_bp_loc_data,
         corp_industry_jobs_data,
@@ -304,10 +304,17 @@ def __dump_corp_blueprints(
         )
         first_time = False
         __bp2 = corp_bp_loc_data[str(loc_id)]
-        type_keys = __bp2.keys()
+        __type_keys = __bp2.keys()
+        # сортировка чертежей по их названиям
+        type_keys = []
+        for type_id in __type_keys:
+            type_keys.append({"id": int(type_id), "name": get_item_name_by_type_id(sde_type_ids, int(type_id))})
+        type_keys.sort(key=lambda bp: bp["name"])
+        # вывод в отчёт инфорации о чертежах
         materials_summary = {}
-        for type_id in type_keys:
-            blueprint_name = get_item_name_by_type_id(sde_type_ids, type_id)
+        for type_dict in type_keys:
+            type_id = type_dict["id"]
+            blueprint_name = type_dict["name"]
             glf.write(
                 '<div class="media">\n'
                 ' <div class="media-left">\n'
@@ -749,7 +756,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_corp_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_conveyor_blueprints(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -1926,7 +1933,7 @@ def __dump_corp_conveyor(
 <div class="container-fluid">
 """)
 
-    __dump_corp_blueprints(
+    __dump_conveyor_blueprints(
         glf,
         corp_bp_loc_data,
         corp_industry_jobs_data,
