@@ -2147,14 +2147,19 @@ def __dump_corp_conveyor(
    <strong>original</strong> blueprints with <strong>10</strong> material efficiency and <strong>20</strong> time efficiency,
    production is currently <strong>active</strong>.
  </p>
- <p>
 """)
-    glf.write('<span style="white-space:nowrap"><img class="icn24" src="{src}"> 30 x Ice Harvester I </span>'
+    glf.write('<p>'
+              '<span style="white-space:nowrap"><img class="icn24" src="{src}"> 30 x Ice Harvester I </span>'
               '&nbsp;<span class="label label-warning"><img class="icn24" src="{src}"> 6 x Ice Harvester I </span>&nbsp;-'
-              '&nbsp;<strong>30</strong> items used in the production, the items are missing <strong>6</strong>.'.
+              '&nbsp;<strong>30</strong> items used in the production, the items are missing <strong>6</strong>.'
+              '</p>'
+              '<p>'
+              '<span style="white-space:nowrap"><img class="icn24" src="{src}"> 30 x Ice Harvester I </span>'
+              '&nbsp;<span class="label label-danger"><img class="icn24" src="{src}"> 29 x Ice Harvester I </span>&nbsp;-'
+              '&nbsp;missing number of items, such that it is not enough to run at least one blueprint copy.'
+              '<p>'.
               format(src=__get_img_src(16278, 32)))
     glf.write("""
- </p>
 </div>
 </div>
 <script>
