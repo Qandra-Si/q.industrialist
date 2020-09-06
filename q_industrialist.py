@@ -187,6 +187,7 @@ def main():
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids)
 

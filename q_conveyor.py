@@ -164,6 +164,12 @@ def main():
     for id in stock_all_loc_ids:
         print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
 
+    exclude_loc_ids = []
+    for tmplt in q_conveyor_settings.g_manufacturing["exclude_container_names"]:
+        exclude_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
+    for id in exclude_loc_ids:
+        print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
+
     blueprint_loc_ids = []
     for tmplt in q_conveyor_settings.g_manufacturing["conveyor_container_names"]:
         blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
@@ -204,6 +210,7 @@ def main():
         corp_bp_loc_data,
         corp_assets_tree,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids,
         materials_for_bps,

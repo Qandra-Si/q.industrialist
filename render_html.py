@@ -253,6 +253,7 @@ def __is_availabe_blueprints_present(
         type_id,
         corp_bp_loc_data,
         sde_bp_materials,
+        exclude_loc_ids,
         blueprint_station_ids,
         corp_assets_tree):
     # определем type_id чертежа по известному type_id материала
@@ -265,8 +266,13 @@ def __is_availabe_blueprints_present(
     loc_ids = corp_bp_loc_data.keys()
     for loc in loc_ids:
         loc_id = int(loc)
+        # пропускаем контейнеры, их которых нельзя доставать чертежи для достройки недостающих материалов
+        if int(loc_id) in exclude_loc_ids:
+            continue
+        # пропускаем прочие станции, на которых нет текущего stock-а и нет конвейеров (ищем свою станку)
         if not is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
             continue
+        # проверяем состояния чертежей
         __bp2 = corp_bp_loc_data[str(loc)]
         __bp2_keys = __bp2.keys()
         for __blueprint_type_id in __bp2_keys:
@@ -305,6 +311,7 @@ def __dump_blueprints_list_with_materials(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids,
         enable_copy_to_clipboard=False):
@@ -571,6 +578,7 @@ def __dump_blueprints_list_with_materials(
                             ms_type_id,
                             corp_bp_loc_data,
                             sde_bp_materials,
+                            exclude_loc_ids,
                             blueprint_station_ids,
                             corp_assets_tree)
                         # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
@@ -836,6 +844,7 @@ def dump_industrialist_into_report(
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids):
     glf = open('{dir}/report.html'.format(dir=ws_dir), "wt+", encoding='utf8')
@@ -851,7 +860,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, blueprint_station_ids)
+        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, exclude_loc_ids, blueprint_loc_ids, blueprint_station_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -2135,6 +2144,7 @@ def __dump_corp_conveyor(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids,
         materials_for_bps,
@@ -2189,6 +2199,7 @@ def __dump_corp_conveyor(
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids,
         enable_copy_to_clipboard=True)
@@ -2388,6 +2399,7 @@ def dump_conveyor_into_report(
         corp_bp_loc_data,
         corp_assets_tree,
         stock_all_loc_ids,
+        exclude_loc_ids,
         blueprint_loc_ids,
         blueprint_station_ids,
         materials_for_bps,
@@ -2395,7 +2407,7 @@ def dump_conveyor_into_report(
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, blueprint_station_ids, materials_for_bps, research_materials_for_bps)
+        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, exclude_loc_ids, blueprint_loc_ids, blueprint_station_ids, materials_for_bps, research_materials_for_bps)
         #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         __dump_footer(glf)
     finally:
