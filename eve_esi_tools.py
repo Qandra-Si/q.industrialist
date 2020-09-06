@@ -56,7 +56,7 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
                 "st": bp_status,
                 "itm": []
             }})
-        elif is_blueprint_copy:
+        else:
             __bp2[type_id][bp_key]["qr"] = __bp2[type_id][bp_key]["qr"] + quantity_or_runs
         # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } }
         __bp2[type_id][bp_key]["itm"].append({
