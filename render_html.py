@@ -8,7 +8,9 @@ from eve_sde_tools import get_yaml
 from eve_sde_tools import get_item_name_by_type_id
 from eve_sde_tools import get_basis_market_group_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
+from eve_sde_tools import get_blueprint_reaction_materials
 from eve_sde_tools import get_blueprint_type_id_by_product_id
+from eve_sde_tools import is_type_id_nested_into_market_group
 from eve_esi_tools import get_assets_location_name
 from eve_esi_tools import is_location_nested_into_another
 
@@ -384,7 +386,12 @@ def __dump_blueprints_list_with_materials(
                     nm=blueprint_name
                 )
             )
-            bp_manuf_mats = get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
+            __blueprint_materials = None
+            __is_reaction_formula = is_type_id_nested_into_market_group(type_id, [1849], sde_type_ids, sde_market_groups)
+            if __is_reaction_formula:  # Reaction Formulas
+                __blueprint_materials = get_blueprint_reaction_materials(sde_bp_materials, type_id)
+            else:
+                __blueprint_materials = get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
@@ -396,13 +403,11 @@ def __dump_blueprints_list_with_materials(
                 glf.write(
                     '<span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>'
-                    '&nbsp;<span class="label label-success">{me} {te}</span>'
                     '&nbsp;<span class="badge">{qr}</span>\n'.format(
                         qr=quantity_or_runs,
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
-                        me=material_efficiency,
-                        te=time_efficiency,
+                        me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if not __is_reaction_formula else "",
                         status=blueprint_status if not (blueprint_status is None) else ""
                     )
                 )
@@ -416,14 +421,14 @@ def __dump_blueprints_list_with_materials(
                     else:
                         glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
                     glf.write('</br></span>\n')
-                elif bp_manuf_mats is None:
+                elif __blueprint_materials is None:
                     glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
                     glf.write('</br></span>\n')
                 else:
                     glf.write('</br></span>\n')
                     glf.write('<div class="qind-materials-used">\n')  # div(materials)
                     not_enough_materials = []
-                    for m in bp_manuf_mats:
+                    for m in __blueprint_materials:
                         bp_manuf_need_all = 0
                         bp_manuf_need_min = 0
                         for __bp3 in __bp2[type_id][bpk]["itm"]:

@@ -170,8 +170,9 @@ def get_root_market_group_by_type_id(type_ids, market_groups, type_id):
         return None
     __group_id = group_id
     while True:
-        if "parentGroupID" in market_groups[str(__group_id)]:
-            __group_id = market_groups[str(__group_id)]["parentGroupID"]
+        __grp1 = market_groups[str(__group_id)]
+        if "parentGroupID" in __grp1:
+            __group_id = __grp1["parentGroupID"]
         else:
             return __group_id
 
@@ -198,11 +199,27 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
                           19  # Trade Goods
                          ]:
             return __group_id
-        if "parentGroupID" in market_groups[str(__group_id)]:
-            __group_id = market_groups[str(__group_id)]["parentGroupID"]
+        __grp1 = market_groups[str(__group_id)]
+        if "parentGroupID" in __grp1:
+            __group_id = __grp1["parentGroupID"]
         else:
             return __group_id
     return group_id
+
+
+def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+    if group_id is None:
+        return None
+    __group_id = group_id
+    while True:
+        if int(__group_id) in market_groups:
+            return True
+        __grp1 = sde_market_groups[str(__group_id)]
+        if "parentGroupID" in __grp1:
+            __group_id = __grp1["parentGroupID"]
+        else:
+            return False
 
 
 def get_blueprint_manufacturing_materials(blueprints, type_id):
@@ -218,6 +235,22 @@ def get_blueprint_manufacturing_materials(blueprints, type_id):
             return None
         else:
             materials = bp["activities"]["manufacturing"]["materials"]
+            return materials
+
+
+def get_blueprint_reaction_materials(blueprints, type_id):
+    if not (str(type_id) in blueprints):
+        return None
+    else:
+        bp = blueprints[str(type_id)]
+        if not ("activities" in bp):
+            return None
+        elif not ("reaction" in bp["activities"]):
+            return None
+        elif not ("materials" in bp["activities"]["reaction"]):
+            return None
+        else:
+            materials = bp["activities"]["reaction"]["materials"]
             return materials
 
 
