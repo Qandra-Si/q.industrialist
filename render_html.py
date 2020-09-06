@@ -304,19 +304,20 @@ def __is_availabe_blueprints_present(
 
 def __dump_blueprints_list_with_materials(
         glf,
+        conveyor_entity,
         corp_bp_loc_data,
         corp_industry_jobs_data,
-        corp_ass_names_data,
         corp_ass_loc_data,
         corp_assets_tree,
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_loc_ids,
-        blueprint_station_ids,
         enable_copy_to_clipboard=False):
+    # получение списков контейнеров и станок из экземпляра контейнера
+    stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
+    exclude_loc_ids = [int(cee["id"]) for cee in conveyor_entity["exclude"]]
+    blueprint_loc_ids = conveyor_entity["containers"]
+    blueprint_station_ids = [conveyor_entity["station_id"]]
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
@@ -334,35 +335,30 @@ def __dump_blueprints_list_with_materials(
                         else:
                             stock_resources.update({itm: __a2[itm]})
 
-    glf.write("""
-<!-- BEGIN: collapsable group (locations) -->
-<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">""")
-
-    first_time = True
     loc_ids = corp_bp_loc_data.keys()
     for loc in loc_ids:
         loc_id = int(loc)
-        if not (blueprint_loc_ids is None):
-            if not (loc_id in blueprint_loc_ids):
-                continue
-        loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == loc_id), loc_id)
+        __container = next((cec for cec in blueprint_loc_ids if cec['id'] == loc_id), None)
+        if __container is None:
+            continue
+        loc_name = __container["name"]
+        fixed_number_of_runs = __container["fixed_number_of_runs"]
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
             '   <h4 class="panel-title">\n'
             '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{nm}</a>\n'
+            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>\n'
             '   </h4>\n'
             '  </div>\n'
-            '  <div id="collapseB{id}" class="panel-collapse collapse{vsbl}" role="tabpanel" '
+            '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
             'aria-labelledby="headingB{id}">\n'
             '   <div class="panel-body">\n'.format(
                 id=loc_id,
-                nm=loc_name,
-                vsbl=" in" if first_time else ""
+                station=conveyor_entity["station"],
+                nm=loc_name
             )
         )
-        first_time = False
         __bp2 = corp_bp_loc_data[str(loc_id)]
         __type_keys = __bp2.keys()
         # сортировка чертежей по их названиям
@@ -371,7 +367,7 @@ def __dump_blueprints_list_with_materials(
             type_keys.append({"id": int(type_id), "name": get_item_name_by_type_id(sde_type_ids, int(type_id))})
         type_keys.sort(key=lambda bp: bp["name"])
         # вывод в отчёт инфорации о чертежах
-        materials_summary = {}
+        materials_summary = []
         for type_dict in type_keys:
             type_id = type_dict["id"]
             blueprint_name = type_dict["name"]
@@ -403,8 +399,9 @@ def __dump_blueprints_list_with_materials(
                 glf.write(
                     '<span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>'
-                    '&nbsp;<span class="badge">{qr}</span>\n'.format(
+                    '&nbsp;<span class="badge">{qr}{fnr}</span>\n'.format(
                         qr=quantity_or_runs,
+                        fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
                         me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if not __is_reaction_formula else "",
@@ -413,7 +410,7 @@ def __dump_blueprints_list_with_materials(
                 )
                 if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
                     if (blueprint_status == "active") or (blueprint_status == "delivered"):
-                        glf.write('&nbsp;<span class="label label-info">{}</span>'.format(blueprint_status))
+                        glf.write('&nbsp;<span class="label label-primary">{}</span>'.format(blueprint_status))
                     elif blueprint_status == "ready":
                         glf.write('&nbsp;<span class="label label-success">{}</span>'.format(blueprint_status))
                     elif (blueprint_status == "cancelled") or (blueprint_status == "paused") or (blueprint_status == "reverted"):
@@ -432,7 +429,12 @@ def __dump_blueprints_list_with_materials(
                         bp_manuf_need_all = 0
                         bp_manuf_need_min = 0
                         for __bp3 in __bp2[type_id][bpk]["itm"]:
-                            quantity_or_runs = __bp3["r"] if is_blueprint_copy else __bp3["q"] if __bp3["q"] > 0 else 1
+                            if is_blueprint_copy:
+                                quantity_or_runs = __bp3["r"]
+                            else:
+                                quantity_or_runs = __bp3["q"] if __bp3["q"] > 0 else 1
+                                if fixed_number_of_runs:
+                                    quantity_or_runs = quantity_or_runs * fixed_number_of_runs
                             __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
                             __need = __used  # поправка на эффективнсть материалов
                             if material_efficiency > 0:
@@ -471,10 +473,12 @@ def __dump_blueprints_list_with_materials(
                         if not_available > 0:
                             not_enough_materials.append({"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm, "absol": not_available_absolutely})
                         # сохраняем материалы для производства в список их суммарного кол-ва
-                        if m["typeID"] in materials_summary:
-                            materials_summary[m["typeID"]] = materials_summary[m["typeID"]] + bp_manuf_need_all
+                        __summary_dict = next((ms for ms in materials_summary if ms['id'] == int(m["typeID"])), None)
+                        if __summary_dict is None:
+                            __summary_dict = {"id": int(m["typeID"]), "q": bp_manuf_need_all, "nm": bpmm_tnm}
+                            materials_summary.append(__summary_dict)
                         else:
-                            materials_summary.update({m["typeID"]: bp_manuf_need_all})
+                            __summary_dict["q"] += bp_manuf_need_all
                     glf.write('</div>\n')  # div(materials)
                     # отображение списка материалов, которых не хватает
                     if len(not_enough_materials) > 0:
@@ -497,17 +501,21 @@ def __dump_blueprints_list_with_materials(
             )
         # отображение в отчёте summary-информаци по недостающим материалам
         if len(materials_summary) > 0:
-            ms_keys = materials_summary.keys()
             # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
             # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
             material_groups = {}
-            for ms_type_id in ms_keys:
-                __quantity = materials_summary[ms_type_id]
-                __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, ms_type_id)
+            for __summary_dict in materials_summary:
+                __quantity = __summary_dict["q"]
+                __type_id = __summary_dict["id"]
+                __item_name = __summary_dict["nm"]
+                __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                __material_dict = {"id": __type_id, "q": __quantity, "nm": __item_name}
                 if str(__market_group) in material_groups:
-                    material_groups[str(__market_group)].update({ms_type_id: __quantity})
+                    material_groups[str(__market_group)].append(__material_dict)
                 else:
-                    material_groups.update({str(__market_group): {ms_type_id: __quantity}})
+                    material_groups.update({str(__market_group): [__material_dict]})
+            # сортировка summary materials списка по названиям элементов
+            materials_summary.sort(key=lambda m: m["nm"])
             glf.write(
                 '<hr><div class="media">\n'
                 ' <div class="media-left">\n'
@@ -517,14 +525,17 @@ def __dump_blueprints_list_with_materials(
                 '  <div class="qind-materials-used">'
                 '  <h4 class="media-heading">Summary materials</h4>\n'
             )
-            for ms_type_id in ms_keys:
+            for __summary_dict in materials_summary:
+                __quantity = __summary_dict["q"]
+                __type_id = __summary_dict["id"]
+                __item_name = __summary_dict["nm"]
                 glf.write(
                     '<span style="white-space:nowrap">'
                     '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                     '</span>\n'.format(
-                        src=__get_img_src(ms_type_id, 32),
-                        q=materials_summary[ms_type_id],
-                        nm=get_item_name_by_type_id(sde_type_ids, ms_type_id)
+                        src=__get_img_src(__type_id, 32),
+                        q=__quantity,
+                        nm=__item_name
                     )
                 )
             glf.write('<hr></div>\n')  # qind-materials-used
@@ -532,10 +543,13 @@ def __dump_blueprints_list_with_materials(
             not_available_row_num = 1
             ms_groups = material_groups.keys()
             for ms_group_id in ms_groups:
-                ms_keys = material_groups[ms_group_id].keys()
+                material_groups[ms_group_id].sort(key=lambda m: m["nm"])
                 group_diplayed = False
-                for ms_type_id in ms_keys:
-                    not_available = material_groups[ms_group_id][ms_type_id]
+                for __material_dict in material_groups[ms_group_id]:
+                    # получение данных по материалу
+                    ms_type_id = __material_dict["id"]
+                    not_available = __material_dict["q"]
+                    ms_item_name = __material_dict["nm"]
                     if ms_type_id in stock_resources:
                         not_available = 0 if stock_resources[ms_type_id] >= not_available else \
                             not_available - stock_resources[ms_type_id]
@@ -597,13 +611,12 @@ def __dump_blueprints_list_with_materials(
                                 vacant_copies_tag = ' <span class="label label-default">copy</span>'
                             if not not_a_product and not vacant_originals and not vacant_copies:
                                 absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
-                            # получение наименования материала
-                        __item_name = get_item_name_by_type_id(sde_type_ids, ms_type_id)
+                        # подготока элементов управления копирования данных в clipboard
                         __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                             '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
                             '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
                             '  aria-hidden="true"></span></a>'. \
-                            format(nm=__item_name)
+                            format(nm=ms_item_name)
                         # вывод сведений в отчёт
                         glf.write(
                             '<tr>\n'
@@ -616,7 +629,7 @@ def __dump_blueprints_list_with_materials(
                                    src=__get_img_src(ms_type_id, 32),
                                    q=not_available,
                                    inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
-                                   nm=__item_name,
+                                   nm=ms_item_name,
                                    clbrd=__copy2clpbrd,
                                    original=vacant_originals_tag,
                                    copy=vacant_copies_tag,
@@ -638,11 +651,6 @@ def __dump_blueprints_list_with_materials(
             "  </div>\n"
             " </div>\n"
         )
-
-    glf.write("""
-</div>
-<!-- END: collapsable group (locations) -->
-""")
 
     return stock_not_enough_materials
 
@@ -2140,6 +2148,7 @@ def __dump_conveyor_stock_all(
 
 def __dump_corp_conveyor(
         glf,
+        conveyour_entities,
         corp_bp_loc_data,
         corp_industry_jobs_data,
         corp_ass_names_data,
@@ -2148,10 +2157,6 @@ def __dump_corp_conveyor(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_loc_ids,
-        blueprint_station_ids,
         materials_for_bps,
         research_materials_for_bps):
     glf.write("""
@@ -2191,28 +2196,38 @@ def __dump_corp_conveyor(
  </div>
 </nav>
 <div class="container-fluid">
+ <!-- BEGIN: collapsable group (locations) -->
+ <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
 """)
 
-    stock_not_enough_materials = __dump_blueprints_list_with_materials(
-        glf,
-        corp_bp_loc_data,
-        corp_industry_jobs_data,
-        corp_ass_names_data,
-        corp_ass_loc_data,
-        corp_assets_tree,
-        sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_loc_ids,
-        blueprint_station_ids,
-        enable_copy_to_clipboard=True)
+    stock_not_enough_materials = None
+    for __conveyor_entity in conveyour_entities:
+        __stock_not_enough_materials = __dump_blueprints_list_with_materials(
+            glf,
+            __conveyor_entity,
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_ass_loc_data,
+            corp_assets_tree,
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            enable_copy_to_clipboard=True)
+        if stock_not_enough_materials is None:
+            stock_not_enough_materials = __stock_not_enough_materials
 
+    glf.write("""
+ </div>
+ <!-- END: collapsable group (locations) -->
+""")
+
+    # получение списков контейнеров и станок из экземпляра контейнера
+    conveyor_entity = conveyour_entities[0]
+    stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     __dump_any_into_modal_header_wo_button(
         glf,
-        next((n["name"] for n in corp_ass_names_data if n['item_id'] == stock_all_loc_ids[0]), 'Stock ALL'),
+        conveyor_entity["stock"][0]["name"],
         'StockAll')
     # формируем содержимое модального диалога
     __dump_conveyor_stock_all(
@@ -2239,7 +2254,7 @@ def __dump_corp_conveyor(
  </p>
  <p>
   <span class="label label-info">original</span>&nbsp;<span class="label label-success">10 20</span>&nbsp;<span
-   class="badge">2</span>&nbsp;<span class="label label-info">active</span> - <strong>two</strong>
+   class="badge">2</span>&nbsp;<span class="label label-primary">active</span> - <strong>two</strong>
    <strong>original</strong> blueprints with <strong>10</strong> material efficiency and <strong>20</strong> time efficiency,
    production is currently <strong>active</strong>.
  </p>
@@ -2394,26 +2409,39 @@ def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
 
 
 def dump_conveyor_into_report(
+        # путь, где будет сохранён отчёт
         ws_dir,
+        # настройки генерации отчёта
+        conveyour_entities,
+        # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_bp_loc_data,
         corp_assets_tree,
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_loc_ids,
-        blueprint_station_ids,
         materials_for_bps,
         research_materials_for_bps):
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, exclude_loc_ids, blueprint_loc_ids, blueprint_station_ids, materials_for_bps, research_materials_for_bps)
-        #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
+        __dump_corp_conveyor(
+            glf,
+            conveyour_entities,
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_ass_names_data,
+            corp_ass_loc_data,
+            corp_assets_tree,
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            materials_for_bps,
+            research_materials_for_bps)
         __dump_footer(glf)
     finally:
         glf.close()
