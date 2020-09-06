@@ -2,12 +2,15 @@
 # содержит настройки работы с производственным конвейером:
 
 g_manufacturing = {
-    "stock_container_names": [  # regular expressions
+    "stock_container_names": [  # названия контейнеров, в которых хранятся материалы для работы конвейеров
         r"^\.\.stock ALL$"  # example: "..stock ALL"
     ],
-    "conveyor_container_names": [  # regular expressions
+    "conveyor_container_names": [  # названия контейнеров, в которых находятся чертежи для запуска конвейеров
         r"^\[prod\] conveyor .$",  # example: "[prod] conveyor 1", "[prod] conveyor 2"
         r"^WORK ../..$"  # example: "WORK 06/09"
         r"^PRODUCTION ../..$"  # example: "PRODUCTION 06/09"
+    ],
+    "exclude_container_names": [  # названия контейнеров, из которых нельзя доставать чертежи для производства материалов
+        r"^\[SCIENCE\] .+"  # example: "[SCIENCE] invention", "[SCIENCE] copy", ...
     ]
 }
