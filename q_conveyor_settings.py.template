@@ -1,0 +1,13 @@
+﻿# индивидуальные настройки для работы скрипта q_conveyor.py
+# содержит настройки работы с производственным конвейером:
+
+g_manufacturing = {
+    "stock_container_names": [  # regular expressions
+        r"^\.\.stock ALL$"  # example: "..stock ALL"
+    ],
+    "conveyor_container_names": [  # regular expressions
+        r"^\[prod\] conveyor .$",  # example: "[prod] conveyor 1", "[prod] conveyor 2"
+        r"^WORK ../..$"  # example: "WORK 06/09"
+        r"^PRODUCTION ../..$"  # example: "PRODUCTION 06/09"
+    ]
+}

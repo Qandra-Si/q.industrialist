@@ -24,10 +24,13 @@ Requires application scopes:
 """
 import sys
 import json
+import requests
+import re
 
 import eve_esi_interface as esi
 
 import q_industrialist_settings
+import q_conveyor_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
@@ -73,8 +76,10 @@ def main():
     sys.stdout.flush()
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
     # Построение списка модулей и ресурсов, которые используются в производстве
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
@@ -117,19 +122,69 @@ def main():
     corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data, containers_filter=None)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
-    # Поиск контейнеров, которые участвуют в производстве
-    print("\nSearching conveyor containter ids...")
+    # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+    foreign_structures_data = {}
+    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+    foreign_structures_forbidden_ids = []
+    if len(foreign_structures_ids) > 0:
+        # Requires: access token
+        for structure_id in foreign_structures_ids:
+            try:
+                universe_structure_data = interface.get_esi_data(
+                    "universe/structures/{}/".format(structure_id))
+                foreign_structures_data.update({str(structure_id): universe_structure_data})
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                    foreign_structures_forbidden_ids.append(structure_id)
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+    print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+    if len(foreign_structures_forbidden_ids) > 0:
+        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
-    stock_all_loc_ids = [n["item_id"] for n in corp_ass_names_data if n['name'] == "..stock ALL"]
+    # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+    # элементов, в виде:
+    # { location1: {items:[item1,item2,...],type_id,location_id},
+    #   location2: {items:[item3],type_id} }
+    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+
+    # Поиск контейнеров, которые участвуют в производстве
+    print("\nSearching conveyor containter and station ids...")
+    sys.stdout.flush()
+
+    stock_all_loc_ids = []
+    for tmplt in q_conveyor_settings.g_manufacturing["stock_container_names"]:
+        stock_all_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
     for id in stock_all_loc_ids:
         print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
-    blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data if
-                         (n['name'][:16] == "[prod] conveyor ")
-                         # or ((n['name'][:5] == "WORK ") and (n['name'][7:-2] == "/"))
-                        ]
+
+    blueprint_loc_ids = []
+    for tmplt in q_conveyor_settings.g_manufacturing["conveyor_container_names"]:
+        blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
     for id in blueprint_loc_ids:
         print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
+
+    blueprint_station_ids = []
+    for id in blueprint_loc_ids:
+        __loc_dict = eve_esi_tools.get_universe_location_by_item(
+            id,
+            sde_inv_names,
+            sde_inv_items,
+            corp_assets_tree,
+            corp_ass_names_data,
+            foreign_structures_data
+        )
+        if "station_id" in __loc_dict:
+            __station_id = __loc_dict["station_id"]
+            if blueprint_station_ids.count(__station_id) == 0:
+                print('  {} = {}'.format(__station_id, __loc_dict["station"]))
+                blueprint_station_ids.append(__station_id)
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -147,8 +202,10 @@ def main():
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_bp_loc_data,
+        corp_assets_tree,
         stock_all_loc_ids,
         blueprint_loc_ids,
+        blueprint_station_ids,
         materials_for_bps,
         research_materials_for_bps)
 

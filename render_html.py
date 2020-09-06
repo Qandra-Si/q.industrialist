@@ -8,7 +8,9 @@ from eve_sde_tools import get_yaml
 from eve_sde_tools import get_item_name_by_type_id
 from eve_sde_tools import get_basis_market_group_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
+from eve_sde_tools import get_blueprint_type_id_by_product_id
 from eve_esi_tools import get_assets_location_name
+from eve_esi_tools import is_location_nested_into_another
 
 import q_industrialist_settings
 import q_logist_settings
@@ -247,17 +249,64 @@ def __dump_blueprints(glf, blueprint_data, assets_data, names_data, type_ids):
 """)
 
 
+def __is_availabe_blueprints_present(
+        type_id,
+        corp_bp_loc_data,
+        sde_bp_materials,
+        blueprint_station_ids,
+        corp_assets_tree):
+    # определем type_id чертежа по известному type_id материала
+    blueprint_type_id = get_blueprint_type_id_by_product_id(type_id, sde_bp_materials)
+    # проверяем, возможно этот материал нельзя произвести с помощью чертежей?
+    if blueprint_type_id is None:
+        return False, False, True
+    # поиск чертежей, по их type_id в списках имеющихся у корпы чертежей
+    vacant_originals = vacant_copies = None
+    loc_ids = corp_bp_loc_data.keys()
+    for loc in loc_ids:
+        loc_id = int(loc)
+        if not is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
+            continue
+        __bp2 = corp_bp_loc_data[str(loc)]
+        __bp2_keys = __bp2.keys()
+        for __blueprint_type_id in __bp2_keys:
+            if int(__blueprint_type_id) != int(blueprint_type_id):
+                continue
+            bp_keys = __bp2[__blueprint_type_id].keys()
+            for bpk in bp_keys:
+                bp = __bp2[__blueprint_type_id][bpk]
+                if not (bp["st"] is None):  # пропускаем чертежи, по которым ведётся работы
+                    continue
+                if bp["cp"]:
+                    vacant_copies = True
+                else:
+                    vacant_originals = True
+                if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
+                    break
+            if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
+                break
+        if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
+            break
+    if vacant_copies is None:
+        vacant_copies = False
+    if vacant_originals is None:
+        vacant_originals = False
+    return vacant_originals, vacant_copies, False
+
+
 def __dump_blueprints_list_with_materials(
         glf,
         corp_bp_loc_data,
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
+        corp_assets_tree,
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids,
+        blueprint_station_ids,
         enable_copy_to_clipboard=False):
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
@@ -501,6 +550,7 @@ def __dump_blueprints_list_with_materials(
 </thead>
 <tbody>
 """)
+                        # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
                         if not group_diplayed:
                             __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
                             glf.write(
@@ -509,23 +559,44 @@ def __dump_blueprints_list_with_materials(
                                 '</tr>'.
                                 format(nm=__grp_name, id=ms_group_id))
                             group_diplayed = True
+                        # получаем список работ, которые выдутся с этим материалом, а результаты сбрабываются в stock-ALL
                         jobs = [j for j in corp_industry_jobs_data if
                                     (j["product_type_id"] == ms_type_id) and
                                     (j['output_location_id'] in stock_all_loc_ids)]
                         in_progress = 0
                         for j in jobs:
                             in_progress = in_progress + j["runs"]
+                        # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
+                        vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
+                            ms_type_id,
+                            corp_bp_loc_data,
+                            sde_bp_materials,
+                            blueprint_station_ids,
+                            corp_assets_tree)
+                        # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
+                        vacant_originals_tag = ""
+                        vacant_copies_tag = ""
+                        absent_blueprints_tag = ""
+                        if not_available > in_progress:
+                            if not not_a_product and vacant_originals:
+                                vacant_originals_tag = ' <span class="label label-info">original</span>'
+                            if not not_a_product and vacant_copies:
+                                vacant_copies_tag = ' <span class="label label-default">copy</span>'
+                            if not not_a_product and not vacant_originals and not vacant_copies:
+                                absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
+                            # получение наименования материала
                         __item_name = get_item_name_by_type_id(sde_type_ids, ms_type_id)
                         __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                             '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
                             '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
                             '  aria-hidden="true"></span></a>'. \
                             format(nm=__item_name)
+                        # вывод сведений в отчёт
                         glf.write(
                             '<tr>\n'
                             ' <th scope="row">{num}</th>\n'
                             ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                            ' <td>{q:,d}</td>\n'
+                            ' <td>{q:,d}{original}{copy}{absent}</td>\n'
                             ' <td>{inp}</td>\n'
                             '</tr>'.
                             format(num=not_available_row_num,
@@ -533,7 +604,10 @@ def __dump_blueprints_list_with_materials(
                                    q=not_available,
                                    inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
                                    nm=__item_name,
-                                   clbrd=__copy2clpbrd)
+                                   clbrd=__copy2clpbrd,
+                                   original=vacant_originals_tag,
+                                   copy=vacant_copies_tag,
+                                   absent=absent_blueprints_tag)
                         )
                         not_available_row_num = not_available_row_num + 1
             if not_available_row_num != 1:
@@ -756,12 +830,14 @@ def dump_industrialist_into_report(
         blueprint_data,
         assets_data,
         asset_names_data,
+        corp_assets_tree,
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
-        blueprint_loc_ids):
+        blueprint_loc_ids,
+        blueprint_station_ids):
     glf = open('{dir}/report.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Workflow")
@@ -775,7 +851,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids)
+        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, blueprint_station_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -2054,11 +2130,13 @@ def __dump_corp_conveyor(
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
+        corp_assets_tree,
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids,
+        blueprint_station_ids,
         materials_for_bps,
         research_materials_for_bps):
     glf.write("""
@@ -2106,11 +2184,13 @@ def __dump_corp_conveyor(
         corp_industry_jobs_data,
         corp_ass_names_data,
         corp_ass_loc_data,
+        corp_assets_tree,
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
         stock_all_loc_ids,
         blueprint_loc_ids,
+        blueprint_station_ids,
         enable_copy_to_clipboard=True)
 
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
@@ -2160,6 +2240,11 @@ def __dump_corp_conveyor(
               '<p>'.
               format(src=__get_img_src(16278, 32)))
     glf.write("""
+ <p>
+  <span class="label label-info">original</span>, <span class="label label-default">copy</span>,
+  <span class="label label-danger">no blueprints</span> - possible labels that reflect the presence of vacant blueprints
+  in the hangars of the station (<i>Not available materials</i> section).
+ </p>
 </div>
 </div>
 <script>
@@ -2301,14 +2386,16 @@ def dump_conveyor_into_report(
         corp_ass_names_data,
         corp_ass_loc_data,
         corp_bp_loc_data,
+        corp_assets_tree,
         stock_all_loc_ids,
         blueprint_loc_ids,
+        blueprint_station_ids,
         materials_for_bps,
         research_materials_for_bps):
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, materials_for_bps, research_materials_for_bps)
+        __dump_corp_conveyor(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, blueprint_loc_ids, blueprint_station_ids, materials_for_bps, research_materials_for_bps)
         #__dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, sde_type_ids)
         __dump_footer(glf)
     finally:

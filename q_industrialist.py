@@ -153,7 +153,7 @@ def main():
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Поиск контейнеров, которые участвуют в производстве
-    print("\nSearching industrialist containter ids...")
+    print("\nSearching industrialist containter and station ids...")
     sys.stdout.flush()
 
     stock_all_loc_ids = [n["item_id"] for n in corp_ass_names_data if n['name'] == "..stock ALL"]
@@ -162,6 +162,8 @@ def main():
     blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data]
     # for id in blueprint_loc_ids:
     #     print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
+    blueprint_station_ids = []
+    # TODO: добавить сюда логику, аналогичную q_conveyor.py
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -178,13 +180,15 @@ def main():
         blueprint_data,
         assets_data,
         asset_names_data,
+        corp_assets_tree,
         corp_industry_jobs_data,
         corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_bp_loc_data,
         stock_all_loc_ids,
-        blueprint_loc_ids)
+        blueprint_loc_ids,
+        blueprint_station_ids)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

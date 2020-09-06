@@ -345,3 +345,76 @@ def get_assets_location_name(
                 loc_name = next((foreign_structures_data[fs]["name"] for fs in foreign_structures_data if int(fs) == location_id), None)
                 foreign = False if loc_name is None else True
     return region_id, region_name, loc_name, foreign
+
+
+def get_universe_location_by_item(
+        __location_id,
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data):
+    # получение название контейнера (названия ingame задают игроки)
+    __loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == __location_id), None)
+    __loc_dict = {"name": __loc_name}
+    # получение информации о регионе, солнечной системе и т.п. (поиск исходного root-а)
+    __root_location_id = __prev_location_id = int(__location_id)
+    __assets_roots = corp_assets_tree["roots"]
+    while True:
+        if __root_location_id in __assets_roots:
+            break
+        if str(__root_location_id) in corp_assets_tree:
+            a = corp_assets_tree[str(__root_location_id)]
+            if "location_id" in a:
+                __prev_location_id = int(__root_location_id)
+                __root_location_id = int(a["location_id"])
+            else:
+                break
+        else:
+            # корня нет (нет ассетов в Jita, но контракт там есть)
+            # переходим к поиску по sde-items, см. https://docs.esi.evetech.net/docs/asset_location_id
+            if __root_location_id > 64000000:
+                break
+            if str(__root_location_id) in sde_inv_items:
+                i = sde_inv_items[str(__root_location_id)]
+                if "locationID" in i:
+                    if i["locationID"] < 30000000:
+                        break
+                    __prev_location_id = int(__root_location_id)
+                    __root_location_id = int(i["locationID"])
+    # определяем регион и солнечную систему, где расположен чертёж
+    region_id, region_name, loc_name, __dummy0 = get_assets_location_name(
+        int(__root_location_id),
+        sde_inv_names,
+        sde_inv_items,
+        corp_ass_names_data,
+        foreign_structures_data)
+    if not (region_id is None):
+        __loc_dict.update({"region_id": region_id, "region": region_name, "solar": loc_name, "solar_id": int(__root_location_id)})
+        if __prev_location_id != __root_location_id:
+            __dummy1, __dummy2, loc_name, foreign = get_assets_location_name(
+                int(__prev_location_id),
+                sde_inv_names,
+                sde_inv_items,
+                corp_ass_names_data,
+                foreign_structures_data)
+            __loc_dict.update({"station": loc_name, "station_id": int(__prev_location_id), "foreign": foreign})
+    return __loc_dict
+
+
+def is_location_nested_into_another(
+        item_location,
+        root_locations,
+        corp_assets_tree):
+    loc_id = int(item_location)
+    while True:
+        if loc_id in root_locations:
+            return True
+        if str(loc_id) in corp_assets_tree:
+            __loc_dict = corp_assets_tree[str(loc_id)]
+            if "location_id" in __loc_dict:
+                loc_id = int(__loc_dict["location_id"])
+            else:
+                return False
+        else:
+            return False

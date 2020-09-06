@@ -138,6 +138,8 @@ dmypy.json
 /jquery
 /q_industrialist_settings.py
 /q_logist_settings.py
+/q_conveyor_settings.py
+/q_blueprints_settings.py
 /.*_cache
 /*_cache
 /debug
@@ -145,4 +147,3 @@ dmypy.json
 /*.~json
 /*.html
 /*.csv
-/q_blueprints_settings.py

@@ -227,9 +227,12 @@ def get_materials_for_blueprints(sde_bp_materials):
     """
     materials_for_bps = []
     for bp in sde_bp_materials:
-        if "manufacturing" in sde_bp_materials[bp]["activities"]:
-            if "materials" in sde_bp_materials[bp]["activities"]["manufacturing"]:
-                for m in sde_bp_materials[bp]["activities"]["manufacturing"]["materials"]:
+        __bpm1 = sde_bp_materials[bp]["activities"]
+        if "manufacturing" in __bpm1:
+            __bpm2 = __bpm1["manufacturing"]
+            if "materials" in __bpm2:
+                __bpm3 = __bpm2["materials"]
+                for m in __bpm3:
                     if "typeID" in m:
                         type_id = int(m["typeID"])
                         if 0 == materials_for_bps.count(type_id):
@@ -243,14 +246,35 @@ def get_research_materials_for_blueprints(sde_bp_materials):
     """
     research_materials_for_bps = []
     for bp in sde_bp_materials:
-        if "research_material" in sde_bp_materials[bp]["activities"]:
-            if "materials" in sde_bp_materials[bp]["activities"]["research_material"]:
-                for m in sde_bp_materials[bp]["activities"]["research_material"]["materials"]:
+        __bpm1 = sde_bp_materials[bp]["activities"]
+        if "research_material" in __bpm1:
+            __bpm2 = __bpm1["research_material"]
+            if "materials" in __bpm2:
+                __bpm3 = __bpm2["materials"]
+                for m in __bpm3:
                     if "typeID" in m:
                         type_id = int(m["typeID"])
                         if 0 == research_materials_for_bps.count(type_id):
                             research_materials_for_bps.append(type_id)
     return research_materials_for_bps
+
+
+def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
+    """
+    Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
+    """
+    for bp in sde_bp_materials:
+        __bpm1 = sde_bp_materials[bp]["activities"]
+        if "manufacturing" in __bpm1:
+            __bpm2 = __bpm1["manufacturing"]
+            if "products" in __bpm2:
+                __bpm3 = __bpm2["products"]
+                for m in __bpm3:
+                    if "typeID" in m:
+                        type_id = int(m["typeID"])
+                        if product_id == type_id:
+                            return int(bp)
+    return None
 
 
 def get_market_groups_tree_root(groups_tree, group_id):
