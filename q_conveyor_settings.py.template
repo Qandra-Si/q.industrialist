@@ -1,16 +1,45 @@
 ﻿# индивидуальные настройки для работы скрипта q_conveyor.py
 # содержит настройки работы с производственным конвейером:
 
-g_manufacturing = {
-    "stock_container_names": [  # названия контейнеров, в которых хранятся материалы для работы конвейеров
-        r"^\.\.stock ALL$"  # example: "..stock ALL"
-    ],
-    "conveyor_container_names": [  # названия контейнеров, в которых находятся чертежи для запуска конвейеров
-        r"^\[prod\] conveyor .$",  # example: "[prod] conveyor 1", "[prod] conveyor 2"
-        r"^WORK ../..$"  # example: "WORK 06/09"
-        r"^PRODUCTION ../..$"  # example: "PRODUCTION 06/09"
-    ],
-    "exclude_container_names": [  # названия контейнеров, из которых нельзя доставать чертежи для производства материалов
-        r"^\[SCIENCE\] .+"  # example: "[SCIENCE] invention", "[SCIENCE] copy", ...
-    ]
-}
+g_manufacturing = [
+    # === конвейер Утамы ===
+    # запуск БПЦ из контейнеров "[prod] conveyor 1", "[prod] conveyor 2" на Сотийке, при этом
+    # сток берётся из контейнера "..stock ALL" (также исключаются названия контейнеров, из
+    # которых нельзя доставать чертежи для производства материалов "[SCIENCE] invention",
+    # "[SCIENCE] copy", ...)
+    {
+        # названия контейнеров, в которых находятся чертежи для запуска конвейеров
+        "conveyor_container_names": [
+            r"^\[prod\] conveyor .$",  # example: "[prod] conveyor 1", "[prod] conveyor 2"
+            # r"^WORK ../..$"  # example: "WORK 06/09"
+            # r"^PRODUCTION ../..$"  # example: "PRODUCTION 06/09"
+        ],
+        # названия контейнеров, в которых хранятся материалы для работы конвейеров
+        "stock_container_names": [
+            r"^\.\.stock ALL$"  # example: "..stock ALL"
+        ],
+        # названия контейнеров, из которых нельзя доставать чертежи для производства материалов
+        "exclude_container_names": [
+            r"^\[SCIENCE\] .+"  # example: "[SCIENCE] invention", "[SCIENCE] copy", ...
+        ]
+    },
+    # === реакции Транквила и Сержа ===
+    # запуск БПО из контейнеров "REACTIONS" на Татарах, при этом сток берётся из того же
+    # онтейнера "REACTIONS" на те же станках
+    {
+        # названия контейнеров, в которых находятся чертежи для запуска конвейеров
+        "conveyor_container_names": [
+            r"^REACTIONS$"  # example: "REACTIONS"
+        ],
+        # названия контейнеров, в которых хранятся материалы для работы конвейеров
+        # "stock_container_names": [
+        #     r"^REACTIONS$"
+        # ],
+        # признак того, что контейнер с чертежами является также стоком материалов
+        "same_stock_container": True,
+        # названия контейнеров, из которых нельзя доставать чертежи для производства материалов
+        "exclude_container_names": [],
+        # фиксированное кол-во ранов БПО, находящихся в контейнерах (для расчёта необходимого кол-ва материалов)
+        "fixed_number_of_runs": 50
+    }
+]
