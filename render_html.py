@@ -398,7 +398,7 @@ def __dump_blueprints_list_with_materials(
                 blueprint_status = bp["st"]
                 glf.write(
                     '<span class="qind-blueprints-{status}">'
-                    '<span class="label label-{cpc}">{cpn}</span>'
+                    '<span class="label label-{cpc}">{cpn}</span>{me_te}'
                     '&nbsp;<span class="badge">{qr}{fnr}</span>\n'.format(
                         qr=quantity_or_runs,
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
