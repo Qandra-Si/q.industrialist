@@ -186,7 +186,7 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
         if __group_id in [211,  # Ammunition & Charges
                           9,   # Ship Equipment
                           157,  # Drones
-                          533,  # Materials
+                          # 533,  # Materials
                           1035,  # Components
                           1872,  # Research Equipment
                           4,  # Ships
@@ -201,7 +201,14 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
             return __group_id
         __grp1 = market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
-            __group_id = __grp1["parentGroupID"]
+            __parent_group_id = __grp1["parentGroupID"]
+            # группа материалов для целей производства должна делиться на подгруппы (производство и заказы
+            # в каждой из них решается индивидуально)
+            if __parent_group_id in [533,  # Materials
+                                     1034,  # Reaction Materials
+                                     ]:
+                return __group_id
+            __group_id = __parent_group_id
         else:
             return __group_id
     return group_id

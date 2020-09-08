@@ -539,6 +539,7 @@ def __dump_blueprints_list_with_materials(
                     )
                 )
             glf.write('<hr></div>\n')  # qind-materials-used
+
             # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
             not_available_row_num = 1
             ms_groups = material_groups.keys()
@@ -579,11 +580,19 @@ def __dump_blueprints_list_with_materials(
                         # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
                         if not group_diplayed:
                             __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
+                            # подготовка элементов управления копирования данных в clipboard
+                            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                                '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
+                                '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
+                                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'. \
+                                format(nm=ms_item_name)
                             glf.write(
                                 '<tr>\n'
-                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}--></td>\n'
+                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
                                 '</tr>'.
-                                format(nm=__grp_name, id=ms_group_id))
+                                format(nm=__grp_name,
+                                       id=ms_group_id,
+                                       clbrd=__copy2clpbrd))
                             group_diplayed = True
                         # получаем список работ, которые выдутся с этим материалом, а результаты сбрабываются в stock-ALL
                         jobs = [j for j in corp_industry_jobs_data if
@@ -611,7 +620,7 @@ def __dump_blueprints_list_with_materials(
                                 vacant_copies_tag = ' <span class="label label-default">copy</span>'
                             if not not_a_product and not vacant_originals and not vacant_copies:
                                 absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
-                        # подготока элементов управления копирования данных в clipboard
+                        # подготовка элементов управления копирования данных в clipboard
                         __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                             '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
                             '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
@@ -622,7 +631,7 @@ def __dump_blueprints_list_with_materials(
                             '<tr>\n'
                             ' <th scope="row">{num}</th>\n'
                             ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                            ' <td>{q:,d}{original}{copy}{absent}</td>\n'
+                            ' <td quantity="{q}">{q:,d}{original}{copy}{absent}</td>\n'
                             ' <td>{inp}</td>\n'
                             '</tr>'.
                             format(num=not_available_row_num,
@@ -2369,9 +2378,28 @@ def __dump_corp_conveyor(
       $(this).tooltip();
     })
     $('a.qind-copy-btn').bind('click', function () {
-      var $temp = $("<input>");
+      var data_copy = $(this).attr('data-copy');
+      if (data_copy === undefined) {
+        var tr = $(this).parent().parent();
+        var tbody = tr.parent();
+        var rows = tbody.children('tr');
+        var start_row = rows.index(tr);
+        data_copy = '';
+        rows.each( function(idx) {
+          if (!(start_row === undefined) && (idx > start_row)) {
+            var td = $(this).find('td').eq(0);
+            if (!(td.attr('class') === undefined))
+              start_row = undefined;
+            else {
+              if (data_copy) data_copy += "\\n"; 
+              data_copy += td.find('a').attr('data-copy') + "\\t" + $(this).find('td').eq(1).attr('quantity');
+            }
+          }
+        });
+      }
+      var $temp = $("<textarea>");
       $("body").append($temp);
-      $temp.val($(this).attr('data-copy')).select();
+      $temp.val(data_copy).select();
       try {
         success = document.execCommand("copy");
         if (success) {
