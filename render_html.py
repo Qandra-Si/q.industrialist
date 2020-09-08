@@ -1062,7 +1062,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
        </li>
 
        <li class="dropdown-submenu">
-         <a class="options-submenu" data-target="#" role="button">Jump Drive Conservation <mark id="lbJumpConservation"></mark><span class="caret"></span></a>
+         <a class="options-submenu" data-target="#" role="button">Jump Fuel Conservation <mark id="lbJumpConservation"></mark><span class="caret"></span></a>
          <ul class="dropdown-menu">
            <li><a id="btnJumpConservation" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation1"></span> 1</a></li>
            <li><a id="btnJumpConservation" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation2"></span> 2</a></li>
