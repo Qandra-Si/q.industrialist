@@ -259,7 +259,7 @@ def __is_availabe_blueprints_present(
         blueprint_station_ids,
         corp_assets_tree):
     # определем type_id чертежа по известному type_id материала
-    blueprint_type_id = get_blueprint_type_id_by_product_id(type_id, sde_bp_materials)
+    blueprint_type_id, __stub01 = get_blueprint_type_id_by_product_id(type_id, sde_bp_materials)
     # проверяем, возможно этот материал нельзя произвести с помощью чертежей?
     if blueprint_type_id is None:
         return False, False, True
@@ -601,6 +601,10 @@ def __dump_blueprints_list_with_materials(
                         in_progress = 0
                         for j in jobs:
                             in_progress = in_progress + j["runs"]
+                        # умножаем на кол-во производимых материалов на один run
+                        __stub01, __bp_dict = get_blueprint_type_id_by_product_id(ms_type_id, sde_bp_materials)
+                        if not (__bp_dict is None):
+                            in_progress *= __bp_dict["activities"]["manufacturing"]["products"][0]["quantity"]
                         # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
                         vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
                             ms_type_id,

@@ -313,8 +313,8 @@ def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
                     if "typeID" in m:
                         type_id = int(m["typeID"])
                         if product_id == type_id:
-                            return int(bp)
-    return None
+                            return int(bp), sde_bp_materials[bp]
+    return None, None
 
 
 def get_market_groups_tree_root(groups_tree, group_id):
