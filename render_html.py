@@ -2566,10 +2566,18 @@ def __dump_corp_accounting_nested_tbl(
                         __filter_found = True
                     if not __filter_found:
                         continue
-                    # выводим информацию по содержимому location (группы товаров)
+                    # получаем список групп товаров, хранящихся в указанном __flag
                     __flag_dict = itm_dict["flags"][str(__flag)]
+                    # сортируем группы товаров на названию групп
+                    __flag_dict_sorted = []
                     __g_keys = __flag_dict.keys()
                     for __group_id in __g_keys:
+                        __group_dict = __flag_dict[str(__group_id)]
+                        __flag_dict_sorted.append({"id": __group_id, "nm": __group_dict["group"]})
+                    __flag_dict_sorted.sort(key=lambda s: s["nm"])
+                    # выводим информацию по содержимому location (группы товаров)
+                    for __group_dict_sorted in __flag_dict_sorted:
+                        __group_id = __group_dict_sorted["id"]
                         __group_dict = __flag_dict[str(__group_id)]
                         glf.write('<tr{color}>'
                                   ' <th scope="row">{num}</th>\n'
