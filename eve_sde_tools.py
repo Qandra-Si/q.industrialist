@@ -183,20 +183,12 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
         return None
     __group_id = group_id
     while True:
-        if __group_id in [211,  # Ammunition & Charges
-                          9,   # Ship Equipment
-                          157,  # Drones
-                          # 533,  # Materials
-                          1035,  # Components
-                          1872,  # Research Equipment
-                          4,  # Ships
-                          943,  # Ship Modifications
-                          1112,  # Subsystems
-                          1659,  # Special Edition Assets
-                          2158,  # Structure Equipment
-                          2203,  # Structure Modifications
-                          477,  # Structures
-                          19  # Trade Goods
+        if __group_id in [# 475,  # Manufacture & Research
+                          # 533,  # Materials (parent:475, см. ниже)
+                          1035,  # Components (parent:475)
+                          1872,  # Research Equipment (parent:475)
+                          955,  # Ship and Module Modifications
+                          1112,  # Subsystems (parent:955)
                          ]:
             return __group_id
         __grp1 = market_groups[str(__group_id)]
