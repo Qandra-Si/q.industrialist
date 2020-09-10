@@ -591,10 +591,11 @@ def __dump_blueprints_list_with_materials(
                                 format(nm=ms_item_name)
                             glf.write(
                                 '<tr>\n'
-                                ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                                # ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
                                 '</tr>'.
                                 format(nm=__grp_name,
-                                       icn=__get_icon_src(__icon_id, sde_icon_ids),
+                                       # icn=__get_icon_src(__icon_id, sde_icon_ids),
                                        id=ms_group_id,
                                        clbrd=__copy2clpbrd))
                             group_diplayed = True
