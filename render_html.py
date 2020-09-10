@@ -2558,6 +2558,9 @@ def __dump_corp_accounting_nested_tbl(
                        img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
                        what='&nbsp;<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else ""))
             row_id = 1
+            __summary_cost = None
+            __summary_volume = 0
+            __blueprints_reactions_dict = None
             if "flags" in itm_dict:
                 __f_keys = itm_dict["flags"].keys()
                 for __flag in __f_keys:  # "CorpDeliveries"
@@ -2569,6 +2572,9 @@ def __dump_corp_accounting_nested_tbl(
                         continue
                     # получаем список групп товаров, хранящихся в указанном __flag
                     __flag_dict = itm_dict["flags"][str(__flag)]
+                    if str(__flag) == "BlueprintsReactions":
+                        __blueprints_reactions_dict = __flag_dict
+                        continue
                     # сортируем группы товаров на названию групп
                     __flag_dict_sorted = []
                     __g_keys = __flag_dict.keys()
@@ -2580,7 +2586,7 @@ def __dump_corp_accounting_nested_tbl(
                     for __group_dict_sorted in __flag_dict_sorted:
                         __group_id = __group_dict_sorted["id"]
                         __group_dict = __flag_dict[str(__group_id)]
-                        glf.write('<tr{color}>'
+                        glf.write('<tr>'
                                   ' <th scope="row">{num}</th>\n'
                                   ' <td>{icn}{nm}{tag}</td>'
                                   ' <td align="right">{cost:,.1f}</td>'
@@ -2589,15 +2595,53 @@ def __dump_corp_accounting_nested_tbl(
                                   format(num=row_id,
                                          nm=__group_dict["group"],
                                          icn='<img class="icn16" src="{}" style="display:inline;">&nbsp;'.
-                                             format(__get_icon_src(__group_dict["icon"], sde_icon_ids)) \
-                                                 if not (__group_dict["icon"] is None) else "",
+                                             format(__get_icon_src(__group_dict["icon"], sde_icon_ids))
+                                             if not (__group_dict["icon"] is None) else "",
                                          cost=__group_dict["cost"],
                                          volume=__group_dict["volume"],
                                          tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
-                                             '&nbsp;<small><span class="label label-default">{flag}</span></small>'.
-                                             format(flag=__camel_to_snake(str(__flag))),
-                                         color=' style="color:green;"' if __flag == "BlueprintsReactions" else ""))
+                                             ' <small><span class="label label-default">{flag}</span></small>'.
+                                             format(flag=__camel_to_snake(str(__flag))
+                                        )))
+                        __summary_cost = __group_dict["cost"] if __summary_cost is None else __summary_cost + __group_dict["cost"]
+                        __summary_volume += __group_dict["volume"]
                         row_id = row_id + 1
+            # вывод summary-информации в конце каждой таблицы
+            if not (__summary_cost is None):
+                # не копируется в модальном окне:__copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
+                # не копируется в модальном окне:                '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                # не копируется в модальном окне:                '  aria-hidden="true"></span></a>'. \
+                # не копируется в модальном окне:                format(cost=__summary_cost)
+                glf.write('<tr style="font-weight:bold;">'
+                          ' <th></th>\n'
+                          ' <td>Summary</td>'
+                          ' <td align="right">{cost:,.1f}</td>'
+                          ' <td align="right">{volume:,.1f}</td>'
+                          '</tr>'.
+                          format(cost=__summary_cost,
+                                 volume=__summary_volume))
+            # вывод пропущенных ранее 'Blueprints & Reactions' (в конце каждой таблицы, под summary)
+            if not (__blueprints_reactions_dict is None):
+                __flag = "BlueprintsReactions"
+                __g_keys = __blueprints_reactions_dict.keys()
+                # выводим информацию по содержимому location (группы товаров)
+                for __group_id in __g_keys:
+                    __group_dict = __blueprints_reactions_dict[str(__group_id)]
+                    glf.write('<tr style="color:green;">'
+                              ' <th></th>\n'
+                              ' <td>{icn}{nm}{tag}</td>'
+                              ' <td align="right">{cost:,.1f}</td>'
+                              ' <td align="right">{volume:,.1f}</td>'
+                              '</tr>'.
+                              format(nm=__group_dict["group"],
+                                     icn='<img class="icn16" src="{}" style="display:inline;">&nbsp;'.
+                                         format(__get_icon_src(__group_dict["icon"], sde_icon_ids))
+                                         if not (__group_dict["icon"] is None) else "",
+                                     cost=__group_dict["cost"],
+                                     volume=__group_dict["volume"],
+                                     tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
+                                         ' <small><span class="label label-default">{flag}</span></small>'.
+                                         format(flag=__camel_to_snake(str(__flag)))))
     if h3_and_table_printed:
         glf.write("""
 </tbody>
