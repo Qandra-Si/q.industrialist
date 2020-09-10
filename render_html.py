@@ -51,6 +51,7 @@ def __dump_header(glf, header_name):
  <meta http-equiv="X-UA-Compatible" content="IE=edge">
  <meta name="viewport" content="width=device-width, initial-scale=1">
 <style type="text/css">
+.icn16 { width:16px; height:16px; }
 .icn24 { width:24px; height:24px; }
 .icn32 { width:32px; height:32px; }
 .icn64 { width:64px; height:64px; }
@@ -312,6 +313,7 @@ def __dump_blueprints_list_with_materials(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_icon_ids,
         enable_copy_to_clipboard=False):
     # получение списков контейнеров и станок из экземпляра контейнера
     stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
@@ -580,6 +582,7 @@ def __dump_blueprints_list_with_materials(
                         # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
                         if not group_diplayed:
                             __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
+                            __icon_id = sde_market_groups[ms_group_id]["iconID"] if "iconID" in sde_market_groups[ms_group_id] else 0
                             # подготовка элементов управления копирования данных в clipboard
                             __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                                 '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
@@ -588,9 +591,10 @@ def __dump_blueprints_list_with_materials(
                                 format(nm=ms_item_name)
                             glf.write(
                                 '<tr>\n'
-                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                                ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
                                 '</tr>'.
                                 format(nm=__grp_name,
+                                       icn=__get_icon_src(__icon_id, sde_icon_ids),
                                        id=ms_group_id,
                                        clbrd=__copy2clpbrd))
                             group_diplayed = True
@@ -731,6 +735,7 @@ def __dump_corp_assets(glf, corp_ass_loc_data, corp_ass_names_data, type_ids):
 
 def __dump_corp_assets_tree_nested(
         glf,
+        parent_location_id,
         location_id,
         corp_assets_data,
         corp_assets_tree,
@@ -776,13 +781,14 @@ def __dump_corp_assets_tree_nested(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
         ' <div class="media-body">\n'
-        '  <h4 class="media-heading">{where}{what}{iq}{nq}</h4>\n'
-        '  <span class="label label-info">{id}</span>{loc_flag}{foreign}\n'
+        '  <h4 class="media-heading" id="id{id}">{where}{what}{iq}{nq}</h4>\n'
+        '  {parent_id}<span class="label label-info">{id}</span>{loc_flag}{foreign}\n'
         '  {grp}{base}{average}{adjusted}{volume}\n'.
         format(
             img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
             where='{} '.format(loc_name) if not (loc_name is None) else "",
             what='<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else "",
+            parent_id='<a href="#id{id}"><span class="label label-primary">parent:{id}</span></a> '.format(id=parent_location_id) if not (parent_location_id is None) else "",
             id=location_id,
             nq=' <span class="badge">{}</span>'.format(items_quantity) if not (items_quantity is None) and (items_quantity > 1) else "",
             iq=' <span class="label label-info">{}</span>'.format(nested_quantity) if not (nested_quantity is None) and (nested_quantity > 1) else "",
@@ -799,6 +805,7 @@ def __dump_corp_assets_tree_nested(
         for itm in items:
             __dump_corp_assets_tree_nested(
                 glf,
+                location_id,
                 itm,
                 corp_assets_data,
                 corp_assets_tree,
@@ -837,6 +844,7 @@ def __dump_corp_assets_tree(
         for loc_id in roots:
             __dump_corp_assets_tree_nested(
                 glf,
+                None,
                 loc_id,
                 corp_assets_data,
                 corp_assets_tree,
@@ -860,6 +868,7 @@ def dump_industrialist_into_report(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_icon_ids,
         wallet_data,
         blueprint_data,
         assets_data,
@@ -886,7 +895,7 @@ def dump_industrialist_into_report(
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Blueprints")
-        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, stock_all_loc_ids, exclude_loc_ids, blueprint_loc_ids, blueprint_station_ids)
+        __dump_blueprints_list_with_materials(glf, corp_bp_loc_data, corp_industry_jobs_data, corp_ass_names_data, corp_ass_loc_data, corp_assets_tree, sde_type_ids, sde_bp_materials, sde_market_groups, sde_icon_ids, stock_all_loc_ids, exclude_loc_ids, blueprint_loc_ids, blueprint_station_ids)
         __dump_any_into_modal_footer(glf)
 
         __dump_any_into_modal_header(glf, "Corp Assets")
@@ -965,9 +974,9 @@ def dump_assets_tree_into_report(
     try:
         __dump_header(glf, "Corp Assets")
 
-        __dump_any_into_modal_header(glf, "Corp Assets")
+        #__dump_any_into_modal_header(glf, "Corp Assets")
         __dump_corp_assets_tree(glf, corp_assets_data, corp_assets_tree, corp_ass_names_data, foreign_structures_data, eve_market_prices_data, sde_type_ids, sde_inv_names, sde_inv_items, sde_market_groups)
-        __dump_any_into_modal_footer(glf)
+        #__dump_any_into_modal_footer(glf)
 
         __dump_footer(glf)
     finally:
@@ -2170,6 +2179,7 @@ def __dump_corp_conveyor(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_icon_ids,
         materials_for_bps,
         research_materials_for_bps):
     glf.write("""
@@ -2225,6 +2235,7 @@ def __dump_corp_conveyor(
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            sde_icon_ids,
             enable_copy_to_clipboard=True)
         if stock_not_enough_materials is None:
             stock_not_enough_materials = __stock_not_enough_materials
@@ -2449,6 +2460,7 @@ def dump_conveyor_into_report(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_icon_ids,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
         corp_ass_names_data,
@@ -2472,6 +2484,7 @@ def dump_conveyor_into_report(
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            sde_icon_ids,
             materials_for_bps,
             research_materials_for_bps)
         __dump_footer(glf)
@@ -2484,6 +2497,7 @@ def __dump_corp_accounting_nested_tbl(
         loc_id,
         loc_dict,
         sde_type_ids,
+        sde_icon_ids,
         filter_flags):
     h3_and_table_printed = False
     if "items" in loc_dict:
@@ -2559,12 +2573,15 @@ def __dump_corp_accounting_nested_tbl(
                         __group_dict = __flag_dict[str(__group_id)]
                         glf.write('<tr{color}>'
                                   ' <th scope="row">{num}</th>\n'
-                                  ' <td>{nm}{tag}</td>'
+                                  ' <td>{icn}{nm}{tag}</td>'
                                   ' <td align="right">{cost:,.1f}</td>'
                                   ' <td align="right">{volume:,.1f}</td>'
                                   '</tr>'.
                                   format(num=row_id,
                                          nm=__group_dict["group"],
+                                         icn='<img class="icn16" src="{}" style="display:inline;">&nbsp;'.
+                                             format(__get_icon_src(__group_dict["icon"], sde_icon_ids)) \
+                                                 if not (__group_dict["icon"] is None) else "",
                                          cost=__group_dict["cost"],
                                          volume=__group_dict["volume"],
                                          tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
@@ -2586,7 +2603,8 @@ def __dump_corp_accounting_details(
         corporation_name,
         corporation_id,
         __corp_tree,
-        sde_type_ids):
+        sde_type_ids,
+        sde_icon_ids):
     __dump_any_into_modal_header(
         glf,
         '<span class="text-primary">{nm}</span> {key}'.format(nm=corporation_name,
@@ -2603,6 +2621,7 @@ def __dump_corp_accounting_details(
             root,
             __corp_tree[str(root)],
             sde_type_ids,
+            sde_icon_ids,
             __filter)  # ["CorpDeliveries"]
     __dump_any_into_modal_footer(glf)
 
@@ -2612,6 +2631,7 @@ def __dump_corp_accounting_nested(
         root_id,
         root,
         sde_type_ids,
+        sde_icon_ids,
         filter_flags):
     if "region" in root:
         __filter_found = filter_flags is None
@@ -2626,15 +2646,16 @@ def __dump_corp_accounting_nested(
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
             system = root["systems"][str(loc_id)]
-            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, filter_flags)
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, sde_icon_ids, filter_flags)
     else:
         glf.write('<h2>???</h2>\n')
-        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, filter_flags)
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, sde_icon_ids, filter_flags)
 
 
 def __dump_corp_accounting(
         glf,
         sde_type_ids,
+        sde_icon_ids,
         corps_accounting):
     glf.write("""
     <nav class="navbar navbar-default">
@@ -2724,7 +2745,8 @@ def __dump_corp_accounting(
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
-                sde_type_ids)
+                sde_type_ids,
+                sde_icon_ids)
             glf.write('</td>'
                       '</tr>\n')
             row_num = row_num + 1
@@ -2748,7 +2770,8 @@ def __dump_corp_accounting(
             __corp["corporation"],
             corporation_id,
             __corp["tree"],
-            sde_type_ids)
+            sde_type_ids,
+            sde_icon_ids)
         glf.write('</td>'
                   '</tr>\n')
         # добавление в подвал (под summary) информацию об omitted-категориях (такая у нас Blueprints & Reactions)
@@ -2773,7 +2796,8 @@ def __dump_corp_accounting(
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
-                sde_type_ids)
+                sde_type_ids,
+                sde_icon_ids)
             glf.write('</td>'
                       '</tr>\n')
 
@@ -2901,11 +2925,12 @@ def __dump_corp_accounting(
 def dump_accounting_into_report(
         ws_dir,
         sde_type_ids,
+        sde_icon_ids,
         corps_accounting):
     glf = open('{dir}/accounting.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         __dump_header(glf, "Accounting")
-        __dump_corp_accounting(glf, sde_type_ids, corps_accounting)
+        __dump_corp_accounting(glf, sde_type_ids, sde_icon_ids, corps_accounting)
         __dump_footer(glf)
     finally:
         glf.close()

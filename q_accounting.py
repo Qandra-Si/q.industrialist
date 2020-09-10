@@ -39,6 +39,7 @@ def __build_accounting_append(
         __quantity,
         __group_id,
         __group_name,
+        __group_icon,
         eve_market_prices_data,
         sde_type_ids,
         __cas1_stat_flag,
@@ -53,7 +54,7 @@ def __build_accounting_append(
         if not (__group_id in process_only_specified_groups):  # напр. Blueprints & Reactions (обрабатываем)
             return
     if not (str(__group_id) in __ca5_station_flag):
-        __ca5_station_flag.update({str(__group_id): {"group": __group_name, "volume": 0, "cost": 0}})
+        __ca5_station_flag.update({str(__group_id): {"group": __group_name, "icon": __group_icon, "volume": 0, "cost": 0}})
     __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
     __type_dict = sde_type_ids[str(__type_id)]
     __price = None
@@ -103,6 +104,7 @@ def __build_accounting_nested(
                 __quantity,
                 __group_id,
                 sde_market_groups[str(__group_id)]["nameID"]["en"],
+                sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
                 eve_market_prices_data,
                 sde_type_ids,
                 __cas1_stat_flag,
@@ -228,6 +230,7 @@ def __build_accounting_blueprints_nested(
                 __quantity,
                 __group_id,
                 sde_market_groups[str(__group_id)]["nameID"]["en"],
+                sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
                 eve_market_prices_data,
                 sde_type_ids,
                 __cas1_stat_flag,
@@ -337,6 +340,7 @@ def __build_accounting(
                                     1,
                                     __group_id,
                                     sde_market_groups[str(__group_id)]["nameID"]["en"],
+                                    sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
                                     eve_market_prices_data,
                                     sde_type_ids,
                                     __cas1_stat_flag,
@@ -421,6 +425,7 @@ def main():
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+    sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
     """
     === Сведения по рассчёту цены ===
@@ -577,6 +582,7 @@ def main():
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_icon_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corps_accounting)
 

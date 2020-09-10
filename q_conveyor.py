@@ -80,6 +80,7 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
     # Построение списка модулей и ресурсов, которые используются в производстве
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
@@ -244,6 +245,7 @@ def main():
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_icon_ids,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
         corp_ass_names_data,
