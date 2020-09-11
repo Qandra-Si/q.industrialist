@@ -214,7 +214,7 @@ class EveOnlineInterface:
                     # и при первом же обращении к первой же странице совпал etag, следовательно весь набор актуален
                     # и заниматься загрузкой остальных страниц (дожидаясь, а может быть на этот раз именно во время
                     # загрузки данные обновятся) - нет никакого смысла! (О) - оптимизация! :)
-                    if first_start and 1 == page:
+                    if first_start and 3 == page:
                         return cached_data["json"] if "json" in cached_data else None
                     # если известны etag-параметры, то все страницы должны совпасть, тогда набор данных
                     # считаем полностью валидным
@@ -249,7 +249,6 @@ class EveOnlineInterface:
                 if page == all_pages:
                     break
                 page = page + 1
-                first_start = False
             if 0 == match_pages:
                 self.__dump_cache_into_file(url, data_headers, data_json)
                 return data_json
