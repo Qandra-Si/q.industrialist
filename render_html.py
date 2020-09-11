@@ -765,7 +765,7 @@ def __dump_corp_assets_tree_nested(
     if not (items is None):
         nested_quantity = len(items)
     if itm_dict is None:
-        itm_dict = next((a for a in corp_assets_data if a['item_id'] == location_id), None)
+        itm_dict = corp_assets_data[loc_dict["index"]] if "index" in loc_dict else None
     if not (itm_dict is None):
         items_quantity = itm_dict["quantity"]
         if str(type_id) in sde_type_ids:
