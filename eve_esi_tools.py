@@ -211,11 +211,11 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
     ass_tree = {}
     stations = []
     # формируем дерево из набора корпоративных ассетов
-    for a in corp_assets_data:
-        item_id = int(a["item_id"])
-        location_id = int(a["location_id"])
-        location_flag = a["location_flag"]
-        type_id = int(a["type_id"])
+    for a in enumerate(corp_assets_data):
+        item_id = int(a[1]["item_id"])
+        location_id = int(a[1]["location_id"])
+        location_flag = a[1]["location_flag"]
+        type_id = int(a[1]["type_id"])
         if virtual_hierarchy_by_corpsag and (location_flag[:-1] == "CorpSAG"):
             corpsag_root = '{}_{}'.format(location_id, location_flag)
             virt_root = str(location_id)
@@ -236,31 +236,37 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
                 ass_tree[locstr_root]["items"].append(item_id)
             else:
                 ass_tree.update({locstr_root: {"items": [item_id]}})
-                location_type = a["location_type"]
+                location_type = a[1]["location_type"]
                 if location_type == "solar_system":
                     ass_tree[locstr_root]["type_id"] = 5  # Solar System
                 elif location_type == "station":
                     if stations.count(location_id) == 0:
                         stations.append(location_id)
         if not (str(item_id) in ass_tree):
-            ass_tree.update({str(item_id): {"type_id": type_id}})
-        elif not ("type_id" in ass_tree[str(item_id)]):
-            ass_tree[str(item_id)]["type_id"] = type_id
+            ass_tree.update({str(item_id): {"type_id": type_id, "index": a[0]}})
+        else:
+            __a = ass_tree[str(item_id)]
+            if not ("type_id" in __a):
+                __a["type_id"] = type_id
+            if not ("index" in __a):
+                __a["index"] = a[0]
     # прописываем location_id парамтеры в каждом элементе по известному item_id
-    for a in corp_assets_data:
-        item_id = str(a["item_id"])
-        location_id = str(a["location_id"])
+    for a in enumerate(corp_assets_data):
+        item_id = str(a[1]["item_id"])
+        location_id = str(a[1]["location_id"])
         if virtual_hierarchy_by_corpsag:
-            location_flag = a["location_flag"]
+            location_flag = a[1]["location_flag"]
             virt_root = '{}_{}'.format(location_id, location_flag) if location_flag[:-1] == "CorpSAG" else location_id
         else:
             virt_root = location_id
         if item_id in ass_tree:
-            itm = ass_tree[item_id]
-            if not ("location_id" in itm):
-                itm["location_id"] = virt_root
-            if not ("type_id" in itm):
-                itm["type_id"] = a["type_id"]
+            __a = ass_tree[item_id]
+            if not ("location_id" in __a):
+                __a["location_id"] = virt_root
+            if not ("type_id" in __a):
+                __a["type_id"] = a[1]["type_id"]
+            if not ("index" in __a):
+                __a["index"] = a[0]
     # дополняем дерево сведениями о станциях, не принадлежащих корпорации (всё равно,
     # что добавить в список NPC-станции)
     foreign_station_ids = foreign_structures_data.keys()

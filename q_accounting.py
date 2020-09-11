@@ -92,26 +92,26 @@ def __build_accounting_nested(
         __ca5_station_flag,
         skip_certain_groups,
         process_only_specified_groups):
-    __item_dict = next((a for a in corp_assets_data if a['item_id'] == int(itm_id)), None)
-    if not (__item_dict is None):
-        __type_id = int(__item_dict["type_id"])
-        __quantity = int(__item_dict["quantity"])
-        # __location_flag = __item_dict["location_flag"]
-        __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-        if not (__group_id is None):
-            __build_accounting_append(
-                __type_id,
-                __quantity,
-                __group_id,
-                sde_market_groups[str(__group_id)]["nameID"]["en"],
-                sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
-                eve_market_prices_data,
-                sde_type_ids,
-                __cas1_stat_flag,
-                __ca5_station_flag,
-                skip_certain_groups,
-                process_only_specified_groups,
-                False)
+    __tree_dict = corp_assets_tree[str(itm_id)]
+    __item_dict = corp_assets_data[int(__tree_dict["index"])]
+    __type_id = int(__item_dict["type_id"])
+    __quantity = int(__item_dict["quantity"])
+    # __location_flag = __item_dict["location_flag"]
+    __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+    if not (__group_id is None):
+        __build_accounting_append(
+            __type_id,
+            __quantity,
+            __group_id,
+            sde_market_groups[str(__group_id)]["nameID"]["en"],
+            sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
+            eve_market_prices_data,
+            sde_type_ids,
+            __cas1_stat_flag,
+            __ca5_station_flag,
+            skip_certain_groups,
+            process_only_specified_groups,
+            False)
     if str(itm_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(itm_id)]
         if "items" in __cat1:
@@ -173,18 +173,23 @@ def __build_accounting_station(
         __ca3_station,
         skip_certain_groups,
         process_only_specified_groups):
-    for a in corp_assets_data:
-        if int(a["location_id"]) == int(loc_id):
-            if a["type_id"] == 16159:  # EVE Alliance (пропускаем, бесполезная инфа, есть есть только в профиле СЕО)
+    __tree = corp_assets_tree[str(loc_id)]
+    __tree_items = corp_assets_tree[str(loc_id)]["items"] if "items" in __tree else None
+    if not (__tree_items is None):
+        for a in __tree_items:
+            __item_id = int(a)
+            __tree_dict = corp_assets_tree[str(__item_id)]
+            __item_dict = corp_assets_data[int(__tree_dict["index"])]
+            if __item_dict["type_id"] == 16159:  # EVE Alliance (пропускаем, бесполезная инфа, есть есть только в профиле СЕО)
                 continue
-            __location_flag = a["location_flag"]
+            __location_flag = __item_dict["location_flag"]
             __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
                 __location_flag,
                 __ca1_region,
                 __ca3_station,
                 corp_accounting_stat)
             __build_accounting_nested(
-                a["item_id"],
+                __item_id,
                 sde_type_ids,
                 sde_market_groups,
                 eve_market_prices_data,
@@ -207,37 +212,37 @@ def __build_accounting_blueprints_nested(
         __ca1_region,
         __ca3_station):
     __ca5_station_flag = __cas1_stat_flag = None
-    __item_dict = next((a for a in corp_assets_data if a['item_id'] == int(__item_id)), None)
-    if not (__item_dict is None):
-        __type_id = int(__item_dict["type_id"])
-        __quantity = int(__item_dict["quantity"])
-        # __location_flag = __item_dict["location_flag"]
-        __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-        if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
-            # регистрируем регион и станцию, на которой обнаружены blueprint
-            if __ca5_station_flag is None:
-                __location_flag = "BlueprintsReactions"
-                __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
-                    __location_flag,
-                    __ca1_region,
-                    __ca3_station,
-                    corp_accounting_stat)
-                __cas1_stat_flag.update({"omit_in_summary": True})
-            # определяем, является ли чертёж БПО или БПЦ? (для БПО предпочтительная цена : base_price, для БПЦ : average_price и adjusted_price)
-            __is_blueprint_copy = ("is_blueprint_copy" in __item_dict) and bool(__item_dict["is_blueprint_copy"])
-            __build_accounting_append(
-                __type_id,
-                __quantity,
-                __group_id,
-                sde_market_groups[str(__group_id)]["nameID"]["en"],
-                sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
-                eve_market_prices_data,
-                sde_type_ids,
-                __cas1_stat_flag,
-                __ca5_station_flag,
-                None,  # в статистику попадают все группы, но следующий фильтр ограничит...
-                [2],   # ...обработку только Blueprints and Reactions
-                not __is_blueprint_copy)  # у БПЦ-чертежей base_price отражает действительность лучше
+    __tree_dict = corp_assets_tree[str(__item_id)]
+    __item_dict = corp_assets_data[int(__tree_dict["index"])]
+    __type_id = int(__item_dict["type_id"])
+    __quantity = int(__item_dict["quantity"])
+    # __location_flag = __item_dict["location_flag"]
+    __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+    if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
+        # регистрируем регион и станцию, на которой обнаружены blueprint
+        if __ca5_station_flag is None:
+            __location_flag = "BlueprintsReactions"
+            __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
+                __location_flag,
+                __ca1_region,
+                __ca3_station,
+                corp_accounting_stat)
+            __cas1_stat_flag.update({"omit_in_summary": True})
+        # определяем, является ли чертёж БПО или БПЦ? (для БПО предпочтительная цена : base_price, для БПЦ : average_price и adjusted_price)
+        __is_blueprint_copy = ("is_blueprint_copy" in __item_dict) and bool(__item_dict["is_blueprint_copy"])
+        __build_accounting_append(
+            __type_id,
+            __quantity,
+            __group_id,
+            sde_market_groups[str(__group_id)]["nameID"]["en"],
+            sde_market_groups[str(__group_id)]["iconID"] if "iconID" in sde_market_groups[str(__group_id)] else None,
+            eve_market_prices_data,
+            sde_type_ids,
+            __cas1_stat_flag,
+            __ca5_station_flag,
+            None,  # в статистику попадают все группы, но следующий фильтр ограничит...
+            [2],   # ...обработку только Blueprints and Reactions
+            not __is_blueprint_copy)  # у БПЦ-чертежей base_price отражает действительность лучше
     if str(__item_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(__item_id)]
         if "items" in __cat1:
@@ -265,11 +270,14 @@ def __build_accounting_blueprints(
         __ca1_region,
         __ca3_station):
     # на текущей станции получаем все item-ы и собираем сводную статистику по Blueprints & Reactions
-    for __item_dict in corp_assets_data:
-        if int(__item_dict["location_id"]) != int(loc_id):
-            continue
+    __tree = corp_assets_tree[str(loc_id)]
+    __tree_items = corp_assets_tree[str(loc_id)]["items"] if "items" in __tree else None
+    if __tree_items is None:
+        return
+    for a in __tree_items:
+        __item_id = int(a)
         __build_accounting_blueprints_nested(
-            __item_dict['item_id'],
+            __item_id,
             sde_type_ids,
             sde_market_groups,
             eve_market_prices_data,
@@ -323,7 +331,8 @@ def __build_accounting(
                 __ca3_station.update({"loc_name": loc_name, "foreign": foreign, "flags": {}})
                 # имущество собственных станций и таможек тоже учитываем в сводной статистике
                 if not foreign:
-                    __item_dict = next((a for a in corp_assets_data if a['item_id'] == int(itm)), None)
+                    __tree_dict = corp_assets_tree[str(itm)] if str(itm) in corp_assets_tree else None
+                    __item_dict = corp_assets_data[int(__tree_dict["index"])] if "index" in __tree_dict else None
                     if not (__item_dict is None):  # может попастся NPC-станция, пропускаем, это точно не наше имущество
                         __location_flag = __item_dict["location_flag"]
                         if __location_flag == "AutoFit":
