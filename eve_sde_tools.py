@@ -155,6 +155,17 @@ def get_item_name_by_type_id(type_ids, type_id):
     return name
 
 
+def get_type_id_by_item_name(type_ids, name):
+    keys = type_ids.keys()
+    for type_id in keys:
+        type_dict = type_ids[str(type_id)]
+        if ("name" in type_dict) and ("en" in type_dict["name"]):
+            __name = type_dict["name"]["en"]
+            if __name == name:
+                return int(type_id)
+    return None
+
+
 def get_market_group_by_type_id(type_ids, type_id):
     if not (str(type_id) in type_ids):
         return None

@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from eve_sde_tools import get_yaml
 from eve_sde_tools import get_item_name_by_type_id
+from eve_sde_tools import get_type_id_by_item_name
 from eve_sde_tools import get_basis_market_group_by_type_id
 from eve_sde_tools import get_blueprint_manufacturing_materials
 from eve_sde_tools import get_blueprint_reaction_materials
@@ -439,7 +440,7 @@ def __dump_blueprints_list_with_materials(
                                     quantity_or_runs = quantity_or_runs * fixed_number_of_runs
                             __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
                             __need = __used  # поправка на эффективнсть материалов
-                            if material_efficiency > 0:
+                            if not __is_reaction_formula:
                                 # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
                                 # см. 1 x run: http://prntscr.com/u0g07w
                                 # см. 4 x run: http://prntscr.com/u0g0cd
@@ -587,8 +588,7 @@ def __dump_blueprints_list_with_materials(
                             __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                                 '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
                                 '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
-                                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'. \
-                                format(nm=ms_item_name)
+                                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
                             glf.write(
                                 '<tr>\n'
                                 # ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
@@ -4084,6 +4084,597 @@ def dump_blueprints_into_report(
     try:
         __dump_header(glf, "Blueprints")
         __dump_corp_blueprints_tbl(glf, corps_blueprints)
+        __dump_footer(glf)
+    finally:
+        glf.close()
+
+
+def __dump_corp_titan(
+        glf,
+        # настройки генерации отчёта
+        report_options,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups,
+        sde_icon_ids,
+        # esi данные, загруженные с серверов CCP
+        corp_assets_data,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_blueprints_data,
+        eve_market_prices_data,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_ass_loc_data,
+        corp_bp_loc_data,
+        corp_assets_tree,
+        materials_for_bps,
+        research_materials_for_bps):
+    product_name = report_options["product"]
+    blueprint_containter_ids = [c["id"] for c in report_options["blueprints"]]
+    enable_copy_to_clipboard = True
+
+    __type_id = get_type_id_by_item_name(sde_type_ids, product_name)
+    if __type_id is None:
+        return
+    __blueprint_id, __blueprint_materials = get_blueprint_type_id_by_product_id(__type_id, sde_bp_materials)
+    __is_reaction_formula = is_type_id_nested_into_market_group(__type_id, [1849], sde_type_ids, sde_market_groups)
+
+    glf.write("""
+<div class="container-fluid">
+<div class="media">
+ <div class="media-left">
+""")
+
+    glf.write('  <img class="media-object icn64" src="{src}" alt="{nm}">\n'
+              ' </div>\n'
+              ' <div class="media-body">\n'
+              '  <h4 class="media-heading">{nm}</h4>\n'
+              '<p>\n'
+              'EveMarketer {nm} tradings: <a href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a></br>'
+              'EveMarketer {nm} Blueprint tradings: <a href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a></br>'
+              'Adam4EVE {nm} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a></br>'
+              'Adam4EVE {nm} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a></br>'
+              'Adam4EVE {nm} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>'.
+              format(nm=product_name,
+                     src=__get_img_src(__type_id, 64),
+                     pid=__type_id,
+                     bid=__blueprint_id))
+
+    # создаём запись несуществующего пока чертежа
+    __titan_blueprint_dict = {
+        "cp": True,  # блюпринт на титан - копия
+        "qr": 1,
+        "me": 0,
+        "te": 0,
+        "st": None,
+        "id": None
+    }
+    for b in corp_blueprints_data:
+        __type_id = int(b["type_id"])
+        if __blueprint_id != __type_id:
+            continue
+        # __location_id = int(b["location_id"])
+        # if not (__location_id in blueprint_containter_ids):
+        #     continue
+        if (__titan_blueprint_dict["me"] < b["material_efficiency"]) or (__titan_blueprint_dict["id"] is None):
+            __quantity = int(b["quantity"])
+            # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
+            # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
+            # activities performed on them yet).
+            __is_blueprint_copy = __quantity == -2
+            __titan_blueprint_dict = {
+                "cp": __is_blueprint_copy,
+                "me": b["material_efficiency"],
+                "te": b["time_efficiency"],
+                "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity),
+                "id": b["item_id"]
+            }
+            print('Found {} Blueprint: '.format(product_name), __titan_blueprint_dict)
+
+    # __titan_is_blueprint_copy = __titan_blueprint_dict["cp"]
+    __titan_material_efficiency = __titan_blueprint_dict["me"]
+    # __titan_time_efficiency = __titan_blueprint_dict["te"]
+    # __titan_blueprint_status = __titan_blueprint_dict["st"]
+    __titan_quantity_or_runs = __titan_blueprint_dict["qr"]
+
+    glf.write("""
+</p>
+  </div> <!--media-body-->
+ </div> <!--media-->
+<hr>
+ <div class="media">
+  <div class="media-left">
+""")
+    glf.write('  <img class="media-object icn64" src="{src}" alt="Summary raw materials">\n'.
+              format(src=__get_icon_src(1436, sde_icon_ids)))  # Manufacture & Research
+    glf.write("""
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Manufacturing materials</h4>
+""")
+    for m in __blueprint_materials["activities"]["manufacturing"]["materials"]:
+        bpmm_used = int(m["quantity"])
+        bpmm_tid = int(m["typeID"])
+        bpmm_tnm = get_item_name_by_type_id(sde_type_ids, bpmm_tid)
+        # вывод наименования ресурса
+        glf.write(
+            '<span style="white-space:nowrap">'
+            '<img class="icn24" src="{src}"> {q:,d} x {nm} '
+            '</span>\n'.format(
+                src=__get_img_src(bpmm_tid, 32),
+                q=bpmm_used,
+                nm=bpmm_tnm
+            )
+        )
+
+    glf.write("""
+  </div> <!--media-body-->
+ </div> <!--media-->
+<hr>
+ <div class="media">
+  <div class="media-left">
+""")
+    glf.write('  <img class="media-object icn64" src="{src}" alt="Capital Ship Components">\n'.
+              format(src=__get_icon_src(2863, sde_icon_ids)))  # Standard Capital Ship Components
+    glf.write("""
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Capital Ship Components</h4>
+<p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,<br/>
+where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.</p>
+<div class="table-responsive">
+ <table class="table table-condensed">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <th>Materials</th>
+  <th>Required</th>
+  <th>Efficiency</th>
+ </tr>
+</thead>
+<tbody>
+""")
+
+    materials_summary = []
+
+    row1_num = 0
+    for m1 in __blueprint_materials["activities"]["manufacturing"]["materials"]:
+        row1_num = row1_num + 1
+        bpmm1_tid = int(m1["typeID"])
+        bpmm1_tnm = get_item_name_by_type_id(sde_type_ids, bpmm1_tid)
+        bpmm1_used = int(m1["quantity"])
+        bpmm1_need = bpmm1_used  # поправка на эффективнсть материалов
+        bpmm1_blueprint_id, bpmm1_blueprint_materials = get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
+        # поиск чертежей, имеющихся в наличии у корпорации
+        bpmm1_blueprints = []
+        if not (bpmm1_blueprint_id is None):
+            for b in corp_blueprints_data:
+                __type_id = int(b["type_id"])
+                if bpmm1_blueprint_id != __type_id:
+                    continue
+                __location_id = int(b["location_id"])
+                if not (__location_id in blueprint_containter_ids):
+                    continue
+                __quantity = int(b["quantity"])
+                # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
+                # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
+                # activities performed on them yet).
+                __is_blueprint_copy = __quantity == -2
+                __bp_dict = {
+                    "cp": __is_blueprint_copy,
+                    "me": b["material_efficiency"],
+                    "te": b["time_efficiency"],
+                    "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity)
+                }
+                bpmm1_blueprints.append(__bp_dict)
+        # расчёт материалов с учётом эффективность производства
+        if not __is_reaction_formula:
+            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+            # см. 1 x run: http://prntscr.com/u0g07w
+            # см. 4 x run: http://prntscr.com/u0g0cd
+            # см. экономия материалов: http://prntscr.com/u0g11u
+            __me = int(100 - __titan_material_efficiency - 1 - 4.2)
+            bpmm1_need = int((bpmm1_used * __me) / 100)
+            if 0 != ((bpmm1_used * __me) % 100):
+                bpmm1_need = bpmm1_need + 1
+        # вывод наименования ресурса
+        glf.write(
+            '<tr class="active">\n'
+            ' <th scope="row">{num}</th>\n'
+            ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
+            ' <td>{qr:,d}</td>\n'
+            ' <td>{qe:,d}</td>\n'
+            '</tr>'.
+            format(
+                num=row1_num,
+                nm=bpmm1_tnm,
+                src=__get_img_src(bpmm1_tid, 32),
+                qr=bpmm1_used,
+                qe=bpmm1_need
+            )
+        )
+        # добавляем в summary сами материалы (продукты первого уровня)
+        materials_summary.append({"id": bpmm1_tid,
+                                  "q": bpmm1_need,
+                                  "nm": bpmm1_tnm})
+        # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
+        # проверяем, что для текущего материала существуют чертежи для производства
+        if not (bpmm1_blueprint_id is None):
+            row2_num = 0
+            # добавление в список материалов чертежей с известным кол-вом run-ов
+            materials_summary.append({"id": bpmm1_blueprint_id,
+                                      "q": bpmm1_need,
+                                      "nm": get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_id),
+                                      "b": bpmm1_blueprints})
+            # вывод списка материалов для постройки по чертежу
+            for m2 in bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"]:
+                row2_num = row2_num + 1
+                bpmm2_tid = int(m2["typeID"])
+                bpmm2_tnm = get_item_name_by_type_id(sde_type_ids, bpmm2_tid)
+                bpmm2_used = int(m2["quantity"])  # сведения из чертежа
+                bpmm2_need = bpmm2_used  # поправка на эффективнсть материалов
+                bpmm2_is_reaction_formula = is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
+                if not bpmm2_is_reaction_formula:
+                    # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
+                    material_efficiency = 10
+                    # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+                    # см. 1 x run: http://prntscr.com/u0g07w
+                    # см. 4 x run: http://prntscr.com/u0g0cd
+                    # см. экономия материалов: http://prntscr.com/u0g11u
+                    __me = int(100 - material_efficiency - 1 - 4.2)
+                    bpmm2_need = int((bpmm2_used * __me) / 100)
+                    if 0 != ((bpmm2_used * __me) % 100):
+                        bpmm2_need = bpmm2_need + 1
+                # вывод наименования ресурса
+                glf.write(
+                    '<tr>\n'
+                    ' <th scope="row">{num1}.{num2}</th>\n'
+                    ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
+                    ' <td>{qr:,d}</td>\n'
+                    ' <td>{qc:,d}</td>\n'
+                    '</tr>'.
+                    format(
+                        num1=row1_num, num2=row2_num,
+                        nm=bpmm2_tnm,
+                        src=__get_img_src(bpmm2_tid, 32),
+                        qr=bpmm1_used * bpmm2_used,
+                        qc=bpmm1_need * bpmm2_need
+                    )
+                )
+                # сохраняем материалы для производства в список их суммарного кол-ва
+                __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm2_tid), None)
+                if __summary_dict is None:
+                    __summary_dict = {"id": bpmm2_tid, "q": bpmm1_need * bpmm2_need, "nm": bpmm2_tnm}
+                    materials_summary.append(__summary_dict)
+                else:
+                    __summary_dict["q"] += bpmm1_need * bpmm2_need
+
+    glf.write("""
+</tbody>
+</table>
+</div> <!--table-responsive-->
+  </div> <!--media-body-->
+ </div> <!--media-->
+<hr>
+ <div class="media">
+  <div class="media-left">
+""")
+    glf.write('  <img class="media-object icn64" src="{src}" alt="Summary raw materials">\n'.
+              format(src=__get_icon_src(1201, sde_icon_ids)))  # Materials
+    glf.write("""
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Summary raw materials</h4>
+<p>The number of Minerals and Components is counted for <mark>all assets</mark> owned by the corporation.</p>
+""")
+    glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container <mark>{}</mark>.</p>\n'.
+              format(report_options["blueprints"][0]["name"]))  # Materials
+    glf.write("""
+<div class="table-responsive">
+ <table class="table table-condensed" style="font-size:small">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <th>Materials</th>
+  <th>Summary</th>
+  <th>Available +<br/>In progress</th>
+  <th>Not available</th>
+  <th style="text-align:right;">Cost, ISK</th>
+  <th style="text-align:right;">Volume, m&sup3;</th>
+ </tr>
+</thead>
+<tbody>
+""")
+
+    material_groups = {}
+    # not_enough_materials = []
+    # stock_resources = []
+
+    # подсчёт кол-ва имеющихся в наличии материалов
+    for a in corp_assets_data:
+        __type_id = int(a["type_id"])
+        __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
+        if __summary_dict is None:
+            continue
+        __quantity = int(a["quantity"])
+        if "a" in __summary_dict:
+            __summary_dict["a"] += __quantity
+        else:
+            __summary_dict.update({"a": __quantity})
+    # получаем список работ, которые выдутся с материалами
+    for j in corp_industry_jobs_data:
+        __type_id = j["product_type_id"]
+        __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
+        if __summary_dict is None:
+            continue
+        __runs = int(j["runs"])
+        if "j" in __summary_dict:
+            __summary_dict["j"] += __runs
+        else:
+            __summary_dict.update({"j": __runs})
+
+    # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+    # чертежей в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
+    for __summary_dict in materials_summary:
+        __quantity = __summary_dict["q"]
+        __assets = __summary_dict["a"] if "a" in __summary_dict else 0
+        __blueprints = __summary_dict["b"] if "b" in __summary_dict else []
+        __in_progress = __summary_dict["j"] if "j" in __summary_dict else 0
+        __type_id = __summary_dict["id"]
+        __item_name = __summary_dict["nm"]
+        #---
+        __market_group = get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+        __material_dict = {
+            "id": __type_id,
+            "q": __quantity,
+            "nm": __item_name,
+            "a": __assets,
+            "b": __blueprints,
+            "j": __in_progress}
+        if str(__market_group) in material_groups:
+            material_groups[str(__market_group)].append(__material_dict)
+        else:
+            material_groups.update({str(__market_group): [__material_dict]})
+
+    # добавление чертежа на корабль в список требуемых материалов
+    # Vanquisher Blueprint не имеет marketGroupID, что является ошибкой ССР, и поэтому приходится изгаляться...
+    __titan_blueprint = {
+        "id": __blueprint_id,
+        "q": __titan_quantity_or_runs,
+        "nm": get_item_name_by_type_id(sde_type_ids, __blueprint_id),
+        "a": 0,
+        "b": [__titan_blueprint_dict] if not (__titan_blueprint_dict["id"] is None) else [],
+        "j": 0}  # не показываем, что строим титан
+    materials_summary.append(__titan_blueprint)
+    material_groups["2"].append(__titan_blueprint)  # Blueprints & Reactions
+
+    # вывод окончательного summary-списка материалов для постройки по чертежу
+    ms_groups = material_groups.keys()
+    row3_num = 0
+    for __group_id in ms_groups:
+        __is_blueprints_group = __group_id == "2"  # Blueprints & Reactions
+        __mg1 = material_groups[__group_id]
+        if (__group_id == "None") or (int(__group_id) == 1857):  # Minerals
+            __mg1.sort(key=lambda m: m["q"], reverse=True)
+        else:
+            __mg1.sort(key=lambda m: m["q"])
+        # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
+        if not (__group_id == "None"):
+            __group_name = sde_market_groups[__group_id]["nameID"]["en"]
+            # подготовка элементов управления копирования данных в clipboard
+            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
+                '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
+                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
+            glf.write('<tr>\n'
+                      ' <td class="active" colspan="7"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                      '</tr>'.
+                      format(
+                        nm=__group_name,
+                        id=__group_id,
+                        clbrd=__copy2clpbrd
+                      ))
+        # вывод материалов в группе
+        __summary_cost = 0
+        __summary_volume = 0
+        for __material_dict in __mg1:
+            # получение данных по материалу
+            bpmm3_tid = __material_dict["id"]
+            bpmm3_tnm = __material_dict["nm"]
+            bpmm3_q = __material_dict["q"]  # quantity
+            bpmm3_a = __material_dict["a"]  # available in assets
+            bpmm3_b = __material_dict["b"]  # blueprints list
+            bpmm3_j = __material_dict["j"]  # in progress (runs of jobs)
+            row3_num = row3_num + 1
+            # получение справочной информации о материале
+            __type_dict = sde_type_ids[str(bpmm3_tid)]
+            # получение цены материала
+            bpmm3_price = None
+            if not __is_blueprints_group:
+                __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+                if not (__price_dict is None):
+                    if "average_price" in __price_dict:
+                        bpmm3_price = __price_dict["average_price"]
+                    elif "adjusted_price" in __price_dict:
+                        bpmm3_price = __price_dict["adjusted_price"]
+                    elif "basePrice" in __type_dict:
+                        bpmm3_price = __type_dict["basePrice"]
+                elif "basePrice" in __type_dict:
+                    bpmm3_price = __type_dict["basePrice"]
+            # получение информации о кол-ве материала (сперва по блюпринтам, потом по ассетам)
+            me_te_tags_list = []
+            me_te_tags = ""
+            if not __is_blueprints_group:
+                bpmm3_available = bpmm3_a
+            else:
+                bpmm3_available = 0
+                for b in bpmm3_b:
+                    if not bool(b["cp"]):
+                        # найден оригинал, это значит что можно произвести ∞ кол-во материалов
+                        bpmm3_available = -1
+                    if bpmm3_available >= 0:
+                        bpmm3_available += int(b["qr"])
+                    # составляем тэги с информацией о me/te чертежей
+                    __me_te = '{me} {te}'.format(me=b["me"], te=b["te"])
+                    if not (__me_te in me_te_tags_list):
+                        me_te_tags += '&nbsp;<span class="label label-success">{}</span>'.format(__me_te)
+                        me_te_tags_list.append(__me_te)
+            # расчёт недостающего количества материала
+            if bpmm3_available < 0:
+                bpmm3_not_available = 0
+            else:
+                bpmm3_not_available = bpmm3_q - bpmm3_available if bpmm3_q >= bpmm3_available else 0
+            # вывод наименования ресурса
+            glf.write(
+                '<tr>\n'
+                ' <th scope="row">{num}</th>\n'
+                ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{me_te}</td>\n'
+                ' <td>{qs:,d}</td>\n'
+                ' <td>{qa}{qip}</td>\n'
+                ' <td quantity="{qna}">{qna:,d}</td>\n'
+                ' <td align="right">{cost}</td>'
+                ' <td align="right">{volume}</td>'
+                '</tr>'.
+                format(
+                    num=row3_num,
+                    nm=bpmm3_tnm,
+                    me_te=me_te_tags,
+                    src=__get_img_src(bpmm3_tid, 32),
+                    qs=bpmm3_q,
+                    qa='{:,d}'.format(bpmm3_available) if bpmm3_available >= 0 else "&infin; <small>runs</small>",
+                    qip="" if bpmm3_j == 0 else '<mark>+ {}</mark>'.format(bpmm3_j),
+                    qna=bpmm3_not_available,
+                    cost='{:,.1f}'.format(bpmm3_price * bpmm3_q) if not (bpmm3_price is None) else "",
+                    volume='{:,.1f}'.format(__type_dict["volume"] * bpmm3_q) if not __is_blueprints_group else ""
+                ))
+            # подсчёт summary кол-ва по всем материалам группы
+            if not (bpmm3_price is None):
+                __summary_cost += bpmm3_price * bpmm3_q
+                __summary_volume += __type_dict["volume"] * bpmm3_q
+        # вывод summary-строки для текущей группы материалов
+        if not (__group_id == "None") and not (__group_id == "2"):
+            glf.write('<tr style="font-weight:bold">'
+                      ' <th></th>'
+                      ' <td colspan="4">Summary&nbsp;(<small>{nm}</small>)</td>'
+                      ' <td align="right">{cost:,.1f}</td>'
+                      ' <td align="right">{volume:,.1f}</td>'
+                      '</tr>\n'.
+                      format(nm=__group_name,
+                             cost=__summary_cost,
+                             volume=__summary_volume))
+
+    glf.write("""
+</tbody>
+</table>
+</div> <!--table-responsive-->
+  </div> <!--media-body-->
+ </div> <!--media-->
+</div> <!--container-fluid-->
+
+<script>
+  // Titan' Options menu and submenu setup
+  $(document).ready(function(){
+    // Working with clipboard
+    $('a.qind-copy-btn').each(function() {
+      $(this).tooltip();
+    })
+    $('a.qind-copy-btn').bind('click', function () {
+      var data_copy = $(this).attr('data-copy');
+      if (data_copy === undefined) {
+        var tr = $(this).parent().parent();
+        var tbody = tr.parent();
+        var rows = tbody.children('tr');
+        var start_row = rows.index(tr);
+        data_copy = '';
+        rows.each( function(idx) {
+          if (!(start_row === undefined) && (idx > start_row)) {
+            var td = $(this).find('td').eq(0);
+            if (!(td.attr('class') === undefined))
+              start_row = undefined;
+            else {
+              var nm = td.attr('data-copy');
+              if (!(nm === undefined)) {
+                if (data_copy) data_copy += "\\n"; 
+                data_copy += nm + "\\t" + $(this).find('td').eq(3).attr('quantity');
+              }
+            }
+          }
+        });
+      }
+      var $temp = $("<textarea>");
+      $("body").append($temp);
+      $temp.val(data_copy).select();
+      try {
+        success = document.execCommand("copy");
+        if (success) {
+          $(this).trigger('copied', ['Copied!']);
+        }
+      } finally {
+        $temp.remove();
+      }
+    });
+    $('a.qind-copy-btn').bind('copied', function(event, message) {
+      $(this).attr('title', message)
+        .tooltip('fixTitle')
+        .tooltip('show')
+        .attr('title', "Copy to clipboard")
+        .tooltip('fixTitle');
+    });
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+      // какой-то код ...
+      $('a.qind-copy-btn').each(function() {
+        $(this).addClass('hidden');
+      })
+    }
+  });
+</script>
+""")
+
+
+def dump_titan_into_report(
+        # путь, где будет сохранён отчёт
+        ws_dir,
+        # настройки генерации отчёта
+        report_options,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups,
+        sde_icon_ids,
+        # esi данные, загруженные с серверов CCP
+        corp_assets_data,
+        corp_industry_jobs_data,
+        corp_ass_names_data,
+        corp_blueprints_data,
+        eve_market_prices_data,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_ass_loc_data,
+        corp_bp_loc_data,
+        corp_assets_tree,
+        materials_for_bps,
+        research_materials_for_bps):
+    product_name = report_options["product"]
+    glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=__camel_to_snake(product_name)), "wt+", encoding='utf8')
+    try:
+        __dump_header(glf, product_name)
+        __dump_corp_titan(
+            glf,
+            report_options,
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            sde_icon_ids,
+            corp_assets_data,
+            corp_industry_jobs_data,
+            corp_ass_names_data,
+            corp_blueprints_data,
+            eve_market_prices_data,
+            corp_ass_loc_data,
+            corp_bp_loc_data,
+            corp_assets_tree,
+            materials_for_bps,
+            research_materials_for_bps)
         __dump_footer(glf)
     finally:
         glf.close()
