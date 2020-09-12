@@ -46,16 +46,26 @@ def __build_accounting_append(
         __ca5_station_flag,
         skip_certain_groups,
         process_only_specified_groups,
-        prefer_base_price):
+        prefer_base_price,
+        top_level_hangar):
     if not (skip_certain_groups is None):
         if __group_id in skip_certain_groups:  # напр. Blueprints & Reactions (пропускаем)
             return
     if not (process_only_specified_groups is None):
         if not (__group_id in process_only_specified_groups):  # напр. Blueprints & Reactions (обрабатываем)
             return
-    if not (str(__group_id) in __ca5_station_flag):
-        __ca5_station_flag.update({str(__group_id): {"group": __group_name, "icon": __group_icon, "volume": 0, "cost": 0}})
-    __ca6_group = __ca5_station_flag[str(__group_id)]  # верим в лучшее, данные по маркету тут должны быть...
+    __hangar_num = None if top_level_hangar is None else int(top_level_hangar)
+    __ca5_key = str(__group_id) if __hangar_num is None else '{}_{}'.format(__group_id, __hangar_num)
+    if not (__ca5_key in __ca5_station_flag):
+        __ca5_station_flag.update({__ca5_key: {
+            "hangar_num": __hangar_num,
+            # "group_id": __group_id,
+            "group": __group_name,
+            "icon": __group_icon,
+            "volume": 0,
+            "cost": 0
+        }})
+    __ca6_hangar_group = __ca5_station_flag[__ca5_key]  # верим в лучшее, данные по маркету тут должны быть...
     __type_dict = sde_type_ids[str(__type_id)]
     __price = None
     if prefer_base_price and ("basePrice" in __type_dict):
@@ -73,11 +83,11 @@ def __build_accounting_append(
             __price = __type_dict["basePrice"]
     if not (__price is None):
         __sum = __price * __quantity
-        __ca6_group["cost"] += __sum
+        __ca6_hangar_group["cost"] += __sum
         __cas1_stat_flag["cost"] += __sum
     if "volume" in __type_dict:
         __sum = __type_dict["volume"] * __quantity
-        __ca6_group["volume"] += __sum
+        __ca6_hangar_group["volume"] += __sum
         __cas1_stat_flag["volume"] += __sum
 
 
@@ -91,13 +101,18 @@ def __build_accounting_nested(
         __cas1_stat_flag,
         __ca5_station_flag,
         skip_certain_groups,
-        process_only_specified_groups):
+        process_only_specified_groups,
+        top_level_hangar):
     __tree_dict = corp_assets_tree[str(itm_id)]
     __item_dict = corp_assets_data[int(__tree_dict["index"])]
     __type_id = int(__item_dict["type_id"])
     __quantity = int(__item_dict["quantity"])
     # __location_flag = __item_dict["location_flag"]
     __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+    # номер ангара добывается на первом и сохраняется на всех последующих уровнях вложенности
+    if top_level_hangar is None:
+        if __item_dict["location_flag"][:-1] == "CorpSAG":
+            top_level_hangar = int(__item_dict["location_flag"][-1:])
     if not (__group_id is None):
         __build_accounting_append(
             __type_id,
@@ -111,7 +126,8 @@ def __build_accounting_nested(
             __ca5_station_flag,
             skip_certain_groups,
             process_only_specified_groups,
-            False)
+            False,
+            top_level_hangar)
     if str(itm_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(itm_id)]
         if "items" in __cat1:
@@ -126,7 +142,8 @@ def __build_accounting_nested(
                     __cas1_stat_flag,
                     __ca5_station_flag,
                     skip_certain_groups,
-                    process_only_specified_groups)
+                    process_only_specified_groups,
+                    top_level_hangar)
     return
 
 
@@ -182,7 +199,7 @@ def __build_accounting_station(
             __item_dict = corp_assets_data[int(__tree_dict["index"])]
             if __item_dict["type_id"] == 16159:  # EVE Alliance (пропускаем, бесполезная инфа, есть есть только в профиле СЕО)
                 continue
-            __location_flag = __item_dict["location_flag"]
+            __location_flag = __item_dict["location_flag"]  # CorpDeliveries, OfficeFolder
             __ca5_station_flag, __cas1_stat_flag = __build_accounting_register_flag(
                 __location_flag,
                 __ca1_region,
@@ -198,7 +215,8 @@ def __build_accounting_station(
                 __cas1_stat_flag,
                 __ca5_station_flag,
                 skip_certain_groups,
-                process_only_specified_groups)
+                process_only_specified_groups,
+                None)  # корпоративный ангар всегда вложен в OfficeFolder и находится уровнем ниже
 
 
 def __build_accounting_blueprints_nested(
@@ -242,7 +260,8 @@ def __build_accounting_blueprints_nested(
             __ca5_station_flag,
             None,  # в статистику попадают все группы, но следующий фильтр ограничит...
             [2],   # ...обработку только Blueprints and Reactions
-            not __is_blueprint_copy)  # у БПЦ-чертежей base_price отражает действительность лучше
+            not __is_blueprint_copy,  # у БПЦ-чертежей base_price отражает действительность лучше
+            None)  #TODO: номер ангара
     if str(__item_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(__item_id)]
         if "items" in __cat1:
@@ -356,7 +375,8 @@ def __build_accounting(
                                     __ca5_station_flag,
                                     [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
                                     None, # Обрабатываем все остальные типы и группы имущества
-                                    False)
+                                    False,
+                                    None)  #TODO: а какой тут номер ангара?
                 # на текущей станции получаем все location_flag и собираем сводную статистику по каждой группе
                 __build_accounting_station(
                     itm,

@@ -198,6 +198,7 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
             # в каждой из них решается индивидуально)
             if __parent_group_id in [533,  # Materials
                                      1034,  # Reaction Materials
+                                     477,  # Structures (чтобы было понятнее содержимое accounting-отчётов)
                                      ]:
                 return __group_id
             __group_id = __parent_group_id

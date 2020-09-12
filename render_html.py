@@ -102,7 +102,7 @@ def __dump_any_into_modal_header_wo_button(glf, name, unique_id=None, modal_size
         format(nm=name, nmm=name_merged, mdl_sz='' if modal_size is None else ' {}'.format(modal_size)))
 
 
-def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", btn_nm=None):
+def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", btn_nm=None, modal_size=None):
     name_merged = name.replace(' ', '') if unique_id is None else unique_id
     glf.write(
         '<!-- Button trigger for {nm} Modal -->\n'
@@ -111,7 +111,7 @@ def __dump_any_into_modal_header(glf, name, unique_id=None, btn_size="btn-lg", b
                nmm=name_merged,
                btn_sz=btn_size,
                btn_nm='Show {nm}'.format(nm=name) if btn_nm is None else btn_nm))
-    __dump_any_into_modal_header_wo_button(glf, name, unique_id, modal_size=None)
+    __dump_any_into_modal_header_wo_button(glf, name, unique_id, modal_size=modal_size)
 
 
 def __dump_any_into_modal_footer(glf):
@@ -2501,6 +2501,8 @@ def __dump_corp_accounting_nested_tbl(
         sde_icon_ids,
         filter_flags):
     h3_and_table_printed = False
+    tr_divider_skipped = True
+    __hangar_colors = ["", "fbfbfe", "f0f5f3", "f8fcf4", "fffdeb", "fff4f5", "f0f1f9", "f8f6f5", "fcfdfd"]
     if "items" in loc_dict:
         __itms_keys = loc_dict["items"].keys()
         for __loc_id in __itms_keys:
@@ -2529,7 +2531,8 @@ def __dump_corp_accounting_nested_tbl(
   <table class="table table-condensed">
 <thead>
  <tr>
-  <th style="width:40px;">#</th>
+  <th style="width:32px;">#</th>
+  <th style="width:32px;"></th>
   <th>Items</th>
   <th style="text-align: right;">Cost, ISK</th>
   <th style="text-align: right;">Volume, m&sup3;</th>
@@ -2544,8 +2547,14 @@ def __dump_corp_accounting_nested_tbl(
             type_id = itm_dict["type_id"]
             if loc_name is None:
                 loc_name = loc_id
+            # добавляем пустую строку для разграничения групп товаров между станциями
+            if not tr_divider_skipped:
+                glf.write('<tr><td colspan="5"></td></tr>')
+            tr_divider_skipped = False
+            # добавляем название станции
+            __station_type_name = get_item_name_by_type_id(sde_type_ids, type_id) if not (type_id is None) else ""
             glf.write(
-                '<tr><td colspan="4">'
+                '<tr><td colspan="5">'
                 '<div class="media">'
                 ' <div class="media-left">{img}</div>'
                 ' <div class="media-body"><strong>{where}</strong>{what}{foreign}{forbidden}<!--{id}--></div>'
@@ -2556,56 +2565,112 @@ def __dump_corp_accounting_nested_tbl(
                        foreign='&nbsp;<small><span class="label label-warning">foreign</span></small>' if foreign else "",
                        forbidden='&nbsp;<small><span class="label label-danger">forbidden</span></small>' if forbidden else "",
                        img='<img class="media-object icn32" src="{src}">'.format(src=__get_img_src(type_id, 32)) if not (type_id is None) else "",
-                       what='&nbsp;<small>{}</small> '.format(get_item_name_by_type_id(sde_type_ids, type_id)) if not (type_id is None) else ""))
+                       what='&nbsp;<small>{}</small> '.format(__station_type_name) if __station_type_name else ""))
             row_id = 1
             __summary_cost = None
             __summary_volume = 0
             __blueprints_reactions_dict = None
             if "flags" in itm_dict:
                 __f_keys = itm_dict["flags"].keys()
-                for __flag in __f_keys:  # "CorpDeliveries"
-                    # отбрасываем элементы не по фильтру (например нет списка "delivery")
-                    __filter_found = filter_flags is None
-                    if not __filter_found and (0 != filter_flags.count(__flag)):
-                        __filter_found = True
-                    if not __filter_found:
-                        continue
-                    # получаем список групп товаров, хранящихся в указанном __flag
-                    __flag_dict = itm_dict["flags"][str(__flag)]
-                    if str(__flag) == "BlueprintsReactions":
-                        __blueprints_reactions_dict = __flag_dict
-                        continue
-                    # сортируем группы товаров на названию групп
-                    __flag_dict_sorted = []
-                    __g_keys = __flag_dict.keys()
-                    for __group_id in __g_keys:
-                        __group_dict = __flag_dict[str(__group_id)]
-                        __flag_dict_sorted.append({"id": __group_id, "nm": __group_dict["group"]})
-                    __flag_dict_sorted.sort(key=lambda s: s["nm"])
-                    # выводим информацию по содержимому location (группы товаров)
-                    for __group_dict_sorted in __flag_dict_sorted:
-                        __group_id = __group_dict_sorted["id"]
-                        __group_dict = __flag_dict[str(__group_id)]
-                        glf.write('<tr>'
-                                  ' <th scope="row">{num}</th>\n'
-                                  ' <td>{icn}{nm}{tag}</td>'
-                                  ' <td align="right">{cost:,.1f}</td>'
-                                  ' <td align="right">{volume:,.1f}</td>'
-                                  '</tr>'.
-                                  format(num=row_id,
-                                         nm=__group_dict["group"],
-                                         icn='<img class="icn16" src="{}" style="display:inline;">&nbsp;'.
-                                             format(__get_icon_src(__group_dict["icon"], sde_icon_ids))
-                                             if not (__group_dict["icon"] is None) else "",
-                                         cost=__group_dict["cost"],
-                                         volume=__group_dict["volume"],
-                                         tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
-                                             ' <small><span class="label label-default">{flag}</span></small>'.
-                                             format(flag=__camel_to_snake(str(__flag))
-                                        )))
-                        __summary_cost = __group_dict["cost"] if __summary_cost is None else __summary_cost + __group_dict["cost"]
-                        __summary_volume += __group_dict["volume"]
-                        row_id = row_id + 1
+                for hangar_type_flags in range(2):
+                    for __flag in __f_keys:  # "CorpDeliveries"
+                        # в начало таблицы размещаем офисы на станке с ангарами, так что в конце таблиц размещено всё остальное (без ангаров)
+                        if (hangar_type_flags == 0) and (__flag != "OfficeFolder"):
+                            continue
+                        elif (hangar_type_flags == 1) and (__flag == "OfficeFolder"):
+                            continue
+                        # отбрасываем элементы не по фильтру (например нет списка "delivery")
+                        __filter_found = filter_flags is None
+                        if not __filter_found and (0 != filter_flags.count(__flag)):
+                            __filter_found = True
+                        if not __filter_found:
+                            continue
+                        # получаем список групп товаров, хранящихся в указанном __flag
+                        __flag_dict = itm_dict["flags"][str(__flag)]
+                        if str(__flag) == "BlueprintsReactions":
+                            __blueprints_reactions_dict = __flag_dict
+                            continue
+                        # сортируем группы товаров на названию групп
+                        __flag_dict_sorted = []
+                        __g_h_keys = __flag_dict.keys()
+                        for __group_hangar_key in __g_h_keys:
+                            __group_dict = __flag_dict[str(__group_hangar_key)]
+                            __hangar = 0 if __group_dict["hangar_num"] is None else int(__group_dict["hangar_num"])
+                            __flag_dict_sorted.append({"key": __group_hangar_key, "nm": '{}_{}'.format(__hangar, __group_dict["group"]), "hg": __hangar})
+                        __flag_dict_sorted.sort(key=lambda s: s["nm"])
+                        # подсчёт кол-ва групп товаров, лежащих в ангарах (необходимо для вывода hangar' summary)
+                        __hangar_num_qty = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+                        for __group_dict_sorted in __flag_dict_sorted:
+                            __hangar_num_qty[int(__group_dict_sorted["hg"])] += 1
+                        # подготавливаем к выводу номера ангаров (если присутствуют)
+                        __prev_hangar_num = None
+                        __summary_hangar_groups = None
+                        __summary_hangar_cost = None
+                        __summary_hangar_volume = None
+                        # выводим информацию по содержимому location (группы товаров)
+                        for __group_dict_sorted in __flag_dict_sorted:
+                            __group_hangar_key = __group_dict_sorted["key"]
+                            __group_dict = __flag_dict[str(__group_hangar_key)]
+                            __hangar_num = __group_dict["hangar_num"]  # м.б. None, в то время как __group_dict_sorted["hg"] м.б. 0
+                            # вывод номера ангара
+                            if (__prev_hangar_num is None) and not (__hangar_num is None) or (__prev_hangar_num != __hangar_num):
+                                __prev_hangar_num = __hangar_num
+                                __summary_hangar_groups = __hangar_num_qty[int(__hangar_num)]
+                                __summary_hangar_cost = 0
+                                __summary_hangar_volume = 0
+                                glf.write('<tr style="font-weight:bold;background-color:#{hngr_clr}">'
+                                          ' <td colspan="5">Hangar {hangar}</td>'
+                                          '</tr>\n'.
+                                          format(hangar=__hangar_num,
+                                                 hngr_clr=__hangar_colors[__hangar_num]))
+                            # создание искусственной вложенности (ангары и прочие категории)
+                            if not (__hangar_num is None):
+                                glf.write('<tr{hngr_clr}>'
+                                          ' <td></td>'
+                                          ' <th scope="row">{num}</th>'
+                                          ' <td>'.
+                                          format(hngr_clr=' style="background-color:#{}"'.format(__hangar_colors[__hangar_num]) if not (__hangar_num is None) else "",
+                                                 num=row_id))
+                            else:
+                                glf.write('<tr>'
+                                          ' <th scope="row">{num}</th>\n'
+                                          ' <td colspan="2">'.
+                                          format(num=row_id))
+                            # вывод названий товаров, стоимость и объём (строка таблицы)
+                            glf.write(' {icn}{nm}{tag}</td>'
+                                      ' <td align="right">{cost:,.1f}</td>'
+                                      ' <td align="right">{volume:,.1f}</td>'
+                                      '</tr>'.
+                                      format(nm=__group_dict["group"],
+                                             icn='<img class="icn16" src="{}" style="display:inline;">&nbsp;'.
+                                                 format(__get_icon_src(__group_dict["icon"], sde_icon_ids))
+                                                 if not (__group_dict["icon"] is None) else "",
+                                             cost=__group_dict["cost"],
+                                             volume=__group_dict["volume"],
+                                             tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
+                                                 ' <small><span class="label label-default">{flag}</span></small>'.
+                                                 format(flag=__camel_to_snake(str(__flag))
+                                            )))
+                            row_id = row_id + 1
+                            __summary_cost = __group_dict["cost"] if __summary_cost is None else __summary_cost + __group_dict["cost"]
+                            __summary_volume += __group_dict["volume"]
+                            # вывод summary-информации по ангару
+                            if not (__summary_hangar_cost is None):
+                                __summary_hangar_cost += __group_dict["cost"]
+                                __summary_hangar_volume += __group_dict["volume"]
+                            if not (__summary_hangar_groups is None):
+                                __summary_hangar_groups -= 1
+                                if __summary_hangar_groups == 0:
+                                    glf.write('<tr style="font-weight:bold;background-color:#{hngr_clr}">'
+                                              ' <td></td>'
+                                              ' <td colspan="2">Summary&nbsp;(<small>Hangar {hangar}</small>)</td>'
+                                              ' <td align="right">{cost:,.1f}</td>'
+                                              ' <td align="right">{volume:,.1f}</td>'
+                                              '</tr>\n'.
+                                              format(hangar=__hangar_num,
+                                                     hngr_clr=__hangar_colors[__hangar_num],
+                                                     cost=__summary_hangar_cost,
+                                                     volume=__summary_hangar_volume))
             # вывод summary-информации в конце каждой таблицы
             if not (__summary_cost is None):
                 # не копируется в модальном окне:__copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
@@ -2613,13 +2678,13 @@ def __dump_corp_accounting_nested_tbl(
                 # не копируется в модальном окне:                '  aria-hidden="true"></span></a>'. \
                 # не копируется в модальном окне:                format(cost=__summary_cost)
                 glf.write('<tr style="font-weight:bold;">'
-                          ' <th></th>\n'
-                          ' <td>Summary</td>'
+                          ' <td colspan="3">Summary{what}</td>'
                           ' <td align="right">{cost:,.1f}</td>'
                           ' <td align="right">{volume:,.1f}</td>'
                           '</tr>'.
                           format(cost=__summary_cost,
-                                 volume=__summary_volume))
+                                 volume=__summary_volume,
+                                 what='&nbsp;(<small>{}</small>)'.format(__station_type_name) if __station_type_name else ""))
             # вывод пропущенных ранее 'Blueprints & Reactions' (в конце каждой таблицы, под summary)
             if not (__blueprints_reactions_dict is None):
                 __flag = "BlueprintsReactions"
@@ -2628,8 +2693,7 @@ def __dump_corp_accounting_nested_tbl(
                 for __group_id in __g_keys:
                     __group_dict = __blueprints_reactions_dict[str(__group_id)]
                     glf.write('<tr style="color:green;">'
-                              ' <th></th>\n'
-                              ' <td>{icn}{nm}{tag}</td>'
+                              ' <td colspan="3">{icn}{nm}{tag}</td>'
                               ' <td align="right">{cost:,.1f}</td>'
                               ' <td align="right">{volume:,.1f}</td>'
                               '</tr>'.
@@ -2665,7 +2729,8 @@ def __dump_corp_accounting_details(
         '{nm}_{key}'.format(nm=corporation_id,
                             key="all" if __key is None else __key),
         "btn-xs",
-        "details&hellip;")
+        "details&hellip;",
+        "modal-lg")
     __roots = __corp_tree.keys()
     __filter = None if __key is None else [__key]
     for root in __roots:
