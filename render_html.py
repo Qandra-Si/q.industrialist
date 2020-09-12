@@ -445,10 +445,8 @@ def __dump_blueprints_list_with_materials(
                                 # см. 1 x run: http://prntscr.com/u0g07w
                                 # см. 4 x run: http://prntscr.com/u0g0cd
                                 # см. экономия материалов: http://prntscr.com/u0g11u
-                                __me = int(100 - material_efficiency - 1 - 4.2)
-                                __need = int((__used * __me) / 100)
-                                if 0 != ((__used * __me) % 100):
-                                    __need = __need + 1
+                                __me = float(100 - material_efficiency - 1 - 4.2)
+                                __need = int(float((__used * __me) / 100) + 0.99999)
                             # считаем общее количество материалов, необходимых для работ по этом чертежу
                             bp_manuf_need_all = bp_manuf_need_all + __need
                             # вычисляем минимально необходимое материалов, необходимых для работ хотя-бы по одному чертежу
@@ -4110,7 +4108,7 @@ def __dump_corp_titan(
     __type_id = get_type_id_by_item_name(sde_type_ids, product_name)
     if __type_id is None:
         return
-    __blueprint_id, __blueprint_materials = get_blueprint_type_id_by_product_id(__type_id, sde_bp_materials)
+    __titan_blueprint_type_id, __titan_blueprint_materials = get_blueprint_type_id_by_product_id(__type_id, sde_bp_materials)
     __is_reaction_formula = is_type_id_nested_into_market_group(__type_id, [1849], sde_type_ids, sde_market_groups)
 
     glf.write("""
@@ -4132,7 +4130,7 @@ def __dump_corp_titan(
               format(nm=product_name,
                      src=__get_img_src(__type_id, 64),
                      pid=__type_id,
-                     bid=__blueprint_id))
+                     bid=__titan_blueprint_type_id))
 
     # создаём запись несуществующего пока чертежа
     __titan_blueprint_dict = {
@@ -4145,7 +4143,7 @@ def __dump_corp_titan(
     }
     for b in corp_blueprints_data:
         __type_id = int(b["type_id"])
-        if __blueprint_id != __type_id:
+        if __titan_blueprint_type_id != __type_id:
             continue
         # __location_id = int(b["location_id"])
         # if not (__location_id in blueprint_containter_ids):
@@ -4186,7 +4184,7 @@ def __dump_corp_titan(
   <div class="media-body">
    <h4 class="media-heading">Manufacturing materials</h4>
 """)
-    for m in __blueprint_materials["activities"]["manufacturing"]["materials"]:
+    for m in __titan_blueprint_materials["activities"]["manufacturing"]["materials"]:
         bpmm_used = int(m["quantity"])
         bpmm_tid = int(m["typeID"])
         bpmm_tnm = get_item_name_by_type_id(sde_type_ids, bpmm_tid)
@@ -4217,13 +4215,15 @@ def __dump_corp_titan(
 <p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,<br/>
 where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.</p>
 <div class="table-responsive">
- <table class="table table-condensed">
+ <table class="table table-condensed" style="font-size:small">
 <thead>
  <tr>
   <th style="width:40px;">#</th>
   <th>Materials</th>
-  <th>Required</th>
+  <th>Available +<br/>In progress</th>
+  <th>Standard</th>
   <th>Efficiency</th>
+  <th>Required<br/>(Not enough)</th>
  </tr>
 </thead>
 <tbody>
@@ -4232,19 +4232,23 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     materials_summary = []
 
     row1_num = 0
-    for m1 in __blueprint_materials["activities"]["manufacturing"]["materials"]:
+    # debug = __titan_blueprint_materials["activities"]["manufacturing"]["materials"][:]
+    # debug.append({"typeID": 11186, "quantity": 15})
+    # debug.append({"typeID": 41332, "quantity": 10})
+    __titan_material_efficiency = 2
+    for m1 in __titan_blueprint_materials["activities"]["manufacturing"]["materials"]:
         row1_num = row1_num + 1
         bpmm1_tid = int(m1["typeID"])
         bpmm1_tnm = get_item_name_by_type_id(sde_type_ids, bpmm1_tid)
-        bpmm1_used = int(m1["quantity"])
-        bpmm1_need = bpmm1_used  # поправка на эффективнсть материалов
-        bpmm1_blueprint_id, bpmm1_blueprint_materials = get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
+        bpmm1_standard = int(m1["quantity"])
+        bpmm1_efficiency = bpmm1_standard  # поправка на эффективность материалов
+        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
         # поиск чертежей, имеющихся в наличии у корпорации
         bpmm1_blueprints = []
-        if not (bpmm1_blueprint_id is None):
+        if not (bpmm1_blueprint_type_id is None):
             for b in corp_blueprints_data:
                 __type_id = int(b["type_id"])
-                if bpmm1_blueprint_id != __type_id:
+                if bpmm1_blueprint_type_id != __type_id:
                     continue
                 __location_id = int(b["location_id"])
                 if not (__location_id in blueprint_containter_ids):
@@ -4261,52 +4265,78 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity)
                 }
                 bpmm1_blueprints.append(__bp_dict)
+        # подсчёт кол-ва имеющихся в наличии материалов
+        bpmm1_available = 0
+        for a in corp_assets_data:
+            __type_id = int(a["type_id"])
+            if bpmm1_tid != __type_id:
+                continue
+            __quantity = int(a["quantity"])
+            bpmm1_available += __quantity
+        # получаем список работ, которые ведутся с материалами
+        bpmm1_in_progress = 0
+        for j in corp_industry_jobs_data:
+            __type_id = j["product_type_id"]
+            if bpmm1_tid != __type_id:
+                continue
+            __runs = int(j["runs"])
+            bpmm1_in_progress += __runs
         # расчёт материалов с учётом эффективность производства
         if not __is_reaction_formula:
             # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
             # см. 1 x run: http://prntscr.com/u0g07w
             # см. 4 x run: http://prntscr.com/u0g0cd
             # см. экономия материалов: http://prntscr.com/u0g11u
-            __me = int(100 - __titan_material_efficiency - 1 - 4.2)
-            bpmm1_need = int((bpmm1_used * __me) / 100)
-            if 0 != ((bpmm1_used * __me) % 100):
-                bpmm1_need = bpmm1_need + 1
+            __me = float(100 - __titan_material_efficiency - 1 - 4.2)
+            bpmm1_efficiency = int(float((bpmm1_standard * __me) / 100) + 0.99999)
+        # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
+        bpmm1_not_enough = bpmm1_efficiency - bpmm1_available - bpmm1_in_progress
+        if bpmm1_not_enough < 0:
+            bpmm1_not_enough = 0
         # вывод наименования ресурса
         glf.write(
             '<tr class="active">\n'
             ' <th scope="row">{num}</th>\n'
             ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
-            ' <td>{qr:,d}</td>\n'
+            ' <td>{qa:,d}{qip}</td>\n'
+            ' <td>{qs:,d}</td>\n'
             ' <td>{qe:,d}</td>\n'
+            ' <td>{qne:,d}</td>\n'
             '</tr>'.
             format(
                 num=row1_num,
                 nm=bpmm1_tnm,
                 src=__get_img_src(bpmm1_tid, 32),
-                qr=bpmm1_used,
-                qe=bpmm1_need
+                qs=bpmm1_standard,
+                qe=bpmm1_efficiency,
+                qa=bpmm1_available,
+                qip="" if bpmm1_in_progress == 0 else '<mark>+ {}</mark>'.format(bpmm1_in_progress),
+                qne=bpmm1_not_enough
             )
         )
         # добавляем в summary сами материалы (продукты первого уровня)
         materials_summary.append({"id": bpmm1_tid,
-                                  "q": bpmm1_need,
-                                  "nm": bpmm1_tnm})
+                                  "nm": bpmm1_tnm,
+                                  "q": bpmm1_efficiency,
+                                  "a": bpmm1_available,
+                                  "j": bpmm1_in_progress})
         # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
         # проверяем, что для текущего материала существуют чертежи для производства
-        if not (bpmm1_blueprint_id is None):
+        if not (bpmm1_blueprint_type_id is None):
             row2_num = 0
             # добавление в список материалов чертежей с известным кол-вом run-ов
-            materials_summary.append({"id": bpmm1_blueprint_id,
-                                      "q": bpmm1_need,
-                                      "nm": get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_id),
+            materials_summary.append({"id": bpmm1_blueprint_type_id,
+                                      "q": bpmm1_efficiency,
+                                      "nm": get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
                                       "b": bpmm1_blueprints})
             # вывод списка материалов для постройки по чертежу
             for m2 in bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"]:
                 row2_num = row2_num + 1
                 bpmm2_tid = int(m2["typeID"])
                 bpmm2_tnm = get_item_name_by_type_id(sde_type_ids, bpmm2_tid)
-                bpmm2_used = int(m2["quantity"])  # сведения из чертежа
-                bpmm2_need = bpmm2_used  # поправка на эффективнсть материалов
+                bpmm2_quantity = int(m2["quantity"])  # сведения из чертежа
+                bpmm2_efficiency = bpmm2_quantity * bpmm1_efficiency  # поправка на эффективность материалов
+                bpmm2_not_enough = bpmm2_quantity * bpmm1_not_enough
                 bpmm2_is_reaction_formula = is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
                 if not bpmm2_is_reaction_formula:
                     # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
@@ -4315,33 +4345,35 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     # см. 1 x run: http://prntscr.com/u0g07w
                     # см. 4 x run: http://prntscr.com/u0g0cd
                     # см. экономия материалов: http://prntscr.com/u0g11u
-                    __me = int(100 - material_efficiency - 1 - 4.2)
-                    bpmm2_need = int((bpmm2_used * __me) / 100)
-                    if 0 != ((bpmm2_used * __me) % 100):
-                        bpmm2_need = bpmm2_need + 1
+                    __me = float(100 - material_efficiency - 1 - 4.2)
+                    bpmm2_efficiency = int(float((bpmm2_efficiency * __me) / 100) + 0.99999)
+                    bpmm2_not_enough = int(float((bpmm2_not_enough * __me) / 100) + 0.99999)
                 # вывод наименования ресурса
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num1}.{num2}</th>\n'
                     ' <td><img class="icn24" src="{src}"> {nm}</td>\n'
-                    ' <td>{qr:,d}</td>\n'
-                    ' <td>{qc:,d}</td>\n'
+                    ' <td></td>\n'
+                    ' <td>{qs:,d}</td>\n'
+                    ' <td>{qe:,d}</td>\n'
+                    ' <td>{qne:,d}</td>\n'
                     '</tr>'.
                     format(
                         num1=row1_num, num2=row2_num,
                         nm=bpmm2_tnm,
                         src=__get_img_src(bpmm2_tid, 32),
-                        qr=bpmm1_used * bpmm2_used,
-                        qc=bpmm1_need * bpmm2_need
+                        qs=bpmm1_standard * bpmm2_quantity,
+                        qe=bpmm2_efficiency,
+                        qne=bpmm2_not_enough
                     )
                 )
                 # сохраняем материалы для производства в список их суммарного кол-ва
                 __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm2_tid), None)
                 if __summary_dict is None:
-                    __summary_dict = {"id": bpmm2_tid, "q": bpmm1_need * bpmm2_need, "nm": bpmm2_tnm}
+                    __summary_dict = {"id": bpmm2_tid, "q": bpmm2_not_enough, "nm": bpmm2_tnm}
                     materials_summary.append(__summary_dict)
                 else:
-                    __summary_dict["q"] += bpmm1_need * bpmm2_need
+                    __summary_dict["q"] += bpmm2_not_enough
 
     glf.write("""
 </tbody>
@@ -4370,9 +4402,9 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
  <tr>
   <th style="width:40px;">#</th>
   <th>Materials</th>
-  <th>Summary</th>
-  <th>Available +<br/>In progress</th>
-  <th>Not available</th>
+  <th>Exists +<br/>In progress</th>
+  <th>Need<br/>(Efficiency)</th>
+  <th>Progress, %</th>
   <th style="text-align:right;">Cost, ISK</th>
   <th style="text-align:right;">Volume, m&sup3;</th>
  </tr>
@@ -4385,27 +4417,31 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # stock_resources = []
 
     # подсчёт кол-ва имеющихся в наличии материалов
+    materials_summary_without_a = [int(ms["id"]) for ms in materials_summary if not ("a" in ms)]
     for a in corp_assets_data:
         __type_id = int(a["type_id"])
-        __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
-        if __summary_dict is None:
-            continue
-        __quantity = int(a["quantity"])
-        if "a" in __summary_dict:
-            __summary_dict["a"] += __quantity
-        else:
-            __summary_dict.update({"a": __quantity})
-    # получаем список работ, которые выдутся с материалами
+        if __type_id in materials_summary_without_a:
+            __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
+            if __summary_dict is None:
+                continue
+            __quantity = int(a["quantity"])
+            if "a" in __summary_dict:
+                __summary_dict["a"] += __quantity
+            else:
+                __summary_dict.update({"a": __quantity})
+    # получаем список работ, которые ведутся с материалами
+    materials_summary_without_j = [int(ms["id"]) for ms in materials_summary if not ("j" in ms)]
     for j in corp_industry_jobs_data:
         __type_id = j["product_type_id"]
-        __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
-        if __summary_dict is None:
-            continue
-        __runs = int(j["runs"])
-        if "j" in __summary_dict:
-            __summary_dict["j"] += __runs
-        else:
-            __summary_dict.update({"j": __runs})
+        if __type_id in materials_summary_without_j:
+            __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
+            if __summary_dict is None:
+                continue
+            __runs = int(j["runs"])
+            if "j" in __summary_dict:
+                __summary_dict["j"] += __runs
+            else:
+                __summary_dict.update({"j": __runs})
 
     # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
     # чертежей в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
@@ -4433,9 +4469,9 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # добавление чертежа на корабль в список требуемых материалов
     # Vanquisher Blueprint не имеет marketGroupID, что является ошибкой ССР, и поэтому приходится изгаляться...
     __titan_blueprint = {
-        "id": __blueprint_id,
+        "id": __titan_blueprint_type_id,
         "q": __titan_quantity_or_runs,
-        "nm": get_item_name_by_type_id(sde_type_ids, __blueprint_id),
+        "nm": get_item_name_by_type_id(sde_type_ids, __titan_blueprint_type_id),
         "a": 0,
         "b": [__titan_blueprint_dict] if not (__titan_blueprint_dict["id"] is None) else [],
         "j": 0}  # не показываем, что строим титан
@@ -4475,7 +4511,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             # получение данных по материалу
             bpmm3_tid = __material_dict["id"]
             bpmm3_tnm = __material_dict["nm"]
-            bpmm3_q = __material_dict["q"]  # quantity
+            bpmm3_q = __material_dict["q"]  # quantity (required, not available yet)
             bpmm3_a = __material_dict["a"]  # available in assets
             bpmm3_b = __material_dict["b"]  # blueprints list
             bpmm3_j = __material_dict["j"]  # in progress (runs of jobs)
@@ -4513,19 +4549,20 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     if not (__me_te in me_te_tags_list):
                         me_te_tags += '&nbsp;<span class="label label-success">{}</span>'.format(__me_te)
                         me_te_tags_list.append(__me_te)
-            # расчёт недостающего количества материала
-            if bpmm3_available < 0:
-                bpmm3_not_available = 0
+            # расчёт прогресса выполнения (постройки, сбора) материалов (bpmm3_j пропускаем, т.к. они не готовы ещё)
+            if bpmm3_available >= bpmm3_q:
+                bpmm3_progress = 100
             else:
-                bpmm3_not_available = bpmm3_q - bpmm3_available if bpmm3_q >= bpmm3_available else 0
+                bpmm3_progress = float(100 * bpmm3_available / bpmm3_q)
             # вывод наименования ресурса
             glf.write(
                 '<tr>\n'
                 ' <th scope="row">{num}</th>\n'
                 ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{me_te}</td>\n'
-                ' <td>{qs:,d}</td>\n'
                 ' <td>{qa}{qip}</td>\n'
-                ' <td quantity="{qna}">{qna:,d}</td>\n'
+                ' <td quantity="{qr}">{qr:,d}</td>\n'
+                ' <td><div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"'
+                ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div></td>\n'
                 ' <td align="right">{cost}</td>'
                 ' <td align="right">{volume}</td>'
                 '</tr>'.
@@ -4534,10 +4571,12 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     nm=bpmm3_tnm,
                     me_te=me_te_tags,
                     src=__get_img_src(bpmm3_tid, 32),
-                    qs=bpmm3_q,
+                    qr=bpmm3_q,
                     qa='{:,d}'.format(bpmm3_available) if bpmm3_available >= 0 else "&infin; <small>runs</small>",
                     qip="" if bpmm3_j == 0 else '<mark>+ {}</mark>'.format(bpmm3_j),
-                    qna=bpmm3_not_available,
+                    prcnt=int(bpmm3_progress),
+                    fprcnt=bpmm3_progress,
+                    prcnt100=" progress-bar-success" if bpmm3_progress == 100 else "",
                     cost='{:,.1f}'.format(bpmm3_price * bpmm3_q) if not (bpmm3_price is None) else "",
                     volume='{:,.1f}'.format(__type_dict["volume"] * bpmm3_q) if not __is_blueprints_group else ""
                 ))
@@ -4589,7 +4628,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
               var nm = td.attr('data-copy');
               if (!(nm === undefined)) {
                 if (data_copy) data_copy += "\\n"; 
-                data_copy += nm + "\\t" + $(this).find('td').eq(3).attr('quantity');
+                data_copy += nm + "\\t" + $(this).find('td').eq(2).attr('quantity');
               }
             }
           }
