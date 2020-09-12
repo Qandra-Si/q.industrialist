@@ -75,15 +75,10 @@ def main():
     sys.stdout.flush()
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
-
-    # Построение списка модулей и ресурсов, которые используются в производстве
-    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
-    research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
 
     # Public information about market prices
     eve_market_prices_data = interface.get_esi_data("markets/prices/")
@@ -117,15 +112,6 @@ def main():
         "corporations/{}/blueprints/".format(corporation_id))
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
-
-    # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
-    corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
-
-    # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
-    # которые предназначены для использования в чертежах
-    corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data, containers_filter=None)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
 
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
     foreign_structures_data = {}
@@ -191,15 +177,8 @@ def main():
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         corp_industry_jobs_data,
-        corp_ass_names_data,
         corp_blueprints_data,
-        eve_market_prices_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
-        corp_bp_loc_data,
-        corp_assets_tree,
-        materials_for_bps,
-        research_materials_for_bps)
+        eve_market_prices_data)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

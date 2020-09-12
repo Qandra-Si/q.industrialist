@@ -4101,15 +4101,8 @@ def __dump_corp_titan(
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         corp_industry_jobs_data,
-        corp_ass_names_data,
         corp_blueprints_data,
-        eve_market_prices_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
-        corp_bp_loc_data,
-        corp_assets_tree,
-        materials_for_bps,
-        research_materials_for_bps):
+        eve_market_prices_data):
     product_name = report_options["product"]
     blueprint_containter_ids = [c["id"] for c in report_options["blueprints"]]
     enable_copy_to_clipboard = True
@@ -4645,15 +4638,8 @@ def dump_titan_into_report(
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         corp_industry_jobs_data,
-        corp_ass_names_data,
         corp_blueprints_data,
-        eve_market_prices_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
-        corp_bp_loc_data,
-        corp_assets_tree,
-        materials_for_bps,
-        research_materials_for_bps):
+        eve_market_prices_data):
     product_name = report_options["product"]
     glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=__camel_to_snake(product_name)), "wt+", encoding='utf8')
     try:
@@ -4667,14 +4653,8 @@ def dump_titan_into_report(
             sde_icon_ids,
             corp_assets_data,
             corp_industry_jobs_data,
-            corp_ass_names_data,
             corp_blueprints_data,
-            eve_market_prices_data,
-            corp_ass_loc_data,
-            corp_bp_loc_data,
-            corp_assets_tree,
-            materials_for_bps,
-            research_materials_for_bps)
+            eve_market_prices_data)
         __dump_footer(glf)
     finally:
         glf.close()
