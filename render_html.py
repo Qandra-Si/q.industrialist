@@ -4485,7 +4485,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             # получение цены материала
             bpmm3_price = None
             if not __is_blueprints_group:
-                __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+                __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(bpmm3_tid)), None)
                 if not (__price_dict is None):
                     if "average_price" in __price_dict:
                         bpmm3_price = __price_dict["average_price"]
@@ -4543,8 +4543,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 ))
             # подсчёт summary кол-ва по всем материалам группы
             if not (bpmm3_price is None):
-                __summary_cost += bpmm3_price * bpmm3_q
-                __summary_volume += __type_dict["volume"] * bpmm3_q
+                __summary_cost = __summary_cost + (bpmm3_price * bpmm3_q)
+                __summary_volume = __summary_volume + (__type_dict["volume"] * bpmm3_q)
         # вывод summary-строки для текущей группы материалов
         if not (__group_id == "None") and not (__group_id == "2"):
             glf.write('<tr style="font-weight:bold">'
