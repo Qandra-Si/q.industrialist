@@ -4590,8 +4590,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             glf.write('<tr style="font-weight:bold">'
                       ' <th></th>'
                       ' <td colspan="4">Summary&nbsp;(<small>{nm}</small>)</td>'
-                      ' <td align="right">{cost:,.1f}</td>'
-                      ' <td align="right">{volume:,.1f}</td>'
+                      ' <td align="right">{cost:,.1f} ISK</td>'
+                      ' <td align="right">{volume:,.1f} m&sup3;</td>'
                       '</tr>\n'.
                       format(nm=__group_name,
                              cost=__summary_cost,
