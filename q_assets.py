@@ -27,11 +27,11 @@ import requests
 
 import eve_esi_interface as esi
 
-import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-from render_html import dump_assets_tree_into_report
+import render_html_assets
+import q_industrialist_settings
 
 from __init__ import __version__
 
@@ -203,7 +203,7 @@ def main():
     # Построение дерева asset-ов:
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
-    dump_assets_tree_into_report(
+    render_html_assets.dump_assets_tree_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
