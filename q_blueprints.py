@@ -33,7 +33,7 @@ import eve_esi_tools
 import eve_sde_tools
 import console_app
 import q_industrialist_settings
-from render_html import dump_blueprints_into_report
+import render_html_blueprints
 
 from __init__ import __version__
 
@@ -378,7 +378,7 @@ def main():
     print("\nBuilding blueprints report...")
     sys.stdout.flush()
 
-    dump_blueprints_into_report(
+    render_html_blueprints.dump_blueprints_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # данные, полученные в результате анализа и перекомпоновки входных списков
