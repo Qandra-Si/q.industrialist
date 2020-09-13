@@ -30,8 +30,9 @@ import eve_esi_interface as esi
 import eve_esi_tools
 import eve_sde_tools
 import q_industrialist_settings
+import render_html_accounting
+
 from __init__ import __version__
-from render_html import dump_accounting_into_report
 
 
 def __build_accounting_append(
@@ -445,71 +446,6 @@ def __build_accounting(
     return corp_accounting_stat, corp_accounting_tree
 
 
-def __build_accounting_details_nested(
-        level,
-        item_id,
-        sde_type_ids,
-        corp_assets_tree,
-        corp_assets_data):
-    # получение информации о текущем элементе
-    __tree_dict = corp_assets_tree[str(item_id)]
-    __item_dict = corp_assets_data[int(__tree_dict["index"])]
-    __type_dict = sde_type_ids[str(__item_dict["type_id"])]
-    # print("                                        "[:level*2], __item_dict["item_id"], ",", __item_dict["location_flag"], ",", __item_dict["type_id"], "=", __type_dict["name"]["en"])
-    # перебор всех вложенных элементов
-    if not (__tree_dict is None) and ("items" in __tree_dict):
-        __cat2 = __tree_dict["items"]
-        for itm in __cat2:
-            __build_accounting_details_nested(
-                level+1,
-                itm,
-                sde_type_ids,
-                corp_assets_tree,
-                corp_assets_data
-            )
-
-
-def __build_accounting_detailed(
-        sde_type_ids,
-        sde_inv_names,
-        sde_inv_items,
-        sde_market_groups,
-        eve_market_prices_data,
-        corp_ass_names_data,
-        foreign_structures_data,
-        foreign_structures_forbidden_ids,
-        corp_assets_tree,
-        corp_assets_data):
-    __roots = corp_assets_tree["roots"]
-    for loc_id in __roots:
-        region_id, region_name, loc_name, __dummy0 = eve_esi_tools.get_assets_location_name(
-            loc_id,
-            sde_inv_names,
-            sde_inv_items,
-            corp_ass_names_data,
-            foreign_structures_data)
-        if not (region_id is None):
-            for itm in corp_assets_tree[str(loc_id)]["items"]:
-                __dummy1, __dummy2, loc_name, foreign = eve_esi_tools.get_assets_location_name(
-                    itm,
-                    sde_inv_names,
-                    sde_inv_items,
-                    corp_ass_names_data,
-                    foreign_structures_data)
-                # print(itm, ",", region_id, ",", region_name, ",", loc_name, ",", foreign)
-                # sys.stdout.flush()
-                # на станции есть хотя-бы офис, или просто вещи валяются, таможка м.б. пустой
-                __station_items = corp_assets_tree[str(itm)]["items"] if "items" in corp_assets_tree[str(itm)] else []
-                for sitm in __station_items:
-                    __build_accounting_details_nested(
-                        1,
-                        sitm,
-                        sde_type_ids,
-                        corp_assets_tree,
-                        corp_assets_data
-                    )
-
-
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -657,26 +593,13 @@ def main():
             foreign_structures_forbidden_ids,
             corp_assets_tree,
             corp_assets_data)
-        corp_accounting_dtls = __build_accounting_detailed(
-            sde_type_ids,
-            sde_inv_names,
-            sde_inv_items,
-            sde_market_groups,
-            eve_market_prices_data,
-            corp_ass_names_data,
-            foreign_structures_data,
-            foreign_structures_forbidden_ids,
-            corp_assets_tree,
-            corp_assets_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_stat.{}".format(corporation_name), corp_accounting_stat)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_tree.{}".format(corporation_name), corp_accounting_tree)
-        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_dtls.{}".format(corporation_name), corp_accounting_dtls)
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
             "stat": corp_accounting_stat,
-            "tree": corp_accounting_tree,
-            "dtls": corp_accounting_dtls
+            "tree": corp_accounting_tree
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_accounting", corps_accounting)
@@ -684,7 +607,7 @@ def main():
     # Построение дерева asset-ов:
     print("\nBuilding accounting report...")
     sys.stdout.flush()
-    dump_accounting_into_report(
+    render_html_accounting.dump_accounting_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
