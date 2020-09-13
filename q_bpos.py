@@ -31,8 +31,8 @@ import eve_esi_interface as esi
 import eve_esi_tools
 import eve_sde_tools
 import console_app
+import render_html_bpos
 import q_industrialist_settings
-from render_html import dump_bpos_into_report
 
 from __init__ import __version__
 
@@ -153,7 +153,7 @@ def main():
 
     print("\nBuilding BPOs report...")
     sys.stdout.flush()
-    dump_bpos_into_report(
+    render_html_bpos.dump_bpos_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
