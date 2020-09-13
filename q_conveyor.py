@@ -29,12 +29,12 @@ import re
 
 import eve_esi_interface as esi
 
-import q_industrialist_settings
-import q_conveyor_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-from render_html import dump_conveyor_into_report
+import render_html_conveyor
+import q_industrialist_settings
+import q_conveyor_settings
 
 from __init__ import __version__
 
@@ -236,7 +236,7 @@ def main():
     print("\nBuilding report...")
     sys.stdout.flush()
 
-    dump_conveyor_into_report(
+    render_html_conveyor.dump_conveyor_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # настройки генерации отчёта
