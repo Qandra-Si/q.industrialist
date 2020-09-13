@@ -1,4 +1,4 @@
-﻿""" Q.Titan (desktop/mobile)
+﻿""" Q.Capital (desktop/mobile)
 
 Prerequisites:
     * Create an SSO application at developers.eveonline.com with the scope
@@ -33,7 +33,7 @@ import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-from render_html import dump_titan_into_report
+import render_html_capital
 
 from __init__ import __version__
 
@@ -164,7 +164,7 @@ def main():
     print("\nBuilding report...")
     sys.stdout.flush()
 
-    dump_titan_into_report(
+    render_html_capital.dump_capital_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # настройки генерации отчёта
