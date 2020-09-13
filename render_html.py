@@ -4560,7 +4560,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 ' <th scope="row">{num}</th>\n'
                 ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{me_te}</td>\n'
                 ' <td>{qa}{qip}</td>\n'
-                ' <td quantity="{qr}">{qr:,d}</td>\n'
+                ' <td quantity="{qneed}">{qr:,d}</td>\n'
                 ' <td><div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"'
                 ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div></td>\n'
                 ' <td align="right">{cost}</td>'
@@ -4572,6 +4572,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     me_te=me_te_tags,
                     src=__get_img_src(bpmm3_tid, 32),
                     qr=bpmm3_q,
+                    qneed=bpmm3_q-bpmm3_available-bpmm3_j if bpmm3_q > (bpmm3_available+bpmm3_j) else 0,
                     qa='{:,d}'.format(bpmm3_available) if bpmm3_available >= 0 else "&infin; <small>runs</small>",
                     qip="" if bpmm3_j == 0 else '<mark>+ {}</mark>'.format(bpmm3_j),
                     prcnt=int(bpmm3_progress),
