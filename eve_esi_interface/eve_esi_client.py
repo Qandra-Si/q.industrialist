@@ -238,7 +238,6 @@ class EveESIClient:
                 if (res.status_code in [502, 504]) and (proxy_error_times < self.__attempts_to_reconnect):
                     # пять раз пытаемся повторить отправку сломанного запроса (часто случается
                     # при подключении через 3G-модем)
-                    print(res.json())
                     proxy_error_times = proxy_error_times + 1
                     continue
                 elif (res.status_code in [520]) and (throttle_error_times < self.__attempts_to_reconnect):
