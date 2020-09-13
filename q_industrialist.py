@@ -26,7 +26,7 @@ import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
-from render_html import dump_industrialist_into_report
+import render_html_industrialist
 
 from __init__ import __version__
 
@@ -55,6 +55,8 @@ def main():
     character_id = authz["character_id"]
     character_name = authz["character_name"]
 
+    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+
     # Public information about a character
     character_data = interface.get_esi_data(
         "characters/{}/".format(character_id))
@@ -66,10 +68,6 @@ def main():
     corporation_name = corporation_data["name"]
     print("\n{} is from '{}' corporation".format(character_name, corporation_name))
     sys.stdout.flush()
-
-    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
-    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     # Requires: access token
     wallet_data = interface.get_esi_data(
@@ -100,24 +98,6 @@ def main():
     print("\n{} has {} asset's names".format(character_name, len(asset_names_data)))
     sys.stdout.flush()
 
-    # Requires: access token
-    fittings_data = interface.get_esi_data(
-        "characters/{}/fittings/".format(character_id))
-    print("\n{} has {} fittings".format(character_name, len(fittings_data)))
-    sys.stdout.flush()
-
-    # Requires: access token
-    contracts_data = []  # interface.get_esi_data(
-    #   "characters/{}/contracts/".format(character_id))
-    # print("\n{} has {} contracts".format(character_name, len(contracts_data)))
-    # sys.stdout.flush()
-
-    # Requires role(s): Factory_Manager
-    corp_industry_jobs_data = interface.get_esi_paged_data(
-        "corporations/{}/industry/jobs/".format(corporation_id))
-    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
-    sys.stdout.flush()
-
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
         "corporations/{}/assets/".format(corporation_id))
@@ -133,19 +113,6 @@ def main():
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
-
-    # Requires role(s): Director
-    corp_blueprints_data = interface.get_esi_paged_data(
-        "corporations/{}/blueprints/".format(corporation_id))
-    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
-    sys.stdout.flush()
-
-    # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
-    corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
-
-    # Построение списка модулей и ресурсов, которые используются в производстве
-    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
 
     # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
     # которые предназначены для использования в чертежах
@@ -168,28 +135,19 @@ def main():
     print("\nBuilding report...")
     sys.stdout.flush()
 
-    dump_industrialist_into_report(
+    render_html_industrialist.dump_industrialist_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         wallet_data,
         blueprint_data,
         assets_data,
         asset_names_data,
-        corp_assets_tree,
-        corp_industry_jobs_data,
         corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data,
-        corp_bp_loc_data,
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_loc_ids,
-        blueprint_station_ids)
+        corp_ass_loc_data)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")
