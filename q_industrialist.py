@@ -19,6 +19,7 @@ run the following command from this directory as the root:
 """
 import sys
 import json
+import requests
 
 import eve_esi_interface as esi
 
@@ -56,6 +57,7 @@ def main():
     character_name = authz["character_name"]
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
 
     # Public information about a character
     character_data = interface.get_esi_data(
@@ -67,35 +69,6 @@ def main():
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
     print("\n{} is from '{}' corporation".format(character_name, corporation_name))
-    sys.stdout.flush()
-
-    # Requires: access token
-    wallet_data = interface.get_esi_data(
-        "characters/{}/wallet/".format(character_id))
-    print("\n{} has {} ISK".format(character_name, wallet_data))
-    sys.stdout.flush()
-
-    # Requires: access token
-    blueprint_data = interface.get_esi_data(
-        "characters/{}/blueprints/".format(character_id))
-    print("\n{} has {} blueprints".format(character_name, len(blueprint_data)))
-    sys.stdout.flush()
-
-    # Requires: access token
-    assets_data = interface.get_esi_data(
-        "characters/{}/assets/".format(character_id))
-    print("\n{} has {} assets".format(character_name, len(assets_data)))
-    sys.stdout.flush()
-
-    # Построение названий контейнеров, которые переименовал персонаж и храних в своих asset-ах
-    asset_names_data = []
-    ass_named_ids = eve_esi_tools.get_assets_named_ids(assets_data)
-    if len(ass_named_ids) > 0:
-        # Requires: access token
-        asset_names_data = interface.get_esi_data(
-            "characters/{}/assets/names/".format(character_id),
-            json.dumps(ass_named_ids, indent=0, sort_keys=False))
-    print("\n{} has {} asset's names".format(character_name, len(asset_names_data)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -114,23 +87,37 @@ def main():
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
-    # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
-    # которые предназначены для использования в чертежах
-    corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data, containers_filter=None)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
-
-    # Поиск контейнеров, которые участвуют в производстве
-    print("\nSearching industrialist containter and station ids...")
+    # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+    foreign_structures_data = {}
+    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+    foreign_structures_forbidden_ids = []
+    if len(foreign_structures_ids) > 0:
+        # Requires: access token
+        for structure_id in foreign_structures_ids:
+            try:
+                universe_structure_data = interface.get_esi_data(
+                    "universe/structures/{}/".format(structure_id))
+                foreign_structures_data.update({str(structure_id): universe_structure_data})
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                    foreign_structures_forbidden_ids.append(structure_id)
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+    print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+    if len(foreign_structures_forbidden_ids) > 0:
+        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
-    stock_all_loc_ids = [n["item_id"] for n in corp_ass_names_data if n['name'] == "..stock ALL"]
-    # for id in stock_all_loc_ids:
-    #     print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
-    blueprint_loc_ids = [n["item_id"] for n in corp_ass_names_data]
-    # for id in blueprint_loc_ids:
-    #     print('  {} = {}'.format(id, next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)))
-    blueprint_station_ids = []
-    # TODO: добавить сюда логику, аналогичную q_conveyor.py
+    # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+    # элементов, в виде:
+    # { location1: {items:[item1,item2,...],type_id,location_id},
+    #   location2: {items:[item3],type_id} }
+    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -141,13 +128,10 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # esi данные, загруженные с серверов CCP
-        wallet_data,
-        blueprint_data,
-        assets_data,
-        asset_names_data,
+        corp_assets_data,
         corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_ass_loc_data)
+        corp_assets_tree)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

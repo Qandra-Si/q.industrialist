@@ -13,7 +13,7 @@ from yaml import SafeLoader
 
 
 # type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
-def get_yaml(type, sub_url, item):
+def __get_yaml(type, sub_url, item):
     f_name = '{cwd}/{type}/{url}'.format(type=type, cwd=os.getcwd(), url=sub_url)
     item_to_search = "\n{}\n".format(item)
     with open(f_name, 'r', encoding='utf8') as f:
@@ -451,12 +451,12 @@ def main():  # rebuild .yaml files
 
 
 def test():
-    data = get_yaml(2, 'sde/fsd/typeIDs.yaml', "32859:")
+    data = __get_yaml(2, 'sde/fsd/typeIDs.yaml', "32859:")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["name"]["en"]))  # Small Standard Container Blueprint
 
-    data = get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: 60003760")
+    data = __get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: 60003760")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["itemName"]))  # Jita IV - Moon 4 - Caldari Navy Assembly Plant
