@@ -37,11 +37,12 @@ def __dump_corp_capital(
               ' <div class="media-body">\n'
               '  <h4 class="media-heading">{nm}</h4>\n'
               '<p>\n'
-              'EveMarketer {nm} tradings: <a href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a></br>'
-              'EveMarketer {nm} Blueprint tradings: <a href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a></br>'
-              'Adam4EVE {nm} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a></br>'
-              'Adam4EVE {nm} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a></br>'
-              'Adam4EVE {nm} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>'.
+              'EveUniversity {nm} wiki: <a href="https://wiki.eveuniversity.org/{nm}">https://wiki.eveuniversity.org/{nm}</a><br/>\n'
+              'EveMarketer {nm} tradings: <a href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a><br/>\n'
+              'EveMarketer {nm} Blueprint tradings: <a href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a><br/>\n'
+              'Adam4EVE {nm} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a><br/>\n'
+              'Adam4EVE {nm} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a><br/>\n'
+              'Adam4EVE {nm} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>\n'.
               format(nm=product_name,
                      src=render_html.__get_img_src(__type_id, 64),
                      pid=__type_id,
@@ -320,7 +321,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
   <th>Exists +<br/>In progress</th>
   <th>Need<br/>(Efficiency)</th>
   <th>Progress, %</th>
-  <th style="text-align:right;">Cost, ISK</th>
+  <th style="text-align:right;">Price per<br/>Unit, ISK</th>
+  <th style="text-align:right;">Sum, ISK</th>
   <th style="text-align:right;">Volume, m&sup3;</th>
  </tr>
 </thead>
@@ -414,7 +416,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
                 '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
             glf.write('<tr>\n'
-                      ' <td class="active" colspan="7"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                      ' <td class="active" colspan="8"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
                       '</tr>'.
                       format(
                         nm=__group_name,
@@ -480,6 +482,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 ' <td quantity="{qneed}">{qr:,d}</td>\n'
                 ' <td><div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"'
                 ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div></td>\n'
+                ' <td align="right">{price}</td>'
                 ' <td align="right">{cost}</td>'
                 ' <td align="right">{volume}</td>'
                 '</tr>'.
@@ -495,6 +498,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                     prcnt=int(bpmm3_progress),
                     fprcnt=bpmm3_progress,
                     prcnt100=" progress-bar-success" if bpmm3_progress == 100 else "",
+                    price='{:,.1f}'.format(bpmm3_price) if not (bpmm3_price is None) else "",
                     cost='{:,.1f}'.format(bpmm3_price * bpmm3_q) if not (bpmm3_price is None) else "",
                     volume='{:,.1f}'.format(__type_dict["volume"] * bpmm3_q) if not __is_blueprints_group else ""
                 ))
@@ -507,7 +511,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             glf.write('<tr style="font-weight:bold">'
                       ' <th></th>'
                       ' <td colspan="4">Summary&nbsp;(<small>{nm}</small>)</td>'
-                      ' <td align="right">{cost:,.1f} ISK</td>'
+                      ' <td colspan="2" align="right">{cost:,.1f} ISK</td>'
                       ' <td align="right">{volume:,.1f} m&sup3;</td>'
                       '</tr>\n'.
                       format(nm=__group_name,
