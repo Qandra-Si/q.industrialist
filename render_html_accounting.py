@@ -2,6 +2,48 @@
 import eve_sde_tools
 
 
+def __dump_corp_wallets_details(
+        glf,
+        corporation_name,
+        corporation_id,
+        __corp_wallets):
+    render_html.__dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> Wallets'.format(nm=corporation_name),
+        '{nm}_wallets'.format(nm=corporation_id),
+        "btn-xs",
+        "details&hellip;",
+        "modal-sm")
+    glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th>Wallet&nbsp;#</th>
+  <th style="text-align: right;">Balance,&nbsp;ISK</th>
+ </tr>
+</thead>
+<tbody>
+""")
+    for w in __corp_wallets:
+        glf.write('<tr>'
+                  ' <th scope="row">{num}</th>'
+                  ' <td align="right">{blnc:,.1f}</td>'
+                  '</tr>\n'.
+                  format(num=w["division"], blnc=w["balance"]))
+    glf.write('<tr style="font-weight:bold;">'
+              ' <td>Summary</td>'
+              ' <td align="right">{sum:,.1f}</td>'
+              '</tr>\n'.
+              format(sum=sum([w["balance"] for w in __corp_wallets])))
+    glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+    render_html.__dump_any_into_modal_footer(glf)
+
+
 def __dump_corp_accounting_nested_tbl(
         glf,
         loc_id,
@@ -32,7 +74,7 @@ def __dump_corp_accounting_nested_tbl(
                 if __loc_name is None:
                     __loc_name = loc_id
                 glf.write(
-                    '<h3>{where}</strong><!--{id}--></h3>\n'.
+                    '<h3>{where}<!--{id}--></h3>\n'.
                     format(where='{} '.format(__loc_name) if not (__loc_name is None) else "",
                            id=loc_id))
                 glf.write("""
@@ -340,12 +382,31 @@ def __dump_corp_accounting(
     __corp_keys = corps_accounting.keys()
     for corporation_id in __corp_keys:
         __corp = corps_accounting[str(corporation_id)]
+        __wallets_balance = sum([w["balance"] for w in __corp["wallet"]])
+        # создание первой строчки - название корпорации
+        # создание второй строчки - кошельки корпорации
         glf.write('<tr class="active">'
                   ' <td colspan="5"><span class="text-primary"><strong>{nm}</strong></span></td>'
-                  '</tr>\n'.
-                  format(nm=__corp["corporation"]))
-        row_num = 1
-        __summary_cost = 0
+                  '</tr>\n'
+                  '<tr>'
+                  ' <th scope="row">1</th>'
+                  ' <td>Wallets</td>'
+                  ' <td align="right">{wallet:,.1f}</td>'
+                  ' <td></td>'
+                  ' <td align="center">'.
+                  format(nm=__corp["corporation"],
+                         wallet=__wallets_balance))
+        # добавление details на страницу (подробности по кошелькам)
+        __dump_corp_wallets_details(
+            glf,
+            __corp["corporation"],
+            corporation_id,
+            __corp["wallet"])
+        glf.write('</td>'
+                  '</tr>\n')
+        # вывод третьей, четвёртой, ... строчек - ассеты корпорации
+        row_num = 2
+        __summary_cost = __wallets_balance
         __summary_volume = 0
         __stat_keys = __corp["stat"].keys()
         for __key in __stat_keys:

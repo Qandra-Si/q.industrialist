@@ -20,6 +20,7 @@ run the following command from this directory as the root:
 Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-universe.read_structures.v1 - Requires: access token
+    * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
 """
 import json
 import sys
@@ -531,6 +532,12 @@ def main():
             sys.stdout.flush()
 
         # Requires role(s): Director
+        corp_wallets_data = interface.get_esi_paged_data(
+            "corporations/{}/wallets/".format(corporation_id))
+        print("\n'{}' corporation has {} wallet divisions".format(corporation_name, len(corp_wallets_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
         print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
@@ -598,6 +605,7 @@ def main():
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
+            "wallet": corp_wallets_data,
             "stat": corp_accounting_stat,
             "tree": corp_accounting_tree
         }})
