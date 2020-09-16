@@ -86,16 +86,22 @@ def main():
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
     research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
 
-    # Requires role(s): Factory_Manager
-    corp_industry_jobs_data = interface.get_esi_paged_data(
-        "corporations/{}/industry/jobs/".format(corporation_id))
-    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
-    sys.stdout.flush()
-
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
         "corporations/{}/assets/".format(corporation_id))
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+    sys.stdout.flush()
+
+    # Requires role(s): Director
+    corp_blueprints_data = interface.get_esi_paged_data(
+        "corporations/{}/blueprints/".format(corporation_id))
+    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+    sys.stdout.flush()
+
+    # Requires role(s): Factory_Manager
+    corp_industry_jobs_data = interface.get_esi_paged_data(
+        "corporations/{}/industry/jobs/".format(corporation_id))
+    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
     corp_ass_names_data = []
@@ -106,12 +112,6 @@ def main():
             "corporations/{}/assets/names/".format(corporation_id),
             json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
-    sys.stdout.flush()
-
-    # Requires role(s): Director
-    corp_blueprints_data = interface.get_esi_paged_data(
-        "corporations/{}/blueprints/".format(corporation_id))
-    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
     # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
