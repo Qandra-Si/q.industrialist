@@ -240,6 +240,14 @@ class EveESIClient:
                     # при подключении через 3G-модем)
                     proxy_error_times = proxy_error_times + 1
                     continue
+                elif (res.status_code in [503]) and (proxy_error_times < self.__attempts_to_reconnect):
+                    # иногда падает интерфейс к серверу tranquility (почему-то как правило на загрузке item-ов контракта)
+                    print(res.json())
+                    # 503 Server Error: service unavailable for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                    # {'error': 'The datasource tranquility is temporarily unavailable'}
+                    proxy_error_times = proxy_error_times + 1
+                    time.sleep(2*proxy_error_times)
+                    continue
                 elif (res.status_code in [520]) and (throttle_error_times < self.__attempts_to_reconnect):
                     # возможная ситация: сервер детектирует спам-запросы (на гитхабе написано, что порог
                     # срабатывания находится около 20 запросов в 10 секунд от одного персонажа), см. подробнее
