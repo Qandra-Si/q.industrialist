@@ -1,21 +1,22 @@
 ﻿""" Q.Capital (desktop/mobile)
 
 Prerequisites:
-    * Create an SSO application at developers.eveonline.com with the scope
-      "esi-characters.read_blueprints.v1" and the callback URL
-      "https://localhost/callback/". Note: never use localhost as a callback
-      in released applications.
     * Have a Python 3 environment available to you (possibly by using a
       virtual environment: https://virtualenv.pypa.io/en/stable/).
     * Run pip install -r requirements.txt with this directory as your root.
+
     * Copy q_industrialist_settings.py.template into q_industrialist_settings.py and
       mood for your needs.
+    * Create an SSO application at developers.eveonline.com with the scopes
+      from g_client_scope list declared in q_industrialist_settings.py and the
+      callback URL "https://localhost/callback/".
+      Note: never use localhost as a callback in released applications.
 
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py
->>> python q_titan.py
+>>> python q_capital.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Requires application scopes:
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
