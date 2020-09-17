@@ -37,13 +37,19 @@ def __get_icon_src(icon_id, sde_icon_ids):
 
 
 def __dump_header(glf, header_name):
+    # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
+    # см. https://developer.mozilla.org/ru/docs/Web/Manifest
+    # рекомендуемый набор favicon-ок, см. https://stackoverflow.com/a/52322368
+    # а также тут, см. https://developer.apple.com/design/human-interface-guidelines/ios/icons-and-images/app-icon/#app-icon-sizes
     glf.write("""
 <!doctype html>
 <html lang="ru">
  <head>
  <meta charset="utf-8">
  <meta http-equiv="X-UA-Compatible" content="IE=edge">
- <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="description" content="A tool for planning logistics, building plans for the manufacture of modules, ships, tracking the process of fulfilling contracts.">
+ <meta name="keywords" content="eve-online, eve, manufacturing, logistics, q.industrialist">
 <style type="text/css">
 .icn16 { width:16px; height:16px; }
 .icn24 { width:24px; height:24px; }
@@ -53,20 +59,62 @@ def __dump_header(glf, header_name):
 """)
     glf.write(
         ' <title>{nm} - Q.Industrialist</title>\n'
-        ' <link rel="stylesheet" href="{bs_css}">\n'
-        '</head>\n'
-        '<body>\n'
-        '<div class="page-header">\n'
-        ' <h1>Q.Industrialist <small>{nm}</small></h1>\n'
-        '</div>\n'
-        '<script src="{jq_js}"></script>\n'
-        '<script src="{bs_js}"></script>\n'.format(
+        ' <link rel="stylesheet" href="{bs_css}">\n'.
+        format(
             nm=header_name,
-            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous',
+            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous'
+        ))
+    glf.write("""
+ <!-- Android  -->
+ <meta name="theme-color" content="#1e2021">
+ <meta name="mobile-web-app-capable" content="yes">
+ <!-- iOS -->
+ <meta name="apple-mobile-web-app-title" content="Q.Industrialist">
+ <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <!-- Windows  -->
+ <meta name="msapplication-navbutton-color" content="#1e2021">
+ <meta name="msapplication-TileColor" content="#1e2021">
+ <meta name="msapplication-TileImage" content="ms-icon-144x144.png">
+ <meta name="msapplication-config" content="browserconfig.xml">
+ <!-- Pinned Sites  -->
+ <meta name="application-name" content="Q.Industrialist">
+ <meta name="msapplication-tooltip" content="Q.Industrialist for EVE Online game">
+ <meta name="msapplication-starturl" content="/">
+ <!-- Enable night mode for this page  -->
+ <meta name="nightmode" content="enable">
+ <meta name="color-scheme" content="dark light">
+ 
+ <!-- Main Link Tags -->
+ <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+ <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+ <link rel="icon" type="image/png" sizes="96x96" href="images/favicon/android-icon-96x96.png">
+ <!-- Android  -->
+ <link rel="icon" type="image/png" sizes="192x192" href="images/favicon/android-icon-192x192.png">
+ <link rel="icon" type="image/png" sizes="128x128" href="images/favicon/android-icon-128x128.png">
+ <!-- iOS  -->
+ <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-precomposed.png">
+ <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+ <link rel="apple-touch-icon" sizes="120x120" href="images/favicon/apple-icon-120x120.png">
+ <link rel="apple-touch-icon" sizes="152x152" href="images/favicon/apple-icon-152x152.png">
+ <link rel="apple-touch-icon" sizes="167x167" href="images/favicon/apple-icon-167x167.png">
+ <!-- Others -->
+ <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+ <!-- Manifest.json  -->
+ <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+""")
+    glf.write(
+        ' <div class="page-header"><h1>Q.Industrialist <small>{nm}</small></h1></div>\n'
+        ' <script src="{jq_js}"></script>\n'
+        ' <script src="{bs_js}"></script>\n'.
+        format(
+            nm=header_name,
             jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
             bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
-        )
-    )
+    ))
+
 
 def __dump_footer(glf):
     # Don't remove line below !
