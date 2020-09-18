@@ -62,6 +62,7 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_meta_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "metaGroups")
 
     # Public information about a character
     character_data = interface.get_esi_data(
@@ -122,6 +123,17 @@ def main():
     #   location2: {items:[item3],type_id} }
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+
+    # Конвертация ETF в список item-ов:
+    corp_manufacturing_scheduler = {"monthly jobs": []}
+    for ship in q_industrialist_settings.g_monthly_jobs:
+        __eft = ship["eft"]
+        __quantity = ship["quantity"]
+        __items, __problems = eve_sde_tools.get_items_list_from_eft(__eft, sde_type_ids, sde_meta_groups)
+        for i in __items:
+            print(i["type_id"], i["name"], "x"+str(i["quantity"]),
+                  "???" if i["meta_group"] is None else i["meta_group"]["nameID"]["en"])
+        print("\n\nPROBLEMS:", __problems, "\n")
 
     print("\nBuilding report...")
     sys.stdout.flush()

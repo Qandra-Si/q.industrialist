@@ -155,15 +155,20 @@ def get_item_name_by_type_id(type_ids, type_id):
     return name
 
 
-def get_type_id_by_item_name(type_ids, name):
+def get_type_id_by_item_name_ex(type_ids, name):
     keys = type_ids.keys()
     for type_id in keys:
         type_dict = type_ids[str(type_id)]
         if ("name" in type_dict) and ("en" in type_dict["name"]):
             __name = type_dict["name"]["en"]
             if __name == name:
-                return int(type_id)
-    return None
+                return int(type_id), type_dict
+    return None, None
+
+
+def get_type_id_by_item_name(type_ids, name):
+    type_id, type_dict = get_type_id_by_item_name_ex(type_ids, name)
+    return type_id
 
 
 def get_market_group_by_type_id(type_ids, type_id):
@@ -359,6 +364,73 @@ def get_market_groups_tree(sde_market_groups):
     return groups_tree
 
 
+def get_items_list_from_eft(eft, sde_type_ids, sde_meta_groups):
+    items = []
+    problems = []
+    item_names = eft.split("\n")
+    for __line in enumerate(item_names):
+        __name = __line[1].strip()
+        # пропускаем пустые строки, и даже не считаем позиции для определения к чему относится
+        # модуль, к разъёму малой или большой мощности? т.к. нам надо получить лишь список
+        # модулей, из которых состоит фит,... лежат ли они в карго, тоже не имеет значения
+        if not __name:
+            continue
+        # распаковываем название корабля из первой строки с квадратными скобками,
+        # например: [Stratios, Vinnegar Douche's Stratios]
+        __quantity = 1
+        if __line[0] == 0:
+            if (__name[:1] == '[') and (__name[-1:] == ']'):
+                __end = __line[1].find(",")
+                if __end <= 1:
+                    continue
+                __name = __line[1][1:__end]
+        else:
+            __pos = __name.rfind(" x")
+            if __pos > 1:
+                __num = __name[__pos + 2:]
+                if __num.isnumeric():
+                    __quantity = __num
+                    __name = __name[:__pos]
+        # попытка получить сведения об item-е по его наименованию
+        __item_dicts = None
+        __type_id, __item = get_type_id_by_item_name_ex(sde_type_ids, __name)
+        if not (__type_id is None):
+            __item_dicts = [{"name": __name, "type_id": __type_id, "quantity": __quantity, "details": __item}]
+        else:
+            # возможно встретилась ситуация: Sisters Core Probe Launcher,Sisters Core Scanner Probe
+            pair = __name.split(",")
+            if len(pair) == 2:
+                __type_id0, __item0 = get_type_id_by_item_name_ex(sde_type_ids, pair[0])
+                __type_id1, __item1 = get_type_id_by_item_name_ex(sde_type_ids, pair[1])
+                if not (__type_id0 is None) and not (__type_id1 is None):
+                    __quantity = 1
+                    if ("capacity" in __item0) and ("volume" in __item1):
+                        __quantity = int(__item0["capacity"]/__item1["volume"])
+                    __item_dicts = [
+                        {"name": pair[0], "type_id": __type_id0, "quantity": 1, "details": __item0},
+                        {"name": pair[1], "type_id": __type_id1, "quantity": __quantity, "details": __item1}
+                    ]
+        # в случае, если элемент не найден, то сохраняем об этом информацию в список проблем
+        if __item_dicts is None:
+            __exists = next((p["name"] for p in problems if p["name"] == __name), None)
+            if __exists is None:
+                problems.append({"name": __name, "problem": "not found"})
+        else:
+            for __item_dict in __item_dicts:
+                __exists = next((i for i in items if i["name"] == __item_dict["name"]), None)
+                if __exists is None:
+                    __meta_group = None
+                    if "metaGroupID" in __item_dict["details"]:
+                        __mg_num = __item_dict["details"]["metaGroupID"]
+                        if str(__mg_num) in sde_meta_groups:
+                            __meta_group = sde_meta_groups[str(__mg_num)]
+                    __item_dict.update({"meta_group": __meta_group})
+                    items.append(__item_dict)
+                else:
+                    __exists["quantity"] += __item_dict["quantity"]
+    return items, problems
+
+
 def __rebuild_icons(ws_dir, name):
     icons = read_converted(ws_dir, name)
     icon_keys = icons.keys()
@@ -405,10 +477,14 @@ def main():  # rebuild .yaml files
             format(app=sys.argv[0]))
         sys.exit(exit_or_wrong_getopt)
 
+    print("Rebuilding metaGroups.yaml file...")
+    sys.stdout.flush()
+    __rebuild(workspace_cache_files_dir, "fsd", "metaGroups", ["iconID", {"nameID": ["en"]}])
+
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
-    
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "volume"])
+
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "bsd", "invPositions", ["itemID", "x", "y", "z"])
