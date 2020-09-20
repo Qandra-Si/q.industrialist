@@ -323,7 +323,7 @@ def __dump_workflow_tools(
 </div> <!--container-fluid-->
 """)
 
-    __dump_sde_type_ids_to_js(glf, sde_type_ids)
+    # __dump_sde_type_ids_to_js(glf, sde_type_ids)
     glf.write("""
 <script>
   // Workflow Options storage (prepare)

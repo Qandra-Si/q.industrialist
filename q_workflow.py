@@ -203,6 +203,7 @@ def __get_monthly_manufacturing_scheduler(
         # настройки
         scheduler_job_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
         sde_named_type_ids,
         sde_bp_materials,
         # esi данные, загруженные с серверов CCP
@@ -215,15 +216,27 @@ def __get_monthly_manufacturing_scheduler(
         "monthly_jobs": [],
         "scheduled_blueprints": [],
         "factory_containers": factory_containers,
+        "factory_repository": [],
+        "factory_blueprints": []
     }
+    scheduled_blueprints = scheduler["scheduled_blueprints"]
+    factory_blueprints = scheduler["factory_blueprints"]
 
     def push_into_scheduled_blueprints(type_id, quantity, name):
-        __sb_dict = next((sb for sb in scheduler["scheduled_blueprints"] if sb["type_id"] == type_id), None)
+        __sb_dict = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
         if __sb_dict is None:
             __sb_dict = {"type_id": type_id, "quantity": int(quantity), "name": name}
-            scheduler["scheduled_blueprints"].append(__sb_dict)
+            scheduled_blueprints.append(__sb_dict)
         else:
             __sb_dict["quantity"] += int(quantity)
+
+    def push_into_factory_blueprints(type_id, runs):
+        __fb_dict = next((fb for fb in factory_blueprints if fb["type_id"] == type_id), None)
+        if __fb_dict is None:
+            __fb_dict = {"type_id": type_id, "runs": int(runs)}  # "name": name
+            factory_blueprints.append(__fb_dict)
+        else:
+            __fb_dict["runs"] += int(runs)
 
     # конвертация ETF в список item-ов
     for ship in scheduler_job_settings:
@@ -264,6 +277,29 @@ def __get_monthly_manufacturing_scheduler(
                          (i["details"]["metaGroupID"] == 2)]
         for bpc in __bpc_for_fit:
             push_into_scheduled_blueprints(bpc["id"], bpc["q"], bpc["nm"])
+
+    # формирование списка чертежей имеющихся на станции в указанных контейнерах
+    factory_container_ids = [fc["id"] for fc in factory_containers["containers"]]
+    # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
+    # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
+    # activities performed on them yet).
+    scheduler["factory_repository"] = [bp for bp in corp_blueprints_data if
+                                       (bp["location_id"] in factory_container_ids) and
+                                       (bp["quantity"] == -2)]
+
+    # формирование сводного списка чертежей фабрики, с суммарным кол-вом run-ов
+    for bp in scheduler["factory_repository"]:
+        push_into_factory_blueprints(bp["type_id"], bp["runs"])
+    # получение названий чертежей и сохранение из в сводном списке чертежей фабрики
+    for bp in factory_blueprints:
+        __type_id = bp["type_id"]
+        bp["name"] = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, __type_id)
+
+    # формирование
+    missing_blueprints
+    # формирование
+    overplus_blueprints
+
     return scheduler
 
 
@@ -354,6 +390,7 @@ def main():
         # настройки
         q_workflow_settings.g_monthly_jobs["jobs"],
         # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
         sde_named_type_ids,
         sde_bp_materials,
         # esi данные, загруженные с серверов CCP
@@ -363,6 +400,12 @@ def main():
         factory_containers
     )
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_manufacturing_scheduler", corp_manufacturing_scheduler)
+
+    print('\nFound {} EFT fits in settings...'.format(len(factory_containers)))
+    print('  scheduled blueprints = {}'.format(len(corp_manufacturing_scheduler["scheduled_blueprints"])))
+    print('  factory repository = {}'.format(len(corp_manufacturing_scheduler["factory_repository"])))
+    print('  factory blueprints = {}'.format(len(corp_manufacturing_scheduler["factory_blueprints"])))
+    sys.stdout.flush()
 
     print("\nBuilding report...")
     sys.stdout.flush()
