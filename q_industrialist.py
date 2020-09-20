@@ -134,7 +134,13 @@ def main():
         __total_quantity = ship["quantity"]
         __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
         __converted.update({"quantity": __total_quantity})
-        __converted["items"].sort(key=lambda s: s["name"])
+        if not (__converted["ship"] is None):
+            __blueprint_type_id, __dummy0 = eve_sde_tools.get_blueprint_type_id_by_product_id(
+                __converted["ship"]["type_id"],
+                sde_bp_materials
+            )
+            __converted["ship"]["blueprint_type_id"] = __blueprint_type_id
+        __converted["items"].sort(key=lambda i: i["name"])
         for __item_dict in __converted["items"]:
             __item_type_id = __item_dict["type_id"]
             __blueprint_type_id, __dummy0 = eve_sde_tools.get_blueprint_type_id_by_product_id(

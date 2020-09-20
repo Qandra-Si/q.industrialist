@@ -114,12 +114,11 @@ def __dump_fit_items(glf, job, job_id):
         __quantity = __item_dict["quantity"]
         __details = __item_dict["details"]
         __is_blueprint_copy = __item_dict["is_blueprint_copy"] if "is_blueprint_copy" in __item_dict else None
-        __blueprint_type_id = __item_dict["blueprint_type_id"] if "blueprint_type_id" in __item_dict else None
         __renamed = __item_dict["renamed"] if "renamed" in __item_dict else None
         glf.write(
             '<tr{nont2}>'
             '<td><img class="media-object icn16" src="{img}"></td>'
-            '<td{flag}><strong>{q}x</strong> {nm}{copy}{renamed}</td>'
+            '<td><strong>{q}x</strong> {nm}{copy}{renamed}</td>'
             '<td align="right">{tq:,d}</td>'
             '</tr>\n'.
             format(
@@ -130,8 +129,7 @@ def __dump_fit_items(glf, job, job_id):
                 q=__quantity,
                 tq=__total_quantity*__quantity,
                 nont2="" if ("metaGroupID" in __details) and (__details["metaGroupID"] == 2) else
-                      ' class="qind-nont2-job{} hidden"'.format(job_id),
-                flag=' class="danger"' if __blueprint_type_id is None else ""
+                      ' class="qind-nont2-job{} hidden"'.format(job_id)
             )
         )
     glf.write("""
@@ -148,6 +146,16 @@ def __dump_monthly_jobs(
 <div class="panel-group" id="monthly_jobs" role="tablist" aria-multiselectable="true">
 """)
 
+    scheduled_blueprints = []
+
+    def push_into_scheduled_blueprints(type_id, quantity, name):
+        __sb_dict = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
+        if __sb_dict is None:
+            __sb_dict = {"type_id": type_id, "quantity": int(quantity), "name": name}
+            scheduled_blueprints.append(__sb_dict)
+        else:
+            __sb_dict["quantity"] += int(quantity)
+
     row_num = 0
     for job in corp_manufacturing_scheduler:
         row_num += 1
@@ -159,6 +167,7 @@ def __dump_monthly_jobs(
         __items = job["items"]
         __problems = job["problems"]
         __warnings = len([i for i in __items if "renamed" in i])
+        # создаём сворачиваемую панель для работы с содержимым фита
         glf.write(
             '<div class="panel panel-default">\n'
             ' <div class="panel-heading" role="tab" id="monthjob_hd{num}">\n'
@@ -183,12 +192,46 @@ def __dump_monthly_jobs(
                 prblms="" if len(__problems) == 0 else '&nbsp;<span class="label label-danger">problems</span>'
             )
         )
+        # выводим элементы управления фитом и его содержимое
         __dump_fit_items(glf, job, row_num)
+        # закрываем сворачиваемую панель
         glf.write(
-            '  </div>\n'
-            ' </div>\n'
-            '</div>\n'
+            '  </div>\n'  # panel-body
+            ' </div>\n'  # panel-collapse
+            '</div>\n'  # panel
         )
+        # добавляем в список БПЦ чертёж хула корабля (это может быть и БПО в итоге...)
+        if not (__ship is None):
+            if ("blueprint_type_id" in __ship) and not (__ship["blueprint_type_id"] is None):
+                push_into_scheduled_blueprints(__ship["blueprint_type_id"], __total_quantity, __ship["name"])
+        # подсчитываем количество БПЦ, необходимых для постройки T2-модулей этого фита
+        __bpc_for_fit = [{"id": i["blueprint_type_id"], "q": __total_quantity*i["quantity"], "nm": i["name"]}
+                         for i in __items if
+                         ("blueprint_type_id" in i) and not (i["blueprint_type_id"] is None) and
+                         ("metaGroupID" in i["details"]) and
+                         (i["details"]["metaGroupID"] == 2)]
+        for bpc in __bpc_for_fit:
+            push_into_scheduled_blueprints(bpc["id"], bpc["q"], bpc["nm"])
+
+    # только для отладки !!!!!
+    glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
+    scheduled_blueprints.sort(key=lambda sb: sb["name"])
+    for bpc in scheduled_blueprints:
+        glf.write(
+            '<tr>'
+            '<td><img class="media-object icn32" src="{img}"></td>'
+            '<td>{nm} <span class="label label-default">{id}</span></td>'
+            '<td align="right">{q}</td>'
+            '</tr>\n'.
+            format(
+                img=render_html.__get_img_src(bpc["type_id"], 32),
+                nm=bpc["name"],
+                id=bpc["type_id"],
+                q=bpc["quantity"]
+            )
+        )
+    glf.write('</table>')
+    # только для отладки !!!!!
 
     glf.write("""
 </div>
