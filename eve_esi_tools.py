@@ -424,3 +424,99 @@ def is_location_nested_into_another(
                 return False
         else:
             return False
+
+
+def __find_containers_in_hangars_nested(
+        item_id,
+        blueprints_hangars,
+        sde_type_ids,
+        corp_assets_data):
+    item_dict = next((a for a in corp_assets_data if a["item_id"] == int(item_id)), None)
+    # пытаемся в дереве asset-ов найти идентификатор, если его нет, то это терминальный узел, например
+    # чертёж, и он нам не интересен, т.к. требуется выдать идентификаторы контейнеров
+    if item_dict is None:
+        return []
+    __nested_items = [a for a in corp_assets_data if a["location_id"] == int(item_id)]
+    # нас интересуют только те контейнеры и ангары, в которых что-то есть, т.к. из них мы будем
+    # впоследствии доставать информацию о находящихся чертежах, т.ч. пустые коробки пропускаем
+    if not __nested_items:
+        return []
+    # ---
+    containers = []
+    for __item_dict in __nested_items:
+        # ожидаем найти офис со списком ангаров, а пока...
+        # ...если список ангаров ещё не найден, то продолжаем поиски; как только нужные ангары будет
+        # найдены, то зануляем параметр blueprints_hangar, что будет в дальнейшем означать, что поиск
+        # ангаров уже остановлен и идёт поиск контейнеров в ангарах
+        __item_id = __item_dict["item_id"]
+        __location_flag = __item_dict["location_flag"]
+        if __location_flag[:-1] == "CorpSAG":
+            str_hangar_num = __location_flag[-1:]
+            if not (int(str_hangar_num) in blueprints_hangars):
+                continue
+            # debug: print(str_hangar_num, "  ", __item_id)
+            # если текущий item является контейнером, то выдаём его номер и внутрь не заглядываем
+            __type_id = __item_dict["type_id"]
+            __is_container = __type_id in [
+                # 379: Cargo Containers
+                #   1651: Secure Containers
+                3465,   # Large Secure Container
+                3466,   # Medium Secure Container
+                3467,   # Small Secure Container
+                11488,  # Huge Secure Container
+                11489,  # Giant Secure Container
+                #   1652: Audit Log Containers
+                17363,  # Small Audit Log Secure Container
+                17364,  # Medium Audit Log Secure Container
+                17365,  # Large Audit Log Secure Container
+                #   1653: Freight Containers
+                24445,  # Giant Freight Container
+                33003,  # Enormous Freight Container
+                33005,  # Huge Freight Container
+                33007,  # Large Freight Container
+                33009,  # Medium Freight Container
+                33011,  # Small Freight Container
+                #   1657: Standard Containers
+                3293,   # Medium Standard Container
+                3296,   # Large Standard Container
+                3297,   # Small Standard Container
+                #   1658: Station Containers
+                17366,  # Station Container
+                17367,  # Station Vault Container
+                17368,  # Station Warehouse Container
+            ]
+            if __is_container:
+                if next((c for c in containers if c["id"] == int(__item_id)), None) is None:
+                    # container_name = next((an["name"] for an in corp_ass_names_data if an["item_id"] == __item_id), None)
+                    # debug: print("       ", item_id, __type_id, container_name)
+                    containers.append({"id": __item_id, "type_id": __type_id})  # "name": container_name
+                continue
+        else:
+            # debug: print(" ", __item_id, __location_flag)
+            containers.extend(__find_containers_in_hangars_nested(
+                __item_id,
+                blueprints_hangars,
+                sde_type_ids,
+                corp_assets_data))
+    return containers
+
+
+def find_containers_in_hangars(
+        station_id,
+        hangars_filter,
+        sde_type_ids,
+        corp_assets_data):
+    # пытаемся получить станцию, как item (это возможно, если она есть в корп-ассетах, т.е. является
+    # имуществом корпорации, иначе она принадлежит альянсу, или корпорация просто имеет там офис)
+    __station_dict = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None)
+    if __station_dict is None:
+        __office_dict = next((a for a in corp_assets_data if (a["location_id"] == int(station_id)) and (a["location_flag"] == "OfficeFolder")), None)
+    if (__station_dict is None) and (__office_dict is None):
+        raise Exception('Not found station or office {} in assets!!!'.format(station_id))
+
+    # поиск контейнеров на станции station_id в ангарах hangars_filter
+    return __find_containers_in_hangars_nested(
+        station_id if not (__station_dict is None) else __office_dict["item_id"],
+        hangars_filter,
+        sde_type_ids,
+        corp_assets_data)

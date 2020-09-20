@@ -141,23 +141,16 @@ def __dump_fit_items(glf, job, job_id):
 def __dump_monthly_jobs(
         glf,
         corp_manufacturing_scheduler):
+    scheduled_blueprints = corp_manufacturing_scheduler["scheduled_blueprints"]
+    monthly_jobs = corp_manufacturing_scheduler["monthly_jobs"]
+
     glf.write("""
 <!--start monthly_jobs-->
 <div class="panel-group" id="monthly_jobs" role="tablist" aria-multiselectable="true">
 """)
 
-    scheduled_blueprints = []
-
-    def push_into_scheduled_blueprints(type_id, quantity, name):
-        __sb_dict = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
-        if __sb_dict is None:
-            __sb_dict = {"type_id": type_id, "quantity": int(quantity), "name": name}
-            scheduled_blueprints.append(__sb_dict)
-        else:
-            __sb_dict["quantity"] += int(quantity)
-
     row_num = 0
-    for job in corp_manufacturing_scheduler:
+    for job in monthly_jobs:
         row_num += 1
         __ship = job["ship"]
         __ship_name = job["ship"]["name"] if not (job["ship"] is None) else None
@@ -200,18 +193,6 @@ def __dump_monthly_jobs(
             ' </div>\n'  # panel-collapse
             '</div>\n'  # panel
         )
-        # добавляем в список БПЦ чертёж хула корабля (это может быть и БПО в итоге...)
-        if not (__ship is None):
-            if ("blueprint_type_id" in __ship) and not (__ship["blueprint_type_id"] is None):
-                push_into_scheduled_blueprints(__ship["blueprint_type_id"], __total_quantity, __ship["name"])
-        # подсчитываем количество БПЦ, необходимых для постройки T2-модулей этого фита
-        __bpc_for_fit = [{"id": i["blueprint_type_id"], "q": __total_quantity*i["quantity"], "nm": i["name"]}
-                         for i in __items if
-                         ("blueprint_type_id" in i) and not (i["blueprint_type_id"] is None) and
-                         ("metaGroupID" in i["details"]) and
-                         (i["details"]["metaGroupID"] == 2)]
-        for bpc in __bpc_for_fit:
-            push_into_scheduled_blueprints(bpc["id"], bpc["q"], bpc["nm"])
 
     # только для отладки !!!!!
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
@@ -239,14 +220,12 @@ def __dump_monthly_jobs(
 """)
 
 
-def __dump_industrialist_tools(
+def __dump_workflow_tools(
         glf,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        sde_meta_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_manufacturing_scheduler,
-        corp_assets_tree):
+        corp_manufacturing_scheduler):
     glf.write("""
 <style>
 .qind-fit-table {
@@ -296,7 +275,7 @@ def __dump_industrialist_tools(
 
     __dump_monthly_jobs(
         glf,
-        corp_manufacturing_scheduler["monthly jobs"])
+        corp_manufacturing_scheduler)
 
     glf.write("""
   </div>
@@ -454,27 +433,20 @@ def __dump_industrialist_tools(
 """)
 
 
-def dump_industrialist_into_report(
+def dump_workflow_into_report(
         # путь, где будет сохранён отчёт
         ws_dir,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        sde_meta_groups,
-        # esi данные, загруженные с серверов CCP
-        corp_assets_data,
-        corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_manufacturing_scheduler,
-        corp_assets_tree):
-    glf = open('{dir}/industrialist.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+        corp_manufacturing_scheduler):
+    glf = open('{dir}/workflow.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Workflow")
-        __dump_industrialist_tools(
+        __dump_workflow_tools(
             glf,
             sde_type_ids,
-            sde_meta_groups,
-            corp_manufacturing_scheduler,
-            corp_assets_tree
+            corp_manufacturing_scheduler
         )
         render_html.__dump_footer(glf)
     finally:

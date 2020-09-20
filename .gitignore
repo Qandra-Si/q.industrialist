@@ -140,6 +140,7 @@ dmypy.json
 /q_logist_settings.py
 /q_conveyor_settings.py
 /q_blueprints_settings.py
+/q_workflow_settings.py
 /.*_cache
 /*_cache
 /debug
