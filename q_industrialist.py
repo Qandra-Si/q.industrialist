@@ -63,6 +63,9 @@ def main():
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_meta_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "metaGroups")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+
+    sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
     # Public information about a character
     character_data = interface.get_esi_data(
@@ -128,12 +131,18 @@ def main():
     corp_manufacturing_scheduler = {"monthly jobs": []}
     for ship in q_industrialist_settings.g_monthly_jobs:
         __eft = ship["eft"]
-        __quantity = ship["quantity"]
-        __items, __problems = eve_sde_tools.get_items_list_from_eft(__eft, sde_type_ids, sde_meta_groups)
-        for i in __items:
-            print(i["type_id"], i["name"], "x"+str(i["quantity"]),
-                  "???" if i["meta_group"] is None else i["meta_group"]["nameID"]["en"])
-        print("\n\nPROBLEMS:", __problems, "\n")
+        __total_quantity = ship["quantity"]
+        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
+        __converted.update({"quantity": __total_quantity})
+        __converted["items"].sort(key=lambda s: s["name"])
+        for __item_dict in __converted["items"]:
+            __item_type_id = __item_dict["type_id"]
+            __blueprint_type_id, __dummy0 = eve_sde_tools.get_blueprint_type_id_by_product_id(
+                __item_type_id,
+                sde_bp_materials
+            )
+            __item_dict["blueprint_type_id"] = __blueprint_type_id
+        corp_manufacturing_scheduler["monthly jobs"].append(__converted)
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -143,10 +152,12 @@ def main():
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_meta_groups,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_manufacturing_scheduler,
         corp_assets_tree)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

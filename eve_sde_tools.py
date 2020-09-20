@@ -11,6 +11,8 @@ import yaml
 import json
 from yaml import SafeLoader
 
+import pyfa_conversions as conversions
+
 
 # type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
 def __get_yaml(type, sub_url, item):
@@ -155,6 +157,32 @@ def get_item_name_by_type_id(type_ids, type_id):
     return name
 
 
+def convert_sde_type_ids(type_ids):
+    named_type_ids = {}
+    keys = type_ids.keys()
+    for type_id in keys:
+        type_dict = type_ids[str(type_id)]
+        if ("name" in type_dict) and ("en" in type_dict["name"]):
+            __name = type_dict["name"]["en"]
+            named_dict = type_dict.copy()
+            del named_dict["name"]
+            named_dict["id"] = int(type_id)
+            named_type_ids.update({__name: named_dict})
+    return named_type_ids
+
+
+def find_type_id_by_item_name_ex(named_type_ids, name):
+    __item = named_type_ids.get(name)
+    if __item is None:
+        return None, None
+    return __item["id"], __item
+
+
+def find_type_id_by_item_name(named_type_ids, name):
+    type_id, __dummy0 = find_type_id_by_item_name_ex(named_type_ids, name)
+    return type_id
+
+
 def get_type_id_by_item_name_ex(type_ids, name):
     keys = type_ids.keys()
     for type_id in keys:
@@ -167,7 +195,7 @@ def get_type_id_by_item_name_ex(type_ids, name):
 
 
 def get_type_id_by_item_name(type_ids, name):
-    type_id, type_dict = get_type_id_by_item_name_ex(type_ids, name)
+    type_id, __dummy0 = get_type_id_by_item_name_ex(type_ids, name)
     return type_id
 
 
@@ -364,71 +392,156 @@ def get_market_groups_tree(sde_market_groups):
     return groups_tree
 
 
-def get_items_list_from_eft(eft, sde_type_ids, sde_meta_groups):
-    items = []
-    problems = []
+# только для работы с текстовыми фитами, где возможно хранятся устаревшие названия модулей
+def __try_to_get_type_id_by_item_name(name, sde_named_type_ids):
+    __type_id = __item = None
+    __item_name = name
+    for i in range(10):
+        # шаг №0 : поиск item-а в справочнике, актуальном на дату обновления EVE static data resources
+        # шаг №1 : поиск item-а в pyfa_conversions-справочнике переименованных модулей
+        # шаг №2..9 : повторный поиск item-а в pyfa_conversions, возможны множественные переименования
+        __type_id, __item = find_type_id_by_item_name_ex(sde_named_type_ids, name)
+        if not (__type_id is None):
+            if bool(__item["published"]):
+                break
+        # пытаемся найти item в pyfa_conversions, возможно он устарел и переименован?
+        __converted_name = conversions.all.get(name)
+        if __converted_name is None:
+            return None, None, None
+        # если найден item с другим названием, то пытаемся снова определить его type_id
+        __item_name = name = __converted_name
+    return __type_id, __item, __item_name
+
+
+# описание формата см. на этой странице https://www.eveonline.com/ru/article/import-export-fittings
+def get_items_list_from_eft(
+        eft,
+        sde_named_type_ids,
+        exclude_specified_meta_groups=None,
+        include_only_meta_groups=None):
+    __converted = {
+        "ship": None,
+        "comment": None,
+        "eft": eft,
+        "items": [],
+        "problems": []
+    }
+    items = __converted["items"]
+    problems = __converted["problems"]
+
+    def push_into_problems(name, quantity, is_blueprint_copy, problem):
+        __problem_dict = next((p for p in problems if (p["name"] == name) and (p["problem"] == problem)), None)
+        if __problem_dict is None:
+            __problem_dict = {"name": name, "quantity": int(quantity), "problem": problem}
+            if not (is_blueprint_copy is None):
+                __problem_dict.update({"is_blueprint_copy": bool(is_blueprint_copy)})
+            problems.append(__problem_dict)
+        else:
+            __problem_dict["quantity"] += int(quantity)
+
+    def push_item_into_problems(item, problem):
+        push_into_problems(
+            item["name"],
+            item["quantity"],
+            item["is_blueprint_copy"] if "is_blueprint_copy" in item else None,
+            problem
+        )
+
+    # начинаем обработку входных данных
     item_names = eft.split("\n")
     for __line in enumerate(item_names):
-        __name = __line[1].strip()
+        __original_name = __line[1].strip()
         # пропускаем пустые строки, и даже не считаем позиции для определения к чему относится
         # модуль, к разъёму малой или большой мощности? т.к. нам надо получить лишь список
         # модулей, из которых состоит фит,... лежат ли они в карго, тоже не имеет значения
-        if not __name:
+        if not __original_name:
             continue
         # распаковываем название корабля из первой строки с квадратными скобками,
         # например: [Stratios, Vinnegar Douche's Stratios]
         __quantity = 1
+        __ship_flag = False
+        __is_blueprint_copy = None
         if __line[0] == 0:
-            if (__name[:1] == '[') and (__name[-1:] == ']'):
+            if (__original_name[:1] == '[') and (__original_name[-1:] == ']'):
+                # выполняем поиск названия корабля в строке
                 __end = __line[1].find(",")
                 if __end <= 1:
                     continue
-                __name = __line[1][1:__end]
+                __original_name = __line[1][1:__end]
+                __converted["comment"] = __line[1][__end+1:-1].strip()
+                __ship_flag = True
         else:
-            __pos = __name.rfind(" x")
-            if __pos > 1:
-                __num = __name[__pos + 2:]
+            # попытка найти в конце строке сочетание x?, например: Nanite Repair Paste x50
+            __quantity_pos = __original_name.rfind(" x")
+            if __quantity_pos > 1:
+                __num = __original_name[__quantity_pos + 2:]
                 if __num.isnumeric():
                     __quantity = __num
-                    __name = __name[:__pos]
+                    __original_name = __original_name[:__quantity_pos]
+            # попытка найти в строке сочетание (Copy), например: Vespa I Blueprint (Copy) x2
+            __copy_pos = __original_name.rfind(" (Copy)")
+            if __copy_pos >= 1:
+                __original_name = __original_name.replace(" (Copy)", "")
+                __is_blueprint_copy = True
         # попытка получить сведения об item-е по его наименованию
         __item_dicts = None
-        __type_id, __item = get_type_id_by_item_name_ex(sde_type_ids, __name)
+        __type_id, __item, __name = __try_to_get_type_id_by_item_name(__original_name, sde_named_type_ids)
+        # Внимание! если известен __type_id, то с __name и __original_name могут не совпадать!!!
         if not (__type_id is None):
-            __item_dicts = [{"name": __name, "type_id": __type_id, "quantity": __quantity, "details": __item}]
+            __item_dicts = [{"name": __name,
+                             "type_id": __type_id,
+                             "quantity": int(__quantity),
+                             "details": __item}]
+            if not (__is_blueprint_copy is None) and __is_blueprint_copy:
+                __item_dicts[0].update({"is_blueprint_copy": True})
+            if __original_name != __name:
+                __item_dicts[0].update({"renamed": True})
         else:
             # возможно встретилась ситуация: Sisters Core Probe Launcher,Sisters Core Scanner Probe
-            pair = __name.split(",")
+            pair = __original_name.split(",")
             if len(pair) == 2:
-                __type_id0, __item0 = get_type_id_by_item_name_ex(sde_type_ids, pair[0])
-                __type_id1, __item1 = get_type_id_by_item_name_ex(sde_type_ids, pair[1])
+                __type_id0, __item0, pair[0] = __try_to_get_type_id_by_item_name(pair[0], sde_named_type_ids)
+                __type_id1, __item1, pair[1] = __try_to_get_type_id_by_item_name(pair[1], sde_named_type_ids)
                 if not (__type_id0 is None) and not (__type_id1 is None):
                     __quantity = 1
                     if ("capacity" in __item0) and ("volume" in __item1):
                         __quantity = int(__item0["capacity"]/__item1["volume"])
-                    __item_dicts = [
+                    __item_dicts = [  # флаг __is_blueprint_copy здесь не может быть выставлен
                         {"name": pair[0], "type_id": __type_id0, "quantity": 1, "details": __item0},
                         {"name": pair[1], "type_id": __type_id1, "quantity": __quantity, "details": __item1}
                     ]
         # в случае, если элемент не найден, то сохраняем об этом информацию в список проблем
         if __item_dicts is None:
-            __exists = next((p["name"] for p in problems if p["name"] == __name), None)
-            if __exists is None:
-                problems.append({"name": __name, "problem": "not found"})
+            push_into_problems(__original_name, __quantity, __is_blueprint_copy, "obsolete")
+        elif __ship_flag:
+            # хул корабля всегда существует в одном экземпляре (не путать с тем, что валяется в карго)
+            __converted["ship"] = __item_dicts[0]
         else:
             for __item_dict in __item_dicts:
+                if not bool(__item_dict["details"]["published"]):
+                    push_item_into_problems(__item_dict, "suppressed")
+                    continue
+                # Внимание! Хул корабля сохранён не в items, а в ship, т.о. если корабль перевозит
+                # в карго такие-же хулы, то их там будет ровно столько, сколько и должно быть
                 __exists = next((i for i in items if i["name"] == __item_dict["name"]), None)
                 if __exists is None:
-                    __meta_group = None
                     if "metaGroupID" in __item_dict["details"]:
                         __mg_num = __item_dict["details"]["metaGroupID"]
-                        if str(__mg_num) in sde_meta_groups:
-                            __meta_group = sde_meta_groups[str(__mg_num)]
-                    __item_dict.update({"meta_group": __meta_group})
+                        # если указано не включать модуль неподходящей мета-группы в
+                        # список item-ов, то пропускаем его
+                        if not (exclude_specified_meta_groups is None) and (__mg_num in exclude_specified_meta_groups):
+                            continue
+                        # если указано, что включать модули только указанной мета-группы в
+                        # список item-ов, то добавляем только его
+                        if not (include_only_meta_groups is None) and not (__mg_num is include_only_meta_groups):
+                            continue
+                    elif not (exclude_specified_meta_groups is None) or not (include_only_meta_groups is None):
+                        push_item_into_problems(__item_dict, "unknown meta group")
+                        continue
                     items.append(__item_dict)
                 else:
-                    __exists["quantity"] += __item_dict["quantity"]
-    return items, problems
+                    __exists["quantity"] += int(__item_dict["quantity"])
+    return __converted
 
 
 def __rebuild_icons(ws_dir, name):
@@ -483,7 +596,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "volume"])
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
 
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
