@@ -10,6 +10,7 @@ import getopt
 import yaml
 import json
 from yaml import SafeLoader
+from pathlib import Path
 
 
 # type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
@@ -109,6 +110,8 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
                     if deleted1:
                         continue
                     break
+            # mkdir
+            Path('{dir}/sde_cache'.format(dir=ws_dir)).mkdir(parents=True, exist_ok=True)
             # json
             s = json.dumps(yaml_data, indent=1, sort_keys=False)
             f = open(f_name_json, "wt+", encoding='utf8')
