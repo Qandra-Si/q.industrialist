@@ -219,16 +219,21 @@ def __get_monthly_manufacturing_scheduler(
         "factory_containers": factory_containers,
         "factory_repository": [],
         "factory_blueprints": [],
-        "missing_blueprints": []
+        "missing_blueprints": [],
+        "overplus_blueprints": [],
     }
     scheduled_blueprints = scheduler["scheduled_blueprints"]
     factory_blueprints = scheduler["factory_blueprints"]
+    missing_blueprints = scheduler["missing_blueprints"]
+    overplus_blueprints = scheduler["overplus_blueprints"]
 
     def push_into_scheduled_blueprints(type_id, quantity, name, product_type_id):
         __sbd227 = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
         if __sbd227 is None:
             __sbd227 = {"type_id": type_id,
+                        "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, type_id),
                         "product": {"scheduled_quantity": int(quantity), "name": name, "type_id": product_type_id}}
+            # получаем данные по чертежу, - продукция, кол-во производимой продукции, материалы
             __ptid227, __pq227, __pm227 = \
                 eve_sde_tools.get_manufacturing_product_by_blueprint_type_id(type_id, sde_bp_materials)
             if not (__ptid227 is None):
@@ -243,7 +248,12 @@ def __get_monthly_manufacturing_scheduler(
     def push_into_factory_blueprints(type_id, runs):
         __fbd235 = next((fb for fb in factory_blueprints if fb["type_id"] == type_id), None)
         if __fbd235 is None:
-            __fbd235 = {"type_id": type_id, "runs": int(runs), "quantity": 1}  # "name": name
+            __fbd235 = {"type_id": type_id,
+                        "runs": int(runs),
+                        "quantity": 1,
+                        # "name": name,
+                        # "meta_group": meta_group
+                        }
             factory_blueprints.append(__fbd235)
         else:
             __fbd235["runs"] += int(runs)
@@ -321,11 +331,17 @@ def __get_monthly_manufacturing_scheduler(
     # формирование сводного списка чертежей фабрики, с суммарным кол-вом run-ов
     factory_repository = scheduler["factory_repository"]
     for bp in factory_repository:
-        push_into_factory_blueprints(bp["type_id"], bp["runs"])
+        __blueprint_type_id = bp["type_id"]
+        push_into_factory_blueprints(__blueprint_type_id, bp["runs"])
     # получение названий чертежей и сохранение из в сводном списке чертежей фабрики
     for bp in factory_blueprints:
-        __type_id = bp["type_id"]
-        bp["name"] = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, __type_id)
+        __blueprint_type_id = bp["type_id"]
+        bp["name"] = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, __blueprint_type_id)
+        # на станции может быть куча всяких БПЦ, нас будут интересовать только Т2 БПЦ
+        if not (str(__blueprint_type_id) in sde_type_ids):
+            continue
+        __item_dict = sde_type_ids[str(__blueprint_type_id)]
+        bp["meta_group"] = int(__item_dict["metaGroupID"]) if "metaGroupID" in __item_dict else None
 
     # расчёт кол-ва run-ов с учётом кратности run-ов T2-чертежей (в списке scheduled_blueprints)
     for __sb_dict in scheduled_blueprints:
@@ -360,38 +376,72 @@ def __get_monthly_manufacturing_scheduler(
         # внимание! на самом деле это магическое число зависит от точных знаний - сколько прогонов
         # может быть у чертежа? но это "рекомендуемое" число, и вовсе не факт, что так и будет...
         __sb_dict["blueprints_quantity"] = __scheduled_blueprints_quantity
-        # тот самый "магический" множитель
+        # тот самый "магический" множитель - кол-во прогонов на чертёж (ожидаемое)
         __sb_dict["blueprint_copy_runs"] = __blueprint_copy_runs
 
     # формирование списка недостающих чертежей
-    missing_blueprints = scheduler["missing_blueprints"]
     for __sb_dict in scheduled_blueprints:
+        # получаем данные по чертежу, запланированному к использованию
         __blueprint_type_id = __sb_dict["type_id"]
         __required_blueprints = __sb_dict["blueprints_quantity"]
         __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
         __products_per_run = __sb_dict["products_per_run"]
         __blueprint_copy_runs = __sb_dict["blueprint_copy_runs"]
+        __single_run_quantity = __blueprint_copy_runs * __products_per_run
+        # получаем данные по имеющимся чертежам
         __exist = [fb for fb in factory_blueprints if fb["type_id"] == __blueprint_type_id]
+        # если чертежей и вовсе нет, то сразу создаём запись о недостающем количестве
         if not __exist:
             missing_blueprints.append({
                 "type_id": __blueprint_type_id,
-                "required_blueprints": __required_blueprints,
+                "name": __sb_dict["name"],
+                "required_quantity": __required_blueprints,
+                "there_are_no_blueprints": True,  # признак того, что нет ни одного чертежа этого типа
             })
         else:
+            # суммируем прогоны чертежей и переводим их в количество продуктов, которые м.б. построено
             __exist_runs = sum([fb["runs"] for fb in __exist])
             __exist_run_products = __exist_runs * __products_per_run
+            # если чертежей недостаточно, то расчитываем недостающее кол-во чертежей
             if __exist_run_products < __scheduled_products:
                 __required_run_products = __scheduled_products - __exist_run_products
-                __single_run_quantity = __blueprint_copy_runs * __products_per_run
                 __required_blueprints = \
                     int(__required_run_products + __single_run_quantity - 1) // int(__single_run_quantity)
                 missing_blueprints.append({
                     "type_id": __blueprint_type_id,
-                    "required_blueprints": __required_blueprints,
+                    "name": __sb_dict["name"],
+                    "required_quantity": __required_blueprints,
+                })
+            # если чертежей избыточное количество, то расчитываем кол-во лишних
+            elif __exist_run_products > __scheduled_products:
+                __unnecessary_run_products = __exist_run_products - __scheduled_products
+                __unnecessary_blueprints = \
+                    int(__unnecessary_run_products) // int(__single_run_quantity)
+                overplus_blueprints.append({
+                    "type_id": __blueprint_type_id,
+                    "name": __sb_dict["name"],
+                    "unnecessary_quantity": __unnecessary_blueprints,
                 })
 
-    # формирование
-    #    overplus_blueprints
+    # формирование списка избыточных чертежей
+    scheduled_blueprint_type_ids = [int(sb["type_id"]) for sb in scheduled_blueprints]
+    for __fb_dict in factory_blueprints:
+        __blueprint_type_id = __fb_dict["type_id"]
+        __meta_group = __fb_dict["meta_group"]
+        # на станции может быть куча всяких БПЦ, нам интересуют излишки только Т2 чертежей
+        if __meta_group is None:
+            continue
+        elif int(__meta_group) != 2:
+            continue
+        # если БПЦ с указанным типом вовсе отсутствует в списке требуемых для постройки, то сразу
+        # создаём запись об излишках, где все чертежи этого типа будут лишними
+        if not (__blueprint_type_id in scheduled_blueprint_type_ids):
+            overplus_blueprints.append({
+                "type_id": __blueprint_type_id,
+                "name": __fb_dict["name"],
+                "unnecessary_quantity": __fb_dict["quantity"],
+                "all_of_them": True  # признак, что все чертежи этого типа - лишние
+            })
 
     return scheduler
 

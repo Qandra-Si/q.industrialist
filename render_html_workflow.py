@@ -138,10 +138,7 @@ def __dump_fit_items(glf, job, job_id):
 """)
 
 
-def __dump_monthly_jobs(
-        glf,
-        corp_manufacturing_scheduler):
-    scheduled_blueprints = corp_manufacturing_scheduler["scheduled_blueprints"]
+def __dump_monthly_jobs(glf, corp_manufacturing_scheduler):
     monthly_jobs = corp_manufacturing_scheduler["monthly_jobs"]
 
     glf.write("""
@@ -195,9 +192,37 @@ def __dump_monthly_jobs(
         )
 
     # только для отладки !!!!!
+    # scheduled_blueprints = corp_manufacturing_scheduler["scheduled_blueprints"]
+    # glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
+    # scheduled_blueprints.sort(key=lambda sb: sb["product"]["name"])
+    # for bpc in scheduled_blueprints:
+    #     glf.write(
+    #         '<tr>'
+    #         '<td><img class="media-object icn32" src="{img}"></td>'
+    #         '<td>{nm} <span class="label label-default">{id}</span></td>'
+    #         '<td align="right">{q}</td>'
+    #         '</tr>\n'.
+    #         format(
+    #             img=render_html.__get_img_src(bpc["type_id"], 32),
+    #             nm=bpc["product"]["name"],
+    #             id=bpc["type_id"],
+    #             q=bpc["product"]["scheduled_quantity"]
+    #         )
+    #     )
+    # glf.write('</table>')
+    # только для отладки !!!!!
+
+    glf.write("""
+</div>
+<!--end monthly_jobs-->
+""")
+
+
+def __dump_missing_blueprints(glf, corp_manufacturing_scheduler):
+    missing_blueprints = corp_manufacturing_scheduler["missing_blueprints"]
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
-    scheduled_blueprints.sort(key=lambda sb: sb["product"]["name"])
-    for bpc in scheduled_blueprints:
+    missing_blueprints.sort(key=lambda mb: mb["name"])
+    for bpc in missing_blueprints:
         glf.write(
             '<tr>'
             '<td><img class="media-object icn32" src="{img}"></td>'
@@ -206,18 +231,33 @@ def __dump_monthly_jobs(
             '</tr>\n'.
             format(
                 img=render_html.__get_img_src(bpc["type_id"], 32),
-                nm=bpc["product"]["name"],
+                nm=bpc["name"],
                 id=bpc["type_id"],
-                q=bpc["product"]["scheduled_quantity"]
+                q=bpc["required_quantity"]
             )
         )
     glf.write('</table>')
-    # только для отладки !!!!!
 
-    glf.write("""
-</div>
-<!--end monthly_jobs-->
-""")
+
+def __dump_overplus_blueprints(glf, corp_manufacturing_scheduler):
+    overplus_blueprints = corp_manufacturing_scheduler["overplus_blueprints"]
+    glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
+    overplus_blueprints.sort(key=lambda mb: mb["name"])
+    for bpc in overplus_blueprints:
+        glf.write(
+            '<tr>'
+            '<td><img class="media-object icn32" src="{img}"></td>'
+            '<td>{nm} <span class="label label-default">{id}</span></td>'
+            '<td align="right">{q}</td>'
+            '</tr>\n'.
+            format(
+                img=render_html.__get_img_src(bpc["type_id"], 32),
+                nm=bpc["name"],
+                id=bpc["type_id"],
+                q=bpc["unnecessary_quantity"]
+            )
+        )
+    glf.write('</table>')
 
 
 def __dump_workflow_tools(
@@ -271,6 +311,7 @@ def __dump_workflow_tools(
  <div class="row">
   <!--start group1-->
   <div class="col-md-4">
+   <h3>Monthly Scheduled Jobs</h3>
 """)
 
     __dump_monthly_jobs(
@@ -282,18 +323,24 @@ def __dump_workflow_tools(
   <!--end group1-->
   <!--start group1-->
   <div class="col-md-4">
+   <h3>Missing Blueprints</h3>
 """)
 
-    glf.write("...")
+    __dump_missing_blueprints(
+        glf,
+        corp_manufacturing_scheduler)
 
     glf.write("""
   </div>
   <!--end group1-->
   <!--start group1-->
   <div class="col-md-4">
+   <h3>Overplus Blueprints</h3>
 """)
 
-    glf.write("...")
+    __dump_overplus_blueprints(
+        glf,
+        corp_manufacturing_scheduler)
 
     glf.write("""
   </div>
