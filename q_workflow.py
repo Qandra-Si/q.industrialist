@@ -206,6 +206,7 @@ def __get_monthly_manufacturing_scheduler(
         sde_type_ids,
         sde_named_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         corp_blueprints_data,
         corp_industry_jobs_data,
@@ -217,26 +218,36 @@ def __get_monthly_manufacturing_scheduler(
         "scheduled_blueprints": [],
         "factory_containers": factory_containers,
         "factory_repository": [],
-        "factory_blueprints": []
+        "factory_blueprints": [],
+        "missing_blueprints": []
     }
     scheduled_blueprints = scheduler["scheduled_blueprints"]
     factory_blueprints = scheduler["factory_blueprints"]
 
-    def push_into_scheduled_blueprints(type_id, quantity, name):
-        __sb_dict = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
-        if __sb_dict is None:
-            __sb_dict = {"type_id": type_id, "quantity": int(quantity), "name": name}
-            scheduled_blueprints.append(__sb_dict)
+    def push_into_scheduled_blueprints(type_id, quantity, name, product_type_id):
+        __sbd227 = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
+        if __sbd227 is None:
+            __sbd227 = {"type_id": type_id,
+                        "product": {"scheduled_quantity": int(quantity), "name": name, "type_id": product_type_id}}
+            __ptid227, __pq227, __pm227 = \
+                eve_sde_tools.get_manufacturing_product_by_blueprint_type_id(type_id, sde_bp_materials)
+            if not (__ptid227 is None):
+                if __ptid227 != product_type_id:
+                    raise Exception('Unable to match product {} and blueprint()!!!'.format(product_type_id, type_id))
+                __sbd227["products_per_run"] = __pq227
+                __sbd227["manufacturing"] = {"materials": __pm227}
+            scheduled_blueprints.append(__sbd227)
         else:
-            __sb_dict["quantity"] += int(quantity)
+            __sbd227["product"]["scheduled_quantity"] += int(quantity)
 
     def push_into_factory_blueprints(type_id, runs):
-        __fb_dict = next((fb for fb in factory_blueprints if fb["type_id"] == type_id), None)
-        if __fb_dict is None:
-            __fb_dict = {"type_id": type_id, "runs": int(runs)}  # "name": name
-            factory_blueprints.append(__fb_dict)
+        __fbd235 = next((fb for fb in factory_blueprints if fb["type_id"] == type_id), None)
+        if __fbd235 is None:
+            __fbd235 = {"type_id": type_id, "runs": int(runs), "quantity": 1}  # "name": name
+            factory_blueprints.append(__fbd235)
         else:
-            __fb_dict["runs"] += int(runs)
+            __fbd235["runs"] += int(runs)
+            __fbd235["quantity"] += 1
 
     # конвертация ETF в список item-ов
     for ship in scheduler_job_settings:
@@ -245,19 +256,26 @@ def __get_monthly_manufacturing_scheduler(
         __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
         __converted.update({"quantity": __total_quantity})
         if not (__converted["ship"] is None):
-            __blueprint_type_id, __dummy0 = eve_sde_tools.get_blueprint_type_id_by_product_id(
+            __blueprint_type_id, __blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 __converted["ship"]["type_id"],
                 sde_bp_materials
             )
-            __converted["ship"]["blueprint_type_id"] = __blueprint_type_id
+            __converted["ship"].update({"blueprint": {
+                "type_id": __blueprint_type_id,
+                # "manufacturing": __blueprint_dict["activities"]["manufacturing"]
+            }})
         __converted["items"].sort(key=lambda i: i["name"])
         for __item_dict in __converted["items"]:
             __item_type_id = __item_dict["type_id"]
-            __blueprint_type_id, __dummy0 = eve_sde_tools.get_blueprint_type_id_by_product_id(
+            __blueprint_type_id, __blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 __item_type_id,
                 sde_bp_materials
             )
-            __item_dict["blueprint_type_id"] = __blueprint_type_id
+            if not (__blueprint_type_id is None) and ("manufacturing" in __blueprint_dict["activities"]):
+                __item_dict.update({"blueprint": {
+                    "type_id": __blueprint_type_id,
+                    # "manufacturing": __blueprint_dict["activities"]["manufacturing"]
+                }})
         scheduler["monthly_jobs"].append(__converted)
 
     # формирование списка чертежей, которые необходимы для постройки запланированного кол-ва фитов
@@ -267,16 +285,29 @@ def __get_monthly_manufacturing_scheduler(
         __items = job["items"]
         # добавляем в список БПЦ чертёж хула корабля (это может быть и БПО в итоге...)
         if not (__ship is None):
-            if ("blueprint_type_id" in __ship) and not (__ship["blueprint_type_id"] is None):
-                push_into_scheduled_blueprints(__ship["blueprint_type_id"], __total_quantity, __ship["name"])
+            if "blueprint" in __ship:
+                push_into_scheduled_blueprints(
+                    __ship["blueprint"]["type_id"],
+                    __total_quantity,
+                    __ship["name"],
+                    __ship["type_id"]
+                )
         # подсчитываем количество БПЦ, необходимых для постройки T2-модулей этого фита
-        __bpc_for_fit = [{"id": i["blueprint_type_id"], "q": __total_quantity * i["quantity"], "nm": i["name"]}
+        __bpc_for_fit = [{"id": i["blueprint"]["type_id"],
+                          "q": __total_quantity * i["quantity"],
+                          "nm": i["name"],
+                          "prod": i["type_id"]}
                          for i in __items if
-                         ("blueprint_type_id" in i) and not (i["blueprint_type_id"] is None) and
+                         ("blueprint" in i) and
                          ("metaGroupID" in i["details"]) and
                          (i["details"]["metaGroupID"] == 2)]
         for bpc in __bpc_for_fit:
-            push_into_scheduled_blueprints(bpc["id"], bpc["q"], bpc["nm"])
+            push_into_scheduled_blueprints(
+                bpc["id"],
+                bpc["q"],
+                bpc["nm"],
+                bpc["prod"]
+            )
 
     # формирование списка чертежей имеющихся на станции в указанных контейнерах
     factory_container_ids = [fc["id"] for fc in factory_containers["containers"]]
@@ -288,17 +319,79 @@ def __get_monthly_manufacturing_scheduler(
                                        (bp["quantity"] == -2)]
 
     # формирование сводного списка чертежей фабрики, с суммарным кол-вом run-ов
-    for bp in scheduler["factory_repository"]:
+    factory_repository = scheduler["factory_repository"]
+    for bp in factory_repository:
         push_into_factory_blueprints(bp["type_id"], bp["runs"])
     # получение названий чертежей и сохранение из в сводном списке чертежей фабрики
     for bp in factory_blueprints:
         __type_id = bp["type_id"]
         bp["name"] = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, __type_id)
 
+    # расчёт кол-ва run-ов с учётом кратности run-ов T2-чертежей (в списке scheduled_blueprints)
+    for __sb_dict in scheduled_blueprints:
+        __blueprint_type_id = __sb_dict["type_id"]
+        __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
+        __product_type_id = __sb_dict["product"]["type_id"]
+        __products_per_run = __sb_dict["products_per_run"]
+        # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана
+        __blueprint_copy_runs = 1
+        if eve_sde_tools.is_type_id_nested_into_market_group(
+                __product_type_id,
+                [9, 157, 11],  # Ship Equipment, Drones, Ammunition & Charges
+                sde_type_ids,
+                sde_market_groups):
+            __blueprint_copy_runs = 10
+        elif eve_sde_tools.is_type_id_nested_into_market_group(
+                __product_type_id,
+                [4],  # Ships
+                sde_type_ids,
+                sde_market_groups):
+            __blueprint_copy_runs = 4
+        elif eve_sde_tools.is_type_id_nested_into_market_group(
+                __product_type_id,
+                [955],  # Ship and Module Modifications
+                sde_type_ids,
+                sde_market_groups):
+            __blueprint_copy_runs = 3
+        __single_run_quantity = __blueprint_copy_runs * __products_per_run
+        __scheduled_blueprints_quantity = \
+            int(__scheduled_products + __single_run_quantity - 1) // int(__single_run_quantity)
+        # сохраняем кол-во БПЦ по правилу выше
+        # внимание! на самом деле это магическое число зависит от точных знаний - сколько прогонов
+        # может быть у чертежа? но это "рекомендуемое" число, и вовсе не факт, что так и будет...
+        __sb_dict["blueprints_quantity"] = __scheduled_blueprints_quantity
+        # тот самый "магический" множитель
+        __sb_dict["blueprint_copy_runs"] = __blueprint_copy_runs
+
+    # формирование списка недостающих чертежей
+    missing_blueprints = scheduler["missing_blueprints"]
+    for __sb_dict in scheduled_blueprints:
+        __blueprint_type_id = __sb_dict["type_id"]
+        __required_blueprints = __sb_dict["blueprints_quantity"]
+        __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
+        __products_per_run = __sb_dict["products_per_run"]
+        __blueprint_copy_runs = __sb_dict["blueprint_copy_runs"]
+        __exist = [fb for fb in factory_blueprints if fb["type_id"] == __blueprint_type_id]
+        if not __exist:
+            missing_blueprints.append({
+                "type_id": __blueprint_type_id,
+                "required_blueprints": __required_blueprints,
+            })
+        else:
+            __exist_runs = sum([fb["runs"] for fb in __exist])
+            __exist_run_products = __exist_runs * __products_per_run
+            if __exist_run_products < __scheduled_products:
+                __required_run_products = __scheduled_products - __exist_run_products
+                __single_run_quantity = __blueprint_copy_runs * __products_per_run
+                __required_blueprints = \
+                    int(__required_run_products + __single_run_quantity - 1) // int(__single_run_quantity)
+                missing_blueprints.append({
+                    "type_id": __blueprint_type_id,
+                    "required_blueprints": __required_blueprints,
+                })
+
     # формирование
-    missing_blueprints
-    # формирование
-    overplus_blueprints
+    #    overplus_blueprints
 
     return scheduler
 
@@ -329,6 +422,7 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
     sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
@@ -393,6 +487,7 @@ def main():
         sde_type_ids,
         sde_named_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         # esi данные, загруженные с серверов CCP
         corp_blueprints_data,
         corp_industry_jobs_data,

@@ -196,7 +196,7 @@ def __dump_monthly_jobs(
 
     # только для отладки !!!!!
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
-    scheduled_blueprints.sort(key=lambda sb: sb["name"])
+    scheduled_blueprints.sort(key=lambda sb: sb["product"]["name"])
     for bpc in scheduled_blueprints:
         glf.write(
             '<tr>'
@@ -206,9 +206,9 @@ def __dump_monthly_jobs(
             '</tr>\n'.
             format(
                 img=render_html.__get_img_src(bpc["type_id"], 32),
-                nm=bpc["name"],
+                nm=bpc["product"]["name"],
                 id=bpc["type_id"],
-                q=bpc["quantity"]
+                q=bpc["product"]["scheduled_quantity"]
             )
         )
     glf.write('</table>')

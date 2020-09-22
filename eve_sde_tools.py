@@ -347,11 +347,27 @@ def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
             if "products" in __bpm2:
                 __bpm3 = __bpm2["products"]
                 for m in __bpm3:
-                    if "typeID" in m:
-                        type_id = int(m["typeID"])
-                        if product_id == type_id:
-                            return int(bp), sde_bp_materials[bp]
+                    type_id = int(m["typeID"])
+                    if product_id == type_id:
+                        return int(bp), sde_bp_materials[bp]
     return None, None
+
+
+def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_materials):
+    """
+    Поиск идентификатора manufacturing-продукта по известному идентификатору чертежа
+    """
+    if str(blueprint_type_id) in sde_bp_materials:
+        __bpm1 = sde_bp_materials[str(blueprint_type_id)]["activities"]
+        if "manufacturing" in __bpm1:
+            __bpm2 = __bpm1["manufacturing"]
+            if "products" in __bpm2:
+                __bpm3 = __bpm2["products"]
+                for m in __bpm3:
+                    product_id = int(m["typeID"])
+                    quantity = int(m["quantity"])
+                    return product_id, quantity, __bpm2["materials"]
+    return None
 
 
 def get_market_groups_tree_root(groups_tree, group_id):
