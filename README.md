@@ -50,4 +50,82 @@ Q.Industrialist версии v0.7.0 является набором утилит
 
 ## Установка и настройка среды разработчика (локальный запуск)
 
-...дописать
+В разделе выше приведены инструкции по настройке и запуску Q.Industrialist в операционной системе Linux. В следующем разделе приведены инструкции по настройке Q.Industrialist в операционной системе Windows.
+
+Для продолжения вам понадобятся установленное ПО:
+1. Python 3 - [python.org](https://www.python.org/downloads/windows/)
+1. Git - [git-scm.com](https://git-scm.com/download/win), см. также [инструкцию](https://git-scm.com/book/ru/v2/%D0%92%D0%B2%D0%B5%D0%B4%D0%B5%D0%BD%D0%B8%D0%B5-%D0%A3%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-Git)
+1. TortoiseGit (необязательный графический пакет) - [tortoisegit.org](https://tortoisegit.org/download/)
+
+### Шаг 1. Настройка среды разработки
+
+Откройте окно программы `Git Bash`, [настройте](https://git-scm.com/book/ru/v2/%D0%92%D0%B2%D0%B5%D0%B4%D0%B5%D0%BD%D0%B8%D0%B5-%D0%9F%D0%B5%D1%80%D0%B2%D0%BE%D0%BD%D0%B0%D1%87%D0%B0%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F-%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-Git) среду `Git` для первого использования, создайте каталог в который будут скачаны и распакованы файлы Q.Industrialist, скачайте файлы:
+
+```bash
+# set your user name and email address
+git config --global user.name "Qandra Si"
+git config --global user.email qandra.si@gmail.com
+# configure the default text editor that will be used when Git needs you to type in a message
+git config --global core.editor nano
+# create workspace directory q_industrialist in your home dir
+cd
+mkdir q_industrialist && cd q_industrialist
+# upload Q.Industrialist files into workspace dir
+git clone --origin github --branch master --single-branch https://github.com/Qandra-Si/q.industrialist.git .
+```
+
+Повторно запустите программу `Git Bash` с правами администратора (щелчок правой кнопкой мыши по ранее запущенной программе `Git Bash`, снова щелчок по пункту "Git Bash", выберите пункт "Запуск от имени администратора"). В каталоге, где были распакованы файлы Q.Industrialist запустите программу `pip` и установите зависимости для `Python 3`. Закройте программу `Git Bash` запущенную с правами администратора, т.к. она более не понадобится.
+
+```bash
+cd ~/q_industrialist
+# setup Python 3 environment requirements
+pip install -r requirements.txt
+exit
+```
+
+Для продолжения настройки среды разработки перейдите в окно программы `Git Bash`, запущенной в самом начале (без прав администратора). Скопируйте шаблон файла с настройками, внесите изменения в настройки Q.Industrialist.
+
+```bash
+# setup Q.Industrialist environment
+cd ~/q_industrialist
+cp q_industrialist_settings.py.template q_industrialist_settings.py
+# edit Q.Industrialist default settings as you wish (to exit nano press Ctrl+X)
+nano q_industrialist_settings.py
+```
+
+Также скопируйте все прочие файлы с настройками, предназначенные для запуска различных модулей Q.Industrialist, внесите в них изменения по желанию (модуль `q_blueprints.py` и/или модуль `q_workspace.py` имеют независимые и отдельные настройки в соответствующих файлах `q_blueprints_settings.py` и `q_workspace_settings.py`). Без подготовки файлов с настройками одноимённый модуль запустить не удастся (к данному шагу можно вернуться впоследствии).
+
+```bash
+# get list of files with template (default) settings 
+ls -1 *_settings.py.template
+# for example:
+#   q_blueprints_settings.py.template
+#   q_conveyor_settings.py.template
+#   q_industrialist_settings.py.template
+#   q_logist_settings.py.template
+# copy each of them except q_industrialist_settings (see previous step)
+cp q_blueprints_settings.py.template q_industrialist_settings.py
+cp q_conveyor_settings.py.template q_conveyor_settings.py
+cp q_logist_settings.py.template q_logist_settings.py
+# copy each of them
+nano q_blueprints_settings.py
+nano q_conveyor_settings.py
+nano q_logist_settings.py
+```
+
+Скачайте и распакуйте последнюю версию статического набора данных [Static Data Export (SDE)](https://developers.eveonline.com/resource/resources) в каталог с названием "2", с сохранением структуры каталогов. Запустите конвертацию `.yaml` файлов в `.json` файлы с помощью программы eve_sde_tools.py в каталог с временными файлами `.q_industrialist`. Процедура конвертации длительная и требовательная к памяти ЭВМ, потребуется не менее 4 Гб памяти, т.ч. при недостаточном кол-ве ОП рекомендуется закрыть лишние программы.
+
+```bash
+# unpack here sde.zip from https://developers.eveonline.com/resource/resources
+echo "$HOME/q_industrialist/2"
+ls -1 $HOME/q_industrialist/2
+# for example:
+#   readme.txt
+#   sde/
+# run .jaml to .json convertation (4 Gb memory required)
+mkdir ./.q_industrialist
+time python eve_sde_tools.py --cache_dir=./.q_industrialist
+# for example:
+#   Rebuilding typeIDs.yaml file...
+#   Rebuilding invPositions.yaml file...
+```
