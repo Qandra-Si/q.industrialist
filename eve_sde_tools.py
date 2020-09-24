@@ -2,7 +2,7 @@
 
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 """
 import sys
 import os
@@ -12,7 +12,7 @@ import json
 from yaml import SafeLoader
 
 
-# type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
+# type=static_data_interface : unpacked SDE-yyyymmdd-TRANQUILITY.zip
 def __get_yaml(type, sub_url, item):
     f_name = '{cwd}/{type}/{url}'.format(type=type, cwd=os.getcwd(), url=sub_url)
     item_to_search = "\n{}\n".format(item)
@@ -40,7 +40,7 @@ def __get_yaml(type, sub_url, item):
 
 
 def __get_source_name(subname, name):
-    return '{cwd}/{type}/{url}'.format(type=2, cwd=os.getcwd(), url="sde/{}/{}.yaml".format(subname, name))
+    return '{cwd}/{type}/{url}'.format(cwd=os.getcwd(), type="static_data_interface", url="{}/{}.yaml".format(subname, name))
 
 
 def __get_converted_name(ws_dir, name):
@@ -451,12 +451,12 @@ def main():  # rebuild .yaml files
 
 
 def test():
-    data = __get_yaml(2, 'sde/fsd/typeIDs.yaml', "32859:")
+    data = __get_yaml("static_data_interface", 'fsd/typeIDs.yaml', "32859:")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["name"]["en"]))  # Small Standard Container Blueprint
 
-    data = __get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: 60003760")
+    data = __get_yaml("static_data_interface", 'bsd/invUniqueNames.yaml', "    itemID: 60003760")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["itemName"]))  # Jita IV - Moon 4 - Caldari Navy Assembly Plant

@@ -17,7 +17,7 @@ def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
 
 def __get_img_src(tp, sz):
     if q_industrialist_settings.g_use_filesystem_resources:
-        return './3/Types/{}_{}.png'.format(tp, sz)
+        return 'image_export_collection/Types/{}_{}.png'.format(tp, sz)
     else:
         return 'http://imageserver.eveonline.com/Type/{}_{}.png'.format(tp, sz)
 
@@ -29,7 +29,7 @@ def __get_icon_src(icon_id, sde_icon_ids):
     if str(icon_id) in sde_icon_ids:
         nm = sde_icon_ids[str(icon_id)]["iconFile"]
         if q_industrialist_settings.g_use_filesystem_resources:
-            return './3/{}'.format(nm)
+            return 'image_export_collection/{}'.format(nm)
         else:  # https://everef.net/img/Icons/items/9_64_5.png
             return 'https://everef.net/img/{}'.format(nm)
     else:

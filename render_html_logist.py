@@ -205,16 +205,28 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
      <tr>
       <th>#</th>
       <th>Solar System</th>
-      <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
-               src="https://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
-               src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
-      <th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
+""")
+        glf.write(
+            '<th><img src="{src648}" width="32px" height="32px" alt="Badger"/></th>\n'
+            '<th><img src="{src32880}" width="32px" height="32px" alt="Venture"/><img\n'
+            ' src="{src1317}" width="32px" height="32px" alt="Expanded Cargohold I"/><img\n'
+            ' src="{src31117}" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>\n'
+            '<th><img src="{src52694}" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>\n'
+            '<th><img src="{src16273}" width="32px" height="32px" alt="Liquid Ozone"/></th>\n'.
+            format(
+                src648=render_html.__get_img_src(648,32),
+                src32880=render_html.__get_img_src(32880,32),
+                src1317=render_html.__get_img_src(1317,32),
+                src31117=render_html.__get_img_src(31117,32),
+                src52694="https://imageserver.eveonline.com/Type/52694_32.png",  # there are no in IEC: render_html.__get_img_src(52694,32),
+                src16273=render_html.__get_img_src(16273,32)
+            )
+        )
+        glf.write("""<th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
      </tr>
     </thead>
-    <tbody>""")
+    <tbody>
+""")
         # --- расчёт дистанции прыжка
         prev_system_id = None
         row_num = 1

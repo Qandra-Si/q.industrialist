@@ -295,7 +295,7 @@ class EveESIClient:
 
         if not client_id:
             client_id = input("Copy your SSO application's client ID and enter it "
-                              "here [press 'Enter' for R Initiative 4 app]: ")
+                              "here [press 'Enter' for default Q.Industrialist app]: ")
             if not client_id:
                 client_id = self.__default_ri4_client_id
 
