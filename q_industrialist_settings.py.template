@@ -14,3 +14,11 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-corporations.read_facilities.v1",  # Requires one of the following EVE corporation role(s): Factory_Manager
                   "esi-planets.read_customs_offices.v1",  # Requires one of the following EVE corporation role(s): Director
                  ]
+g_database = {
+    "host":     "127.0.0.1",
+    "dbname":   "qindustrialist",
+    "port":     5432,
+    "schema":   "corenetwork",
+    "user":     "qindustrialist",
+    "password": "PC@1s5$MwX0srid5"  # <-- this is the value you probably need to edit
+}

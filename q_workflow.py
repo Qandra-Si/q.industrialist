@@ -24,6 +24,7 @@ Requires application scopes:
 import sys
 import json
 import requests
+import psycopg2
 
 import eve_esi_interface as esi
 
@@ -447,6 +448,17 @@ def __get_monthly_manufacturing_scheduler(
 
 
 def main():
+    # conn = psycopg2.connect(
+    #     dbname=q_industrialist_settings.g_database["dbname"],
+    #     user=q_industrialist_settings.g_database["user"],
+    #     password=q_industrialist_settings.g_database["password"],
+    #     host=q_industrialist_settings.g_database["host"],
+    #     port=q_industrialist_settings.g_database["port"]
+    # )
+    # print(conn)
+    # conn.close()
+    # return
+
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
