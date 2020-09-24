@@ -93,9 +93,49 @@ cp q_industrialist_settings.py.template q_industrialist_settings.py
 nano q_industrialist_settings.py
 ```
 
-Также скопируйте все прочие файлы с настройками, предназначенные для запуска различных модулей Q.Industrialist, внесите в них изменения по желанию (модуль `q_blueprints.py` и/или модуль `q_workspace.py` имеют независимые и отдельные настройки в соответствующих файлах `q_blueprints_settings.py` и `q_workspace_settings.py`). Без подготовки файлов с настройками одноимённый модуль запустить не удастся (к данному шагу можно вернуться впоследствии).
+Скачайте и распакуйте последнюю версию статического набора данных [Static Data Export (SDE)](https://developers.eveonline.com/resource/resources) в каталог с названием "2", с сохранением структуры каталогов. Запустите конвертацию `.yaml` файлов в `.json` файлы с помощью программы eve_sde_tools.py в каталог с временными файлами `.q_industrialist`. Процедура конвертации длительная и требовательная к памяти ЭВМ, потребуется не менее 4 Гб памяти, т.ч. при недостаточном кол-ве ОП рекомендуется закрыть лишние программы.
 
 ```bash
+# unpack here sde.zip from https://developers.eveonline.com/resource/resources
+echo "$HOME/q_industrialist/2"
+ls -1 $HOME/q_industrialist/2
+# for example:
+#   readme.txt
+#   sde/
+# run .jaml to .json convertation (too long and 4 Gb memory required)
+cd ~/q_industrialist
+mkdir ./.q_industrialist
+time python eve_sde_tools.py --cache_dir=./.q_industrialist
+# for example:
+#   Rebuilding typeIDs.yaml file...
+#   Rebuilding invPositions.yaml file...
+#   ...
+#   real 24m39,000s
+```
+
+### Шаг 2. Настройка модулей Q.Industrialist
+
+Модулями Q.Industrialist являются отдельные программы, скрипты, выполняющие генерацию отчётов. Каждый модуль выполняет какую-то отдельную задачу, как то, например, построение маршрутов циносети и отслеживание отстатков цинок и топляка на промежуточных станциях циносети; либо же отслеживание остатков чертежей в заданных коробках, а также необходимого или недостающего количества материалов для запуска производства по имеющимся чертежам и т.д. Каждый модуль и каждый отчёт самодостаточен, по желанию можно запускать генерацию лишь какого-то одного отчёта, пользуясь соответствующим модулем. Перед использованием всякий модуль должен быть настроен. Для настройки модулей используются одноимённые файлы, например модуль `q_logist.py` настраивается с помощью скрипта `q_logist_settings.py`. По умолчанию, рабочая копия Q.Industrialist не содержит settings-файлов, их необходимо создать используя заранее подготовленные шаблоны, в частности для скрипта `q_logist_settings.py` в рабочей копии имеется шаблон `q_logist_settings.py.template`. Для остальных модулей, если это требуется, имеются аналогичные файлы с шаблонными настройками.
+
+Программный комплект Q.Industrialist содержит следующие модули:
+* q_accounting.py- модуль для построения балансового отчёта корпорации по имеющимся остаткам на складах в разных частях Вселенной EVE Online
+* q_blueprints.py - модуль для построения отчёта по имеющимся чертежам в имуществе корпорации для их анализа, поиска, отслеживания контрактов в которых упомянуты чертежи
+* q_capital.py - модуль для построения отчёта по прогрессу производства капитальных кораблей, отслеживания имеющегося количества материалов для постройки, чертежей и отдельных компонентов
+* q_conveyor.py - модуль для построение отчёта для отслеживания остатков чертежей в заданных коробках, а также необходимого или недостающего количества материалов для запуска производства по имеющимся чертежам
+* q_logist.py - модуль для построения отчёта с остатками цинок и топляка по маршрутам циносети, отслежиавние их отстатков на промежуточных станциях циносети
+* q_workflow - модуль для построения отчёта по прогрессу производства по заданному ежемесячному плану
+
+К служебным (вспомогательным) модулям относятся:
+* q_preloader.py - модуль для централизованной загрузки всех необходимых данных для генерации отчётов другими модулями, подробнее см. раздел "Запуск модулей в offline-режиме"
+
+К отладочным модулям относятся:
+* q_assets.py - модуль для построения дерева ассетов корпорации
+* q_bpos.py - модуль для построения отчётов по имеющимся БПО и БПЦ в виде электронных таблиц, а также дерева чертежей корпорации, где иерархическим представлением служат market-дерево
+
+Скопируйте файлы с настройками, предназначенные для запуска различных модулей Q.Industrialist, внесите в них изменения по желанию. Как указано выше, модуль `q_blueprints.py` и/или модуль `q_workspace.py` имеют независимые и отдельные настройки в соответствующих файлах `q_blueprints_settings.py` и `q_workspace_settings.py`. Без подготовки файлов с настройками одноимённый модуль запустить не удастся.
+
+```bash
+cd ~/q_industrialist
 # get list of files with template (default) settings 
 ls -1 *_settings.py.template
 # for example:
@@ -113,19 +153,87 @@ nano q_conveyor_settings.py
 nano q_logist_settings.py
 ```
 
-Скачайте и распакуйте последнюю версию статического набора данных [Static Data Export (SDE)](https://developers.eveonline.com/resource/resources) в каталог с названием "2", с сохранением структуры каталогов. Запустите конвертацию `.yaml` файлов в `.json` файлы с помощью программы eve_sde_tools.py в каталог с временными файлами `.q_industrialist`. Процедура конвертации длительная и требовательная к памяти ЭВМ, потребуется не менее 4 Гб памяти, т.ч. при недостаточном кол-ве ОП рекомендуется закрыть лишние программы.
+### Шаг 3. Первый запуск Q.Industrialist и создание своего ESI-приложения
+
+Выполните первый запуск любого понравившегося модуля. Ниже рассмотрен пример настройки и запуска модуля `q_logist.py`, который включает в себя пример первичной настройки, редактирование зависимостей, получение подрочной информации, запуск программы, регистрацию собстенного ESI-приложения, авторизацию вашего пилота и т.д. Пример рассмотрен достаточно подробно, включает в себя все подготовительные шаги, большинство из которых выполняется лишь однократно и не потребуются в дальнейшем, однако каждый такой этап является важным при первом запуске программного комплекта Q.Industrialist.
+
+Для настройки модуля генерации отчёта по маршрутам циносети воспользуйтесь [Jump planner на dotlan.net](https://evemaps.dotlan.net/jump). Выберите для себя подходящий маршрут и получите адресную строку следующего вида: https://evemaps.dotlan.net/jump/Rhea,544/Shafrak:Zayi:Leran:Heydieles В конце адресной строки будут упомянуты названия солнечных систем по циномаршруту, в данном случае упомянуты системы `Shafrak`, `Zayi`, `Leran` и `Heydieles`. Необходимо получить и вписать в файл настроек идентификаторы станций, находящихся в перечисленных системах.
+
+Получить идентификаторы NPC-станций, которые упомянуты в статическом набора данных (SDE) можно с помощью поиска по `.yaml` SDE-файлам, либо по файлу `.converted_typeIDs.json`, например (идентификаторы NPC-станций имеют номера от 60000000 до 64000000, см. [справочную информацию](https://docs.esi.evetech.net/docs/asset_location_id) по идентификаторам в EVE Online):
 
 ```bash
-# unpack here sde.zip from https://developers.eveonline.com/resource/resources
-echo "$HOME/q_industrialist/2"
-ls -1 $HOME/q_industrialist/2
+# searching inventory names by filter (for example 'Jita')
+cd ~/q_industrialist
+python -c "import eve_sde_tools
+names = eve_sde_tools.read_converted('./.q_industrialist', 'invNames')
+systems = ['Shafrak', 'Zayi', 'Leran', 'Heydieles']
+for filter in systems:
+  print(*[(int(nm),names[nm]) for nm in names if (names[nm].find(filter)>=0) and (int(nm)>=60000000) and (int(nm)<=64000000)],sep='\n')"
 # for example:
-#   readme.txt
-#   sde/
-# run .jaml to .json convertation (4 Gb memory required)
-mkdir ./.q_industrialist
-time python eve_sde_tools.py --cache_dir=./.q_industrialist
-# for example:
-#   Rebuilding typeIDs.yaml file...
-#   Rebuilding invPositions.yaml file...
+#   (60001120, 'Shafrak VIII - Moon 13 - Kaalakiota Corporation Factory')
+#   (60008443, 'Shafrak VIII - Moon 9 - Amarr Navy Assembly Plant')
+#   (60011464, 'Zayi X - Moon 7 - Pend Insurance Depository')
+#   (60008824, 'Leran VI - Civic Court Accounting')
+#   (60010933, 'Heydieles III - Moon 13 - Duvolle Laboratories Factory')
+#   (60010939, 'Heydieles IV - Moon 19 - Duvolle Laboratories Warehouse')
 ```
+
+Таким образом, с помощью подручных средств (утилит программного пакета Q.Industrialist), либо же с помощью поиска по текстовым файлам, могут быть получены идентификаторы станций, перечисленных в маршруте Jump planner-а. Вносим полученные идентификаторы станций в файл настроек `q_logist_settings.py`.
+
+```bash
+# edit Cyno Network routes and settings (to exit nano press Ctrl+X)
+nano q_logist_settings.py
+# show Cyno Network routes and settings
+cat q_logist_settings.py
+# for example:
+#   g_cynonetworks = [
+#     {  # route for url: "https://evemaps.dotlan.net/jump/Rhea,544/Shafrak:Zayi:Leran:Heydieles"
+#       "route": [
+#         60001120,  # Shafrak VIII - Moon 13 - Kaalakiota Corporation Factory
+#         60011464,  # Zayi X - Moon 7 - Pend Insurance Depository
+#         60008824,  # Leran VI - Civic Court Accounting
+#         60010939   # Heydieles IV - Moon 19 - Duvolle Laboratories Warehouse
+#       ]
+#     }
+#  ]
+```
+
+*Примечание: идентификаторы структур (не NPC-станций) получить сложнее, для этого потребуется запустить модуль `q_assets.py`, однако на данном этапе этот шаг умышленно пропущен, т.к. для начала потребуется закончить подготовку модуля `q_logist.py` к первому запуску.*
+
+После того, как настройка модуля `q_logist.py` завершена, перед запуском требуется определиться:
+1. создать ли своё новое ESI-приложение
+1. использовать готовое ESI-приложение Q.Industrialist'
+Если вы планируете только пользоваться готовым программным обеспечением Q.Industrialist, то вам подойдёт второй вариант. Если в ваши намерения входит собственная разработка программ на языке Python и модификация программного комплекта Q.Industrilaist, то вам подойдёт первый вариант, в этом случае воспользуйтесь созданием и регистрацией ESI-приложения по [этой ссылке](https://developers.eveonline.com/applications).
+
+Запустите модуль `q_logist.py`, указав в командной строке имя пилота, расположение сконвертированных во время шага №1 файлов, а также другие параметры запуска (с полным перечнем вы можете озанкомиться в разделе "Параметры командной строки модулей Q.Industrialist"). В процессе первого запуска вам будет предложено ввести идентификатор вашего ESI-приложения, или воспользоваться существующим. Также вам будет предложено пройти авторизацию по ссылке, которую надо скипировать и вставить в адресную строку браузера. После завершения авторизации вашего пилота браузер перейдёт на несуществующую страницу, например, `https://localhost/callback/?code=HgII28v2fs64mrPFdcCbCA&state=unique-state` вернитесь в окно программы `Git Bash` и введите значение параметра `code`. Дождитесь завершения работы модуля генерации страницы с отчётом по циносети от Tama до Jita.
+
+```bash
+# first time Q.Industrialist run
+python q_logist.py --pilot="Qandra Si" --online --cache_dir=./.q_industrialist
+# for example:
+#   Follow the prompts and enter the info asked for.
+#   Copy your SSO application's client ID and enter it here [press 'Enter' for default Q.Industrialist app]:
+#   Open the following link in your browser:
+#   https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=...
+#   Once you have logged in as a character you will get redirected to https://localhost/callback/.
+#   Copy the "code" query parameter and enter it here: HgII28v2fs64mrPFdcCbCA
+#
+#   Qandra Si is from 'R Initiative 4' corporation
+#   'R Initiative 4' corporation has 30826 assets
+#   'R Initiative 4' corporation has 162 custom asset's names
+#   'R Initiative 4' corporation has offices in 40 foreign stations
+#   Building cyno network report...
+#   Done
+```
+
+Откройте сформированный отчёт `cynonetwork.html`, расположенный в папке с временными файлами `.q_industrialist`.
+
+<img src="https://raw.githubusercontent.com/Qandra-Si/q.industrialist/master/examples/005-cynonetwork_v0.7.1.png" height="80%" width="80%">
+
+## Параметры командной строки модулей Q.Industrialist
+
+...
+
+### Запуск модулей в offline-режиме
+
+...
