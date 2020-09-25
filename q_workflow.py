@@ -417,12 +417,15 @@ def __get_monthly_manufacturing_scheduler(
                 __unnecessary_run_products = __exist_run_products - __scheduled_products
                 __unnecessary_blueprints = \
                     int(__unnecessary_run_products) // int(__single_run_quantity)
-                overplus_blueprints.append({
-                    "type_id": __blueprint_type_id,
-                    "name": __sb_dict["name"],
-                    "product_type_id": __product_type_id,
-                    "unnecessary_quantity": __unnecessary_blueprints,
-                })
+                # возможна ситуация: имеется чертежей на 70 продуктов, требуется 65 продуктов,
+                # но каждый ран - 10 продуктов, таким образом (70-65)//10 - все чертежи нужны
+                if __unnecessary_blueprints > 0:
+                    overplus_blueprints.append({
+                        "type_id": __blueprint_type_id,
+                        "name": __sb_dict["name"],
+                        "product_type_id": __product_type_id,
+                        "unnecessary_quantity": __unnecessary_blueprints,
+                    })
 
     # формирование списка избыточных чертежей
     scheduled_blueprint_type_ids = [int(sb["type_id"]) for sb in scheduled_blueprints]
