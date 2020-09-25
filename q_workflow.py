@@ -432,6 +432,7 @@ def __get_monthly_manufacturing_scheduler(
     for __fb_dict in factory_blueprints:
         __blueprint_type_id = __fb_dict["type_id"]
         __meta_group = __fb_dict["meta_group"]
+        __product_type_id = __fb_dict["product_type_id"]
         # на станции может быть куча всяких БПЦ, нам интересуют излишки только Т2 чертежей
         if __meta_group is None:
             continue

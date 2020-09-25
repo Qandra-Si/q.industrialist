@@ -259,15 +259,15 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
             glf.write(
                 '<tr><!--{id}-->'
                 '<td><img class="media-object icn32" src="{img}"></td>'
-                '<td>{nm}{flag}</td>'
+                '<td>{nm}</td>'
                 '<td align="right">{q}</td>'
                 '</tr>\n'.
                 format(
                     img=render_html.__get_img_src(bpc["type_id"], 32),
                     nm=bpc["name"],
+                    # чертежи могут храниться не только в 6м ангаре: flag='<br/><span class="label label-danger">no blueprints</span>' if "there_are_no_blueprints" in bpc else ""
                     id=bpc["type_id"],
-                    q=bpc["required_quantity"],
-                    flag='<br/><span class="label label-danger">no blueprints</span>' if "there_are_no_blueprints" in bpc else ""
+                    q=bpc["required_quantity"]
                 )
             )
     glf.write('</table>')
