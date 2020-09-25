@@ -6,7 +6,7 @@
         "station_id": 60003760,
         "station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
         # hangar, which stores blueprint copies to build T2 modules
-        "blueprints_hangar": 1
+        "blueprints_hangars": [1]
     },
     "jobs": [
         {
