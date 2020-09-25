@@ -1,4 +1,5 @@
 ﻿import render_html
+import eve_sde_tools
 
 
 def __dump_sde_type_ids_to_js(glf, sde_type_ids):
@@ -218,45 +219,85 @@ def __dump_monthly_jobs(glf, corp_manufacturing_scheduler):
 """)
 
 
-def __dump_missing_blueprints(glf, corp_manufacturing_scheduler):
+def __group_blueprints_by_category(blueprints, sde_type_ids, sde_market_groups):
+    blueprint_categories = []
+    for bp in enumerate(blueprints):
+        __product_type_id = bp[1]["product_type_id"]
+        __blueprint_name = bp[1]["name"]
+        # проверяем список market-груп, которым принадлежит продукт и отбираем
+        # базовый как самый информативный
+        __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(
+            sde_type_ids,
+            sde_market_groups,
+            __product_type_id)
+        __category_dict = next((bc for bc in blueprint_categories if bc["id"] == __market_group_id), None)
+        if __category_dict is None:
+            __market_group_name = eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
+            __category_dict = {"id": __market_group_id, "name": __market_group_name, "products": []}
+            blueprint_categories.append(__category_dict)
+        __category_dict["products"].append({"type_id": __product_type_id, "sort": __blueprint_name, "index": bp[0]})
+    # пересортировка всех списков, с тем, чтобы при выводе в отчёт они были по алфавиту
+    blueprint_categories.sort(key=lambda bc: bc["name"])
+    for bc in blueprint_categories:
+        bc["products"].sort(key=lambda bc: bc["sort"])
+    return blueprint_categories
+
+
+def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, sde_market_groups):
     missing_blueprints = corp_manufacturing_scheduler["missing_blueprints"]
+    blueprint_categories = __group_blueprints_by_category(
+        missing_blueprints,
+        sde_type_ids,
+        sde_market_groups)
+    
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
-    missing_blueprints.sort(key=lambda mb: mb["name"])
-    for bpc in missing_blueprints:
-        glf.write(
-            '<tr>'
-            '<td><img class="media-object icn32" src="{img}"></td>'
-            '<td>{nm} <span class="label label-default">{id}</span></td>'
-            '<td align="right">{q}</td>'
-            '</tr>\n'.
-            format(
-                img=render_html.__get_img_src(bpc["type_id"], 32),
-                nm=bpc["name"],
-                id=bpc["type_id"],
-                q=bpc["required_quantity"]
+    for __cat_dict in blueprint_categories:
+        __products = __cat_dict["products"]
+        glf.write('<tr><td class="active" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
+        for __product_dict in __products:
+            bpc = missing_blueprints[__product_dict["index"]]
+            glf.write(
+                '<tr><!--{id}-->'
+                '<td><img class="media-object icn32" src="{img}"></td>'
+                '<td>{nm}</td>'
+                '<td align="right">{q}</td>'
+                '</tr>\n'.
+                format(
+                    img=render_html.__get_img_src(bpc["type_id"], 32),
+                    nm=bpc["name"],
+                    id=bpc["type_id"],
+                    q=bpc["required_quantity"]
+                )
             )
-        )
     glf.write('</table>')
 
 
-def __dump_overplus_blueprints(glf, corp_manufacturing_scheduler):
+def __dump_overplus_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, sde_market_groups):
     overplus_blueprints = corp_manufacturing_scheduler["overplus_blueprints"]
+    blueprint_categories = __group_blueprints_by_category(
+        overplus_blueprints,
+        sde_type_ids,
+        sde_market_groups)
+
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
-    overplus_blueprints.sort(key=lambda mb: mb["name"])
-    for bpc in overplus_blueprints:
-        glf.write(
-            '<tr>'
-            '<td><img class="media-object icn32" src="{img}"></td>'
-            '<td>{nm} <span class="label label-default">{id}</span></td>'
-            '<td align="right">{q}</td>'
-            '</tr>\n'.
-            format(
-                img=render_html.__get_img_src(bpc["type_id"], 32),
-                nm=bpc["name"],
-                id=bpc["type_id"],
-                q=bpc["unnecessary_quantity"]
+    for __cat_dict in blueprint_categories:
+        __products = __cat_dict["products"]
+        glf.write('<tr><td class="active" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
+        for __product_dict in __products:
+            bpc = overplus_blueprints[__product_dict["index"]]
+            glf.write(
+                '<tr><!--{id}-->'
+                '<td><img class="media-object icn32" src="{img}"></td>'
+                '<td>{nm}</td>'
+                '<td align="right">{q}</td>'
+                '</tr>\n'.
+                format(
+                    img=render_html.__get_img_src(bpc["type_id"], 32),
+                    nm=bpc["name"],
+                    id=bpc["type_id"],
+                    q=bpc["unnecessary_quantity"]
+                )
             )
-        )
     glf.write('</table>')
 
 
@@ -264,6 +305,7 @@ def __dump_workflow_tools(
         glf,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_market_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_manufacturing_scheduler):
     glf.write("""
@@ -328,7 +370,9 @@ def __dump_workflow_tools(
 
     __dump_missing_blueprints(
         glf,
-        corp_manufacturing_scheduler)
+        corp_manufacturing_scheduler,
+        sde_type_ids,
+        sde_market_groups)
 
     glf.write("""
   </div>
@@ -340,7 +384,9 @@ def __dump_workflow_tools(
 
     __dump_overplus_blueprints(
         glf,
-        corp_manufacturing_scheduler)
+        corp_manufacturing_scheduler,
+        sde_type_ids,
+        sde_market_groups)
 
     glf.write("""
   </div>
@@ -485,6 +531,7 @@ def dump_workflow_into_report(
         ws_dir,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_market_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_manufacturing_scheduler):
     glf = open('{dir}/workflow.html'.format(dir=ws_dir), "wt+", encoding='utf8')
@@ -493,6 +540,7 @@ def dump_workflow_into_report(
         __dump_workflow_tools(
             glf,
             sde_type_ids,
+            sde_market_groups,
             corp_manufacturing_scheduler
         )
         render_html.__dump_footer(glf)

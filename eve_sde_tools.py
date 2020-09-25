@@ -199,30 +199,51 @@ def get_type_id_by_item_name(type_ids, name):
     return type_id
 
 
-def get_market_group_by_type_id(type_ids, type_id):
-    if not (str(type_id) in type_ids):
+def get_market_group_name_by_id(sde_type_ids, group_id):
+    group_sid = str(group_id)
+    if group_sid in sde_type_ids:
+        group_dict = sde_type_ids[group_sid]
+        if ("nameID" in group_dict) and ("en" in group_dict["nameID"]):
+            return group_dict["nameID"]["en"]
+        else:
+            return group_sid
+    return group_sid
+
+
+def get_market_group_by_type_id(sde_type_ids, type_id):
+    if not (str(type_id) in sde_type_ids):
         return None
-    type_dict = type_ids[str(type_id)]
+    type_dict = sde_type_ids[str(type_id)]
     if "marketGroupID" in type_dict:
         return type_dict["marketGroupID"]
     return None
 
 
-def get_root_market_group_by_type_id(type_ids, market_groups, type_id):
-    group_id = get_market_group_by_type_id(type_ids, type_id)
+def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
-        return None
+        return []
     __group_id = group_id
+    __groups_chain = [group_id]
     while True:
-        __grp1 = market_groups[str(__group_id)]
+        __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
             __group_id = __grp1["parentGroupID"]
+            # переворачиваем элементы списка, где корень будет в его начале
+            __groups_chain.insert(0, __group_id)
         else:
-            return __group_id
+            return __groups_chain
 
 
-def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
-    group_id = get_market_group_by_type_id(type_ids, type_id)
+def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+    if groups_chain is None:
+        return None
+    return groups_chain[0]
+
+
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return None
     __group_id = group_id
@@ -235,7 +256,7 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
                           1112,  # Subsystems (parent:955)
                          ]:
             return __group_id
-        __grp1 = market_groups[str(__group_id)]
+        __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
             __parent_group_id = __grp1["parentGroupID"]
             # группа материалов для целей производства должна делиться на подгруппы (производство и заказы
@@ -252,18 +273,10 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
 
 
 def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
-    if group_id is None:
+    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+    if groups_chain is None:
         return None
-    __group_id = group_id
-    while True:
-        if int(__group_id) in market_groups:
-            return True
-        __grp1 = sde_market_groups[str(__group_id)]
-        if "parentGroupID" in __grp1:
-            __group_id = __grp1["parentGroupID"]
-        else:
-            return False
+    return bool(set(groups_chain) & set(market_groups))
 
 
 def get_blueprint_manufacturing_materials(blueprints, type_id):
@@ -367,7 +380,7 @@ def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_mat
                     product_id = int(m["typeID"])
                     quantity = int(m["quantity"])
                     return product_id, quantity, __bpm2["materials"]
-    return None
+    return None, None, None
 
 
 def get_market_groups_tree_root(groups_tree, group_id):

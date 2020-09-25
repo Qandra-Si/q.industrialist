@@ -333,10 +333,13 @@ def __get_monthly_manufacturing_scheduler(
     for bp in factory_repository:
         __blueprint_type_id = bp["type_id"]
         push_into_factory_blueprints(__blueprint_type_id, bp["runs"])
-    # получение названий чертежей и сохранение из в сводном списке чертежей фабрики
+    # получение названий чертежей и сохранение их в сводном списке чертежей фабрики
     for bp in factory_blueprints:
         __blueprint_type_id = bp["type_id"]
+        __product_type_id, __dummy0, __dummy1 = \
+            eve_sde_tools.get_manufacturing_product_by_blueprint_type_id(__blueprint_type_id, sde_bp_materials)
         bp["name"] = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, __blueprint_type_id)
+        bp["product_type_id"] = __product_type_id
         # на станции может быть куча всяких БПЦ, нас будут интересовать только Т2 БПЦ
         if not (str(__blueprint_type_id) in sde_type_ids):
             continue
@@ -349,25 +352,19 @@ def __get_monthly_manufacturing_scheduler(
         __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
         __product_type_id = __sb_dict["product"]["type_id"]
         __products_per_run = __sb_dict["products_per_run"]
+        # получаем список market-груп, которым принадлежит продукт
+        __market_groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(
+            sde_type_ids,
+            sde_market_groups,
+            __product_type_id)
+        __market_groups = set(__market_groups_chain)
         # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана
         __blueprint_copy_runs = 1
-        if eve_sde_tools.is_type_id_nested_into_market_group(
-                __product_type_id,
-                [9, 157, 11],  # Ship Equipment, Drones, Ammunition & Charges
-                sde_type_ids,
-                sde_market_groups):
+        if bool(__market_groups & {9, 157, 11}):  # Ship Equipment, Drones, Ammunition & Charges
             __blueprint_copy_runs = 10
-        elif eve_sde_tools.is_type_id_nested_into_market_group(
-                __product_type_id,
-                [4],  # Ships
-                sde_type_ids,
-                sde_market_groups):
+        elif 4 in __market_groups:  # Ships
             __blueprint_copy_runs = 4
-        elif eve_sde_tools.is_type_id_nested_into_market_group(
-                __product_type_id,
-                [955],  # Ship and Module Modifications
-                sde_type_ids,
-                sde_market_groups):
+        elif 955 in __market_groups:  # Ship and Module Modifications
             __blueprint_copy_runs = 3
         __single_run_quantity = __blueprint_copy_runs * __products_per_run
         __scheduled_blueprints_quantity = \
@@ -383,6 +380,7 @@ def __get_monthly_manufacturing_scheduler(
     for __sb_dict in scheduled_blueprints:
         # получаем данные по чертежу, запланированному к использованию
         __blueprint_type_id = __sb_dict["type_id"]
+        __product_type_id = __sb_dict["product"]["type_id"]
         __required_blueprints = __sb_dict["blueprints_quantity"]
         __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
         __products_per_run = __sb_dict["products_per_run"]
@@ -395,6 +393,7 @@ def __get_monthly_manufacturing_scheduler(
             missing_blueprints.append({
                 "type_id": __blueprint_type_id,
                 "name": __sb_dict["name"],
+                "product_type_id": __product_type_id,
                 "required_quantity": __required_blueprints,
                 "there_are_no_blueprints": True,  # признак того, что нет ни одного чертежа этого типа
             })
@@ -410,6 +409,7 @@ def __get_monthly_manufacturing_scheduler(
                 missing_blueprints.append({
                     "type_id": __blueprint_type_id,
                     "name": __sb_dict["name"],
+                    "product_type_id": __product_type_id,
                     "required_quantity": __required_blueprints,
                 })
             # если чертежей избыточное количество, то расчитываем кол-во лишних
@@ -420,6 +420,7 @@ def __get_monthly_manufacturing_scheduler(
                 overplus_blueprints.append({
                     "type_id": __blueprint_type_id,
                     "name": __sb_dict["name"],
+                    "product_type_id": __product_type_id,
                     "unnecessary_quantity": __unnecessary_blueprints,
                 })
 
@@ -439,6 +440,7 @@ def __get_monthly_manufacturing_scheduler(
             overplus_blueprints.append({
                 "type_id": __blueprint_type_id,
                 "name": __fb_dict["name"],
+                "product_type_id": __product_type_id,
                 "unnecessary_quantity": __fb_dict["quantity"],
                 "all_of_them": True  # признак, что все чертежи этого типа - лишние
             })
@@ -560,6 +562,7 @@ def main():
         argv_prms["workspace_cache_files_dir"],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_market_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_manufacturing_scheduler
     )
