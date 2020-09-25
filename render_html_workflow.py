@@ -259,14 +259,15 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
             glf.write(
                 '<tr><!--{id}-->'
                 '<td><img class="media-object icn32" src="{img}"></td>'
-                '<td>{nm}</td>'
+                '<td>{nm}{flag}</td>'
                 '<td align="right">{q}</td>'
                 '</tr>\n'.
                 format(
                     img=render_html.__get_img_src(bpc["type_id"], 32),
                     nm=bpc["name"],
                     id=bpc["type_id"],
-                    q=bpc["required_quantity"]
+                    q=bpc["required_quantity"],
+                    flag='<br/><span class="label label-danger">no blueprints</span>' if "there_are_no_blueprints" in bpc else ""
                 )
             )
     glf.write('</table>')
@@ -288,14 +289,15 @@ def __dump_overplus_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, 
             glf.write(
                 '<tr><!--{id}-->'
                 '<td><img class="media-object icn32" src="{img}"></td>'
-                '<td>{nm}</td>'
+                '<td>{nm}{flag}</td>'
                 '<td align="right">{q}</td>'
                 '</tr>\n'.
                 format(
                     img=render_html.__get_img_src(bpc["type_id"], 32),
                     nm=bpc["name"],
                     id=bpc["type_id"],
-                    q=bpc["unnecessary_quantity"]
+                    q=bpc["unnecessary_quantity"],
+                    flag='<br/><span class="label label-primary">all of them</span>' if "all_of_them" in bpc else ""
                 )
             )
     glf.write('</table>')
