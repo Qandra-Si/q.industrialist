@@ -253,7 +253,7 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
     for __cat_dict in blueprint_categories:
         __products = __cat_dict["products"]
-        glf.write('<tr><td class="active" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
+        glf.write('<tr><td class="active text-info" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
         for __product_dict in __products:
             bpc = missing_blueprints[__product_dict["index"]]
             glf.write(
@@ -283,7 +283,7 @@ def __dump_overplus_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, 
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
     for __cat_dict in blueprint_categories:
         __products = __cat_dict["products"]
-        glf.write('<tr><td class="active" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
+        glf.write('<tr><td class="active text-info" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
         for __product_dict in __products:
             bpc = overplus_blueprints[__product_dict["index"]]
             glf.write(
