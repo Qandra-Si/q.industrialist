@@ -447,17 +447,57 @@ def __get_monthly_manufacturing_scheduler(
     return scheduler
 
 
+g_module_name = "workflow"
+g_module_default_settings = {
+    # either "station_id" or "station_name" is required
+    # if "station_id" is unknown, then the names of stations and structures will be
+    # additionally loaded (too slow, please identify and set "station_id")
+    "factory:station_id": 60003760,
+    "factory:station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
+    # hangar, which stores blueprint copies to build T2 modules
+    "factory:blueprints_hangars": [1]
+}
+
+
 def main():
-    # conn = psycopg2.connect(
-    #     dbname=q_industrialist_settings.g_database["dbname"],
-    #     user=q_industrialist_settings.g_database["user"],
-    #     password=q_industrialist_settings.g_database["password"],
-    #     host=q_industrialist_settings.g_database["host"],
-    #     port=q_industrialist_settings.g_database["port"]
-    # )
-    # print(conn)
-    # conn.close()
-    # return
+    conn = psycopg2.connect(
+        dbname=q_industrialist_settings.g_database["dbname"],
+        user=q_industrialist_settings.g_database["user"],
+        password=q_industrialist_settings.g_database["password"],
+        host=q_industrialist_settings.g_database["host"],
+        port=q_industrialist_settings.g_database["port"]
+    )
+    cur = conn.cursor()
+    #---
+    cur.execute("SET search_path TO qi")
+    #---
+    cur.execute("SELECT ml_id FROM modules_list WHERE ml_name=%s;", (g_module_name, ));
+    db_module_id = cur.fetchone()
+    if db_module_id is None:
+        cur.execute("INSERT INTO modules_list(ml_name) VALUES(%s) RETURNING ml_id;", (g_module_name, ));
+        db_module_id = cur.fetchone()[0]
+        for ms in g_module_default_settings:
+            print(ms)
+        for ms in g_module_default_settings.items():
+            cur.execute("INSERT INTO modules_settings(ms_module,ms_key,ms_val) VALUES(%s,%s,%s);", (db_module_id,ms[0],str(ms[1])))
+        conn.commit()
+    else:
+        db_module_id = db_module_id[0]
+    print(db_module_id)
+    cur.execute("SELECT ms_key,ms_val FROM modules_settings WHERE ms_module=%s;", (db_module_id, ));
+    db_workflow_settings = cur.fetchall()
+    print(db_workflow_settings)
+    #---
+    cur.execute("SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs;")
+    db_monthly_jobs = cur.fetchall()
+    cur.execute("SELECT wfc_id,wfc_name FROM workflow_factory_containers;")
+    db_factory_containers = cur.fetchall()
+    #---
+    cur.close()
+    conn.close()
+
+    db_monthly_jobs = [{"eft": wmj[3], "quantity": wmj[2]} for wmj in db_monthly_jobs]
+    db_factory_containers = [{"id": wfc[0], "name": wfc[1]} for wfc in db_factory_containers]
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -543,8 +583,8 @@ def main():
 
     # формирование набора данных для построения отчёта
     corp_manufacturing_scheduler = __get_monthly_manufacturing_scheduler(
-        # настройки
-        q_workflow_settings.g_monthly_jobs["jobs"],
+        # данные, полученные из БД
+        db_monthly_jobs,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_named_type_ids,

@@ -16,9 +16,8 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                  ]
 g_database = {
     "host":     "127.0.0.1",
-    "dbname":   "qindustrialist",
+    "dbname":   "qi_db",
     "port":     5432,
-    "schema":   "corenetwork",
-    "user":     "qindustrialist",
-    "password": "PC@1s5$MwX0srid5"  # <-- this is the value you probably need to edit
+    "user":     "qi_user",
+    "password": "qi_LAZ7dBLmSJb9"  # <-- this is the value you probably need to edit
 }
