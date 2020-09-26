@@ -5,10 +5,10 @@ Prerequisites:
       virtual environment: https://virtualenv.pypa.io/en/stable/).
     * Run pip install -r requirements.txt with this directory as your root.
 
-    * Copy q_workflow_settings.py.template into q_workflow_settings.py and
+    * Copy q_industrialist_settings.py.template into q_industrialist_settings.py and
       mood for your needs.
     * Create an SSO application at developers.eveonline.com with the scopes
-      from g_client_scope list declared in q_workflow_settings.py and the
+      from g_client_scope list declared in q_industrialist_settings.py and the
       callback URL "https://localhost/callback/".
       Note: never use localhost as a callback in released applications.
 
@@ -24,11 +24,10 @@ Requires application scopes:
 import sys
 import json
 import requests
-import psycopg2
 
 import eve_esi_interface as esi
+import postgresql_interface as db
 
-import q_workflow_settings
 import q_industrialist_settings
 import eve_esi_tools
 import eve_sde_tools
@@ -38,11 +37,22 @@ import render_html_workflow
 from __init__ import __version__
 
 
+g_module_default_settings = {
+    # either "station_id" or "station_name" is required
+    # if "station_id" is unknown, then the names of stations and structures will be
+    # additionally loaded (too slow, please identify and set "station_id")
+    "factory:station_id": 60003760,
+    "factory:station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
+    # hangar, which stores blueprint copies to build T2 modules
+    "factory:blueprints_hangars": [1]
+}
+
+
 def __get_blueprints_containers_with_data_loading(
         # esi input & output
         esi_interface,
         # настройки
-        factory_settings,
+        module_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         corp_assets_data):
@@ -55,11 +65,11 @@ def __get_blueprints_containers_with_data_loading(
     esi_interface["foreign_structures_data"] = {}
 
     # input setings
-    hangars_filter = factory_settings["blueprints_hangars"]
+    hangars_filter = module_settings["factory:blueprints_hangars"]
     # output factory containers
     factory_containers = {
-        "station_id": factory_settings["station_id"] if "station_id" in factory_settings else None,
-        "station_name": factory_settings["station_name"] if "station_name" in factory_settings else None,
+        "station_id": module_settings["factory:station_id"] if "factory:station_id" in module_settings else None,
+        "station_name": module_settings["factory:station_name"] if "factory:station_name" in module_settings else None,
         "station_foreign": None,
         "containers": None
     }
@@ -67,6 +77,7 @@ def __get_blueprints_containers_with_data_loading(
     # пытаемся определить недостающее звено, либо station_id, либо station_name (если неизвестны)
     if not (factory_containers["station_id"] is None):
         station_id = factory_containers["station_id"]
+        station_name = None
         factory_containers["station_foreign"] = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None) is None
 
         # поиск контейнеров на станции station_id в ангарах hangars_filter
@@ -447,54 +458,17 @@ def __get_monthly_manufacturing_scheduler(
     return scheduler
 
 
-g_module_name = "workflow"
-g_module_default_settings = {
-    # either "station_id" or "station_name" is required
-    # if "station_id" is unknown, then the names of stations and structures will be
-    # additionally loaded (too slow, please identify and set "station_id")
-    "factory:station_id": 60003760,
-    "factory:station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-    # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars": [1]
-}
-
-
 def main():
-    conn = psycopg2.connect(
-        dbname=q_industrialist_settings.g_database["dbname"],
-        user=q_industrialist_settings.g_database["user"],
-        password=q_industrialist_settings.g_database["password"],
-        host=q_industrialist_settings.g_database["host"],
-        port=q_industrialist_settings.g_database["port"]
-    )
-    cur = conn.cursor()
-    #---
-    cur.execute("SET search_path TO qi")
-    #---
-    cur.execute("SELECT ml_id FROM modules_list WHERE ml_name=%s;", (g_module_name, ));
-    db_module_id = cur.fetchone()
-    if db_module_id is None:
-        cur.execute("INSERT INTO modules_list(ml_name) VALUES(%s) RETURNING ml_id;", (g_module_name, ));
-        db_module_id = cur.fetchone()[0]
-        for ms in g_module_default_settings:
-            print(ms)
-        for ms in g_module_default_settings.items():
-            cur.execute("INSERT INTO modules_settings(ms_module,ms_key,ms_val) VALUES(%s,%s,%s);", (db_module_id,ms[0],str(ms[1])))
-        conn.commit()
-    else:
-        db_module_id = db_module_id[0]
-    print(db_module_id)
-    cur.execute("SELECT ms_key,ms_val FROM modules_settings WHERE ms_module=%s;", (db_module_id, ));
-    db_workflow_settings = cur.fetchall()
-    print(db_workflow_settings)
-    #---
-    cur.execute("SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs;")
-    db_monthly_jobs = cur.fetchall()
-    cur.execute("SELECT wfc_id,wfc_name FROM workflow_factory_containers;")
-    db_factory_containers = cur.fetchall()
-    #---
-    cur.close()
-    conn.close()
+    qidb = db.QIndustrialistDatabase("workflow", debug=True)
+    qidb.connect(q_industrialist_settings.g_database)
+    module_settings = qidb.load_module_settings(g_module_default_settings)
+    db_monthly_jobs = qidb.select_all_rows(
+        "SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks "
+        "FROM workflow_monthly_jobs;")
+    db_factory_containers = qidb.select_all_rows(
+        "SELECT wfc_id,wfc_name "
+        "FROM workflow_factory_containers;")
+    del qidb
 
     db_monthly_jobs = [{"eft": wmj[3], "quantity": wmj[2]} for wmj in db_monthly_jobs]
     db_factory_containers = [{"id": wfc[0], "name": wfc[1]} for wfc in db_factory_containers]
@@ -559,13 +533,13 @@ def main():
     }
     factory_containers = __get_blueprints_containers_with_data_loading(
         esi_interface,
-        q_workflow_settings.g_monthly_jobs["factory"],
+        module_settings,
         sde_type_ids,
         corp_assets_data
     )
     print('\nFound factory station {} with containers in hangars...'.format(factory_containers["station_name"]))
     print('  {} = {}'.format(factory_containers["station_id"], factory_containers["station_name"]))
-    print('  blueprint hangars = {}'.format(q_workflow_settings.g_monthly_jobs["factory"]["blueprints_hangars"]))
+    print('  blueprint hangars = {}'.format(module_settings["factory:blueprints_hangars"]))
     print('  blueprint containers = {}'.format(len([fc["id"] for fc in factory_containers["containers"]])))
     sys.stdout.flush()
 
