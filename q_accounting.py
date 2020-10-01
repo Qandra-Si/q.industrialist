@@ -50,6 +50,7 @@ def __build_accounting_append(
         skip_certain_groups,
         process_only_specified_groups,
         prefer_base_price,
+        do_not_use_any_price,
         top_level_hangar):
     if not (skip_certain_groups is None):
         if __group_id in skip_certain_groups:  # напр. Blueprints & Reactions (пропускаем)
@@ -70,28 +71,29 @@ def __build_accounting_append(
         }})
     __ca6_hangar_group = __ca5_station_flag[__ca5_key]  # верим в лучшее, данные по маркету тут должны быть...
     __type_dict = sde_type_ids[str(__type_id)]
-    __price = None
-    if prefer_base_price and ("basePrice" in __type_dict):
-        __price = __type_dict["basePrice"]
-    if __price is None:
-        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
-        if not (__price_dict is None):
-            if "average_price" in __price_dict:
-                __price = __price_dict["average_price"]
-            elif "adjusted_price" in __price_dict:
-                __price = __price_dict["adjusted_price"]
-            elif "basePrice" in __type_dict:
-                __price = __type_dict["basePrice"]
-        elif "basePrice" in __type_dict:
-            __price = __type_dict["basePrice"]
-    if not (__price is None):
-        __sum = __price * __quantity
-        __ca6_hangar_group["cost"] += __sum
-        __cas1_stat_flag["cost"] += __sum
     if "volume" in __type_dict:
         __sum = __type_dict["volume"] * __quantity
         __ca6_hangar_group["volume"] += __sum
         __cas1_stat_flag["volume"] += __sum
+    if not do_not_use_any_price:
+        __price = None
+        if prefer_base_price and ("basePrice" in __type_dict):
+            __price = __type_dict["basePrice"]
+        if __price is None:
+            __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+            if not (__price_dict is None):
+                if "average_price" in __price_dict:
+                    __price = __price_dict["average_price"]
+                elif "adjusted_price" in __price_dict:
+                    __price = __price_dict["adjusted_price"]
+                elif "basePrice" in __type_dict:
+                    __price = __type_dict["basePrice"]
+            elif "basePrice" in __type_dict:
+                __price = __type_dict["basePrice"]
+        if not (__price is None):
+            __sum = __price * __quantity
+            __ca6_hangar_group["cost"] += __sum
+            __cas1_stat_flag["cost"] += __sum
 
 
 def __build_accounting_nested(
@@ -129,6 +131,7 @@ def __build_accounting_nested(
             __ca5_station_flag,
             skip_certain_groups,
             process_only_specified_groups,
+            False,
             False,
             top_level_hangar)
     if str(itm_id) in corp_assets_tree:
@@ -263,7 +266,8 @@ def __build_accounting_blueprints_nested(
             __ca5_station_flag,
             None,  # в статистику попадают все группы, но следующий фильтр ограничит...
             [2],   # ...обработку только Blueprints and Reactions
-            not __is_blueprint_copy,  # у БПЦ-чертежей base_price отражает действительность лучше
+            not __is_blueprint_copy,  # признак использования base_price
+            __is_blueprint_copy,  # поправка: для БПЦ-чертежей любая цена от ЦЦП невалидна
             None)  #TODO: номер ангара
     if str(__item_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(__item_id)]
@@ -378,6 +382,7 @@ def __build_accounting(
                                     __ca5_station_flag,
                                     [2],  # пропускаем: Blueprints and Reactions (собирается в отдельную группу)
                                     None, # Обрабатываем все остальные типы и группы имущества
+                                    False,
                                     False,
                                     None)  #TODO: а какой тут номер ангара?
                 # на текущей станции получаем все location_flag и собираем сводную статистику по каждой группе
