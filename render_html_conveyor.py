@@ -780,18 +780,6 @@ def __dump_corp_conveyor(
       media.removeClass('hidden');
     else
       media.addClass('hidden');
-
-    // var bpblocks = mbody.find('div.qind-bp-block'); // list of blueprint groups
-    // var nonactive = mbody.find('span.qind-blueprints-'); // list of unused blueprints
-    // //alert(mbody.find('h4.media-heading').html() + " " + nonactive.length + " " + impossible.length);
-    // if ((nonactive.length == 0) && (bpblocks.length))
-    //   media.addClass('hidden');
-    // else {
-    //   if (show_active == 0) {
-    //     media.find('span.qind-blueprints-active').each(function() { $(this).addClass('hidden'); })
-    //   }
-    //   media.removeClass('hidden');
-    // }
   }
   // Conveyor Options storage (rebuild body components)
   function rebuildBody() {
@@ -808,17 +796,6 @@ def __dump_corp_conveyor(
     } else {
       $('div.media').each(function() { toggleMediaVisibility($(this), show_impossible, show_active); })
     }
-    //$('span.qind-blueprints-active').each(function() {
-    //  var mbody = $(this).closest('div.media-body');
-    //  var media = mbody.closest('div.media');
-    //  if (show_active == 1) {
-    //    $(this).removeClass('hidden');
-    //    media.removeClass('hidden');
-    //  } else {
-    //    $(this).addClass('hidden');
-    //    
-    //  }
-    //})
     show = ls.getItem('Show Materials');
     $('div.qind-materials-used').each(function() {
       if (show == 1)
