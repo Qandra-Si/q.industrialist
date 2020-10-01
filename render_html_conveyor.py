@@ -150,7 +150,7 @@ def __dump_blueprints_list_with_materials(
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
                 glf.write(
-                    '<span class="qind-blueprints-{status}">'
+                    '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
                     '&nbsp;<span class="badge">{qr}{fnr}</span>\n'.format(
                         qr=quantity_or_runs,
@@ -170,12 +170,12 @@ def __dump_blueprints_list_with_materials(
                         glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
                     else:
                         glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
-                    glf.write('</br></span>\n')
+                    glf.write('</br></span>')  # qind-blueprints-?
                 elif __blueprint_materials is None:
                     glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
-                    glf.write('</br></span>\n')
+                    glf.write('</br></span>')  # qind-blueprints-?
                 else:
-                    glf.write('</br></span>\n')
+                    glf.write('</br></span>')  # qind-blueprints-?
                     glf.write('<div class="qind-materials-used">\n')  # div(materials)
                     not_enough_materials = []
                     for m in __blueprint_materials:
@@ -246,6 +246,7 @@ def __dump_blueprints_list_with_materials(
                                 )
                             )
                         glf.write('</div>\n')  # div(not_enough_materials)
+                glf.write('</div>\n')  # qind-bp-block
             glf.write(
                 ' </div>\n'  # media-body
                 '</div>\n'  # media
@@ -598,6 +599,7 @@ def __dump_corp_conveyor(
     <li class="dropdown">
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
       <ul class="dropdown-menu">
+       <li><a id="btnToggleImpossible" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowImpossible"></span> Show impossible to produce</a></li>
        <li><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
        <li><a id="btnToggleMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMaterials"></span> Show used materials</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
@@ -709,6 +711,9 @@ def __dump_corp_conveyor(
     if (!ls.getItem('Show Legend')) {
       ls.setItem('Show Legend', 1);
     }
+    if (!ls.getItem('Show Impossible')) {
+      ls.setItem('Show Impossible', 1);
+    }
     if (!ls.getItem('Show Active')) {
       ls.setItem('Show Active', 1);
     }
@@ -723,6 +728,11 @@ def __dump_corp_conveyor(
       $('#imgShowLegend').removeClass('hidden');
     else
       $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Impossible');
+    if (show == 1)
+      $('#imgShowImpossible').removeClass('hidden');
+    else
+      $('#imgShowImpossible').addClass('hidden');
     show = ls.getItem('Show Active');
     if (show == 1)
       $('#imgShowActive').removeClass('hidden');
@@ -734,6 +744,55 @@ def __dump_corp_conveyor(
     else
       $('#imgShowMaterials').addClass('hidden');
   }
+  // Conveyor media body visibility toggler
+  function toggleMediaVisibility(media, show_impossible, show_active) {
+    var mbody = media.find('div.media-body');
+    var visible = false;
+    mbody.find('div.qind-bp-block').each(function() {
+      var bp_block = $(this);
+      var non_active = true;
+      bp_block.find('span.qind-blueprints-active').each(function() {
+        non_active = false;
+        //alert(mbody.find('h4.media-heading').html() + " " + $(this).text());
+        if (show_active == 0)
+          bp_block.addClass('hidden');
+        else {
+          bp_block.removeClass('hidden');
+          visible = true;
+        }
+      })
+      if (non_active) {
+        var non_danger = true;
+        bp_block.find('span.label-danger').each(function() {
+          non_danger = false;
+          //alert(mbody.find('h4.media-heading').html() + " " + $(this).text());
+          if (show_impossible == 0)
+            bp_block.addClass('hidden');
+          else {
+            bp_block.removeClass('hidden');
+            visible = true;
+          }
+        })
+        if (non_danger) visible = true;
+      }
+    })
+    if (visible)
+      media.removeClass('hidden');
+    else
+      media.addClass('hidden');
+
+    // var bpblocks = mbody.find('div.qind-bp-block'); // list of blueprint groups
+    // var nonactive = mbody.find('span.qind-blueprints-'); // list of unused blueprints
+    // //alert(mbody.find('h4.media-heading').html() + " " + nonactive.length + " " + impossible.length);
+    // if ((nonactive.length == 0) && (bpblocks.length))
+    //   media.addClass('hidden');
+    // else {
+    //   if (show_active == 0) {
+    //     media.find('span.qind-blueprints-active').each(function() { $(this).addClass('hidden'); })
+    //   }
+    //   media.removeClass('hidden');
+    // }
+  }
   // Conveyor Options storage (rebuild body components)
   function rebuildBody() {
     show = ls.getItem('Show Legend');
@@ -741,13 +800,25 @@ def __dump_corp_conveyor(
       $('#legend-block').removeClass('hidden');
     else
       $('#legend-block').addClass('hidden');
-    show = ls.getItem('Show Active');
-    $('span.qind-blueprints-active').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
+    show_impossible = ls.getItem('Show Impossible');
+    show_active = ls.getItem('Show Active');
+    if ((show_impossible == 1) && (show_active == 1)) {
+      $('div.qind-bp-block').each(function() { $(this).removeClass('hidden'); })
+      $('div.media').each(function() { $(this).removeClass('hidden'); })
+    } else {
+      $('div.media').each(function() { toggleMediaVisibility($(this), show_impossible, show_active); })
+    }
+    //$('span.qind-blueprints-active').each(function() {
+    //  var mbody = $(this).closest('div.media-body');
+    //  var media = mbody.closest('div.media');
+    //  if (show_active == 1) {
+    //    $(this).removeClass('hidden');
+    //    media.removeClass('hidden');
+    //  } else {
+    //    $(this).addClass('hidden');
+    //    
+    //  }
+    //})
     show = ls.getItem('Show Materials');
     $('div.qind-materials-used').each(function() {
       if (show == 1)
@@ -757,25 +828,17 @@ def __dump_corp_conveyor(
     })
   }
   // Conveyor Options menu and submenu setup
+  function toggleMenuOption(name) {
+    show = (ls.getItem(name) == 1) ? 0 : 1;
+    ls.setItem(name, show);
+    rebuildOptionsMenu();
+    rebuildBody();
+  }
   $(document).ready(function(){
-    $('#btnToggleLegend').on('click', function () {
-      show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
-      ls.setItem('Show Legend', show);
-      rebuildOptionsMenu();
-      rebuildBody();
-    });
-    $('#btnToggleActive').on('click', function () {
-      show = (ls.getItem('Show Active') == 1) ? 0 : 1;
-      ls.setItem('Show Active', show);
-      rebuildOptionsMenu();
-      rebuildBody();
-    });
-    $('#btnToggleMaterials').on('click', function () {
-      show = (ls.getItem('Show Materials') == 1) ? 0 : 1;
-      ls.setItem('Show Materials', show);
-      rebuildOptionsMenu();
-      rebuildBody();
-    });
+    $('#btnToggleLegend').on('click', function () { toggleMenuOption('Show Legend'); });
+    $('#btnToggleImpossible').on('click', function () { toggleMenuOption('Show Impossible'); });
+    $('#btnToggleActive').on('click', function () { toggleMenuOption('Show Active'); });
+    $('#btnToggleMaterials').on('click', function () { toggleMenuOption('Show Materials'); });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
