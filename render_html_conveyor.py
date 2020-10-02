@@ -196,6 +196,10 @@ def __dump_blueprints_list_with_materials(
                         glf.write('&nbsp;<span class="label label-warning">{}</span>'.format(blueprint_status))
                     else:
                         glf.write('&nbsp;<span class="label label-danger">{}</span>'.format(blueprint_status))
+                    # ---
+                    __jobs_cost = sum([i["jc"] for i in bp["itm"] if "jc" in i])
+                    glf.write('&nbsp;<span class="label badge-light">{:,.1f} ISK</span>'.format(__jobs_cost))
+                    # ---
                     glf.write('</br></span>')  # qind-blueprints-?
                 elif __blueprint_materials is None:
                     glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
@@ -529,6 +533,10 @@ def __dump_conveyor_stock_all(
 <style>
 #tblStockAll tr {
   font-size: small;
+}
+.badge-light {
+  color: #212529;
+  background-color: #f8f9fa;
 }
 </style>
 
