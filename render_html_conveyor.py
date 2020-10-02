@@ -660,7 +660,7 @@ def __dump_corp_conveyor(
     <label>Sorting:&nbsp;</label>
     <div class="btn-group" role="group" aria-label="Sorting">
      <button id="btnSortByName" type="button" class="btn btn-default active">Name</button>
-     <button id="btnSortByTime" type="button" class="btn btn-default">Time</button>
+     <button id="btnSortByTime" type="button" class="btn btn-default">Duration</button>
     </div>
    </form>
   </div>
