@@ -52,10 +52,11 @@ def main():
         sys.exit(22)  # Unit errno.h : EINVAL=22 /* Invalid argument */
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-    print("\nStarting preload commonly used data...")
+    print("\nStarting preload commonly used data...\n")
 
     try:
         eve_market_prices_data = None
+        various_characters_data = []
         for pilot_name in argv_prms["character_names"]:
             # настройка Eve Online ESI Swagger interface
             auth = esi.EveESIAuth(
@@ -85,61 +86,63 @@ def main():
 
             corporation_id = character_data["corporation_id"]
             corporation_name = corporation_data["name"]
-            print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+            print("{} is from '{}' corporation\n".format(character_name, corporation_name))
             sys.stdout.flush()
+
+            various_characters_data.append({str(corporation_id): character_data})
 
             if eve_market_prices_data is None:
                 # Public information about market prices
                 eve_market_prices_data = interface.get_esi_data("markets/prices/")
-                print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+                print("EVE market has {} prices\n".format(len(eve_market_prices_data)))
                 sys.stdout.flush()
 
             # Requires role(s): Director
             corp_wallets_data = interface.get_esi_paged_data(
                 "corporations/{}/wallets/".format(corporation_id))
-            print("\n'{}' corporation has {} wallet divisions".format(corporation_name, len(corp_wallets_data)))
+            print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_assets_data = interface.get_esi_paged_data(
                 "corporations/{}/assets/".format(corporation_id))
-            print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+            print("'{}' corporation has {} assets\n".format(corporation_name, len(corp_assets_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_blueprints_data = interface.get_esi_paged_data(
                 "corporations/{}/blueprints/".format(corporation_id))
-            print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+            print("'{}' corporation has {} blueprints\n".format(corporation_name, len(corp_blueprints_data)))
             sys.stdout.flush()
 
             # Requires role(s): Factory_Manager
             corp_industry_jobs_data = interface.get_esi_paged_data(
                 "corporations/{}/industry/jobs/".format(corporation_id))
-            print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
+            print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
             sys.stdout.flush()
 
             # Requires role(s): Station_Manager
             corp_structures_data = interface.get_esi_paged_data(
                 "corporations/{}/structures/".format(corporation_id))
-            print("\n'{}' corporation has {} structures".format(corporation_name, len(corp_structures_data)))
+            print("'{}' corporation has {} structures\n".format(corporation_name, len(corp_structures_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_starbases_data = interface.get_esi_paged_data(
                 "corporations/{}/starbases/".format(corporation_id))
-            print("\n'{}' corporation has {} starbases".format(corporation_name, len(corp_starbases_data)))
+            print("'{}' corporation has {} starbases\n".format(corporation_name, len(corp_starbases_data)))
             sys.stdout.flush()
 
             # Requires role(s): Factory_Manager
             corp_facilities_data = interface.get_esi_paged_data(
                 "corporations/{}/facilities/".format(corporation_id))
-            print("\n'{}' corporation has {} facilities".format(corporation_name, len(corp_facilities_data)))
+            print("'{}' corporation has {} facilities\n".format(corporation_name, len(corp_facilities_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_customs_offices_data = interface.get_esi_paged_data(
                 "corporations/{}/customs_offices/".format(corporation_id))
-            print("\n'{}' corporation has {} customs offices".format(corporation_name, len(corp_customs_offices_data)))
+            print("'{}' corporation has {} customs offices\n".format(corporation_name, len(corp_customs_offices_data)))
             sys.stdout.flush()
 
             # Получение названий контейнеров, станций, кошельков, и т.п. - всё что переименовывается ingame
@@ -150,7 +153,7 @@ def main():
                 corp_ass_names_data = interface.get_esi_data(
                     "corporations/{}/assets/names/".format(corporation_id),
                     json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
-            print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+            print("'{}' corporation has {} custom asset's names\n".format(corporation_name, len(corp_ass_names_data)))
             sys.stdout.flush()
 
             # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
@@ -173,15 +176,15 @@ def main():
                     except:
                         print(sys.exc_info())
                         raise
-            print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+            print("'{}' corporation has offices in {} foreign stations\n".format(corporation_name, len(foreign_structures_data)))
             if len(foreign_structures_forbidden_ids) > 0:
-                print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
+                print("'{}' corporation has offices in {} forbidden stations : {}\n".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
             sys.stdout.flush()
 
             # Requires role(s): access token
             corp_contracts_data = interface.get_esi_paged_data(
                 "corporations/{}/contracts/".format(corporation_id))
-            print("\n'{}' corporation has {} contracts".format(corporation_name, len(corp_contracts_data)))
+            print("'{}' corporation has {} contracts\n".format(corporation_name, len(corp_contracts_data)))
             sys.stdout.flush()
 
             # Получение подробной информации о каждому из контракту в списке
@@ -213,16 +216,28 @@ def main():
                     except:
                         print(sys.exc_info())
                         raise
+                    # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                    issuer_id = c["issuer_id"]
+                    __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                    if __issuer_dict is None:
+                        # Public information about a character
+                        issuer_data = interface.get_esi_data(
+                            "characters/{}/".format(issuer_id))
+                        various_characters_data.append({str(issuer_id): issuer_data})
+                    sys.stdout.flush()
             eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
 
-            print("\n'{}' corporation has {} items in contracts".format(corporation_name, corp_contract_items_len))
+            print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
             if len(corp_contract_items_not_found) > 0:
-                print("\n'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+                print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
             sys.stdout.flush()
 
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)
+
         # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-        print("\nDone")
+        print("\nDone\n")
     except:
+        print(sys.exc_info())
         sys.exit(1)  # errno.h : EPERM=1 /* Operation not permitted */
     sys.exit(0)  # code 0, all ok
 

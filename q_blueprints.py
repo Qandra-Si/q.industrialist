@@ -68,6 +68,7 @@ def __build_blueprints(
         eve_market_prices_data,
         corp_contracts_data,
         corp_contract_items_data,
+        various_characters_data,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -171,6 +172,8 @@ def __build_blueprints(
                     # получение общих данных данных по контракту
                     __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
                     __location_id = __contract_dict["start_location_id"]
+                    __issuer_id = __contract_dict["issuer_id"]
+                    __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
                     __blueprint = {
                         "item_id": __items_dict["record_id"],
                         "type_id": __type_id,
@@ -182,7 +185,9 @@ def __build_blueprints(
                         "flag": __contract_dict["title"],
                         "price": __contract_dict["price"],
                         "cntrct_sta": __contract_dict["status"],
-                        "cntrct_typ": __contract_dict["type"]
+                        "cntrct_typ": __contract_dict["type"],
+                        "cntrct_issuer": __issuer_id,
+                        "cntrct_issuer_name": __issuer_name
                     }
                     # осуществляем поиск местоположения чертежа
                     __push_location_into_blueprints_locations(
@@ -211,6 +216,7 @@ def main():
 
     corps_blueprints = {}
     eve_market_prices_data = None
+    various_characters_data = []
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -242,6 +248,8 @@ def main():
         corporation_name = corporation_data["name"]
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
+
+        various_characters_data.append({str(corporation_id): character_data})
 
         if eve_market_prices_data is None:
             # Public information about market prices
@@ -338,11 +346,21 @@ def main():
                 except:
                     print(sys.exc_info())
                     raise
+                # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                issuer_id = c["issuer_id"]
+                __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                if __issuer_dict is None:
+                    # Public information about a character
+                    issuer_data = interface.get_esi_data(
+                        "characters/{}/".format(issuer_id))
+                    various_characters_data.append({str(issuer_id): issuer_data})
+                sys.stdout.flush()
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)  # сохраняем м.б. многократно
 
         print("\n'{}' corporation has {} items in contracts".format(corporation_name, corp_contract_items_len))
         if len(corp_contract_items_not_found) > 0:
-            print("\n'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+            print("'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
         sys.stdout.flush()
 
         # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
@@ -361,6 +379,7 @@ def main():
             eve_market_prices_data,
             corp_contracts_data,
             corp_contract_items_data,
+            various_characters_data,
             sde_type_ids,
             sde_inv_names,
             sde_inv_items,

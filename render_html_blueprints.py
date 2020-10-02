@@ -139,15 +139,24 @@ def __dump_corp_blueprints_sales(
                     __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
                     # [ outstanding, in_progress, finished_issuer, finished_contractor, finished, cancelled, rejected, failed, deleted, reversed ]
                     __blueprint_contract_activity = __cntrct_dict["cntrct_sta"]
-                    __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
+                    if __blueprint_contract_activity in ["outstanding", "finished_issuer", "finished_contractor", "reversed"]:
+                        __activity = '&nbsp;<span class="label label-warning">{}</span>'.format(__blueprint_contract_activity)
+                    elif __blueprint_contract_activity in ["in_progress"]:
+                        __activity = '&nbsp;<span class="label label-success">{}</span>'.format(__blueprint_contract_activity)
+                    else:
+                        __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
+                    # issuer
+                    __issuer = '&nbsp;<a href="https://evewho.com/character/{id}" target="_blank">{nm}</a>'. \
+                               format(id=__cntrct_dict["cntrct_issuer"],nm=__cntrct_dict["cntrct_issuer_name"])
                     # summary по контракту
                     if __contracts_summary:
                         __contracts_summary += '</br>\n'
                     __contracts_summary += \
-                        '{prc:,.1f}{st}{act}'. \
+                        '{prc:,.1f}{st}{act}{iss}'. \
                         format(prc=__cntrct_dict["price"],
                                st=__status,
-                               act=__activity)
+                               act=__activity,
+                               iss=__issuer)
                 # формируем строку таблицы - найден нужный чертёж в ассетах
                 glf.write(
                     '<tr>'
