@@ -233,7 +233,7 @@ def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sd
             return False
 
 
-def get_blueprint_manufacturing_materials(blueprints, type_id):
+def get_blueprint_manufacturing_activity(blueprints, type_id):
     if not (str(type_id) in blueprints):
         return None
     else:
@@ -245,11 +245,18 @@ def get_blueprint_manufacturing_materials(blueprints, type_id):
         elif not ("materials" in bp["activities"]["manufacturing"]):
             return None
         else:
-            materials = bp["activities"]["manufacturing"]["materials"]
-            return materials
+            manufacturing = bp["activities"]["manufacturing"]
+            return manufacturing
 
 
-def get_blueprint_reaction_materials(blueprints, type_id):
+def get_blueprint_manufacturing_materials(blueprints, type_id):
+    manufacturing = get_blueprint_manufacturing_activity(blueprints, type_id)
+    if manufacturing is None:
+        return None
+    return manufacturing["materials"]
+
+
+def get_blueprint_reaction_activity(blueprints, type_id):
     if not (str(type_id) in blueprints):
         return None
     else:
@@ -261,8 +268,15 @@ def get_blueprint_reaction_materials(blueprints, type_id):
         elif not ("materials" in bp["activities"]["reaction"]):
             return None
         else:
-            materials = bp["activities"]["reaction"]["materials"]
-            return materials
+            reaction = bp["activities"]["reaction"]
+            return reaction
+
+
+def get_blueprint_reaction_materials(blueprints, type_id):
+    reaction = get_blueprint_reaction_activity(blueprints, type_id)
+    if reaction is None:
+        return None
+    return reaction["materials"]
 
 
 def get_materials_for_blueprints(sde_bp_materials):

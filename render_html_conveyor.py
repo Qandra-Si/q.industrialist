@@ -119,12 +119,44 @@ def __dump_blueprints_list_with_materials(
         for type_id in __type_keys:
             type_keys.append({"id": int(type_id), "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, int(type_id))})
         type_keys.sort(key=lambda bp: bp["name"])
+        # инициализация скрытой таблицы, которая предназначена для сортировки чертежей по различным критериям
+        glf.write("""
+<div class="table-responsive">
+ <table class="table table-condensed qind-blueprints-tbl">
+  <tbody>
+""")
         # вывод в отчёт инфорации о чертежах
         materials_summary = []
         for type_dict in type_keys:
             type_id = type_dict["id"]
             blueprint_name = type_dict["name"]
+            # ---
+            __activity_time = 0
+            __blueprint_materials = None
+            __is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(type_id, [1849], sde_type_ids, sde_market_groups)
+            if __is_reaction_formula:  # Reaction Formulas
+                __reaction = eve_sde_tools.get_blueprint_reaction_activity(sde_bp_materials, type_id)
+                __blueprint_materials = __reaction["materials"]
+                __activity_time = __reaction["time"]
+            else:
+                __manufacturing = eve_sde_tools.get_blueprint_manufacturing_activity(sde_bp_materials, type_id)
+                __blueprint_materials = __manufacturing["materials"]
+                __activity_time = __manufacturing["time"]
+            __min_activity_time = None
+            # ---
+            bp_keys = __bp2[type_id].keys()
+            for bpk in bp_keys:
+                bp = __bp2[type_id][bpk]
+                for itm in bp["itm"]:
+                    __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
+                    __time = __runs * __activity_time
+                    if __min_activity_time is None:
+                        __min_activity_time = __time
+                    elif __min_activity_time > __time:
+                        __min_activity_time = __time
+            # ---
             glf.write(
+                '<tr><td class="hidden">{nm}</td><td class="hidden">{time}</td><td>\n'
                 '<div class="media">\n'
                 ' <div class="media-left">\n'
                 '  <img class="media-object icn64" src="{src}" alt="{nm}">\n'
@@ -132,16 +164,10 @@ def __dump_blueprints_list_with_materials(
                 ' <div class="media-body">\n'
                 '  <h4 class="media-heading">{nm}</h4>\n'.format(
                     src=render_html.__get_img_src(type_id, 64),
-                    nm=blueprint_name
+                    nm=blueprint_name,
+                    time=__min_activity_time
                 )
             )
-            __blueprint_materials = None
-            __is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(type_id, [1849], sde_type_ids, sde_market_groups)
-            if __is_reaction_formula:  # Reaction Formulas
-                __blueprint_materials = eve_sde_tools.get_blueprint_reaction_materials(sde_bp_materials, type_id)
-            else:
-                __blueprint_materials = eve_sde_tools.get_blueprint_manufacturing_materials(sde_bp_materials, type_id)
-            bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
                 is_blueprint_copy = bp["cp"]
@@ -250,7 +276,13 @@ def __dump_blueprints_list_with_materials(
             glf.write(
                 ' </div>\n'  # media-body
                 '</div>\n'  # media
+                '</td></tr>\n'
             )
+        glf.write("""
+  </tbody>
+ </table>
+</div> <!--table-responsive-->
+""")
         # отображение в отчёте summary-информаци по недостающим материалам
         if len(materials_summary) > 0:
             # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
@@ -413,11 +445,11 @@ def __dump_blueprints_list_with_materials(
                 ' </div>\n'
                 '</div>\n'
             )
-        glf.write(
-            "   </div>\n"
-            "  </div>\n"
-            " </div>\n"
-        )
+        glf.write("""
+   </div> <!--panel-body-->
+  </div> <!--panel-collapse-->
+ </div> <!--panel-->
+""")
 
     return stock_not_enough_materials
 
@@ -582,6 +614,13 @@ def __dump_corp_conveyor(
         materials_for_bps,
         research_materials_for_bps):
     glf.write("""
+<style>
+.qind-blueprints-tbl>tbody>tr>td {
+  padding: 4px;
+  border-top: none;
+}
+</style>
+
 <nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
@@ -610,10 +649,11 @@ def __dump_corp_conveyor(
     <li><a data-target="#modalStockAll" role="button" data-toggle="modal">Stock All</a></li>
    </ul>
    <form class="navbar-form navbar-right">
-    <div class="form-group">
-     <input type="text" class="form-control" placeholder="Item" disabled>
+    <label>Sorting:&nbsp;</label>
+    <div class="btn-group" role="group" aria-label="Sorting">
+     <button id="btnSortByName" type="button" class="btn btn-default active">Name</button>
+     <button id="btnSortByTime" type="button" class="btn btn-default">Time</button>
     </div>
-    <button type="button" class="btn btn-default disabled">Search</button>
    </form>
   </div>
  </div>
@@ -703,6 +743,9 @@ def __dump_corp_conveyor(
 </div>
 </div>
 <script>
+  // Conveyor Options dictionaries
+  var g_tbl_col_orders = [-1,+1]; // -1:desc, +1:asc
+  var g_tbl_col_types = [0,1]; // 0:str, 1:num, 2:x-data
   // Conveyor Options storage (prepare)
   ls = window.localStorage;
 
@@ -743,6 +786,14 @@ def __dump_corp_conveyor(
       $('#imgShowMaterials').removeClass('hidden');
     else
       $('#imgShowMaterials').addClass('hidden');
+    sort_by = ls.getItem('Sort By');
+    if ((sort_by === null) || (sort_by == 0)) {
+      $('#btnSortByName').addClass('active');
+      $('#btnSortByTime').removeClass('active');
+    } else if (sort_by == 1) {
+      $('#btnSortByName').removeClass('active');
+      $('#btnSortByTime').addClass('active');
+    }
   }
   // Conveyor media body visibility toggler
   function toggleMediaVisibility(media, show_impossible, show_active) {
@@ -777,9 +828,39 @@ def __dump_corp_conveyor(
       }
     })
     if (visible)
-      media.removeClass('hidden');
+      media.closest('tr').removeClass('hidden');
     else
-      media.addClass('hidden');
+      media.closest('tr').addClass('hidden');
+  }
+  // Conveyor table sorter
+  function sortConveyor(table, order, what, typ) {
+    var asc = order > 0;
+    var col = 'td:eq('+what.toString()+')';
+    var tbody = table.find('tbody');
+    tbody.find('tr').sort(function(a, b) {
+      var keyA, keyB;
+      if (typ == 2) {
+        keyA = parseFloat($(col, a).attr('x-data'));
+        keyB = parseFloat($(col, b).attr('x-data'));
+        if (isNaN(keyA)) keyA = 0;
+        if (isNaN(keyB)) keyB = 0;
+        return asc ? (keyA - keyB) : (keyB - keyA);
+      }
+      else {
+        keyA = $(col, a).text();
+        keyB = $(col, b).text();
+        if (typ == 1) {
+          keyA = parseInt(keyA, 10);
+          keyB = parseInt(keyB, 10);
+          if (isNaN(keyA)) keyA = 0;
+          if (isNaN(keyB)) keyB = 0;
+          return asc ? (keyA - keyB) : (keyB - keyA);
+        } 
+      }
+      _res = (keyA < keyB) ? -1 : ((keyA > keyB) ? 1 : 0);
+      if (asc) _res = -_res;
+      return _res;
+    }).appendTo(tbody);
   }
   // Conveyor Options storage (rebuild body components)
   function rebuildBody() {
@@ -792,7 +873,7 @@ def __dump_corp_conveyor(
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
       $('div.qind-bp-block').each(function() { $(this).removeClass('hidden'); })
-      $('div.media').each(function() { $(this).removeClass('hidden'); })
+      $('div.media').each(function() { $(this).closest('tr').removeClass('hidden'); })
     } else {
       $('div.media').each(function() { toggleMediaVisibility($(this), show_impossible, show_active); })
     }
@@ -802,6 +883,11 @@ def __dump_corp_conveyor(
         $(this).removeClass('hidden');
       else
         $(this).addClass('hidden');
+    })
+    sort_by = ls.getItem('Sort By');
+    sort_by = 0 ? (sort_by === null) : sort_by;
+    $('table.qind-blueprints-tbl').each(function() {
+      sortConveyor($(this),g_tbl_col_orders[sort_by],sort_by,g_tbl_col_types[sort_by]);
     })
   }
   // Conveyor Options menu and submenu setup
@@ -819,6 +905,16 @@ def __dump_corp_conveyor(
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnSortByName').on('click', function () {
+      ls.setItem('Sort By', 0);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnSortByTime').on('click', function () {
+      ls.setItem('Sort By', 1);
       rebuildOptionsMenu();
       rebuildBody();
     });
