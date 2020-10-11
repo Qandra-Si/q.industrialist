@@ -49,7 +49,7 @@ def __dump_fit_items(glf, job, job_id):
         '   <div class="col-md-4 col-md-offset-2" align="right">\n'
         '    <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon'
         '     glyphicon-pencil" aria-hidden="true"></span></button>\n'
-        '    <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon'
+        '    <button type="button" class="btn btn-default btn-xs qind-btn-del"><span class="glyphicon'
         '     glyphicon-trash" aria-hidden="true"></span></button>\n'
         '   </div>\n'
         '  </div>\n'
@@ -367,6 +367,13 @@ def __dump_workflow_tools(
   some suppressed item found in the fit (the item has already been renamed or is no longer in use, or
   publication discontinued).
  </p>
+</div> <!--legend-->
+
+<form class="hidden" action="qi_digger.php" method="get" id="frmDelFit">
+ <input type="hidden" name="module" value="workflow">
+ <input type="hidden" name="action" value="del">
+ <input type="hidden" name="fit" value="2">
+</form>
 </div> <!--container-fluid-->
 """)
 
@@ -448,6 +455,13 @@ def __dump_workflow_tools(
           var t2_toggle = (txt.html() == 'T2') ? 0 : 1;
           var job = $(this).attr('job');
           setupT2ButtonAndTable(t2_toggle, job, img, txt);
+      })
+    })
+    $('button.qind-btn-del').each(function() {
+        $(this).on('click', function () {
+          var frm = $("#frmDelFit");
+          var fit = frm.find('input').eq(2).attr('value');
+          frm.submit();
       })
     })
     $('#btnToggleShowT2Only').on('click', function () {
