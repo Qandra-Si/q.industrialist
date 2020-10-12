@@ -71,7 +71,7 @@ elseif (isset($_POST['module'])) {
             //---
             elseif (($action == 'add') && isset($_POST['quantity']) && isset($_POST['eft'])) {
                 $wmj_quantity = htmlentities($_POST['quantity']);
-                if (is_numeric($wmj_quantity)) {
+                if (is_numeric($wmj_quantity) && (get_numeric($wmj_quantity) >= 1)) {
                     $wmj_eft = $_POST['eft'];
                     if (!empty($wmj_eft)) {
                         $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft) VALUES($1,$2);';
