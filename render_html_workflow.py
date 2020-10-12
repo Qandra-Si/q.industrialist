@@ -47,12 +47,6 @@ def __dump_fit_items(glf, job, job_id):
         '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
         '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
         '   </div>\n'
-        '   <div class="col-md-4 col-md-offset-2" align="right">\n'
-        '    <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon'
-        '     glyphicon-pencil" aria-hidden="true"></span></button>\n'
-        '    <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon'
-        '     glyphicon-trash" aria-hidden="true"></span></button>\n'
-        '   </div>\n'
         '  </div>\n'
         ' </div>\n'
         '</div>\n'.
@@ -415,6 +409,7 @@ def __dump_workflow_tools(
   some suppressed item found in the fit (the item has already been renamed or is no longer in use, or
   publication discontinued).
  </p>
+</div> <!--legend-->
 </div> <!--container-fluid-->
 """)
 

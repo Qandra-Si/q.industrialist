@@ -132,15 +132,12 @@ dmypy.json
 .pyre/
 
 # Q.Industrialist
-/2
-/3
+/static_data_interface
+/image_export_collection
+/favicon
 /bootstrap
 /jquery
-/q_industrialist_settings.py
-/q_logist_settings.py
-/q_conveyor_settings.py
-/q_blueprints_settings.py
-/q_workflow_settings.py
+/q_*_settings.py
 /.*_cache
 /*_cache
 /debug

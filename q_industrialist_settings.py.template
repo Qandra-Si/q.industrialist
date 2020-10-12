@@ -1,7 +1,7 @@
 ﻿# filesystem resources : data located in .3\ & .bootstrap\ & .jquery\ directories
 # g_client_scope : application scopes, едины для всех приложений проекта
 
-g_use_filesystem_resources = True
+g_use_filesystem_resources = False
 g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
@@ -14,3 +14,10 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-corporations.read_facilities.v1",  # Requires one of the following EVE corporation role(s): Factory_Manager
                   "esi-planets.read_customs_offices.v1",  # Requires one of the following EVE corporation role(s): Director
                  ]
+g_database = {
+    "host":     "127.0.0.1",
+    "dbname":   "qi_db",
+    "port":     5432,
+    "user":     "qi_user",
+    "password": "qi_LAZ7dBLmSJb9"  # <-- this is the value you probably need to edit
+}

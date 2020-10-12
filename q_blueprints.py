@@ -17,7 +17,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_blueprints.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
