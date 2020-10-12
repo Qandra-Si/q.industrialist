@@ -5,13 +5,18 @@ if (!extension_loaded('pgsql')) return;
 
 include_once '.settings.php';
 
+
+function get_numeric($val) {
+    return is_numeric($val) ? ($val + 0) : 0;
+}
+
 if (isset($_GET['module'])) {
     $method = htmlentities($_GET['module']);
     if ($method == 'workflow') {
         if (isset($_GET['action']) && isset($_GET['fit'])) {
             $action = htmlentities($_GET['action']);
             $wmj_id = htmlentities($_GET['fit']);
-            if (is_numeric($wmj_id)) {
+            if (is_numeric($wmj_id) && (get_numeric($wmj_id) >= 1)) {
                 $query = NULL;
                 $params = NULL;
                 if ($action == 'del') {
@@ -47,14 +52,19 @@ elseif (isset($_POST['module'])) {
             if (($action == 'edit') && isset($_POST['fit']) && isset($_POST['quantity']) && isset($_POST['eft'])) {
                 $wmj_id = htmlentities($_POST['fit']);
                 $wmj_quantity = htmlentities($_POST['quantity']);
-                if (is_numeric($wmj_id) && is_numeric($wmj_quantity)) {
+                if (is_numeric($wmj_id) && is_numeric($wmj_quantity) &&
+                    (get_numeric($wmj_id) >= 1) && (get_numeric($wmj_quantity) >= 1)) {
                     $wmj_eft = $_POST['eft'];
-                    $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3 WHERE wmj_id=$1;';
-                    $params = array($wmj_id, $wmj_quantity, $wmj_eft);
-                    if (isset($_POST['remarks'])) {
-                        $wmj_remarks = $_POST['remarks'];
-                        $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_remarks=$4 WHERE wmj_id=$1;';
-                        array_push($params, $wmj_remarks);
+                    if (!empty($wmj_eft)) {
+                        $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3 WHERE wmj_id=$1;';
+                        $params = array($wmj_id, $wmj_quantity, $wmj_eft);
+                        if (isset($_POST['remarks'])) {
+                            $wmj_remarks = $_POST['remarks'];
+                            if (!empty($wmj_remarks)) {
+                                $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_remarks=$4 WHERE wmj_id=$1;';
+                                array_push($params, $wmj_remarks);
+                            }
+                        }
                     }
                 }
             }
@@ -63,12 +73,16 @@ elseif (isset($_POST['module'])) {
                 $wmj_quantity = htmlentities($_POST['quantity']);
                 if (is_numeric($wmj_quantity)) {
                     $wmj_eft = $_POST['eft'];
-                    $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft) VALUES($1,$2);';
-                    $params = array($wmj_quantity, $wmj_eft);
-                    if (isset($_POST['remarks'])) {
-                        $wmj_remarks = $_POST['remarks'];
-                        $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_remarks) VALUES($1,$2,$3);';
-                        array_push($params, $wmj_remarks);
+                    if (!empty($wmj_eft)) {
+                        $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft) VALUES($1,$2);';
+                        $params = array($wmj_quantity, $wmj_eft);
+                        if (isset($_POST['remarks'])) {
+                            $wmj_remarks = $_POST['remarks'];
+                            if (!empty($wmj_remarks)) {
+                                $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_remarks) VALUES($1,$2,$3);';
+                                array_push($params, $wmj_remarks);
+                            }
+                        }
                     }
                 }
             }
