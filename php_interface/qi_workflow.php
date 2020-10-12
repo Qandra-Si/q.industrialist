@@ -1,10 +1,11 @@
 <?php
 include 'qi_render_html.php';
+include_once '.settings.php';
 ?>
 
 <?php function __dump_monthly_jobs() {
     if (!extension_loaded('pgsql')) return;
-    $conn = pg_connect("host=localhost port=5432 dbname=qi_db user=qi_user password=qi_LAZ7dBLmSJb9")
+    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs ORDER BY 4;';

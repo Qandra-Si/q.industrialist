@@ -3,6 +3,8 @@
 <?php
 if (!extension_loaded('pgsql')) return;
 
+include_once '.settings.php';
+
 if (isset($_GET['module'])) {
     $method = htmlentities($_GET['module']);
     if ($method == 'workflow') {
@@ -21,7 +23,7 @@ if (isset($_GET['module'])) {
                     $params = array($wmj_id, ($action == 'act') ? 1 : 0);
                 }
                 if (!is_null($query)) {
-                    $conn = pg_connect("host=localhost port=5432 dbname=qi_db user=qi_user password=qi_LAZ7dBLmSJb9")
+                    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
                         or die('pg_connect err: '.pg_last_error());
                     pg_exec($conn, "SET search_path TO qi");
                     pg_query_params($conn, $query, $params)
@@ -72,7 +74,7 @@ elseif (isset($_POST['module'])) {
             }
             //---
             if (!is_null($query)) {
-                $conn = pg_connect("host=localhost port=5432 dbname=qi_db user=qi_user password=qi_LAZ7dBLmSJb9")
+                $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
                 or die('pg_connect err: '.pg_last_error());
                 pg_exec($conn, "SET search_path TO qi");
                 pg_query_params($conn, $query, $params)
