@@ -14,6 +14,23 @@ include 'qi_render_html.php';
     pg_close($conn);
     $jobs_sz = sizeof($jobs);
 ?>
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="collapsed navbar-toggle" data-toggle="collapse"
+    data-target="#bs-jobs-navbar-collapse" aria-expanded="false">
+   <span class="sr-only">Toggle navigation</span>
+   <span class="icon-bar"></span>
+   <span class="icon-bar"></span>
+   <span class="icon-bar"></span>
+   </button>
+   <a data-target="#" class="navbar-brand">Scheduling</a>
+  </div>
+  <div class="collapse navbar-collapse" id="bs-jobs-navbar-collapse">
+   <button type="button" class="btn btn-default navbar-btn" id="qind-btn-add">Add new</button>
+  </div>
+ </div>
+</nav> 
 <div class="panel-group" id="monthly_jobs" role="tablist" aria-multiselectable="true">
 <?php
     // вывод информации о корабле, а также формирование элементов пользовательского интерфейса
@@ -97,12 +114,12 @@ $(document).ready(function(){
 })
 </script>
 
-<div class="modal fade" id="modalEditFit" tabindex="-1" role="dialog" aria-labelledby="modalEditFitLabel">
+<div class="modal fade" id="modalFit" tabindex="-1" role="dialog" aria-labelledby="modalFitLabel">
  <div class="modal-dialog" role="document">
   <div class="modal-content">
    <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-    <h4 class="modal-title" id="modalEditFitLabel"></h4>
+    <h4 class="modal-title" id="modalFitLabel"></h4>
    </div>
    <div class="modal-body">
     <form action="qi_digger.php" method="post" id="frmEditFit">
@@ -139,15 +156,27 @@ $(document).ready(function(){
       var q = $("#qind-job-q"+job).text();
       var rmrks = $('#qind-job-rmrks'+job).text();
       var eft = $('#qind-job-eft'+job).html();
-      var modal = $("#modalEditFit");
-      $('#modalEditFitLabel').html(q + 'x ' + ship);
+      var modal = $("#modalFit");
+      $('#modalFitLabel').html(q + 'x ' + ship);
       modal.find('textarea').html(eft);
       modal.find("input[name='remarks']").val(rmrks);
       modal.find("input[name='quantity']").val(q);
       modal.find("input[name='fit']").val(job);
+      modal.find("input[name='action']").val('edit');
       modal.modal('show');
       frm.submit();
     })
+  })
+  $('#qind-btn-add').on('click', function () {
+      var modal = $("#modalFit");
+      $('#modalFitLabel').html('Scheduling new monthly job...');
+      modal.find('textarea').html('');
+      modal.find("input[name='remarks']").val('');
+      modal.find("input[name='quantity']").val(1);
+      modal.find("input[name='fit']").val(0);
+      modal.find("input[name='action']").val('add');
+      modal.modal('show');
+      frm.submit();
   })
 })
 </script>

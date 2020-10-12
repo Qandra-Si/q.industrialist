@@ -37,36 +37,48 @@ if (isset($_GET['module'])) {
 elseif (isset($_POST['module'])) {
     $method = htmlentities($_POST['module']);
     if ($method == 'workflow') {
-        if (isset($_POST['action']) && isset($_POST['fit'])) {
+        if (isset($_POST['action'])) {
+            $query = NULL;
+            $params = NULL;
+            //---
             $action = htmlentities($_POST['action']);
-            $wmj_id = htmlentities($_POST['fit']);
-            if (is_numeric($wmj_id)) {
-                $query = NULL;
-                $params = NULL;
-                if ($action == 'edit') {
-                    if (isset($_POST['quantity']) && isset($_POST['eft'])) {
-                        $wmj_quantity = htmlentities($_POST['quantity']);
-                        $wmj_eft = $_POST['eft'];
-                        if (is_numeric($wmj_quantity)) {
-                            $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3 WHERE wmj_id=$1;';
-                            $params = array($wmj_id, $wmj_quantity, $wmj_eft);
-                            if (isset($_POST['remarks'])) {
-                                $wmj_remarks = $_POST['remarks'];
-                                $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_remarks=$4 WHERE wmj_id=$1;';
-                                array_push($params, $wmj_remarks);
-                            }
-                        }
+            if (($action == 'edit') && isset($_POST['fit']) && isset($_POST['quantity']) && isset($_POST['eft'])) {
+                $wmj_id = htmlentities($_POST['fit']);
+                $wmj_quantity = htmlentities($_POST['quantity']);
+                if (is_numeric($wmj_id) && is_numeric($wmj_quantity)) {
+                    $wmj_eft = $_POST['eft'];
+                    $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3 WHERE wmj_id=$1;';
+                    $params = array($wmj_id, $wmj_quantity, $wmj_eft);
+                    if (isset($_POST['remarks'])) {
+                        $wmj_remarks = $_POST['remarks'];
+                        $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_remarks=$4 WHERE wmj_id=$1;';
+                        array_push($params, $wmj_remarks);
                     }
                 }
-                if (!is_null($query)) {
-                    $conn = pg_connect("host=localhost port=5432 dbname=qi_db user=qi_user password=qi_LAZ7dBLmSJb9")
-                        or die('pg_connect err: '.pg_last_error());
-                    pg_exec($conn, "SET search_path TO qi");
-                    pg_query_params($conn, $query, $params)
-                        or die('pg_query_params err: '.pg_last_error());
-                    pg_query($conn, 'COMMIT;');
-                    pg_close($conn);
+            }
+            //---
+            elseif (($action == 'add') && isset($_POST['quantity']) && isset($_POST['eft'])) {
+                $wmj_quantity = htmlentities($_POST['quantity']);
+                if (is_numeric($wmj_quantity)) {
+                    $wmj_eft = $_POST['eft'];
+                    $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft) VALUES($1,$2);';
+                    $params = array($wmj_quantity, $wmj_eft);
+                    if (isset($_POST['remarks'])) {
+                        $wmj_remarks = $_POST['remarks'];
+                        $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_remarks) VALUES($1,$2,$3);';
+                        array_push($params, $wmj_remarks);
+                    }
                 }
+            }
+            //---
+            if (!is_null($query)) {
+                $conn = pg_connect("host=localhost port=5432 dbname=qi_db user=qi_user password=qi_LAZ7dBLmSJb9")
+                or die('pg_connect err: '.pg_last_error());
+                pg_exec($conn, "SET search_path TO qi");
+                pg_query_params($conn, $query, $params)
+                or die('pg_query_params err: '.pg_last_error());
+                pg_query($conn, 'COMMIT;');
+                pg_close($conn);
             }
         }
     }
