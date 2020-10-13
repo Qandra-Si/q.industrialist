@@ -1,4 +1,4 @@
-<?php
+п»ї<?php
 include 'qi_render_html.php';
 include_once '.settings.php';
 ?>
@@ -34,7 +34,7 @@ include_once '.settings.php';
 </nav> 
 <div class="panel-group" id="monthly_jobs" role="tablist" aria-multiselectable="true">
 <?php
-    // вывод информации о корабле, а также формирование элементов пользовательского интерфейса
+    // РІС‹РІРѕРґ РёРЅС„РѕСЂРјР°С†РёРё Рѕ РєРѕСЂР°Р±Р»Рµ, Р° С‚Р°РєР¶Рµ С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ СЌР»РµРјРµРЅС‚РѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРѕРіРѕ РёРЅС‚РµСЂС„РµР№СЃР°
     foreach ($jobs as &$job)
     {
         $id = $job['wmj_id'];
@@ -79,20 +79,20 @@ include_once '.settings.php';
  </div>
 </div>
 <?php
-        // добавление окна, в котором можно просматривать и копировать EFT
+        // РґРѕР±Р°РІР»РµРЅРёРµ РѕРєРЅР°, РІ РєРѕС‚РѕСЂРѕРј РјРѕР¶РЅРѕ РїСЂРѕСЃРјР°С‚СЂРёРІР°С‚СЊ Рё РєРѕРїРёСЂРѕРІР°С‚СЊ EFT
         __dump_any_into_modal_header_wo_button(
             sprintf('<strong>%sx %s</strong>%s',
                     $q,
                     $nm,
                     !is_null($cmnt) && !empty($cmnt) ? '<small><br>'.$cmnt.'</small>' : ''
             ),
-            'EFT'.$id, // modal добавляется автоматически
+            'EFT'.$id, // modal РґРѕР±Р°РІР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё
             NULL // 'modal-sm'
         );
-        // формируем содержимое модального диалога
+        // С„РѕСЂРјРёСЂСѓРµРј СЃРѕРґРµСЂР¶РёРјРѕРµ РјРѕРґР°Р»СЊРЅРѕРіРѕ РґРёР°Р»РѕРіР°
         echo '<textarea onclick="this.select();" class="col-md-12" rows="15" style="resize:none"'.
              ' readonly="readonly">'.$fit.'</textarea>';
-        // закрываем footer модального диалога
+        // Р·Р°РєСЂС‹РІР°РµРј footer РјРѕРґР°Р»СЊРЅРѕРіРѕ РґРёР°Р»РѕРіР°
         __dump_any_into_modal_footer();
     }
     unset($job);

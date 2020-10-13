@@ -1,13 +1,13 @@
-<?php
+ï»¿<?php
 // --------------------------------------------------------------------------------------------------------------
 // __dump_header
 // --------------------------------------------------------------------------------------------------------------
 function __dump_header($header_name, $use_filesystem_resources)
 {
-    # ñì. https://github.com/gokulkrishh/awesome-meta-and-manifest
-    # ñì. https://developer.mozilla.org/ru/docs/Web/Manifest
-    # ðåêîìåíäóåìûé íàáîð favicon-îê, ñì. https://stackoverflow.com/a/52322368
-    # à òàêæå òóò, ñì. https://developer.apple.com/design/human-interface-guidelines/ios/icons-and-images/app-icon/#app-icon-sizes
+    # ÑÐ¼. https://github.com/gokulkrishh/awesome-meta-and-manifest
+    # ÑÐ¼. https://developer.mozilla.org/ru/docs/Web/Manifest
+    # Ñ€ÐµÐºÐ¾Ð¼ÐµÐ½Ð´ÑƒÐµÐ¼Ñ‹Ð¹ Ð½Ð°Ð±Ð¾Ñ€ favicon-Ð¾Ðº, ÑÐ¼. https://stackoverflow.com/a/52322368
+    # Ð° Ñ‚Ð°ÐºÐ¶Ðµ Ñ‚ÑƒÑ‚, ÑÐ¼. https://developer.apple.com/design/human-interface-guidelines/ios/icons-and-images/app-icon/#app-icon-sizes
     if ($use_filesystem_resources)
     {
         $bs_css = 'bootstrap/3.4.1/css/bootstrap.min.css';
