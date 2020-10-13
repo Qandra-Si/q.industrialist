@@ -59,11 +59,14 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
         else:
             __bp2[type_id][bp_key]["qr"] = __bp2[type_id][bp_key]["qr"] + quantity_or_runs
         # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } }
-        __bp2[type_id][bp_key]["itm"].append({
-            "id": int(bp["item_id"]),
+        __itm_dict = {
+            "id": blueprint_id,
             "q": quantity,
             "r": runs
-        })
+        }
+        if not (__job_dict is None):
+            __itm_dict.update({"jc": __job_dict["cost"]})
+        __bp2[type_id][bp_key]["itm"].append(__itm_dict)
     return corp_bp_loc_data
 
 
