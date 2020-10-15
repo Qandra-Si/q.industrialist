@@ -510,8 +510,8 @@ def get_items_list_from_eft(
                 __end = __line[1].find(",")
                 if __end <= 1:
                     continue
-                __original_name = __line[1][1:__end]
-                __converted["comment"] = __line[1][__end+1:-1].strip()
+                __converted["comment"] = __original_name[__end+1:-1].strip()
+                __original_name = __original_name[1:__end]
                 __ship_flag = True
         else:
             # попытка найти в конце строке сочетание x?, например: Nanite Repair Paste x50
