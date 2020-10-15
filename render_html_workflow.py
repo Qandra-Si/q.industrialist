@@ -35,29 +35,48 @@ def __dump_fit_items(glf, job, job_id):
     __fit_items = job["items"]
     __problems = job["problems"]
     # вывод информации о корабле, а также формирование элементов пользовательского интерфейса
-    glf.write(
-        '<div class="media">\n'
-        ' <div class="media-left"><img class="media-object icn32" src="{src}"></div>\n'
-        ' <div class="media-body">\n'
-        '  <h4 class="media-heading">{q}x {nm}</h4>\n'
-        '  <div class="row">\n'
-        '   <div class="col-md-6">\n'
-        '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" job="{job}"><span'
-        '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
-        '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
-        '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
-        '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
-        '   </div>\n'
-        '  </div>\n'
-        ' </div>\n'
-        '</div>\n'.
-        format(
-            job=job_id,
-            nm=__ship_name,
-            src=render_html.__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
-            q=__total_quantity
+    if (__ship_name is None) or (__ship_type_id is None):
+        glf.write(
+            '<div class="media">\n'
+            ' <div class="media-left"></div>\n'
+            ' <div class="media-body">\n'
+            '  <div class="row">\n'
+            '   <div class="col-md-6">\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" job="{job}"><span'
+            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
+            '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
+            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
+            '   </div>\n'
+            '  </div>\n'
+            ' </div>\n'
+            '</div>\n'.
+            format(job=job_id)
         )
-    )
+    else:
+        glf.write(
+            '<div class="media">\n'
+            ' <div class="media-left"><img class="media-object icn32" src="{src}"></div>\n'
+            ' <div class="media-body">\n'
+            '  <h4 class="media-heading">{q}x {nm}</h4>\n'
+            '  <div class="row">\n'
+            '   <div class="col-md-6">\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" job="{job}"><span'
+            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
+            '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
+            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
+            '   </div>\n'
+            '  </div>\n'
+            ' </div>\n'
+            '</div>\n'.
+            format(
+                job=job_id,
+                nm=__ship_name,
+                src=render_html.__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
+                q=__total_quantity
+            )
+        )
     # добавление окна, в котором можно просматривать и копировать EFT
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
