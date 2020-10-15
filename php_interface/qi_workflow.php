@@ -3,18 +3,7 @@ include 'qi_render_html.php';
 include_once '.settings.php';
 ?>
 
-<?php function __dump_monthly_jobs() {
-    if (!extension_loaded('pgsql')) return;
-    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-            or die('pg_connect err: '.pg_last_error());
-    pg_exec($conn, "SET search_path TO qi");
-    $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs ORDER BY 4;';
-    $jobs_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
-    $jobs = pg_fetch_all($jobs_cursor);
-    pg_close($conn);
-    $jobs_sz = sizeof($jobs);
-?>
+<?php function __dump_monthly_jobs($jobs) { ?>
 <nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
@@ -184,14 +173,88 @@ $(document).ready(function(){
 <?php } ?>
 
 
-<?php __dump_header("Workflow Settings", true); ?>
+<?php function __dump_settings($settings) {
+    $id = $name = $hangars = NULL;
+    if (!is_null($settings))
+    {
+        foreach ($settings as &$row)
+        {
+            $key = $row['ms_key'];
+            $val = $row['ms_val'];
+            if ($key == 'factory:station_id')
+                $id = $val;
+            elseif ($key == 'factory:station_name')
+                $name = $val;
+            elseif ($key == 'factory:blueprints_hangars')
+                $hangars = str_replace(array('[',']'),'',$val);
+        }
+    }
+?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="settings_hd">
+  <h4 class="panel-title">
+   <a role="button" data-toggle="collapse"
+    href="#settings_collapse" aria-expanded="true"
+    aria-controls="settings_collapse"><strong>Factory Location</strong></a>
+  </h4>
+ </div>
+ <div id="settings_collapse" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="settings_hd">
+  <div class="panel-body">
+
+<form action="qi_digger.php" method="post" id="frmSettings">
+  <input type="hidden" name="module" value="workflow">
+  <input type="hidden" name="action" value="settings">
+  <div class="form-group">
+    <label for="settingsId">Station (structure) Id</label>
+    <input name="id" class="form-control" id="settingsId" placeholder="64-bit number" value="<?=$id?>">
+  </div>
+  <div class="form-group">
+    <label for="settingsName">Station (structure) Name</label>
+    <input name="name" class="form-control" id="settingsName" placeholder="Name" value="<?=$name?>">
+  </div>
+  <div class="form-group">
+    <label for="settingsHangars">Hangar numbers</label>
+    <input name="hangars" class="form-control" id="settingsHangars" placeholder="Comma separated numbers" value="<?=$hangars?>">
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+  </div>
+ </div>
+</div>
+<?php } ?>
+
+
+<?php
+    __dump_header("Workflow Settings", true);
+    if (!extension_loaded('pgsql')) return;
+    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+            or die('pg_connect err: '.pg_last_error());
+    pg_exec($conn, "SET search_path TO qi");
+    $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs ORDER BY 4;';
+    $jobs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $jobs = pg_fetch_all($jobs_cursor);
+    $query = 'SELECT ms_key,ms_val FROM modules_settings WHERE ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$1);';
+    $params = array('workflow');
+    $settings_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
+    if (pg_num_rows($settings_cursor) > 0)
+        $settings = pg_fetch_all($settings_cursor);
+    else
+        $settings = NULL;
+    pg_close($conn);
+?>
 <div class="container-fluid">
  <div class="row">
   <div class="col-md-6">
    <h3>Monthly Scheduled Jobs</h3>
-   <?php __dump_monthly_jobs(); ?>
+   <?php __dump_monthly_jobs($jobs); ?>
   </div>
   <div class="col-md-6">
+   <h3>Settings</h3>
+   <?php __dump_settings($settings); ?>
    <h3>Containers</h3>
    &times; &times; &times; &times; &times;
   </div>

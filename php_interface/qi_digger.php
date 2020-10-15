@@ -29,10 +29,10 @@ if (isset($_GET['module'])) {
                 }
                 if (!is_null($query)) {
                     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-                        or die('pg_connect err: '.pg_last_error());
+                            or die('pg_connect err: '.pg_last_error());
                     pg_exec($conn, "SET search_path TO qi");
                     pg_query_params($conn, $query, $params)
-                        or die('pg_query_params err: '.pg_last_error());
+                            or die('pg_query_params err: '.pg_last_error());
                     pg_exec($conn, 'COMMIT;');
                     pg_close($conn);
                 }
@@ -87,12 +87,26 @@ elseif (isset($_POST['module'])) {
                 }
             }
             //---
+            elseif (($action == 'settings') && isset($_POST['id']) && isset($_POST['name']) && isset($_POST['hangars'])) {
+                $ms_val_id = htmlentities($_POST['id']);
+                $ms_val_name = htmlentities($_POST['name']);
+                $ms_val_hangars = htmlentities($_POST['hangars']);
+                if (is_numeric($ms_val_id)) {
+                    $query = <<<EOD
+UPDATE modules_settings SET ms_val=v.v
+FROM (VALUES ('factory:station_id',$1),('factory:station_name',$2),('factory:blueprints_hangars',$3)) AS v(k,v)
+WHERE ms_key=v.k AND ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$4);
+EOD;
+                    $params = array($ms_val_id, $ms_val_name, '['.$ms_val_hangars.']', 'workflow');
+                }
+            }
+            //---
             if (!is_null($query)) {
                 $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-                or die('pg_connect err: '.pg_last_error());
+                        or die('pg_connect err: '.pg_last_error());
                 pg_exec($conn, "SET search_path TO qi");
                 pg_query_params($conn, $query, $params)
-                or die('pg_query_params err: '.pg_last_error());
+                        or die('pg_query_params err: '.pg_last_error());
                 pg_query($conn, 'COMMIT;');
                 pg_close($conn);
             }
