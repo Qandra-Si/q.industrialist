@@ -227,7 +227,7 @@ $(document).ready(function(){
 
 
 <?php
-    __dump_header("Workflow Settings", true);
+    __dump_header("Workflow Settings", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());

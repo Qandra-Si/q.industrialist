@@ -6,4 +6,6 @@ define('DB_DATABASE', 'qi_db');
 define('DB_USERNAME', 'qi_user');
 define('DB_PASSWORD', 'qi_LAZ7dBLmSJb9'); // <-- this is the value you probably need to edit.
 define('DB_DEBUG', false);
+
+define('FS_RESOURCES', false); // use_filesystem_resources
 ?>
