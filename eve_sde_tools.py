@@ -508,10 +508,12 @@ def get_items_list_from_eft(
             if (__original_name[:1] == '[') and (__original_name[-1:] == ']'):
                 # выполняем поиск названия корабля в строке
                 __end = __line[1].find(",")
-                if __end <= 1:
+                if __end < 0:
                     continue
                 __converted["comment"] = __original_name[__end+1:-1].strip()
                 __original_name = __original_name[1:__end]
+                if not __original_name:
+                    continue
                 __ship_flag = True
         else:
             # попытка найти в конце строке сочетание x?, например: Nanite Repair Paste x50
