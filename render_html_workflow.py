@@ -27,7 +27,8 @@ function getSdeItemName(id) {
 
 def __dump_fit_items(glf, job, job_id):
     __ship = job["ship"]
-    __ship_name = job["ship"]["name"] if not (job["ship"] is None) else None
+    __ship_name = __ship["name"] if not (__ship is None) else None
+    __ship_type_id = __ship["type_id"] if not (__ship is None) and ("type_id" in __ship) else None
     __fit_comment = job["comment"]
     __eft = job["eft"]
     __total_quantity = job["quantity"]
@@ -53,7 +54,7 @@ def __dump_fit_items(glf, job, job_id):
         format(
             job=job_id,
             nm=__ship_name,
-            src=render_html.__get_img_src(job["ship"]["type_id"], 32),
+            src=render_html.__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
             q=__total_quantity
         )
     )
