@@ -226,16 +226,49 @@ $(document).ready(function(){
 <?php } ?>
 
 
+<?php function __dump_containers($containers) { ?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="containers_hd">
+  <h4 class="panel-title">
+   <a role="button" data-toggle="collapse"
+    href="#containers_collapse" aria-expanded="true"
+    aria-controls="containers_collapse"><strong>Containers</strong></a>
+  </h4>
+ </div>
+ <div id="containers_collapse" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="containers_hd">
+  <div class="panel-body">
+   <form action="qi_digger.php" method="post" id="frmContainers">
+    <input type="hidden" name="module" value="workflow">
+    <input type="hidden" name="action" value="containers">
+<?php if (!is_null($containers)) { foreach ($containers as &$cont) { ?>
+<div class="checkbox">
+ <label class="form-check-label">
+  <input type="checkbox" <?php if ($cont["wfc_active"]=='t') echo 'checked';?> name="<?=$cont["wfc_id"]?>"> <?=$cont["wfc_name"]?>
+ </label>
+</div>
+<?php } } ?>
+    <button type="reset" class="btn btn-default">Reset</button>
+    <button type="submit" class="btn btn-primary">Save</button>
+   </form>
+  </div>
+ </div>
+</div>
+<?php } ?>
+
+
 <?php
     __dump_header("Workflow Settings", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
+    //---
     $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs ORDER BY 4;';
     $jobs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $jobs = pg_fetch_all($jobs_cursor);
+    //---
     $query = 'SELECT ms_key,ms_val FROM modules_settings WHERE ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$1);';
     $params = array('workflow');
     $settings_cursor = pg_query_params($conn, $query, $params)
@@ -244,6 +277,15 @@ $(document).ready(function(){
         $settings = pg_fetch_all($settings_cursor);
     else
         $settings = NULL;
+    //---
+    $query = 'SELECT wfc_id,wfc_name,wfc_active FROM workflow_factory_containers ORDER BY 2;';
+    $containers_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    if (pg_num_rows($containers_cursor) > 0)
+        $containers = pg_fetch_all($containers_cursor);
+    else
+        $containers = NULL;
+    //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
@@ -255,8 +297,7 @@ $(document).ready(function(){
   <div class="col-md-6">
    <h3>Settings</h3>
    <?php __dump_settings($settings); ?>
-   <h3>Containers</h3>
-   &times; &times; &times; &times; &times;
+   <?php __dump_containers($containers); ?>
   </div>
  </div> <!--row-->
 </div> <!--container-fluid-->

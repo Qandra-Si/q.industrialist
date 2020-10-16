@@ -543,6 +543,20 @@ def main():
         sde_type_ids,
         corp_assets_data
     )
+    # обновление данных в БД (названия контейнеров, и первичное автозаполнение)
+    if len(db_factory_containers) == 0:
+        # "containers": [
+        #    {"id": 1032456650838,
+        #     "type_id": 33011,
+        #     "name": "t2 fit 2"},... ]
+        qidb = db.QIndustrialistDatabase("workflow", debug=True)
+        qidb.connect(q_industrialist_settings.g_database)
+        for fc in factory_containers["containers"]:
+            qidb.execute(
+                "INSERT INTO workflow_factory_containers(wfc_id,wfc_name) VALUES(%s,%s);",
+                fc["id"], fc["name"])
+        del qidb
+
     print('\nFound factory station {} with containers in hangars...'.format(factory_containers["station_name"]))
     print('  {} = {}'.format(factory_containers["station_id"], factory_containers["station_name"]))
     print('  blueprint hangars = {}'.format(module_settings["factory:blueprints_hangars"]))

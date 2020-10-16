@@ -118,8 +118,9 @@ TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 CREATE TABLE qi.workflow_factory_containers
 (
-    wfc_id INTEGER NOT NULL, -- идентификатор контейнера
+    wfc_id BIGINT NOT NULL, -- идентификатор контейнера
     wfc_name CHARACTER VARYING(63), -- наименование контейнера (может устаревать, нужен для сигнализации)
+    wfc_active BOOLEAN NOT NULL DEFAULT TRUE, -- признак использования контейнера (отключенные нужны для наблюдения содержимого заданных ангаров)
     CONSTRAINT pk_wfc PRIMARY KEY (wfc_id)
 )
 TABLESPACE pg_default;

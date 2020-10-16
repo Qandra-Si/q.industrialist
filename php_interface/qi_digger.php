@@ -10,6 +10,13 @@ function get_numeric($val) {
     return is_numeric($val) ? ($val + 0) : 0;
 }
 
+function get_conn() {
+    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+        or die('pg_connect err: '.pg_last_error());
+    pg_exec($conn, "SET search_path TO qi");
+    return $conn;
+}
+
 if (isset($_GET['module'])) {
     $method = htmlentities($_GET['module']);
     if ($method == 'workflow') {
@@ -45,6 +52,7 @@ elseif (isset($_POST['module'])) {
     $method = htmlentities($_POST['module']);
     if ($method == 'workflow') {
         if (isset($_POST['action'])) {
+            $conn = NULL;
             $query = NULL;
             $params = NULL;
             //---
@@ -101,10 +109,30 @@ EOD;
                 }
             }
             //---
+            elseif ($action == 'containers') {
+                $conn = get_conn();
+                $containers_cursor = pg_query($conn, 'SELECT wfc_id,wfc_name,wfc_active FROM workflow_factory_containers;')
+                        or die('pg_query err: '.pg_last_error());
+                $containers = pg_fetch_all($containers_cursor);
+                //print_r($containers);
+                foreach($containers as &$cont) {
+                    $id = $cont['wfc_id'];
+                    $on = isset($_POST[$id]) ? 't' : 'f'; // всегда установлен в on (в список не попадают off значения)
+                    $active = $cont['wfc_active'];
+                    if ($on != $active) {
+                        $query = 'UPDATE workflow_factory_containers SET wfc_active=$1 WHERE wfc_id=$2;';
+                        $params = array($on, $id);
+                        pg_query_params($conn, $query, $params)
+                                or die('pg_query_params err: '.pg_last_error());
+                    }
+                }
+                pg_query($conn, 'COMMIT;');
+                pg_close($conn);
+                return; // или $query = NULL;
+            }
+            //---
             if (!is_null($query)) {
-                $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-                        or die('pg_connect err: '.pg_last_error());
-                pg_exec($conn, "SET search_path TO qi");
+                $conn = get_conn();
                 pg_query_params($conn, $query, $params)
                         or die('pg_query_params err: '.pg_last_error());
                 pg_query($conn, 'COMMIT;');
