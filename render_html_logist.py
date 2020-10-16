@@ -300,11 +300,12 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     ))
             else:
                 glf.write(
-                    '<tr>\n'
+                    '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
                     ' <td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
+                           cnn=cynonetwork_num,
                            nm=system_name))
             if row_num != len(cn_route):
                 glf.write(
