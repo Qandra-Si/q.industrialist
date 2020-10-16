@@ -214,6 +214,7 @@ def __get_blueprints_containers_with_data_loading(
 def __get_monthly_manufacturing_scheduler(
         # настройки
         scheduler_job_settings,
+        db_factory_containers,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_named_type_ids,
@@ -333,11 +334,13 @@ def __get_monthly_manufacturing_scheduler(
 
     # формирование списка чертежей имеющихся на станции в указанных контейнерах
     factory_container_ids = [fc["id"] for fc in factory_containers["containers"]]
+    db_factory_container_ids = [dbfc["id"] for dbfc in db_factory_containers if dbfc["active"] and not dbfc["disabled"]]
     # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
     # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
     # activities performed on them yet).
     scheduler["factory_repository"] = [bp for bp in corp_blueprints_data if
-                                       (bp["location_id"] in factory_container_ids) and
+                                       (bp["location_id"] in factory_container_ids) and  # real ids
+                                       (bp["location_id"] in db_factory_container_ids) and  # ids from database settings (filter for real ids)
                                        (bp["quantity"] == -2)]
 
     # формирование сводного списка чертежей фабрики, с суммарным кол-вом run-ов
@@ -464,20 +467,86 @@ def __get_monthly_manufacturing_scheduler(
     return scheduler
 
 
-def main():
+def __get_db_connection():
     qidb = db.QIndustrialistDatabase("workflow", debug=True)
     qidb.connect(q_industrialist_settings.g_database)
+    return qidb
+
+
+def __actualize_factory_containers(db_factory_containers, real_factory_containers):
+    # "containers": [
+    #    {"id": 1032456650838,
+    #     "type_id": 33011,
+    #     "name": "t2 fit 2"},... ]
+    qidb = None
+    default_active = 't' if len(db_factory_containers) == 0 else 'f'
+    for fc in real_factory_containers:
+        db_fc = next((c for c in db_factory_containers if int(c["id"]) == int(fc["id"])), None)
+        if (db_fc is None) or \
+                ("name" in fc) and (db_fc["name"] != fc["name"]) or \
+                db_fc["disabled"]:
+            if qidb is None:
+                qidb = __get_db_connection()
+            if db_fc is None:
+                qidb.execute(  # контейнер с заданным id отсутствует в БД - добавляем выключенным
+                    "INSERT INTO workflow_factory_containers(wfc_id,wfc_name,wfc_active) VALUES(%s,%s,%s);",
+                    fc["id"], fc["name"] if "name" in fc else None, default_active)
+                db_factory_containers.append({
+                    "id": fc["id"],
+                    "name": fc["name"] if "name" in fc else None,
+                    "active": default_active,
+                    "disabled": False,
+                    "processed": True})
+            elif ("name" in fc) and (db_fc["name"] != fc["name"]):
+                if db_fc["disabled"]:
+                    qidb.execute(  # контейнер был переименован и вернулся в ангар (раньше там отсутствовал)
+                        "UPDATE workflow_factory_containers SET wfc_name=%s,wfc_disabled=FALSE WHERE wfc_id=%s;",
+                        fc["name"], fc["id"])
+                    db_fc["disabled"] = False
+                else:
+                    qidb.execute(  # контейнер был переименован
+                        "UPDATE workflow_factory_containers SET wfc_name=%s WHERE wfc_id=%s;",
+                        fc["name"], fc["id"])
+                db_fc["name"] = fc["name"]
+            elif db_fc["disabled"]:
+                qidb.execute(  # контейнер вернулся в ангар (раньше там отсутствовал)
+                    "UPDATE workflow_factory_containers SET wfc_disabled=FALSE WHERE wfc_id=%s;",
+                    fc["id"])
+                db_fc["disabled"] = False
+        if not (db_fc is None):
+            db_fc.update({"processed": True})
+    if len(db_factory_containers) > 0:
+        for db_fc in db_factory_containers:
+            # пропускаем актуализированные контейнеры (имеющиеся сейчас в ангарах)
+            if "processed" in db_fc:
+                continue
+            # пропускаем уже помеченные "отсутствующими" контейнеры
+            if db_fc["disabled"]:
+                continue
+            if qidb is None:
+                qidb = __get_db_connection()
+            qidb.execute(  # контейнер исчез из ангара (помечаем "отсутствующим", оставляем в БД)
+                "UPDATE workflow_factory_containers SET wfc_disabled=TRUE WHERE wfc_id=%s;",
+                db_fc["id"])
+            db_fc["disabled"] = True
+    if not (qidb is None):
+        qidb.commit()
+        del qidb
+
+
+def main():
+    qidb = __get_db_connection()
     module_settings = qidb.load_module_settings(g_module_default_settings)
     db_monthly_jobs = qidb.select_all_rows(
         "SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks "
         "FROM workflow_monthly_jobs;")
     db_factory_containers = qidb.select_all_rows(
-        "SELECT wfc_id,wfc_name "
+        "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled "
         "FROM workflow_factory_containers;")
     del qidb
 
     db_monthly_jobs = [{"eft": wmj[3], "quantity": wmj[2]} for wmj in db_monthly_jobs]
-    db_factory_containers = [{"id": wfc[0], "name": wfc[1]} for wfc in db_factory_containers]
+    db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3]} for wfc in db_factory_containers]
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -544,23 +613,13 @@ def main():
         corp_assets_data
     )
     # обновление данных в БД (названия контейнеров, и первичное автозаполнение)
-    if len(db_factory_containers) == 0:
-        # "containers": [
-        #    {"id": 1032456650838,
-        #     "type_id": 33011,
-        #     "name": "t2 fit 2"},... ]
-        qidb = db.QIndustrialistDatabase("workflow", debug=True)
-        qidb.connect(q_industrialist_settings.g_database)
-        for fc in factory_containers["containers"]:
-            qidb.execute(
-                "INSERT INTO workflow_factory_containers(wfc_id,wfc_name) VALUES(%s,%s);",
-                fc["id"], fc["name"])
-        del qidb
+    __actualize_factory_containers(db_factory_containers, factory_containers["containers"])
 
     print('\nFound factory station {} with containers in hangars...'.format(factory_containers["station_name"]))
     print('  {} = {}'.format(factory_containers["station_id"], factory_containers["station_name"]))
     print('  blueprint hangars = {}'.format(module_settings["factory:blueprints_hangars"]))
     print('  blueprint containers = {}'.format(len([fc["id"] for fc in factory_containers["containers"]])))
+    print('  database containers = {}'.format(len(db_factory_containers)))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -577,17 +636,18 @@ def main():
 
     # формирование набора данных для построения отчёта
     corp_manufacturing_scheduler = __get_monthly_manufacturing_scheduler(
-        # данные, полученные из БД
+        # данные полученные из БД
         db_monthly_jobs,
-        # sde данные, загруженные из .converted_xxx.json файлов
+        db_factory_containers,
+        # sde данные загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_named_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        # esi данные, загруженные с серверов CCP
+        # esi данные загруженные с серверов CCP
         corp_blueprints_data,
         corp_industry_jobs_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
+        # данные полученные в результате анализа и перекомпоновки входных списков
         factory_containers
     )
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_manufacturing_scheduler", corp_manufacturing_scheduler)

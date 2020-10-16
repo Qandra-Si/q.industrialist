@@ -121,6 +121,7 @@ CREATE TABLE qi.workflow_factory_containers
     wfc_id BIGINT NOT NULL, -- идентификатор контейнера
     wfc_name CHARACTER VARYING(63), -- наименование контейнера (может устаревать, нужен для сигнализации)
     wfc_active BOOLEAN NOT NULL DEFAULT TRUE, -- признак использования контейнера (отключенные нужны для наблюдения содержимого заданных ангаров)
+    wfc_disabled BOOLEAN NOT NULL DEFAULT FALSE, -- признак отсутствия контейнера в ангаре (был перемещён, и актуализирован как "сейчас отсутствует")
     CONSTRAINT pk_wfc PRIMARY KEY (wfc_id)
 )
 TABLESPACE pg_default;

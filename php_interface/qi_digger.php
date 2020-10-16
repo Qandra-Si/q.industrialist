@@ -111,11 +111,12 @@ EOD;
             //---
             elseif ($action == 'containers') {
                 $conn = get_conn();
-                $containers_cursor = pg_query($conn, 'SELECT wfc_id,wfc_name,wfc_active FROM workflow_factory_containers;')
+                $containers_cursor = pg_query($conn, 'SELECT wfc_id,wfc_name,wfc_active,wfc_disabled FROM workflow_factory_containers;')
                         or die('pg_query err: '.pg_last_error());
                 $containers = pg_fetch_all($containers_cursor);
                 //print_r($containers);
                 foreach($containers as &$cont) {
+                    if ($cont['wfc_disabled'] == 't') continue;  # пропускаем контейнеры, помеченные "отсутствующими", пока они не будут снова актуализированы
                     $id = $cont['wfc_id'];
                     $on = isset($_POST[$id]) ? 't' : 'f'; // всегда установлен в on (в список не попадают off значения)
                     $active = $cont['wfc_active'];

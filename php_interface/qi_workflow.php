@@ -232,7 +232,7 @@ $(document).ready(function(){
   <h4 class="panel-title">
    <a role="button" data-toggle="collapse"
     href="#containers_collapse" aria-expanded="true"
-    aria-controls="containers_collapse"><strong>Containers</strong></a>
+    aria-controls="containers_collapse"><strong>Containers with Blueprint Copies</strong></a>
   </h4>
  </div>
  <div id="containers_collapse" class="panel-collapse collapse"
@@ -244,7 +244,9 @@ $(document).ready(function(){
 <?php if (!is_null($containers)) { foreach ($containers as &$cont) { ?>
 <div class="checkbox">
  <label class="form-check-label">
-  <input type="checkbox" <?php if ($cont["wfc_active"]=='t') echo 'checked';?> name="<?=$cont["wfc_id"]?>"> <?=$cont["wfc_name"]?>
+  <input type="checkbox" <?php if ($cont["wfc_active"]=='t') echo 'checked';?> 
+   <?php if ($cont["wfc_disabled"]=='t') echo 'disabled';?> name="<?=$cont["wfc_id"]?>">
+   <?php echo ($cont["wfc_name"]) ? $cont["wfc_name"] : '<span class="text-muted">#'.$cont["wfc_id"].'</span>'; ?>
  </label>
 </div>
 <?php } } ?>
@@ -278,7 +280,7 @@ $(document).ready(function(){
     else
         $settings = NULL;
     //---
-    $query = 'SELECT wfc_id,wfc_name,wfc_active FROM workflow_factory_containers ORDER BY 2;';
+    $query = 'SELECT wfc_id,wfc_name,wfc_active,wfc_disabled FROM workflow_factory_containers ORDER BY 4,2;';
     $containers_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     if (pg_num_rows($containers_cursor) > 0)
