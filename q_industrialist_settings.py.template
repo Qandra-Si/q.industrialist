@@ -9,6 +9,7 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-universe.read_structures.v1",  # Requires: access token
                   "esi-contracts.read_corporation_contracts.v1",  # Requires: access token
                   "esi-wallet.read_corporation_wallets.v1",  # Requires one of the following EVE corporation role(s): Accountant, Junior_Accountant
+                  "esi-corporations.read_divisions.v1",  # Requires one of the following EVE corporation role(s): Director
                   "esi-corporations.read_structures.v1",  # Requires one of the following EVE corporation role(s): Station_Manager
                   "esi-corporations.read_starbases.v1",  # Requires one of the following EVE corporation role(s): Director
                   "esi-corporations.read_facilities.v1",  # Requires one of the following EVE corporation role(s): Factory_Manager

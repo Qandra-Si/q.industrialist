@@ -7,6 +7,7 @@ def __dump_corp_wallets_details(
         corporation_name,
         corporation_id,
         __corp_wallets,
+        __corp_wallet_names,
         __corp_wallets_stat):
     render_html.__dump_any_into_modal_header(
         glf,
@@ -27,11 +28,13 @@ def __dump_corp_wallets_details(
 """)
     for w in __corp_wallets:
         __wallet_division = w["division"]
+        __wallet_name = next((wn["name"] for wn in __corp_wallet_names if (wn['division'] == __wallet_division) and ("name" in wn)), None)
         glf.write('<tr class="success">'
-                  ' <th scope="row">{num}</th>'
+                  ' <th scope="row">{nm}</th>'
                   ' <td align="right">{blnc:,.1f}</td>'
                   '</tr>\n'.
-                  format(num=__wallet_division, blnc=w["balance"]))
+                  format(nm="{nm} [{d}]".format(nm=__wallet_name,d=__wallet_division) if not (__wallet_name is None) else "{d} Wallet [{d}]".format(d=__wallet_division),
+                         blnc=w["balance"]))
         __wd_keys = __corp_wallets_stat[__wallet_division-1].keys()
         for __wd_key in __wd_keys:
             __amount = __corp_wallets_stat[__wallet_division-1][__wd_key]
@@ -59,6 +62,7 @@ def __dump_corp_accounting_nested_tbl(
         glf,
         loc_id,
         loc_dict,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids,
         filter_flags):
@@ -180,10 +184,11 @@ def __dump_corp_accounting_nested_tbl(
                                 __summary_hangar_groups = __hangar_num_qty[int(__hangar_num)]
                                 __summary_hangar_cost = 0
                                 __summary_hangar_volume = 0
+                                __hangar_name = next((hn["name"] for hn in __corp_hangar_names if (hn['division'] == __hangar_num) and ("name" in hn)), None)
                                 glf.write('<tr style="font-weight:bold;background-color:#{hngr_clr}">'
-                                          ' <td colspan="5">Hangar {hangar}</td>'
+                                          ' <td colspan="5">{nm}</td>'
                                           '</tr>\n'.
-                                          format(hangar=__hangar_num,
+                                          format(nm="{nm} [{num}]".format(nm=__hangar_name,num=__hangar_num) if not (__hangar_name is None) else "{num} Hangar [{num}]".format(num=__hangar_num),
                                                  hngr_clr=__hangar_colors[__hangar_num]))
                             # создание искусственной вложенности (ангары и прочие категории)
                             if not (__hangar_num is None):
@@ -282,6 +287,7 @@ def __dump_corp_accounting_details(
         corporation_name,
         corporation_id,
         __corp_tree,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids):
     render_html.__dump_any_into_modal_header(
@@ -300,6 +306,7 @@ def __dump_corp_accounting_details(
             glf,
             root,
             __corp_tree[str(root)],
+            __corp_hangar_names,
             sde_type_ids,
             sde_icon_ids,
             __filter)  # ["CorpDeliveries"]
@@ -310,6 +317,7 @@ def __dump_corp_accounting_nested(
         glf,
         root_id,
         root,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids,
         filter_flags):
@@ -326,10 +334,10 @@ def __dump_corp_accounting_nested(
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
             system = root["systems"][str(loc_id)]
-            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, sde_icon_ids, filter_flags)
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, __corp_hangar_names, sde_type_ids, sde_icon_ids, filter_flags)
     else:
         glf.write('<h2>???</h2>\n')
-        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, sde_icon_ids, filter_flags)
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, __corp_hangar_names, sde_type_ids, sde_icon_ids, filter_flags)
 
 
 def __dump_corp_accounting(
@@ -413,6 +421,7 @@ def __dump_corp_accounting(
             __corp["corporation"],
             corporation_id,
             __corp["wallet"],
+            __corp["divisions"]["wallet"] if "wallet" in __corp["divisions"] else [],
             __corp["wallet_stat"])
         glf.write('</td>'
                   '</tr>\n')
@@ -445,6 +454,7 @@ def __dump_corp_accounting(
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
+                __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
                 sde_type_ids,
                 sde_icon_ids)
             glf.write('</td>'
@@ -470,6 +480,7 @@ def __dump_corp_accounting(
             __corp["corporation"],
             corporation_id,
             __corp["tree"],
+            __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
             sde_type_ids,
             sde_icon_ids)
         glf.write('</td>'
@@ -496,6 +507,7 @@ def __dump_corp_accounting(
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
+                __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
                 sde_type_ids,
                 sde_icon_ids)
             glf.write('</td>'

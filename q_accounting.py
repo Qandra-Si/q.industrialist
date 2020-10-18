@@ -566,6 +566,12 @@ def main():
             print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
             sys.stdout.flush()
 
+        # Requires one of the following EVE corporation role(s): Director
+        corp_divisions_data = interface.get_esi_data(
+            "corporations/{}/divisions/".format(corporation_id))
+        print("'{}' corporation has {} hangar and {} wallet names\n".format(corporation_name, len(corp_divisions_data["hangar"]) if "hangar" in corp_divisions_data else 0, len(corp_divisions_data["wallet"]) if "wallet" in corp_divisions_data else 0))
+        sys.stdout.flush()
+
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
@@ -636,6 +642,7 @@ def main():
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
+            "divisions": corp_divisions_data,
             "wallet": corp_wallets_data,
             "wallet_stat": corp_wallet_stat,
             "stat": corp_accounting_stat,
