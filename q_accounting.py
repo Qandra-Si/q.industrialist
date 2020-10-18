@@ -453,6 +453,20 @@ def __build_accounting(
     return corp_accounting_stat, corp_accounting_tree
 
 
+def __build_wallets_stat(corp_wallet_journal_data):
+    corp_wallet_stat = [{}, {}, {}, {}, {}, {}, {}]
+    for wallet_division_jounal in enumerate(corp_wallet_journal_data):
+        __wallet_dict = corp_wallet_stat[wallet_division_jounal[0]]
+        for w in wallet_division_jounal[1]:
+            # https://github.com/esi/eve-glue/blob/master/eve_glue/wallet_journal_ref.py
+            __ref_type = str(w.get("ref_type"))  # mandatory
+            __amount = w.get("amount", None)  # optional
+            if not (__ref_type in __wallet_dict):
+                __wallet_dict.update({__ref_type: 0.00})
+            __wallet_dict[__ref_type] += __amount
+    return corp_wallet_stat
+
+
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -543,6 +557,15 @@ def main():
         print("\n'{}' corporation has {} wallet divisions".format(corporation_name, len(corp_wallets_data)))
         sys.stdout.flush()
 
+        # Requires role(s): Accountant, Junior_Accountant
+        corp_wallet_journal_data = [None, None, None, None, None, None, None]
+        for w in corp_wallets_data:
+            division = w["division"]
+            corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
+                "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
+            print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
+            sys.stdout.flush()
+
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
@@ -608,10 +631,13 @@ def main():
             corp_assets_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_stat.{}".format(corporation_name), corp_accounting_stat)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_tree.{}".format(corporation_name), corp_accounting_tree)
+        corp_wallet_stat = __build_wallets_stat(corp_wallet_journal_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_wallet_stat.{}".format(corporation_name), corp_wallet_stat)
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
             "wallet": corp_wallets_data,
+            "wallet_stat": corp_wallet_stat,
             "stat": corp_accounting_stat,
             "tree": corp_accounting_tree
         }})

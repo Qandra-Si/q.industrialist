@@ -97,11 +97,20 @@ def main():
                 print("EVE market has {} prices\n".format(len(eve_market_prices_data)))
                 sys.stdout.flush()
 
-            # Requires role(s): Director
+            # Requires role(s): Accountant, Junior_Accountant
             corp_wallets_data = interface.get_esi_paged_data(
                 "corporations/{}/wallets/".format(corporation_id))
             print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
             sys.stdout.flush()
+
+            # Requires role(s): Accountant, Junior_Accountant
+            corp_wallet_journal_data = [None, None, None, None, None, None, None]
+            for w in corp_wallets_data:
+                division = w["division"]
+                corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
+                    "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
+                print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
+                sys.stdout.flush()
 
             # Requires role(s): Director
             corp_assets_data = interface.get_esi_paged_data(

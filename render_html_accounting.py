@@ -6,14 +6,14 @@ def __dump_corp_wallets_details(
         glf,
         corporation_name,
         corporation_id,
-        __corp_wallets):
+        __corp_wallets,
+        __corp_wallets_stat):
     render_html.__dump_any_into_modal_header(
         glf,
         '<span class="text-primary">{nm}</span> Wallets'.format(nm=corporation_name),
-        '{nm}_wallets'.format(nm=corporation_id),
-        "btn-xs",
-        "details&hellip;",
-        "modal-sm")
+        unique_id='{nm}_wallets'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
     glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
@@ -26,11 +26,22 @@ def __dump_corp_wallets_details(
 <tbody>
 """)
     for w in __corp_wallets:
-        glf.write('<tr>'
+        __wallet_division = w["division"]
+        glf.write('<tr class="success">'
                   ' <th scope="row">{num}</th>'
                   ' <td align="right">{blnc:,.1f}</td>'
                   '</tr>\n'.
-                  format(num=w["division"], blnc=w["balance"]))
+                  format(num=__wallet_division, blnc=w["balance"]))
+        __wd_keys = __corp_wallets_stat[__wallet_division-1].keys()
+        for __wd_key in __wd_keys:
+            __amount = __corp_wallets_stat[__wallet_division-1][__wd_key]
+            glf.write('<tr>'
+                      ' <td>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{ref}</th>'
+                      ' <td align="right"{clr}>{amount:,.1f}</td>'
+                      '</tr>\n'.
+                      format(ref=__wd_key,
+                             amount=__amount,
+                             clr=' class="text-danger"' if __amount < 0 else ""))
     glf.write('<tr style="font-weight:bold;">'
               ' <td>Summary</td>'
               ' <td align="right">{sum:,.1f}</td>'
@@ -401,7 +412,8 @@ def __dump_corp_accounting(
             glf,
             __corp["corporation"],
             corporation_id,
-            __corp["wallet"])
+            __corp["wallet"],
+            __corp["wallet_stat"])
         glf.write('</td>'
                   '</tr>\n')
         # вывод третьей, четвёртой, ... строчек - ассеты корпорации
