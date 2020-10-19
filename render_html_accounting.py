@@ -283,7 +283,8 @@ def __dump_corp_accounting_nested_tbl(
 
 def __dump_corp_accounting_details(
         glf,
-        __key,
+        __association,
+        __keys,
         corporation_name,
         corporation_id,
         __corp_tree,
@@ -293,14 +294,13 @@ def __dump_corp_accounting_details(
     render_html.__dump_any_into_modal_header(
         glf,
         '<span class="text-primary">{nm}</span> {key}'.format(nm=corporation_name,
-                                                              key="" if __key is None else __key),
+                                                              key=__association),
         '{nm}_{key}'.format(nm=corporation_id,
-                            key="all" if __key is None else __key),
+                            key="all" if __keys is None else render_html.__camel_to_snake(__association)),
         "btn-xs",
         "details&hellip;",
         "modal-lg")
     __roots = __corp_tree.keys()
-    __filter = None if __key is None else [__key]
     for root in __roots:
         __dump_corp_accounting_nested(
             glf,
@@ -309,7 +309,7 @@ def __dump_corp_accounting_details(
             __corp_hangar_names,
             sde_type_ids,
             sde_icon_ids,
-            __filter)  # ["CorpDeliveries"]
+            __keys)  # ["CorpDeliveries"]
     render_html.__dump_any_into_modal_footer(glf)
 
 
@@ -425,15 +425,66 @@ def __dump_corp_accounting(
             __corp["wallet_stat"])
         glf.write('</td>'
                   '</tr>\n')
+
         # вывод третьей, четвёртой, ... строчек - ассеты корпорации
         row_num = 2
         __summary_cost = __wallets_balance
         __summary_volume = 0
         __stat_keys = __corp["stat"].keys()
+
+        # [
+        #  { "Structures": [{"AutoFit": ...}, {"ServiceSlot0": ...}, ...] },
+        #  { "OfficeFolder": [{"OfficeFolder": ...}]] },
+        #  { "FighterTube": [{"FighterTube0": ...}, {"FighterTube1": ...}, ...]] },
+        # ]
+        __sorted_keys = []
+
+        def add_into_sorted_keys(__association, __key, __stat_dict):
+            __association_dict = next((k442 for k442 in __sorted_keys if __association in k442), None)
+            if __association_dict is None:
+                __sorted_keys.append({__association: [{__key: __stat_dict}]})
+            else:
+                __association_dict[__association].append({__key: __stat_dict})
+
         for __key in __stat_keys:
             __stat_dict = __corp["stat"][str(__key)]
             if ("omit_in_summary" in __stat_dict) and __stat_dict["omit_in_summary"]:
                 continue
+            # удаляем из нумерованных ключей последнюю цифру
+            __unnumbered_key = __key[:-1]
+            # https://github.com/esi/eve-glue/blob/master/eve_glue/location_flag.py
+            if (__key == "AutoFit") or (__unnumbered_key == "ServiceSlot") or \
+               (__key == "StructureFuel") or (__unnumbered_key == "RigSlot"):
+                # собираем структурные keys (AutoFit, ServiceSlot? => Structures)
+                add_into_sorted_keys("Structures", __key, __stat_dict)
+            else:
+                # FighterTube0, FighterTube1, ..., SubSystemSlot0, SubSystemSlot1, ...
+                if (__unnumbered_key == "FighterTube") or \
+                   (__unnumbered_key == "CorpSAG") or \
+                   (__unnumbered_key == "HiSlot") or \
+                   (__unnumbered_key == "MedSlot") or \
+                   (__unnumbered_key == "LoSlot") or \
+                   (__unnumbered_key == "SubSystemSlot"):
+                    add_into_sorted_keys(__unnumbered_key, __key, __stat_dict)
+                else:
+                    add_into_sorted_keys(__key, __key, __stat_dict)
+
+        __sorted_keys = sorted(__sorted_keys, key=lambda x: str(list(x.keys())[0]))
+        for ka in __sorted_keys:
+            __association = list(ka.keys())[0]      # "Structures"
+            __association_dict = ka[__association]  # [{"AutoFit": ...}, {"ServiceSlot0": ...}, ...]
+            __association_dict = sorted(__association_dict, key=lambda x: str(list(x.keys())[0]))
+            # подсчёт общей статистики
+            __association_cost = 0
+            __association_volume = 0
+            __association_keys = []
+            for ad in __association_dict:
+                __key = list(ad.keys())[0]  # "AutoFit"
+                __stat_dict = ad[__key]     # ...
+                __association_keys.append(__key)
+                # подсчёт общей статистики
+                __association_cost += __stat_dict["cost"]
+                __association_volume += __stat_dict["volume"]
             glf.write('<tr>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}</td>'
@@ -441,16 +492,14 @@ def __dump_corp_accounting(
                       ' <td align="right">{volume:,.1f}</td>'
                       ' <td align="center">'.
                       format(num=row_num,
-                             nm=__key,  # "CorpDeliveries"
-                             cost=__stat_dict["cost"],
-                             volume=__stat_dict["volume"]))
-            # подсчёт общей статистики
-            __summary_cost = __summary_cost + __stat_dict["cost"]
-            __summary_volume = __summary_volume + __stat_dict["volume"]
+                             nm=__association,  # "CorpDeliveries"
+                             cost=__association_cost,
+                             volume=__association_volume))
             # добавление details на страницу
             __dump_corp_accounting_details(
                 glf,
-                __key,
+                __association,
+                __association_keys,
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
@@ -460,6 +509,8 @@ def __dump_corp_accounting(
             glf.write('</td>'
                       '</tr>\n')
             row_num = row_num + 1
+
+        # добавление строки Summary
         __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
                         '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                         '  aria-hidden="true"></span></a>'. \
@@ -476,6 +527,7 @@ def __dump_corp_accounting(
         # добавление details в summary
         __dump_corp_accounting_details(
             glf,
+            "Summary",
             None,
             __corp["corporation"],
             corporation_id,
@@ -485,6 +537,7 @@ def __dump_corp_accounting(
             sde_icon_ids)
         glf.write('</td>'
                   '</tr>\n')
+
         # добавление в подвал (под summary) информацию об omitted-категориях (такая у нас Blueprints & Reactions)
         # повторно запускаем цикл
         for __key in __stat_keys:
@@ -503,7 +556,8 @@ def __dump_corp_accounting(
             # добавление details на страницу
             __dump_corp_accounting_details(
                 glf,
-                __key,
+                __key,  # "BlueprintsReactions"
+                [__key],
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
