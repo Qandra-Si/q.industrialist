@@ -286,7 +286,7 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
                     id=bpc["type_id"],
                     q=__required,
                     a=__availiable,
-                    color='class="text-danger"' if __availiable == 0 else ('class="text-muted"' if __availiable >= __required else "")
+                    color='class="text-warning"' if __availiable == 0 else ('class="text-muted"' if __availiable >= __required else "")
                 )
             )
     glf.write('</table>')
