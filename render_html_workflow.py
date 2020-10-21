@@ -267,21 +267,26 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
     glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
     for __cat_dict in blueprint_categories:
         __products = __cat_dict["products"]
-        glf.write('<tr><td class="active text-info" colspan="3"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
+        glf.write('<tr><td class="active text-info" colspan="4"><strong>{nm}</strong></td></tr>\n'.format(nm=__cat_dict["name"]))
         for __product_dict in __products:
             bpc = missing_blueprints[__product_dict["index"]]
+            __required = bpc["required_quantity"]
+            __availiable = bpc["available_quantity"]
             glf.write(
-                '<tr><!--{id}-->'
+                '<tr {color}><!--{id}-->'
                 '<td><img class="media-object icn32" src="{img}"></td>'
                 '<td>{nm}</td>'
                 '<td align="right">{q}</td>'
+                '<td align="right">{a}</td>'
                 '</tr>\n'.
                 format(
                     img=render_html.__get_img_src(bpc["type_id"], 32),
                     nm=bpc["name"],
                     # чертежи могут храниться не только в 6м ангаре: flag='<br/><span class="label label-danger">no blueprints</span>' if "there_are_no_blueprints" in bpc else ""
                     id=bpc["type_id"],
-                    q=bpc["required_quantity"]
+                    q=__required,
+                    a=__availiable,
+                    color='class="text-danger"' if __availiable == 0 else ('class="text-muted"' if __availiable >= __required else "")
                 )
             )
     glf.write('</table>')

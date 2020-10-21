@@ -410,6 +410,7 @@ def __get_monthly_manufacturing_scheduler(
                 "name": __sb_dict["name"],
                 "product_type_id": __product_type_id,
                 "required_quantity": __required_blueprints,
+                "available_quantity": 0,
                 "there_are_no_blueprints": True,  # признак того, что нет ни одного чертежа этого типа
             })
         else:
@@ -426,6 +427,7 @@ def __get_monthly_manufacturing_scheduler(
                     "name": __sb_dict["name"],
                     "product_type_id": __product_type_id,
                     "required_quantity": __required_blueprints,
+                    "available_quantity": __exist_run_products
                 })
             # если чертежей избыточное количество, то расчитываем кол-во лишних
             elif __exist_run_products > __scheduled_products:
