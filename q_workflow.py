@@ -410,19 +410,20 @@ def __get_monthly_manufacturing_scheduler(
             __missing_blueprints = 0
         else:
             __missing_blueprints = (__scheduled_products - __exist_run_products + __single_run_quantity + 1) // __single_run_quantity
-        # print(__sb_dict["name"],
+        #print(__sb_dict["name"],
         #      "scheduled=", __scheduled_products,
         #      ",  per run=", __blueprint_copy_runs, '*', __products_per_run,
         #      ",  required=", __sb_dict["blueprints_quantity"],
         #      ",  missing=", __missing_blueprints,
-        #      ",  exist=", [fb["runs"] for fb in __exist], "*", __products_per_run)
+        #      ",  exist=", [fb["runs"] for fb in __exist], "*", __products_per_run,
+        #      ",  ex_runs=", __exist_runs)
         # отправка данных для формирования отчёта
         missing_blueprints.append({
             "type_id": __blueprint_type_id,
             "name": __sb_dict["name"],
             "product_type_id": __product_type_id,
             "missing_blueprints": __missing_blueprints,  # подразумевается как недостающее кол-во
-            "available_quantity": (__exist_runs + __single_run_quantity - 1) // __single_run_quantity,
+            "available_quantity": (__exist_run_products + __single_run_quantity - 1) // __single_run_quantity,
             "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
         })
 
