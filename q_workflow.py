@@ -404,21 +404,27 @@ def __get_monthly_manufacturing_scheduler(
         # получаем данные по имеющимся чертежам
         __exist = [fb for fb in factory_blueprints if fb["type_id"] == __blueprint_type_id]
         # если чертежей и вовсе нет, то сразу создаём запись о недостающем количестве
-        print(__sb_dict["name"],
-              "scheduled=", __scheduled_products,
-              ",  per run=", __single_run_quantity,
-              ",  required=", __required_blueprints,
-              ",  exist=", [fb["runs"] for fb in __exist])
         if True:
             # суммируем прогоны чертежей и переводим их в количество продуктов, которые м.б. построено
             __exist_runs = sum([fb["runs"] for fb in __exist])  # напр. 3 рана...
             __exist_run_products = __exist_runs * __products_per_run  # ...по 1000 шт продукции, итого 3000 продукций
             # расчитываем недостающее кол-во чертежей
+            if __exist_run_products >= __scheduled_products:
+                __missing_blueprints = 0
+            else:
+                __missing_blueprints = (__scheduled_products - __exist_run_products + __single_run_quantity + 1) // __single_run_quantity
+            #print(__sb_dict["name"],
+            #      "scheduled=", __scheduled_products,
+            #      ",  per run=", __single_run_quantity,
+            #      ",  required=", __required_blueprints,
+            #      ",  missing=", __missing_blueprints,
+            #      ",  exist=", [fb["runs"] for fb in __exist])
+            # отправка данных для формирования отчёта
             missing_blueprints.append({
                 "type_id": __blueprint_type_id,
                 "name": __sb_dict["name"],
                 "product_type_id": __product_type_id,
-                "required_quantity": __required_blueprints,
+                "required_quantity": __missing_blueprints,  # подразумевается как недостающее кол-во
                 "available_quantity": (__exist_runs + __single_run_quantity - 1) // __single_run_quantity,
                 "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
             })
