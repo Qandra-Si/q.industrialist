@@ -272,10 +272,11 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
             bpc = missing_blueprints[__product_dict["index"]]
             __required = bpc["required_quantity"]
             __availiable = bpc["available_quantity"]
+            __scheduled = bpc["scheduled_quantity"]
             glf.write(
                 '<tr {color}><!--{id}-->'
                 '<td><img class="media-object icn32" src="{img}"></td>'
-                '<td>{nm}</td>'
+                '<td><strong>{s}x</strong> {nm}</td>'
                 '<td align="right">{q}</td>'
                 '<td align="right">{a}</td>'
                 '</tr>\n'.
@@ -286,7 +287,8 @@ def __dump_missing_blueprints(glf, corp_manufacturing_scheduler, sde_type_ids, s
                     id=bpc["type_id"],
                     q=__required,
                     a=__availiable,
-                    color='class="danger"' if __availiable == 0 else ('class="text-muted"' if __availiable >= __required else 'class="warning"')
+                    s=__scheduled,
+                    color='class="danger"' if __availiable == 0 else ('class="text-muted"' if __availiable >= __scheduled else 'class="warning"')
                 )
             )
     glf.write('</table>')
