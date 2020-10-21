@@ -396,80 +396,35 @@ def __get_monthly_manufacturing_scheduler(
         # получаем данные по чертежу, запланированному к использованию
         __blueprint_type_id = __sb_dict["type_id"]
         __product_type_id = __sb_dict["product"]["type_id"]
-        __required_blueprints = __sb_dict["blueprints_quantity"]
         __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
         __products_per_run = __sb_dict["products_per_run"]
         __blueprint_copy_runs = __sb_dict["blueprint_copy_runs"]
         __single_run_quantity = __blueprint_copy_runs * __products_per_run
         # получаем данные по имеющимся чертежам
         __exist = [fb for fb in factory_blueprints if fb["type_id"] == __blueprint_type_id]
-        # если чертежей и вовсе нет, то сразу создаём запись о недостающем количестве
-        if True:
-            # суммируем прогоны чертежей и переводим их в количество продуктов, которые м.б. построено
-            __exist_runs = sum([fb["runs"] for fb in __exist])  # напр. 3 рана...
-            __exist_run_products = __exist_runs * __products_per_run  # ...по 1000 шт продукции, итого 3000 продукций
-            # расчитываем недостающее кол-во чертежей
-            if __exist_run_products >= __scheduled_products:
-                __missing_blueprints = 0
-            else:
-                __missing_blueprints = (__scheduled_products - __exist_run_products + __single_run_quantity + 1) // __single_run_quantity
-            #print(__sb_dict["name"],
-            #      "scheduled=", __scheduled_products,
-            #      ",  per run=", __single_run_quantity,
-            #      ",  required=", __required_blueprints,
-            #      ",  missing=", __missing_blueprints,
-            #      ",  exist=", [fb["runs"] for fb in __exist])
-            # отправка данных для формирования отчёта
-            missing_blueprints.append({
-                "type_id": __blueprint_type_id,
-                "name": __sb_dict["name"],
-                "product_type_id": __product_type_id,
-                "required_quantity": __missing_blueprints,  # подразумевается как недостающее кол-во
-                "available_quantity": (__exist_runs + __single_run_quantity - 1) // __single_run_quantity,
-                "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
-            })
+        # суммируем прогоны чертежей и переводим их в количество продуктов, которые м.б. построено
+        __exist_runs = sum([fb["runs"] for fb in __exist])  # напр. 3 рана...
+        __exist_run_products = __exist_runs * __products_per_run  # ...по 1000 шт продукции, итого 3000 продукций
+        # расчитываем недостающее кол-во чертежей
+        if __exist_run_products >= __scheduled_products:
+            __missing_blueprints = 0
         else:
-            # это выключенная ветка, с тех пор, как Utama попросил переделать отображение 2ю колонку
-            if not __exist:
-                missing_blueprints.append({
-                    "type_id": __blueprint_type_id,
-                    "name": __sb_dict["name"],
-                    "product_type_id": __product_type_id,
-                    "required_quantity": __required_blueprints,
-                    "available_quantity": 0,  # нет ни одного чертежа этого типа
-                    "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
-                })
-            else:
-                # суммируем прогоны чертежей и переводим их в количество продуктов, которые м.б. построено
-                __exist_runs = sum([fb["runs"] for fb in __exist])  # напр. 3 рана...
-                __exist_run_products = __exist_runs * __products_per_run  # ...по 1000 шт продукции, итого 3000 продукций
-                # если чертежей недостаточно, то расчитываем недостающее кол-во чертежей
-                if __exist_run_products < __scheduled_products:
-                    __required_run_products = __scheduled_products - __exist_run_products
-                    __required_blueprints = \
-                        int(__required_run_products + __single_run_quantity - 1) // int(__single_run_quantity)
-                    missing_blueprints.append({
-                        "type_id": __blueprint_type_id,
-                        "name": __sb_dict["name"],
-                        "product_type_id": __product_type_id,
-                        "required_quantity": __required_blueprints,
-                        "available_quantity": __exist_runs,
-                        "scheduled_quantity": (__scheduled_products + __products_per_run - 1) // __products_per_run
-                    })
-                # если чертежей избыточное количество, то расчитываем кол-во лишних
-                elif __exist_run_products > __scheduled_products:
-                    __unnecessary_run_products = __exist_run_products - __scheduled_products
-                    __unnecessary_blueprints = \
-                        int(__unnecessary_run_products) // int(__single_run_quantity)
-                    # возможна ситуация: имеется чертежей на 70 продуктов, требуется 65 продуктов,
-                    # но каждый ран - 10 продуктов, таким образом (70-65)//10 - все чертежи нужны
-                    if __unnecessary_blueprints > 0:
-                        overplus_blueprints.append({
-                            "type_id": __blueprint_type_id,
-                            "name": __sb_dict["name"],
-                            "product_type_id": __product_type_id,
-                            "unnecessary_quantity": __unnecessary_blueprints,
-                        })
+            __missing_blueprints = (__scheduled_products - __exist_run_products + __single_run_quantity + 1) // __single_run_quantity
+        print(__sb_dict["name"],
+              "scheduled=", __scheduled_products,
+              ",  per run=", __single_run_quantity,
+              ",  required=", __sb_dict["blueprints_quantity"],
+              ",  missing=", __missing_blueprints,
+              ",  exist=", [fb["runs"] for fb in __exist], "*", __single_run_quantity)
+        # отправка данных для формирования отчёта
+        missing_blueprints.append({
+            "type_id": __blueprint_type_id,
+            "name": __sb_dict["name"],
+            "product_type_id": __product_type_id,
+            "missing_blueprints": __missing_blueprints,  # подразумевается как недостающее кол-во
+            "available_quantity": (__exist_runs + __single_run_quantity - 1) // __single_run_quantity,
+            "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
+        })
 
     # формирование списка избыточных чертежей
     scheduled_blueprint_type_ids = [int(sb["type_id"]) for sb in scheduled_blueprints]
