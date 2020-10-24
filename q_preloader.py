@@ -187,6 +187,7 @@ def main():
                         if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
                             foreign_structures_forbidden_ids.append(structure_id)
                         else:
+                            # print(sys.exc_info())
                             raise
                     except:
                         print(sys.exc_info())
@@ -227,6 +228,7 @@ def main():
                         if status_code == 404:  # это нормально, что часть доп.инфы по контрактам может быть не найдена!
                             corp_contract_items_not_found.append(contract_id)
                         else:
+                            # print(sys.exc_info())
                             raise
                     except:
                         print(sys.exc_info())

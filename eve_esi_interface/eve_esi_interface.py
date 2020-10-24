@@ -255,6 +255,8 @@ class EveOnlineInterface:
             elif len(cached_data["headers"]) == match_pages:
                 return cached_data["json"] if "json" in cached_data else None
             else:
+                print(match_pages)
+                print(cached_data["headers"])
                 raise
 
     def authenticate(self, character_name=None):
