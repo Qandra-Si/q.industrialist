@@ -202,7 +202,6 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             1,
             bpmm1_standard,  # сведения из чертежа
             __capital_material_efficiency)
-        print(bpmm1_standard, bpmm1_efficiency, __capital_material_efficiency)
         # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
         bpmm1_not_enough = bpmm1_efficiency - bpmm1_available - bpmm1_in_progress
         if bpmm1_not_enough < 0:
