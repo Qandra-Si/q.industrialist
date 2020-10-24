@@ -218,15 +218,12 @@ def __dump_blueprints_list_with_materials(
                                 quantity_or_runs = __bp3["q"] if __bp3["q"] > 0 else 1
                                 if fixed_number_of_runs:
                                     quantity_or_runs = quantity_or_runs * fixed_number_of_runs
-                            __used = int(m["quantity"]) * quantity_or_runs  # сведения из чертежа
-                            __need = __used  # поправка на эффективнсть материалов
-                            if not __is_reaction_formula:
-                                # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-                                # см. 1 x run: http://prntscr.com/u0g07w
-                                # см. 4 x run: http://prntscr.com/u0g0cd
-                                # см. экономия материалов: http://prntscr.com/u0g11u
-                                __me = float(100 - material_efficiency - 1 - 4.2)
-                                __need = int(float((__used * __me) / 100) + 0.99999)
+                            # расчёт кол-ва материала с учётом эффективности производства
+                            __need = eve_sde_tools.get_industry_material_efficiency(
+                                __is_reaction_formula,
+                                quantity_or_runs,
+                                m["quantity"],  # сведения из чертежа
+                                material_efficiency)
                             # считаем общее количество материалов, необходимых для работ по этом чертежу
                             bp_manuf_need_all = bp_manuf_need_all + __need
                             # вычисляем минимально необходимое материалов, необходимых для работ хотя-бы по одному чертежу

@@ -397,6 +397,42 @@ def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_mat
     return None, None, None
 
 
+def get_industry_material_efficiency(
+    # признак - это чертёж или формула?
+    __is_reaction_formula,
+    # кол-во run-ов
+    runs_quantity,
+    # кол-во из исходного чертежа (до учёта всех бонусов)
+    __bpo_materials_quantity,
+    # me-параметр чертежа
+    material_efficiency):
+    if __is_reaction_formula:
+        # TODO: для формул нет расчёта материалоёмкости
+        __need = runs_quantity
+    elif __bpo_materials_quantity == 1:
+        # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
+        # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
+        __need = runs_quantity
+    else:
+        # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+        # см. 1 x run: http://prntscr.com/u0g07w
+        # см. 4 x run: http://prntscr.com/u0g0cd
+        # см.11 x run: https://prnt.sc/v3mk1m
+        # см. экономия материалов: http://prntscr.com/u0g11u
+        # ---
+        # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
+        __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
+        # учитываем бонус профиля сооружения
+        __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
+        # учитываем бонус установленного модификатора
+        __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
+        # округляем вещественное число до старшего целого
+        __stage4 = int(float(__stage3 + 0.99))
+        # ---
+        __need = __stage4
+    return __need
+
+
 def get_market_groups_tree_root(groups_tree, group_id):
     if not (str(group_id) in groups_tree):
         return group_id

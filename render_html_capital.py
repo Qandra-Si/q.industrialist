@@ -151,7 +151,6 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # debug = __capital_blueprint_materials["activities"]["manufacturing"]["materials"][:]
     # debug.append({"typeID": 11186, "quantity": 15})
     # debug.append({"typeID": 41332, "quantity": 10})
-    __capital_material_efficiency = 2
     for m1 in __capital_blueprint_materials["activities"]["manufacturing"]["materials"]:
         row1_num = row1_num + 1
         bpmm1_tid = int(m1["typeID"])
@@ -197,14 +196,13 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 continue
             __runs = int(j["runs"])
             bpmm1_in_progress += __runs
-        # расчёт материалов с учётом эффективность производства
-        if not __is_reaction_formula:
-            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-            # см. 1 x run: http://prntscr.com/u0g07w
-            # см. 4 x run: http://prntscr.com/u0g0cd
-            # см. экономия материалов: http://prntscr.com/u0g11u
-            __me = float(100 - __capital_material_efficiency - 1 - 4.2)
-            bpmm1_efficiency = int(float((bpmm1_standard * __me) / 100) + 0.99999)
+        # расчёт кол-ва материала с учётом эффективности производства
+        bpmm1_efficiency = eve_sde_tools.get_industry_material_efficiency(
+            __is_reaction_formula,
+            1,
+            bpmm1_standard,  # сведения из чертежа
+            __capital_material_efficiency)
+        print(bpmm1_standard, bpmm1_efficiency, __capital_material_efficiency)
         # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
         bpmm1_not_enough = bpmm1_efficiency - bpmm1_available - bpmm1_in_progress
         if bpmm1_not_enough < 0:
