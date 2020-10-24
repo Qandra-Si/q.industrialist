@@ -54,8 +54,8 @@ def __dump__industry(
             '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
             '<td><strong>{q}x</strong> {nm}</td>'
             '<td>{progress}</td>'
-            '<td align="right">{cost:,.1f}</td>'
-            '<td align="right">{volume:,.1f}</td>'
+            '<td align="right">{cost:,.1f}<br><mark><span style="font-size: smaller;">{scost:,.2f}</span></mark></td>'
+            '<td align="right">{volume:,.1f}<br><mark><span style="font-size: smaller;">{svolume:,.2f}</span></mark></td>'
             '</tr>\n'.
             format(
                 id=__product_type_id,
@@ -63,7 +63,9 @@ def __dump__industry(
                 nm=__product_name,
                 q=__blueprints_runs,
                 cost=wij["cost"],
+                scost=wij["cost"] / __blueprints_runs,
                 volume=__blueprints_runs*__product_volume,
+                svolume=__product_volume,
                 progress=__progress
             )
         )
