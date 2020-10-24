@@ -4,6 +4,11 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+DROP INDEX IF EXISTS qi.idx_wij_bp_tid;
+DROP INDEX IF EXISTS qi.idx_wij_bp_id;
+DROP INDEX IF EXISTS qi.idx_wij_pk;
+DROP TABLE IF EXISTS qi.workflow_industry_jobs;
+
 DROP INDEX IF EXISTS qi.idx_wfc_pk;
 DROP TABLE IF EXISTS qi.workflow_factory_containers;
 
@@ -131,6 +136,56 @@ ALTER TABLE qi.workflow_factory_containers OWNER TO qi_user;
 CREATE UNIQUE INDEX idx_wfc_pk
     ON qi.workflow_factory_containers USING btree
     (wfc_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- workflow_industry_jobs
+-- список работ по производству, которые выполнены корпорацией
+--------------------------------------------------------------------------------
+CREATE TABLE qi.workflow_industry_jobs
+(
+    wij_job_id INTEGER NOT NULL,            -- job_id*                integer($int32)
+    wij_activity_id INTEGER NOT NULL,       -- activity_id*           integer($int32)
+    wij_cost DOUBLE PRECISION,              -- cost                   number($double)
+    wij_duration INTEGER NOT NULL,          -- duration*              integer($int32)
+    wij_runs INTEGER NOT NULL,              -- runs*                  integer($int32)
+                                            -- licensed_runs          integer($int32)
+                                            -- successful_runs        integer($int32)
+    wij_product_tid INTEGER,                -- product_type_id        integer($int32)
+    wij_bp_id BIGINT NOT NULL,              -- blueprint_id*          integer($int64)
+    wij_bp_tid INTEGER NOT NULL,            -- blueprint_type_id*     integer($int32)
+    wij_bp_lid BIGINT NOT NULL,             -- blueprint_location_id* integer($int64)
+    wij_lid BIGINT NOT NULL,                -- location_id*           integer($int64)
+    wij_out_lid BIGINT NOT NULL,            -- output_location_id*    integer($int64)
+    wij_facility_id BIGINT NOT NULL,        -- facility_id*           integer($int64)
+    wij_installer_id BIGINT NOT NULL,       -- installer_id*          integer($int32)
+                                            -- completed_character_id integer($int32)
+                                            -- completed_date         string($date-time)
+    wij_start_date TIMESTAMP NOT NULL,      -- start_date*            string($date-time)
+                                            -- pause_date             string($date-time)
+    wij_end_date TIMESTAMP NOT NULL,        -- end_date*              string($date-time)
+                                            -- probability            number($float)
+                                            -- status*                string
+    CONSTRAINT pk_wij PRIMARY KEY (wij_job_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.workflow_industry_jobs OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_wij_pk
+    ON qi.workflow_industry_jobs USING btree
+    (wij_job_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_wij_bp_id
+    ON qi.workflow_industry_jobs USING btree
+    (wij_bp_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_wij_bp_tid
+    ON qi.workflow_industry_jobs USING btree
+    (wij_bp_tid ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

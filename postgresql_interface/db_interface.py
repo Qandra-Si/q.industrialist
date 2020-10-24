@@ -21,7 +21,7 @@ class QIndustrialistDatabase:
         self.__module_settings = []
 
     def __del__(self):
-        """ constructor
+        """ destructor
         """
         self.disconnect()
 
