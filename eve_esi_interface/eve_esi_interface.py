@@ -207,7 +207,13 @@ class EveOnlineInterface:
                 # см. рекомендации по программированию тут
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
                 etag = cached_data["headers"][page-1]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
-                        len(cached_data["headers"]) >= page) and ("etag" in cached_data["headers"][page-1]) else None
+                        len(cached_data["headers"]) >= page) and ("etag" in cached_data["headers"][page-1]) and (
+                        len(data_headers) == 0) else None
+                # возможна ситуация, когда page=1 считался с кодом 200, причём в кеше имеется
+                # page=2, при этом X-Pages=2:
+                #   200 corporations/98615601/contracts/?page=1 14:10:23 "3f60dac1..."
+                #   304 corporations/98615601/contracts/?page=2 14:10:23 "fb294fda..." (из кеша)
+                # в этом случае, если уже встречались 200-коды, то etag не отправляем
                 page_data = self.__client.send_esi_request_http(data_path, etag)
                 if page_data.status_code == 304:
                     # ускоренный вывод данных из этого метода - если находимся в цикле загрузке данных с сервера
@@ -255,8 +261,8 @@ class EveOnlineInterface:
             elif len(cached_data["headers"]) == match_pages:
                 return cached_data["json"] if "json" in cached_data else None
             else:
-                print(match_pages)
-                print(cached_data["headers"])
+                print("ERROR! : ", match_pages)
+                print("ERROR! : ", cached_data["headers"])
                 raise
 
     def authenticate(self, character_name=None):
