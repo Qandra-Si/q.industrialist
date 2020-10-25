@@ -1,5 +1,5 @@
 -- UTF-8 without BOM
--- скрипт выполняется от имени пользователя msc
+-- скрипт выполняется от имени пользователя qi_user
 -- скрипт создаёт в базе данных таблицы, секвенторы, индексы
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;

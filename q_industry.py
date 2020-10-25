@@ -23,14 +23,11 @@ Requires application scopes:
 
 """
 import sys
-import json
-import requests
 
 import eve_esi_interface as esi
 import postgresql_interface as db
 
 import q_industrialist_settings
-import eve_esi_tools
 import eve_sde_tools
 import console_app
 import render_html_industry

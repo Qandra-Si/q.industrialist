@@ -115,6 +115,7 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
             s = json.dumps(yaml_data, indent=1, sort_keys=False)
             f = open(f_name_json, "wt+", encoding='utf8')
             f.write(s)
+            del yaml_data
         finally:
             f.close()
 
@@ -143,6 +144,8 @@ def __rebuild_list2dict_by_key(ws_dir, name, key, val=None):
     s = json.dumps(dct, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del dct
+    del lst
 
 
 def get_item_name_by_type_id(type_ids, type_id):
@@ -638,6 +641,8 @@ def __rebuild_icons(ws_dir, name):
     s = json.dumps(icons, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del icon_keys
+    del icons
 
 
 def __clean_positions(ws_dir, name):
@@ -648,6 +653,7 @@ def __clean_positions(ws_dir, name):
     s = json.dumps(positions, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del positions
 
 
 def main():  # rebuild .yaml files
@@ -710,10 +716,6 @@ def main():  # rebuild .yaml files
     print("Reindexing .converted_invItems.json file...")
     sys.stdout.flush()
     __rebuild_list2dict_by_key(workspace_cache_files_dir, "invItems", "itemID")
-
-    print("Rebuilding typeIDs.yaml file...")
-    sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
