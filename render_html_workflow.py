@@ -371,8 +371,23 @@ def __dump_workflow_tools(
   </div>
  </div>
 </nav>
-    
+
 <div class="container-fluid">
+""")
+
+    # кол-во блюпринтов в имуществе корпорации не должно быть больше 25'000
+    __loaded_blueprints_quantity = corp_manufacturing_scheduler["loaded_blueprints"]
+    __loaded_factor = (__loaded_blueprints_quantity / 25000.0) * 100.0
+    print(__loaded_blueprints_quantity)
+    glf.write(
+        '<div class="progress" style="margin-bottom:0px">'
+        ' <div class="progress-bar progress-bar-{prcnt100}" role="progressbar" aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">Capacity: {fprcnt:.1f}%</div>'
+        '</div>'.
+        format(prcnt100="danger" if __loaded_blueprints_quantity >= 24000 else ("warning" if __loaded_blueprints_quantity >= 23000 else "info"),
+               prcnt=int(__loaded_factor),
+               fprcnt=__loaded_factor,))
+
+    glf.write("""
  <div class="row">
   <!--start group1-->
   <div class="col-md-4">

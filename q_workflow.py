@@ -234,6 +234,7 @@ def __get_monthly_manufacturing_scheduler(
         "factory_blueprints": [],
         "missing_blueprints": [],
         "overplus_blueprints": [],
+        "loaded_blueprints": len(corp_blueprints_data)
     }
     scheduled_blueprints = scheduler["scheduled_blueprints"]
     factory_blueprints = scheduler["factory_blueprints"]
