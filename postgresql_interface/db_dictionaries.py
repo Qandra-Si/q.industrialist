@@ -13,7 +13,7 @@ class QDictionaries:
         """ destructor
         """
 
-    def is_exist(self, id, category):
+    def is_exist_name(self, id, category):
         """
 
         :param id: unique id
@@ -29,7 +29,7 @@ class QDictionaries:
             return False
         return True
 
-    def clean(self, category):
+    def clean_names(self, category):
         """ clean named items in the database by category
 
         :param category: category of id
@@ -38,7 +38,7 @@ class QDictionaries:
             "DELETE FROM eve_sde_names WHERE sden_category=%s;",
             category)
 
-    def insert(self, id, category, name):
+    def insert_name(self, id, category, name):
         """ inserts named item into database
 
         :param id: unique id
@@ -50,10 +50,10 @@ class QDictionaries:
             "VALUES (%s,%s,%s);",
             id, category, name)
 
-    def actualize(self, items, category, name_tag):
+    def actualize_names(self, items, category, name_tag):
         if isinstance(items, dict):
             # очиска таблица по указанной категории
-            self.clean(category)
+            self.clean_names(category)
             # заполнение таблица по указанной категории
             items_keys = items.keys()
             for itm_key in items_keys:
@@ -68,7 +68,7 @@ class QDictionaries:
                     __dict = items[str(itm_key)]
                     if (name_tag in __dict) and ("en" in __dict[name_tag]):
                         nm = __dict[name_tag]["en"]
-                        self.insert(id, category, nm)
+                        self.insert_name(id, category, nm)
                 else:
                     # предполагаем следущий справочник:
                     # { "0": "Shafrak IX - Moon 1",
@@ -76,4 +76,25 @@ class QDictionaries:
                     #   "2": "Шафрак"
                     # }
                     nm = items[str(itm_key)]
-                    self.insert(id, category, nm)
+                    self.insert_name(id, category, nm)
+
+    def clean_integers(self, category):
+        """ clean numbered items in the database by category
+
+        :param category: category of id
+        """
+        self.db.execute(
+            "DELETE FROM eve_sde_integers WHERE sdei_category=%s;",
+            category)
+
+    def insert_integer(self, id, category, number):
+        """ inserts numbered item into database
+
+        :param id: unique id
+        :param category: category of id
+        :param number: item' number
+        """
+        self.db.execute(
+            "INSERT INTO eve_sde_integers(sdei_id,sdei_category,sdei_number) "
+            "VALUES (%s,%s,%s);",
+            id, category, number)

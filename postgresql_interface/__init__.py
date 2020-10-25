@@ -5,4 +5,4 @@ from .db_interface import QIndustrialistDatabase  # noqa
 from .db_wij import QWorkflowIndustryJobs  # noqa
 from .db_dictionaries import QDictionaries  # noqa
 
-__version__ = '0.7.5'
+__version__ = '0.7.6'
