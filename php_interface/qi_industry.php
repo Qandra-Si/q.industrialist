@@ -3,8 +3,18 @@ include 'qi_render_html.php';
 include_once '.settings.php';
 ?>
 
+<?php function __dump_factory_summary($summary_factory_cost) { ?>
+<tr style="font-weight:bold;">
+ <td colspan="2" align="right">Summary</td>
+ <td align="right"><?=number_format($summary_factory_cost,0,'.',',')?></td>
+</tr>
+</tbody>
+</table>
+<?php } ?>
+
 <?php function __dump_industrial_jobs($jobs, $quantities) {
     $fid = NULL;
+    $summary_factory_cost = 0;
     foreach ($jobs as &$job)
     {
         $aid = $job['aid'];
@@ -24,6 +34,7 @@ include_once '.settings.php';
         $ptid = $job['ptid'];
         $nm = $job['nm'];
         $cost = $job['cost'];
+        $summary_factory_cost += $cost;
         $products = $job['runs'] * $single_run_quantity;
         switch ($aid)
         {
@@ -38,7 +49,7 @@ include_once '.settings.php';
         default:$anm = '&nbsp;<span class="label label-danger">activity#'.$aid.'</span>'; break;
         }
         if ($fid != $job['fid']) {
-            if (!is_null($fid)) echo '</tbody></table>';
+            if (!is_null($fid)) __dump_factory_summary($summary_factory_cost);
             $fid = $job['fid']; ?>
 <h3><?=$fid?></h3>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
@@ -54,14 +65,12 @@ include_once '.settings.php';
 <tr><!--<?=$ptid?>-->
  <td><img class="icn32" src="<?=__get_img_src($ptid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><strong><?=number_format($products,0,'.',',')?>x</strong> <?=$nm.$anm?></td>
- <td align="right"><?=number_format($cost,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($cost / $products,2,'.',',')?></span></mark></td>
+ <td align="right"><?=number_format($cost,0,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($cost / $products,2,'.',',')?></span></mark></td>
 </tr>
 <?php
     }
-?>
-</tbody>
-</table>
-<?php } ?>
+    __dump_factory_summary($summary_factory_cost);
+} ?>
 
 
 <?php
