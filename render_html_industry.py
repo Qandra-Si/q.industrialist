@@ -44,7 +44,7 @@ def __dump__industry(
             __wij_runs = __wij_dict["runs"]
             __wij_cost = __wij_dict["cost"]
             __td_manufactured =\
-                '<span class="text-warning">{q:,d}</span>'.\
+                '<strong><span class="text-warning">{q:,d}</span></strong>'.\
                 format(q=__wij_runs)
             __td_cost = \
                 '{cost:,.1f}<br><mark><span style="font-size: smaller;">{scost:,.2f}</span></mark>'.\
