@@ -35,17 +35,6 @@ import render_html_industry
 from __init__ import __version__
 
 
-g_module_default_settings = {
-    # either "station_id" or "station_name" is required
-    # if "station_id" is unknown, then the names of stations and structures will be
-    # additionally loaded (too slow, please identify and set "station_id")
-    "factory:station_id": 60003760,
-    "factory:station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-    # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars": [1]
-}
-
-
 def __get_db_connection():
     qidb = db.QIndustrialistDatabase("workflow", debug=True)
     qidb.connect(q_industrialist_settings.g_database)
@@ -54,13 +43,10 @@ def __get_db_connection():
 
 def main():
     qidb = __get_db_connection()
-    module_settings = qidb.load_module_settings(g_module_default_settings)
-    db_monthly_jobs = qidb.select_all_rows(
-        "SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks "
-        "FROM workflow_monthly_jobs;")
-    db_factory_containers = qidb.select_all_rows(
-        "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled "
-        "FROM workflow_factory_containers;")
+    db_conveyor_jobs = qidb.select_all_rows(
+        "SELECT wmj_quantity,wmj_eft "
+        "FROM workflow_monthly_jobs "
+        "WHERE wmj_active AND wmj_conveyor;")
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -86,6 +72,7 @@ def main():
     character_name = authz["character_name"]
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
     # Public information about a character
     character_data = interface.get_esi_data(
@@ -112,6 +99,39 @@ def main():
     sys.stdout.flush()
     del wij
 
+    # конвертация ETF в список item-ов
+    conveyor_product_type_ids = []
+    conveyor_scheduled_products = []
+    for job in db_conveyor_jobs:
+        __total_quantity = job[0]
+        __eft = job[1]
+        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
+        __converted.update({"quantity": __total_quantity})
+        if not (__converted["ship"] is None):
+            __product_type_id = __converted["ship"]["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                conveyor_scheduled_products.append({
+                    "name": __converted["ship"]["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity
+        for __item_dict in __converted["items"]:
+            __product_type_id = __item_dict["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                conveyor_scheduled_products.append({
+                    "name": __item_dict["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity * __item_dict["quantity"]
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
+
     # выбираем накопленные данные по производству из БД
     workflow_industry_jobs = qidb.select_all_rows(
         "SELECT"
@@ -123,9 +143,11 @@ def main():
         " wij_out_lid AS olid,"
         " wij_facility_id AS fid "
         "FROM workflow_industry_jobs "
-        "WHERE wij_activity_id=1 "
+        "WHERE wij_activity_id=1 AND wij_product_tid=ANY(%s) "
         "GROUP BY 1,4,5,6,7 "
-        "ORDER BY 1;")
+        "ORDER BY 1;",
+        conveyor_product_type_ids
+        )
     db_workflow_industry_jobs = [{"ptid": wij[0], "cost": wij[1], "runs": wij[2], "bptid": wij[3], "bplid": wij[4], "olid": wij[5], "fid": wij[6]} for wij in workflow_industry_jobs]
     del workflow_industry_jobs
 
@@ -138,7 +160,8 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        db_workflow_industry_jobs
+        db_workflow_industry_jobs,
+        conveyor_scheduled_products
     )
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

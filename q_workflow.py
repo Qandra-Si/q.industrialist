@@ -561,7 +561,6 @@ def main():
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
-
     sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
     # Public information about a character
