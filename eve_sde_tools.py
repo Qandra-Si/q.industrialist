@@ -538,6 +538,9 @@ def get_items_list_from_eft(
         # модулей, из которых состоит фит,... лежат ли они в карго, тоже не имеет значения
         if not __original_name:
             continue
+        # пропускаем строки вида [Empty Low slot], [Empty High slot], [Empty Rig slot],...
+        if (__original_name[:7] == '[Empty ') and (__original_name[-6:] == ' slot]'):
+            continue
         # распаковываем название корабля из первой строки с квадратными скобками,
         # например: [Stratios, Vinnegar Douche's Stratios]
         __quantity = 1
