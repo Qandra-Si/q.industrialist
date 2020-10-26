@@ -27,20 +27,24 @@ include_once '.settings.php';
     foreach ($jobs as &$job)
     {
         $id = $job['wmj_id'];
+        $active = $job['wmj_active'];
         $q = $job['wmj_quantity'];
-        $cmnt = $job['wmj_remarks'];
+        $rmrk = $job['wmj_remarks'];
         $fit = $job['wmj_eft'];
-        $nm = substr(strtok(strtok($fit, "\n"), ","), 1);
+        $fit_first_line = trim(strtok($fit, "\n"));
+        $cmnt = substr(strstr($fit_first_line, ','), 2, -1);
+        $nm = substr(strtok($fit_first_line, ","), 1);
 ?>
-<div class="panel panel-default">
+<div class="panel panel-<?=($active=='f')?'warning':'default'?>">
  <div class="panel-heading" role="tab" id="monthjob_hd<?=$id?>">
   <h4 class="panel-title">
    <a role="button" data-toggle="collapse"
     href="#monthjob_collapse<?=$id?>" aria-expanded="true"
-    aria-controls="monthjob_collapse<?=$id?>"><strong><?=$nm?></strong>&nbsp;<span
+    aria-controls="monthjob_collapse<?=$id?>"><strong><?=$nm?></strong>&nbsp;<?=($active=='f')?'(archival copy)&nbsp;':''?><span
     class="badge" id="qind-job-q<?=$id?>"><?=$q?></span></a>
   </h4>
-  <span id="qind-job-rmrks<?=$id?>"><?=$cmnt?></span>
+  <span id="qind-job-eft-cmnt<?=$id?>" class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
+  <span id="qind-job-rmrks<?=$id?>" class="text-success"><small><strong>Your remark: </strong><?=$rmrk?></small></span>
  </div>
  <div id="monthjob_collapse<?=$id?>" class="panel-collapse collapse"
   role="tabpanel" aria-labelledby="monthjob_hd<?=$id?>">
@@ -56,10 +60,17 @@ include_once '.settings.php';
     <div class="col-md-4 col-md-offset-2" align="right">
      <button type="button" class="btn btn-default btn-xs qind-btn-edit" job="<?=$id?>" ship="<?=$nm?>"><span
       class="glyphicon glyphicon-pencil" aria-hidden="true"></span></button>
-     <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon
+     <?php if ($active=='t') { ?>
+     <button type="button" class="btn btn-default btn-xs qind-btn-arch" job="<?=$id?>" action="deact"><span class="glyphicon
       glyphicon-cloud" aria-hidden="true"></span></button>
+     <button type="button" class="btn btn-default btn-xs disabled"><span class="glyphicon
+      glyphicon-trash" aria-hidden="true"></span></button>
+     <?php } else { ?>
+     <button type="button" class="btn btn-default btn-xs qind-btn-arch" job="<?=$id?>" action="act"><span class="glyphicon
+      glyphicon-cloud-download" aria-hidden="true"></span></button>
      <button type="button" class="btn btn-default btn-xs qind-btn-del" job="<?=$id?>"><span class="glyphicon
       glyphicon-trash" aria-hidden="true"></span></button>
+     <?php } ?>
     </div>
    </div>
    <hr style="margin-top: 6px; margin-bottom: 10px;">
@@ -73,7 +84,7 @@ include_once '.settings.php';
             sprintf('<strong>%sx %s</strong>%s',
                     $q,
                     $nm,
-                    !is_null($cmnt) && !empty($cmnt) ? '<small><br>'.$cmnt.'</small>' : ''
+                    !is_null($rmrk) && !empty($rmrk) ? '<small><br>'.$rmrk.'</small>' : ''
             ),
             'EFT'.$id, // modal добавляется автоматически
             NULL // 'modal-sm'
@@ -90,7 +101,7 @@ include_once '.settings.php';
 <form class="hidden" action="qi_digger.php" method="get" id="frmDelFit">
  <input type="hidden" name="module" value="workflow">
  <input type="hidden" name="action" value="del">
- <input type="hidden" name="fit" value="2">
+ <input type="hidden" name="fit" value="-1">
 </form>
 <script>
 $(document).ready(function(){
@@ -98,6 +109,24 @@ $(document).ready(function(){
     $(this).on('click', function () {
       var frm = $("#frmDelFit");
       frm.find("input[name='fit']").val($(this).attr('job'));
+      frm.submit();
+    })
+  })
+})
+</script>
+
+<form class="hidden" action="qi_digger.php" method="get" id="frmArchiveFit">
+ <input type="hidden" name="module" value="workflow">
+ <input type="hidden" name="action" value="">
+ <input type="hidden" name="fit" value="-1">
+</form>
+<script>
+$(document).ready(function(){
+  $('button.qind-btn-arch').each(function(){
+    $(this).on('click', function () {
+      var frm = $("#frmArchiveFit");
+      frm.find("input[name='fit']").val($(this).attr('job'));
+      frm.find("input[name='action']").val($(this).attr('action'));
       frm.submit();
     })
   })

@@ -524,14 +524,15 @@ def main():
     qidb = __get_db_connection()
     module_settings = qidb.load_module_settings(g_module_default_settings)
     db_monthly_jobs = qidb.select_all_rows(
-        "SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks "
-        "FROM workflow_monthly_jobs;")
+        "SELECT wmj_quantity,wmj_eft "
+        "FROM workflow_monthly_jobs "
+        "WHERE wmj_active;")
     db_factory_containers = qidb.select_all_rows(
         "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled "
         "FROM workflow_factory_containers;")
     del qidb
 
-    db_monthly_jobs = [{"eft": wmj[3], "quantity": wmj[2]} for wmj in db_monthly_jobs]
+    db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0]} for wmj in db_monthly_jobs]
     db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3]} for wfc in db_factory_containers]
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
