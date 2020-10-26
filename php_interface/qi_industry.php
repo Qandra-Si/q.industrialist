@@ -12,30 +12,18 @@ include_once '.settings.php';
 </table>
 <?php } ?>
 
-<?php function __dump_industrial_jobs($jobs, $quantities) {
+<?php function __dump_industrial_jobs($jobs) {
     $fid = NULL;
     $summary_factory_cost = 0;
     foreach ($jobs as &$job)
     {
         $aid = $job['aid'];
         $bptid = $job['bptid'];
-        $single_run_quantity = 1;
-        foreach ($quantities as &$q)
-        {
-            if ($q['bptid'] != $bptid) continue;
-            if ($aid == 1)
-              $single_run_quantity = intval($q['mq']);
-            elseif ($aid == 8)
-              $single_run_quantity = intval($q['iq']);
-            elseif ($aid == 9 or $aid == 11)
-              $single_run_quantity = intval($q['rq']);
-            break;
-        }
         $ptid = $job['ptid'];
         $nm = $job['nm'];
         $cost = $job['cost'];
         $summary_factory_cost += $cost;
-        $products = $job['runs'] * $single_run_quantity;
+        $products = $job['quantity'];
         switch ($aid)
         {
         case 1: $anm = '&nbsp;<span class="label label-primary">manufacturing</span>'; break;  # Manufacturing
@@ -88,7 +76,7 @@ SELECT
  wij_bp_tid AS bptid,
  wij_activity_id AS aid,
  sum(wij_cost) AS cost,
- sum(wij_runs) AS runs
+ sum(wij_quantity) AS quantity
 FROM
  workflow_industry_jobs
   LEFT OUTER JOIN eve_sde_names
@@ -100,18 +88,6 @@ EOD;
     $jobs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $jobs = pg_fetch_all($jobs_cursor);
-    //---
-    $query = <<<EOD
-SELECT DISTINCT
- wij_bp_tid AS bptid,
- (SELECT sdei_number FROM eve_sde_integers WHERE sdei_id=wij_bp_tid AND sdei_category=5) AS mq,
- (SELECT sdei_number FROM eve_sde_integers WHERE sdei_id=wij_bp_tid AND sdei_category=6) AS iq,
- (SELECT sdei_number FROM eve_sde_integers WHERE sdei_id=wij_bp_tid AND sdei_category=7) AS rq
-FROM workflow_industry_jobs
-EOD;
-    $quantities_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
-    $quantities = pg_fetch_all($quantities_cursor);
     //---
     pg_close($conn);
 ?>

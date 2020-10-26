@@ -28,10 +28,11 @@ class QWorkflowIndustryJobs:
             return False
         return True
 
-    def insert(self, job):
+    def insert(self, job, quantity):
         """ inserts job data into database
 
         :param job: https://esi.evetech.net/ui/#/Industry/get_corporations_corporation_id_industry_jobs
+        :param quantity: manufacturing products quantity
         :return:
         """
 
@@ -59,9 +60,9 @@ class QWorkflowIndustryJobs:
         self.db.execute(
             "INSERT INTO workflow_industry_jobs(wij_job_id,wij_activity_id,wij_cost,wij_duration,"
             " wij_runs,wij_product_tid,wij_bp_id,wij_bp_tid,wij_bp_lid,wij_lid,wij_out_lid,"
-            " wij_facility_id,wij_installer_id,wij_start_date,wij_end_date) "
+            " wij_facility_id,wij_installer_id,wij_start_date,wij_end_date,wij_quantity) "
             "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TIMESTAMP WITHOUT TIME ZONE %s,"
-            " TIMESTAMP WITHOUT TIME ZONE %s) "
+            " TIMESTAMP WITHOUT TIME ZONE %s,%s) "
             "ON CONFLICT ON CONSTRAINT pk_wij DO NOTHING;",  # тот же самый job_id ?
             job["job_id"],
             job["activity_id"],
@@ -77,10 +78,11 @@ class QWorkflowIndustryJobs:
             job["facility_id"],
             job["installer_id"],
             job["start_date"],
-            job["end_date"]
+            job["end_date"],
+            quantity
         )
 
-    def actualize(self, corp_industry_jobs_data):
+    def actualize(self, corp_industry_jobs_data, sde_bp_materials):
         # отключаем отладку при работе с БД (слишком много спама)
         db_in_debug_mode = self.db.debug
         if db_in_debug_mode:
@@ -89,7 +91,24 @@ class QWorkflowIndustryJobs:
         res = 0
         for job in corp_industry_jobs_data:
             if not self.is_exist(job["job_id"]):
-                self.insert(job)
+                # расчёт кол-ва продуктов, выполняемых текущей работой
+                products_quantity = job["runs"]
+                blueprint_type_id = job["blueprint_type_id"]
+                __bp_dict = sde_bp_materials[str(blueprint_type_id)]["activities"] if str(blueprint_type_id) in sde_bp_materials else None
+                if job["activity_id"] == 1:
+                    if "manufacturing" in __bp_dict:
+                        if "products" in __bp_dict["manufacturing"]:
+                            products_quantity *= __bp_dict["manufacturing"]["products"][0]["quantity"]
+                elif job["activity_id"] == 8:
+                    if "invention" in __bp_dict:
+                        if "products" in __bp_dict["invention"]:
+                            products_quantity *= __bp_dict["invention"]["products"][0]["quantity"]
+                elif job["activity_id"] in (9, 11):
+                    if "reaction" in __bp_dict:
+                        if "products" in __bp_dict["reaction"]:
+                            products_quantity *= __bp_dict["reaction"]["products"][0]["quantity"]
+                # ввод данных в БД
+                self.insert(job, products_quantity)
                 res += 1
         # сохраняем данные и подключаем отладку при работе с БД (если отключалась)
         self.db.commit()

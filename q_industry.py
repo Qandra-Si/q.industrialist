@@ -72,6 +72,7 @@ def main():
     character_name = authz["character_name"]
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
     # Public information about a character
@@ -94,7 +95,7 @@ def main():
 
     # сохраняем данные по производству в БД
     wij = db.QWorkflowIndustryJobs(qidb)
-    new_jobs_found = wij.actualize(corp_industry_jobs_data)
+    new_jobs_found = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
     print("\n'{}' corporation has {} new jobs since last update".format(corporation_name, new_jobs_found))
     sys.stdout.flush()
     del wij
@@ -137,7 +138,7 @@ def main():
         "SELECT"
         " wij_product_tid AS ptid,"
         " sum(wij_cost) AS cost,"
-        " sum(wij_runs) AS runs,"
+        " sum(wij_quantity) AS products,"
         " wij_bp_tid AS bptid,"
         " wij_bp_lid AS bplid,"
         " wij_out_lid AS olid,"
@@ -148,7 +149,7 @@ def main():
         "ORDER BY 1;",
         conveyor_product_type_ids
         )
-    db_workflow_industry_jobs = [{"ptid": wij[0], "cost": wij[1], "runs": wij[2], "bptid": wij[3], "bplid": wij[4], "olid": wij[5], "fid": wij[6]} for wij in workflow_industry_jobs]
+    db_workflow_industry_jobs = [{"ptid": wij[0], "cost": wij[1], "products": wij[2], "bptid": wij[3], "bplid": wij[4], "olid": wij[5], "fid": wij[6]} for wij in workflow_industry_jobs]
     del workflow_industry_jobs
 
     print("\nBuilding report...")

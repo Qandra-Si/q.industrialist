@@ -41,21 +41,21 @@ def __dump__industry(
         __td_cost = ""
         __td_volume = ""
         if not (__wij_dict is None):
-            __wij_runs = __wij_dict["runs"]
+            __wij_products = __wij_dict["products"]
             __wij_cost = __wij_dict["cost"]
             __td_manufactured =\
                 '<strong><span class="text-warning">{q:,d}</span></strong>'.\
-                format(q=__wij_runs)
+                format(q=__wij_products)
             __td_cost = \
                 '{cost:,.1f}<br><mark><span style="font-size: smaller;">{scost:,.2f}</span></mark>'.\
-                format(cost=__wij_cost, scost=__wij_cost/__wij_runs)
+                format(cost=__wij_cost, scost=__wij_cost/__wij_products)
             __td_volume = \
                 '{volume:,.1f}<br><mark><span style="font-size: smaller;">{svolume:,.2f}</span></mark>'.\
-                format(volume=__product_volume, svolume=__product_volume/__wij_runs)
-            if __wij_runs >= __product_scheduled_quantity:
+                format(volume=__product_volume, svolume=__product_volume/__wij_products)
+            if __wij_products >= __product_scheduled_quantity:
                 __progress_factor = 100
             else:
-                __progress_factor = float(100 * __wij_runs / __product_scheduled_quantity)
+                __progress_factor = float(100 * __wij_products / __product_scheduled_quantity)
             __td_progress = \
                 '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
                 ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'.\

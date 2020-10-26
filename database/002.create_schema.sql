@@ -168,6 +168,7 @@ CREATE TABLE qi.workflow_industry_jobs
     wij_end_date TIMESTAMP NOT NULL,        -- end_date*              string($date-time)
                                             -- probability            number($float)
                                             -- status*                string
+    wij_quantity INTEGER, -- кол-во продуктов, с учётом кол-ва run-ов чертежа (вычисляемые данные)
     CONSTRAINT pk_wij PRIMARY KEY (wij_job_id)
 )
 TABLESPACE pg_default;
