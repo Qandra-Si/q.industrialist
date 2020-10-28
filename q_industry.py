@@ -108,21 +108,17 @@ def __build_industry(
 
     # выбираем накопленные данные по производству из БД
     db_workflow_industry_jobs = qidb.select_all_rows(
-        "SELECT ptid,sum(cst),sum(prdcts),bptid,bplid,olid,fid,mnth "
+        "SELECT ptid,sum(cst),sum(prdcts),mnth "
         "FROM (SELECT "
         "  wij_product_tid AS ptid,"
         "  wij_cost AS cst,"
         "  wij_quantity AS prdcts,"
-        "  wij_bp_tid AS bptid,"
-        "  wij_bp_lid AS bplid,"
-        "  wij_out_lid AS olid,"
-        "  wij_facility_id AS fid,"
         "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
         " FROM qi.workflow_industry_jobs"
-        " WHERE wij_activity_id=1 AND wij_product_tid=ANY(%s)"
+        " WHERE wij_activity_id=1 AND wij_bp_lid IN (1032846295901,1033675076928) AND wij_product_tid=ANY(%s)"
         ") AS a "
         "WHERE mnth>=(%s-2) "
-        "GROUP BY 1,4,5,6,7,8 "
+        "GROUP BY 1,4 "
         "ORDER BY 1;",
         conveyor_product_type_ids,
         db_current_month[0])
@@ -130,11 +126,7 @@ def __build_industry(
         "ptid": wij[0],
         "cost": wij[1],
         "products": wij[2],
-        "bptid": wij[3],
-        "bplid": wij[4],
-        "olid": wij[5],
-        "fid": wij[6],
-        "month": int(wij[7])
+        "month": int(wij[3])
     } for wij in db_workflow_industry_jobs]
     del db_workflow_industry_jobs
     del conveyor_product_type_ids
