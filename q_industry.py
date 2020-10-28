@@ -29,6 +29,7 @@ import postgresql_interface as db
 
 import q_industrialist_settings
 import eve_sde_tools
+import eve_esi_tools
 import console_app
 import render_html_industry
 
@@ -41,13 +42,110 @@ def __get_db_connection():
     return qidb
 
 
-def main():
+def __build_industry(
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_named_type_ids,
+        # esi данные, загруженные с серверов CCP
+        corp_industry_jobs_data):
+    corp_industry_stat = {
+        "new_jobs_found": 0,
+        "current_month": -1,
+        "conveyor_scheduled_products": [],
+        "workflow_industry_jobs": []
+    }
+
+    # подключаемся к БД
     qidb = __get_db_connection()
+    # получаем текущий месяц с помощью sql-запроса
+    db_current_month = qidb.select_one_row("SELECT EXTRACT(MONTH FROM CURRENT_DATE)")
+    corp_industry_stat["current_month"] = int(db_current_month[0])
+
+    # сохраняем данные по производству в БД
+    wij = db.QWorkflowIndustryJobs(qidb)
+    corp_industry_stat["new_jobs_found"] = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
+    del wij
+
     db_conveyor_jobs = qidb.select_all_rows(
         "SELECT wmj_quantity,wmj_eft "
         "FROM workflow_monthly_jobs "
         "WHERE wmj_active AND wmj_conveyor;")
 
+    # конвертация ETF в список item-ов
+    conveyor_product_type_ids = []
+    conveyor_scheduled_products = []
+    for job in db_conveyor_jobs:
+        __total_quantity = job[0]
+        __eft = job[1]
+        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
+        __converted.update({"quantity": __total_quantity})
+        if not (__converted["ship"] is None):
+            __product_type_id = __converted["ship"]["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                conveyor_scheduled_products.append({
+                    "name": __converted["ship"]["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity
+        for __item_dict in __converted["items"]:
+            __product_type_id = __item_dict["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                conveyor_scheduled_products.append({
+                    "name": __item_dict["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity * __item_dict["quantity"]
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
+    corp_industry_stat["conveyor_scheduled_products"] = conveyor_scheduled_products
+
+    # выбираем накопленные данные по производству из БД
+    db_workflow_industry_jobs = qidb.select_all_rows(
+        "SELECT ptid,sum(cst),sum(prdcts),bptid,bplid,olid,fid,mnth "
+        "FROM (SELECT "
+        "  wij_product_tid AS ptid,"
+        "  wij_cost AS cst,"
+        "  wij_quantity AS prdcts,"
+        "  wij_bp_tid AS bptid,"
+        "  wij_bp_lid AS bplid,"
+        "  wij_out_lid AS olid,"
+        "  wij_facility_id AS fid,"
+        "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
+        " FROM qi.workflow_industry_jobs"
+        " WHERE wij_activity_id=1 --AND wij_product_tid=ANY(%s)\n"
+        ") AS a "
+        "WHERE mnth>=(%s-2) "
+        "GROUP BY 1,4,5,6,7,8 "
+        "ORDER BY 1;",
+        conveyor_product_type_ids,
+        db_current_month[0])
+    corp_industry_stat["workflow_industry_jobs"] = [{
+        "ptid": wij[0],
+        "cost": wij[1],
+        "products": wij[2],
+        "bptid": wij[3],
+        "bplid": wij[4],
+        "olid": wij[5],
+        "fid": wij[6],
+        "month": int(wij[7])
+    } for wij in db_workflow_industry_jobs]
+    del db_workflow_industry_jobs
+    del conveyor_product_type_ids
+
+    # отключение от БД
+    del qidb
+
+    return corp_industry_stat
+
+
+def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
@@ -93,64 +191,19 @@ def main():
     print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
-    # сохраняем данные по производству в БД
-    wij = db.QWorkflowIndustryJobs(qidb)
-    new_jobs_found = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
-    print("\n'{}' corporation has {} new jobs since last update".format(corporation_name, new_jobs_found))
+    # строим данные для генерации отчёта
+    corp_industry_stat = __build_industry(
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_named_type_ids,
+        # esi данные, загруженные с серверов CCP
+        corp_industry_jobs_data)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_industry_stat", corp_industry_stat)
+
+    # вывод отчёта на экран
+    print("\n'{}' corporation has {} new jobs since last update".format(corporation_name, corp_industry_stat["new_jobs_found"]))
     sys.stdout.flush()
-    del wij
-
-    # конвертация ETF в список item-ов
-    conveyor_product_type_ids = []
-    conveyor_scheduled_products = []
-    for job in db_conveyor_jobs:
-        __total_quantity = job[0]
-        __eft = job[1]
-        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
-        __converted.update({"quantity": __total_quantity})
-        if not (__converted["ship"] is None):
-            __product_type_id = __converted["ship"]["type_id"]
-            if conveyor_product_type_ids.count(__product_type_id) == 0:
-                conveyor_product_type_ids.append(__product_type_id)
-                conveyor_scheduled_products.append({
-                    "name": __converted["ship"]["name"],
-                    "type_id": __product_type_id,
-                    "quantity": __total_quantity
-                })
-            else:
-                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
-                __job_dict["quantity"] += __total_quantity
-        for __item_dict in __converted["items"]:
-            __product_type_id = __item_dict["type_id"]
-            if conveyor_product_type_ids.count(__product_type_id) == 0:
-                conveyor_product_type_ids.append(__product_type_id)
-                conveyor_scheduled_products.append({
-                    "name": __item_dict["name"],
-                    "type_id": __product_type_id,
-                    "quantity": __total_quantity * __item_dict["quantity"]
-                })
-            else:
-                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
-                __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
-
-    # выбираем накопленные данные по производству из БД
-    workflow_industry_jobs = qidb.select_all_rows(
-        "SELECT"
-        " wij_product_tid AS ptid,"
-        " sum(wij_cost) AS cost,"
-        " sum(wij_quantity) AS products,"
-        " wij_bp_tid AS bptid,"
-        " wij_bp_lid AS bplid,"
-        " wij_out_lid AS olid,"
-        " wij_facility_id AS fid "
-        "FROM workflow_industry_jobs "
-        "WHERE wij_activity_id=1 AND wij_product_tid=ANY(%s) "
-        "GROUP BY 1,4,5,6,7 "
-        "ORDER BY 1;",
-        conveyor_product_type_ids
-        )
-    db_workflow_industry_jobs = [{"ptid": wij[0], "cost": wij[1], "products": wij[2], "bptid": wij[3], "bplid": wij[4], "olid": wij[5], "fid": wij[6]} for wij in workflow_industry_jobs]
-    del workflow_industry_jobs
 
     print("\nBuilding report...")
     sys.stdout.flush()
@@ -161,12 +214,9 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        db_workflow_industry_jobs,
-        conveyor_scheduled_products
-    )
+        corp_industry_stat)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-    del qidb
     print("\nDone")
 
 
