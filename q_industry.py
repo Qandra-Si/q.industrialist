@@ -119,7 +119,7 @@ def __build_industry(
         "  wij_facility_id AS fid,"
         "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
         " FROM qi.workflow_industry_jobs"
-        " WHERE wij_activity_id=1 --AND wij_product_tid=ANY(%s)\n"
+        " WHERE wij_activity_id=1 AND wij_product_tid=ANY(%s)"
         ") AS a "
         "WHERE mnth>=(%s-2) "
         "GROUP BY 1,4,5,6,7,8 "
