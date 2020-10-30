@@ -79,10 +79,12 @@ def main():
 
             # Public information about a character
             character_data = interface.get_esi_data(
-                "characters/{}/".format(character_id))
+                "characters/{}/".format(character_id),
+                fully_trust_cache=True)
             # Public information about a corporation
             corporation_data = interface.get_esi_data(
-                "corporations/{}/".format(character_data["corporation_id"]))
+                "corporations/{}/".format(character_data["corporation_id"]),
+                fully_trust_cache=True)
 
             corporation_id = character_data["corporation_id"]
             corporation_name = corporation_data["name"]
@@ -114,7 +116,8 @@ def main():
 
             # Requires one of the following EVE corporation role(s): Director
             corp_divisions_data = interface.get_esi_data(
-                "corporations/{}/divisions/".format(corporation_id))
+                "corporations/{}/divisions/".format(corporation_id),
+                fully_trust_cache=True)
             print("'{}' corporation has {} hangar and {} wallet names\n".format(corporation_name, len(corp_divisions_data["hangar"]) if "hangar" in corp_divisions_data else 0, len(corp_divisions_data["wallet"]) if "wallet" in corp_divisions_data else 0))
             sys.stdout.flush()
 
@@ -136,29 +139,29 @@ def main():
             print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
             sys.stdout.flush()
 
-            # Requires role(s): Station_Manager
-            corp_structures_data = interface.get_esi_paged_data(
-                "corporations/{}/structures/".format(corporation_id))
-            print("'{}' corporation has {} structures\n".format(corporation_name, len(corp_structures_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Station_Manager
+            # corp_structures_data = interface.get_esi_paged_data(
+            #     "corporations/{}/structures/".format(corporation_id))
+            # print("'{}' corporation has {} structures\n".format(corporation_name, len(corp_structures_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Director
-            corp_starbases_data = interface.get_esi_paged_data(
-                "corporations/{}/starbases/".format(corporation_id))
-            print("'{}' corporation has {} starbases\n".format(corporation_name, len(corp_starbases_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Director
+            # corp_starbases_data = interface.get_esi_paged_data(
+            #     "corporations/{}/starbases/".format(corporation_id))
+            # print("'{}' corporation has {} starbases\n".format(corporation_name, len(corp_starbases_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Factory_Manager
-            corp_facilities_data = interface.get_esi_paged_data(
-                "corporations/{}/facilities/".format(corporation_id))
-            print("'{}' corporation has {} facilities\n".format(corporation_name, len(corp_facilities_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Factory_Manager
+            # corp_facilities_data = interface.get_esi_paged_data(
+            #     "corporations/{}/facilities/".format(corporation_id))
+            # print("'{}' corporation has {} facilities\n".format(corporation_name, len(corp_facilities_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Director
-            corp_customs_offices_data = interface.get_esi_paged_data(
-                "corporations/{}/customs_offices/".format(corporation_id))
-            print("'{}' corporation has {} customs offices\n".format(corporation_name, len(corp_customs_offices_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Director
+            # corp_customs_offices_data = interface.get_esi_paged_data(
+            #     "corporations/{}/customs_offices/".format(corporation_id))
+            # print("'{}' corporation has {} customs offices\n".format(corporation_name, len(corp_customs_offices_data)))
+            # sys.stdout.flush()
 
             # Получение названий контейнеров, станций, кошельков, и т.п. - всё что переименовывается ingame
             corp_ass_names_data = []
@@ -180,7 +183,8 @@ def main():
                 for structure_id in foreign_structures_ids:
                     try:
                         universe_structure_data = interface.get_esi_data(
-                            "universe/structures/{}/".format(structure_id))
+                            "universe/structures/{}/".format(structure_id),
+                            fully_trust_cache=True)
                         foreign_structures_data.update({str(structure_id): universe_structure_data})
                     except requests.exceptions.HTTPError as err:
                         status_code = err.response.status_code
@@ -220,7 +224,8 @@ def main():
                     contract_id = c["contract_id"]
                     try:
                         __contract_items = interface.get_esi_data(
-                            "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id))
+                            "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                            fully_trust_cache=True)
                         corp_contract_items_len += len(__contract_items)
                         corp_contract_items_data.append({str(contract_id): __contract_items})
                     except requests.exceptions.HTTPError as err:
@@ -239,7 +244,8 @@ def main():
                     if __issuer_dict is None:
                         # Public information about a character
                         issuer_data = interface.get_esi_data(
-                            "characters/{}/".format(issuer_id))
+                            "characters/{}/".format(issuer_id),
+                            fully_trust_cache=True)
                         various_characters_data.append({str(issuer_id): issuer_data})
                     sys.stdout.flush()
             eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)

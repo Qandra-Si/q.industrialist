@@ -239,10 +239,12 @@ def main():
 
         # Public information about a character
         character_data = interface.get_esi_data(
-            "characters/{}/".format(character_id))
+            "characters/{}/".format(character_id),
+            fully_trust_cache=True)
         # Public information about a corporation
         corporation_data = interface.get_esi_data(
-            "corporations/{}/".format(character_data["corporation_id"]))
+            "corporations/{}/".format(character_data["corporation_id"]),
+            fully_trust_cache=True)
 
         corporation_id = character_data["corporation_id"]
         corporation_name = corporation_data["name"]
@@ -295,7 +297,8 @@ def main():
             for structure_id in foreign_structures_ids:
                 try:
                     universe_structure_data = interface.get_esi_data(
-                        "universe/structures/{}/".format(structure_id))
+                        "universe/structures/{}/".format(structure_id),
+                        fully_trust_cache=True)
                     foreign_structures_data.update({str(structure_id): universe_structure_data})
                 except requests.exceptions.HTTPError as err:
                     status_code = err.response.status_code
@@ -334,7 +337,8 @@ def main():
                 contract_id = c["contract_id"]
                 try:
                     __contract_items = interface.get_esi_data(
-                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id))
+                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                        fully_trust_cache=True)
                     corp_contract_items_len += len(__contract_items)
                     corp_contract_items_data.append({str(contract_id): __contract_items})
                 except requests.exceptions.HTTPError as err:
@@ -352,7 +356,8 @@ def main():
                 if __issuer_dict is None:
                     # Public information about a character
                     issuer_data = interface.get_esi_data(
-                        "characters/{}/".format(issuer_id))
+                        "characters/{}/".format(issuer_id),
+                        fully_trust_cache=True)
                     various_characters_data.append({str(issuer_id): issuer_data})
                 sys.stdout.flush()
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)

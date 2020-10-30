@@ -137,12 +137,18 @@ class EveOnlineInterface:
         rsp.status_code = code
         raise requests.exceptions.HTTPError(message, response=rsp)
 
-    def get_esi_data(self, url, body=None):
+    def get_esi_data(self, url, body=None, fully_trust_cache=False):
         """ performs ESI GET/POST-requests in online mode,
         or returns early retrieved data when working on offline mode
+
+        :param url: EVE Swagger Interface ulr
+        :param body: parameters to send to ESI API with POST request
+        :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__offline_mode:
+        if self.__offline_mode or (fully_trust_cache and not (cached_data is None) and ("json" in cached_data)):
+            if cached_data is None:
+                return None
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             if "Http-Error" in cached_data["headers"]:
                 code = int(cached_data["headers"]["Http-Error"])

@@ -132,10 +132,12 @@ def main():
 
     # Public information about a character
     character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id))
+        "characters/{}/".format(character_id),
+        fully_trust_cache=True)
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]))
+        "corporations/{}/".format(character_data["corporation_id"]),
+        fully_trust_cache=True)
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
@@ -172,7 +174,8 @@ def main():
         for structure_id in foreign_structures_ids:
             try:
                 universe_structure_data = interface.get_esi_data(
-                    "universe/structures/{}/".format(structure_id))
+                    "universe/structures/{}/".format(structure_id),
+                    fully_trust_cache=True)
                 foreign_structures_data.update({str(structure_id): universe_structure_data})
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code

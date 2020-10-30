@@ -167,10 +167,12 @@ def main():
 
     # Public information about a character
     character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id))
+        "characters/{}/".format(character_id),
+        fully_trust_cache=True)
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]))
+        "corporations/{}/".format(character_data["corporation_id"]),
+        fully_trust_cache=True)
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
