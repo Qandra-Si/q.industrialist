@@ -29,6 +29,7 @@ include_once '.settings.php';
         $id = $job['wmj_id'];
         $active = $job['wmj_active'];
         $q = $job['wmj_quantity'];
+        $conveyor = $job['wmj_conveyor'];
         $rmrk = $job['wmj_remarks'];
         $fit = $job['wmj_eft'];
         $fit_first_line = trim(strtok($fit, "\n"));
@@ -41,7 +42,7 @@ include_once '.settings.php';
    <a role="button" data-toggle="collapse"
     href="#monthjob_collapse<?=$id?>" aria-expanded="true"
     aria-controls="monthjob_collapse<?=$id?>"><strong><?=$nm?></strong>&nbsp;<?=($active=='f')?'(archival copy)&nbsp;':''?><span
-    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span></a>
+    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span><?=($conveyor=='t')?'&nbsp;<span class="label label-info">conveyor</span>':''?></a>
   </h4>
   <span id="qind-job-eft-cmnt<?=$id?>" class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
   <span id="qind-job-rmrks<?=$id?>" class="text-success"><small><strong>Your remark: </strong><?=$rmrk?></small></span>
@@ -295,7 +296,7 @@ $(document).ready(function(){
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     //---
-    $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks FROM workflow_monthly_jobs ORDER BY 4;';
+    $query = 'SELECT wmj_id,wmj_active,wmj_quantity,wmj_eft,wmj_remarks,wmj_conveyor FROM workflow_monthly_jobs ORDER BY 4;';
     $jobs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $jobs = pg_fetch_all($jobs_cursor);
