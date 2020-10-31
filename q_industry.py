@@ -46,6 +46,7 @@ def __build_industry(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         sde_named_type_ids,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data):
@@ -53,8 +54,15 @@ def __build_industry(
         "new_jobs_found": 0,
         "current_month": -1,
         "conveyor_scheduled_products": [],
-        "workflow_industry_jobs": []
+        "workflow_industry_jobs": [],
+        "conveyor_market_groups": {}
     }
+
+    def push_into_conveyor_market_groups(__market_group_id):
+        if corp_industry_stat["conveyor_market_groups"].get(str(__market_group_id), None) is None:
+            corp_industry_stat["conveyor_market_groups"].update({
+                str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
+            })
 
     # подключаемся к БД
     qidb = __get_db_connection()
@@ -84,10 +92,13 @@ def __build_industry(
             __product_type_id = __converted["ship"]["type_id"]
             if conveyor_product_type_ids.count(__product_type_id) == 0:
                 conveyor_product_type_ids.append(__product_type_id)
+                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                push_into_conveyor_market_groups(__market_group_id)
                 conveyor_scheduled_products.append({
                     "name": __converted["ship"]["name"],
                     "type_id": __product_type_id,
-                    "quantity": __total_quantity
+                    "quantity": __total_quantity,
+                    "market": __market_group_id
                 })
             else:
                 __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
@@ -96,10 +107,13 @@ def __build_industry(
             __product_type_id = __item_dict["type_id"]
             if conveyor_product_type_ids.count(__product_type_id) == 0:
                 conveyor_product_type_ids.append(__product_type_id)
+                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                push_into_conveyor_market_groups(__market_group_id)
                 conveyor_scheduled_products.append({
                     "name": __item_dict["name"],
                     "type_id": __product_type_id,
-                    "quantity": __total_quantity * __item_dict["quantity"]
+                    "quantity": __total_quantity * __item_dict["quantity"],
+                    "market": __market_group_id
                 })
             else:
                 __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
@@ -163,6 +177,7 @@ def main():
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
     # Public information about a character
@@ -190,6 +205,7 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_market_groups,
         sde_named_type_ids,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data)
