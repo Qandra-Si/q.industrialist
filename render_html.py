@@ -6,6 +6,7 @@ from datetime import datetime
 import q_industrialist_settings
 
 __g_local_timezone = tzlocal.get_localzone()
+__g_render_datetime = None
 __g_pattern_c2s1 = re.compile(r'(.)([A-Z][a-z]+)')
 __g_pattern_c2s2 = re.compile(r'([a-z0-9])([A-Z])')
 
@@ -13,6 +14,14 @@ __g_pattern_c2s2 = re.compile(r'([a-z0-9])([A-Z])')
 def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
   name = __g_pattern_c2s1.sub(r'\1_\2', name)
   return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
+
+
+def __get_render_datetime():
+    global __g_render_datetime
+    global __g_local_timezone
+    if __g_render_datetime is None:
+        __g_render_datetime = datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')
+    return __g_render_datetime
 
 
 def __get_img_src(tp, sz):
@@ -118,8 +127,7 @@ def __dump_header(glf, header_name):
 
 def __dump_footer(glf):
     # Don't remove line below !
-    glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
-        dt=datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
+    glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(dt=__get_render_datetime()))
     glf.write("""</br>
 &copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
 </br>

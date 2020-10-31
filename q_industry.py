@@ -33,7 +33,14 @@ import eve_esi_tools
 import console_app
 import render_html_industry
 
+from datetime import datetime, date, timedelta
+
 from __init__ import __version__
+
+
+g_module_default_settings = {
+    "factory:conveyor_containers": [1032846295901, 1033675076928]
+}
 
 
 def __get_db_connection():
@@ -129,11 +136,12 @@ def __build_industry(
         "  wij_quantity AS prdcts,"
         "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
         " FROM qi.workflow_industry_jobs"
-        " WHERE wij_activity_id=1 AND wij_bp_lid IN (1032846295901,1033675076928) AND wij_product_tid=ANY(%s)"
+        " WHERE wij_activity_id=1 AND wij_bp_lid=ANY(%s) AND wij_product_tid=ANY(%s)"
         ") AS a "
         "WHERE mnth>=(%s-2) "
         "GROUP BY 1,4 "
         "ORDER BY 1;",
+        g_module_default_settings["factory:conveyor_containers"],
         conveyor_product_type_ids,
         db_current_month[0])
     corp_industry_stat["workflow_industry_jobs"] = [{
@@ -149,6 +157,87 @@ def __build_industry(
     del qidb
 
     return corp_industry_stat
+
+
+def __build_possible_t2_products(
+        esi_interface,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups):
+    # автоматический расчёт плана производства на следующий месяц (или для корректировки текущего)
+    possible_t2_products = {
+        "products": [],
+        "market_groups": {}
+    }
+
+    def push_into_market_groups(__market_group_id):
+        if possible_t2_products["market_groups"].get(str(__market_group_id), None) is None:
+            possible_t2_products["market_groups"].update({
+                str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
+            })
+
+    # Public information about market prices
+    markets_theforge_types_data = esi_interface.get_esi_paged_data(
+        "markets/{}/types/".format(10000002))
+    print("\n'{}' region has {} product's market positions".format('The Forge', len(markets_theforge_types_data)))
+    sys.stdout.flush()
+
+    for p in sde_type_ids.items():
+        __p_dict = p[1]
+        if ("published" in __p_dict) and not __p_dict["published"]:
+            continue
+        if ("metaGroupID" in __p_dict) and (__p_dict["metaGroupID"] == 2):
+            __product_type_id = int(p[0])
+            __product_name = __p_dict["name"]["en"] if "name" in __p_dict else str(__product_type_id)
+            if (__product_name == "unused blueprint type") or (__product_name[-9:] == "Blueprint"):
+                continue  # на самом деле следует проверить groupID продукта и categoryID группы, пропустив чертежи
+            __blueprint_type_id, __materials = eve_sde_tools.get_blueprint_type_id_by_product_id(__product_type_id, sde_bp_materials)
+            if __blueprint_type_id is None:
+                continue
+            __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+            if not (__market_group_id is None):
+                push_into_market_groups(__market_group_id)
+            possible_t2_products["products"].append({
+                "type_id": __product_type_id,
+                "name": __product_name,
+                "active_orders": __product_type_id in markets_theforge_types_data,
+                "market": __market_group_id
+            })
+
+    __now = datetime.now()
+    for product in possible_t2_products["products"]:
+        if product["active_orders"]:
+            __product_type_id = product["type_id"]
+
+            # Public information about market prices
+            markets_theforge_types_data = esi_interface.get_esi_paged_data(
+                "markets/{}/orders/?type_id={}&order_type=all".format(10000002, __product_type_id))
+
+            # Public information about market prices
+            markets_theforge_history_data = esi_interface.get_esi_data(
+                "markets/{}/history/?type_id={}".format(10000002, __product_type_id))
+
+            # 60003760: "Jita IV - Moon 4 - Caldari Navy Assembly Plant"
+            jita_sell = [o["price"] for o in markets_theforge_types_data if (o["location_id"] == 60003760) and not o["is_buy_order"]]
+            jita_buy = [o["price"] for o in markets_theforge_types_data if (o["location_id"] == 60003760) and o["is_buy_order"]]
+            if jita_sell:
+                product.update({"jita_sell": min(jita_sell)})
+            if jita_buy:
+                product.update({"jita_buy": max(jita_buy)})
+
+            theforge_market = [{"average": h["average"], "volume": h["volume"]}
+                               for h in markets_theforge_history_data if (__now-datetime.fromisoformat(h["date"])).days <= 31]
+            # month_theforge_average = sum([h["average"] for h in theforge_market])  # сумма (средняя цена сделок по дням)
+            month_theforge_volume = sum([h["volume"] for h in theforge_market])  # сумма (кол-во сделок по дням)
+            month_theforge_average_isk = sum([h["average"]*h["volume"] for h in theforge_market])  # средний объём isk за последний месяц
+            product.update({"month": {
+                # "sum_average": month_theforge_average,  # неинтересно, т.к. даже нельзя делить на 30, если есть пропуски по дням
+                "sum_volume": month_theforge_volume,
+                "avg_isk": month_theforge_average_isk
+            }})
+
+    return possible_t2_products
 
 
 def main():
@@ -200,6 +289,15 @@ def main():
     print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
+    possible_t2_products = __build_possible_t2_products(
+        interface,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups
+    )
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "possible_t2_products", possible_t2_products)
+
     # строим данные для генерации отчёта
     corp_industry_stat = __build_industry(
         # sde данные, загруженные из .converted_xxx.json файлов
@@ -213,6 +311,7 @@ def main():
 
     # вывод отчёта на экран
     print("\n'{}' corporation has {} new jobs since last update".format(corporation_name, corp_industry_stat["new_jobs_found"]))
+    print("'{}' market has {} / {} active orders for T2-products".format('The Forge', len([p for p in possible_t2_products["products"] if p["active_orders"]]), len(possible_t2_products["products"])))
     sys.stdout.flush()
 
     print("\nBuilding report...")
@@ -224,7 +323,8 @@ def main():
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_industry_stat)
+        corp_industry_stat,
+        possible_t2_products)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

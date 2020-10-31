@@ -206,10 +206,16 @@ class EveOnlineInterface:
                     if restart_cache:
                         cached_data = None
                     restart = False
-                data_path = ("{srv}{url}?page={page}".format(
-                    srv=self.server_url,
-                    url=url,
-                    page=page))  # noqa
+                if url.find('?') == -1:
+                    data_path = ("{srv}{url}?page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
+                else:
+                    data_path = ("{srv}{url}&page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
                 # см. рекомендации по программированию тут
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
                 etag = cached_data["headers"][page-1]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
