@@ -1,5 +1,6 @@
 ﻿import render_html
 import eve_sde_tools
+import eve_efficiency
 
 
 def __dump_corp_capital(
@@ -197,7 +198,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             __runs = int(j["runs"])
             bpmm1_in_progress += __runs
         # расчёт кол-ва материала с учётом эффективности производства
-        bpmm1_efficiency = eve_sde_tools.get_industry_material_efficiency(
+        bpmm1_efficiency = eve_efficiency.get_industry_material_efficiency(
             __is_reaction_formula,
             1,
             bpmm1_standard,  # сведения из чертежа

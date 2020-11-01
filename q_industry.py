@@ -30,16 +30,18 @@ import postgresql_interface as db
 import q_industrialist_settings
 import eve_sde_tools
 import eve_esi_tools
+import eve_efficiency
+import eve_praisal
 import console_app
 import render_html_industry
 
-from datetime import datetime, date, timedelta
+from datetime import datetime
 
 from __init__ import __version__
 
 
 g_module_default_settings = {
-    "factory:conveyor_containers": [1032846295901, 1033675076928]
+    "factory:conveyor_containers": [1032846295901, 1033675076928],
 }
 
 
@@ -49,7 +51,7 @@ def __get_db_connection():
     return qidb
 
 
-def __build_industry(
+def __build_industry_workflow(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
@@ -168,11 +170,13 @@ def __build_possible_t2_products(
         sde_market_groups):
     # автоматический расчёт плана производства на следующий месяц (или для корректировки текущего)
     possible_t2_products = {
-        "products": [],
-        "market_groups": {},
-        "materials": {}
+        "products": [],  # список T2-продуктов с подробностями
+        "market_groups": {},  # справочник названий market_group_id:name
+        "market": {}  # рыночные данные по материалам (и продуктам)
     }
-    __now = datetime.now()
+    __invent_effects = eve_efficiency.get_corp_rules_invent_effects(sde_market_groups, qidb=None)
+    __the_forge_region_id = eve_praisal.get_the_forge_region_id()
+    __jita_trade_hub_id = eve_praisal.get_jita_trade_hub_station_id()
 
     def push_into_market_groups(__market_group_id):
         if possible_t2_products["market_groups"].get(str(__market_group_id), None) is None:
@@ -180,46 +184,27 @@ def __build_possible_t2_products(
                 str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
             })
 
-    def push_into_materials(__product_type_id):
-        if possible_t2_products["materials"].get(str(__product_type_id), None) is None:
-            __product183 = {}
-
-            # Public information about market prices
-            __markets_theforge_orders_data186 = esi_interface.get_esi_paged_data(
-                "markets/{}/orders/?type_id={}&order_type=all".format(10000002, __product_type_id),
-                fully_trust_cache=True
-                )
-
-            # Public information about market prices
-            __markets_theforge_history_data190 = esi_interface.get_esi_data(
-                "markets/{}/history/?type_id={}".format(10000002, __product_type_id),
-                fully_trust_cache=True)
-
-            # 60003760: "Jita IV - Moon 4 - Caldari Navy Assembly Plant"
-            __jita_sell194 = [o["price"] for o in __markets_theforge_orders_data186 if (o["location_id"] == 60003760) and not o["is_buy_order"]]
-            __jita_buy195 = [o["price"] for o in __markets_theforge_orders_data186 if (o["location_id"] == 60003760) and o["is_buy_order"]]
-            if __jita_sell194:
-                __product183.update({"jita_sell": min(__jita_sell194)})
-            if __jita_buy195:
-                __product183.update({"jita_buy": max(__jita_buy195)})
-
-            __theforge_market201 = [{"average": h["average"], "volume": h["volume"]}
-                               for h in __markets_theforge_history_data190 if (__now-datetime.fromisoformat(h["date"])).days <= 31]
-            __month_theforge_volume203 = sum([h["volume"] for h in __theforge_market201])  # сумма (кол-во сделок по дням)
-            __month_theforge_average_isk204 = sum([h["average"]*h["volume"] for h in __theforge_market201])  # средний объём isk за последний месяц
-            __product183.update({"month": {
-                "sum_volume": __month_theforge_volume203,
-                "avg_isk": __month_theforge_average_isk204
-            }})
-
-            possible_t2_products["materials"].update({
-                str(__product_type_id): __product183
-            })
+    def push_into_market(__product_type_id):
+        __md188 = possible_t2_products["market"].get(str(__product_type_id), None)
+        if __md188 is None:
+            # загружаем данные с серверов CCP
+            __markets_orders_data, __markets_history_data = eve_praisal.load_market_data(
+                esi_interface,
+                __product_type_id,
+                __the_forge_region_id)
             sys.stdout.flush()
+            # выбираем ценную информацию из загруженных данных
+            __md188 = eve_praisal.get_market_analytics(
+                __markets_orders_data,
+                __markets_history_data,
+                __jita_trade_hub_id)
+            # добавляем полученные данные в список сведений о материалах
+            possible_t2_products["market"].update({str(__product_type_id): __md188})
+        return __md188
 
     # Public information about market prices
     markets_theforge_types_data = esi_interface.get_esi_paged_data(
-        "markets/{}/types/".format(10000002))
+        "markets/{}/types/".format(__the_forge_region_id))
     print("\n'{}' region has {} product's market positions".format('The Forge', len(markets_theforge_types_data)))
     sys.stdout.flush()
 
@@ -230,27 +215,101 @@ def __build_possible_t2_products(
         if ("metaGroupID" in __p_dict) and (__p_dict["metaGroupID"] == 2):
             __product_type_id = int(p[0])
             __product_name = __p_dict["name"]["en"] if "name" in __p_dict else str(__product_type_id)
+            # ВРЕМЕННО: пропускаем капитальные корабли (цены в Jita на компоненты неадекватный,
+            # а поэтапный расчёт профита пока отсутствует), см. пример: https://prnt.sc/vb97v7
+            __groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+            if 1381 in __groups_chain:  # Capital Ships
+                continue
+            # ВРЕМЕННО: пропускаем продукты, которые  начинается со слова Capital (цены в Jita неадекватные,
+            # а поэтапный расчёт профита пока отсутствует), см. пример: https://prnt.sc/vb97v7
+            if __product_name[:8] == "Capital ":
+                continue
             if (__product_name == "unused blueprint type") or (__product_name[-9:] == "Blueprint"):
                 continue  # на самом деле следует проверить groupID продукта и categoryID группы, пропустив чертежи
-            __blueprint_type_id, __materials = eve_sde_tools.get_blueprint_type_id_by_product_id(__product_type_id, sde_bp_materials)
-            if __blueprint_type_id is None:
+            # проверяем, что для этого продукта существуют чертежи
+            __t2_blueprint_type_id, __materials = eve_sde_tools.get_blueprint_type_id_by_product_id(__product_type_id, sde_bp_materials)
+            if __t2_blueprint_type_id is None:
+                continue
+            # ВРЕМЕННО?: проверяем, что найденный чертёж можно инвентить (иначе, например, стоимость чертежа
+            # на Enforcer будет космической)
+            __t1_blueprint_type_id, __invent_materials = eve_sde_tools.get_blueprint_type_id_by_invention_product_id(__t2_blueprint_type_id, sde_bp_materials)
+            if __t1_blueprint_type_id is None:
                 continue
             __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
             if not (__market_group_id is None):
                 push_into_market_groups(__market_group_id)
+            # считаем кол-во материалов для производства продуктов с учётом эффективности, кол-ва прогонов и бонусов
+            __materials = __materials["activities"]["manufacturing"]["materials"]
+            __t2_bpc_attributes = eve_efficiency.get_t2_bpc_attributes(__product_type_id, __invent_effects, sde_type_ids, sde_market_groups)
+            __materials_with_me = eve_efficiency.get_t2_bpc_materials_with_efficiency(__t2_bpc_attributes, __materials)
+            # загружаем рыночные данные для продукта
+            __mpd = push_into_market(__product_type_id)  # market product dict (orders:month:week:last)
+            # загружаем рыночные данные для материалов, необходимых для производства продукта
+            __t2_price_for_materials = {
+                "lo": 0.0, "lo_known": True,
+                "hi": 0.0, "hi_known": True,
+                "avg": 0.0, "avg_known": True
+            }
+            for m in __materials_with_me:
+                __mmd = push_into_market(m["typeID"])  # market material dict (orders:month:week:last)
+                __cmp = eve_praisal.get_current_market_prices(__mmd)  # current market prices (lo:hi:avg)
+                if __cmp is None:
+                    continue
+                # расчёт нижней и верхней цены для оценки стоимости материалов
+                __quantity = float(m["quantity"]) / __t2_bpc_attributes["runs"]
+                if ("lo" in __cmp) and not (__cmp["lo"] is None):
+                    __t2_price_for_materials["lo"] += (__quantity * __cmp["lo"])
+                else:
+                    __t2_price_for_materials["lo_known"] = False
+                if ("hi" in __cmp) and not (__cmp["hi"] is None):
+                    __t2_price_for_materials["hi"] += (__quantity * __cmp["hi"])
+                else:
+                    __t2_price_for_materials["hi_known"] = False
+                if ("avg" in __cmp) and not (__cmp["avg"] is None):
+                    __t2_price_for_materials["avg"] += (__quantity * __cmp["avg"])
+                else:
+                    __t2_price_for_materials["avg_known"] = False
+            # рассчитываем маржу от производства -> продажи продукта
+            # НАДО КАЧАТЬ JITA ДЛЯ SELL ПРОДУКТОВ и КАЧАТЬ PERIMETER ДЛЯ BUY МАТЕРИАЛОВ
+            __profit = None
+            if __t2_price_for_materials["lo_known"] or __t2_price_for_materials["hi_known"] or __t2_price_for_materials["avg_known"]:
+                # берём среднюю (текущую в моменте) цену на материалы и пытаемся продать по
+                # sell-ам (Глорден долго держит позицию), если не получается, то продаём по баям
+                if __t2_price_for_materials["lo_known"]:
+                    # покупаем с комиссией 1% в Периметре, не платим брокерскую комиссию
+                    __materials_price = __t2_price_for_materials["lo"]
+                    __materials_price = __materials_price * (100.0 + 1.0) / 100.0
+                elif __t2_price_for_materials["avg_known"]:
+                    # покупаем с комиссией 1% в Периметре, не платим брокерскую комиссию
+                    __materials_price = __t2_price_for_materials["avg"]
+                    __materials_price = __materials_price * (100.0 + 1.0) / 100.0
+                else:  # подразумевается: if __t2_price_for_materials["hi_known"]:
+                    # покупаем без комиссии, т.к. когда покупаешь sell-ордера, взимается 0% комиссии
+                    __materials_price = __t2_price_for_materials["hi"]
+                # теперь считаем профит (маржу от производства)
+                if "sell" in __mpd["orders"]:
+                    # вычитаем из sell-цены брокерскую комиссию и комиссию на продажу
+                    __sell_product = __mpd["orders"]["sell"] * (100.0 - 3.1 - 2.25) / 100.0
+                    __profit = __sell_product - __materials_price
+                # не считаем, т.к. есть спрос, но нет предложения - цена может быть абсолютно любой
+                # (скорее всего неадекватной)
+                # см. пример: https://prnt.sc/vb8a2z , https://prnt.sc/vb88y2 , https://prnt.sc/vb89bs
+                # ---
+                # elif "buy" in __mpd["orders"]:
+                #     # вычитаем из buy-цены комиссию на продажу (брокерскую комиссию не выплачиваем)
+                #     __buy_product = __mpd["orders"]["buy"] * (100.0 - 2.25) / 100.0
+                #     __profit = __buy_product - __materials_price
+            # сохраняем расчёты в сведения о продукте
             possible_t2_products["products"].append({
                 "type_id": __product_type_id,
                 "name": __product_name,
                 "active_orders": __product_type_id in markets_theforge_types_data,
-                "materials": __materials["activities"]["manufacturing"]["materials"],
-                "market": __market_group_id
+                "market_group_id": __market_group_id,
+                "t2_bpc_attrs": __t2_bpc_attributes,
+                "t2_bpc_materials": __materials_with_me,
+                "manuf_price": __t2_price_for_materials,
+                "profit": __profit
             })
-            for m in __materials["activities"]["manufacturing"]["materials"]:
-                push_into_materials(m["typeID"])
-
-    for product in possible_t2_products["products"]:
-        if product["active_orders"]:
-            push_into_materials(product["type_id"])
 
     return possible_t2_products
 
@@ -314,7 +373,7 @@ def main():
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "possible_t2_products", possible_t2_products)
 
     # строим данные для генерации отчёта
-    corp_industry_stat = __build_industry(
+    corp_industry_stat = __build_industry_workflow(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,

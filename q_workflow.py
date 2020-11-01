@@ -375,11 +375,9 @@ def __get_monthly_manufacturing_scheduler(
             sde_market_groups,
             __product_type_id)
         __market_groups = set(__market_groups_chain)
-        # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана
-        __blueprint_copy_runs = 1
-        if bool(__market_groups & {9, 157, 11}):  # Ship Equipment, Drones, Ammunition & Charges
-            __blueprint_copy_runs = 10
-        elif 4 in __market_groups:  # Ships
+        # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана (см. 1_industry.py)
+        __blueprint_copy_runs = 10  # Ship Equipment, Drones, Ammunition & Charges, ...
+        if 4 in __market_groups:  # Ships
             __blueprint_copy_runs = 4
         elif 955 in __market_groups:  # Ship and Module Modifications
             __blueprint_copy_runs = 3

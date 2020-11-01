@@ -222,6 +222,18 @@ def get_market_group_by_type_id(sde_type_ids, type_id):
     return None
 
 
+def get_market_group_by_name(sde_market_groups, name):
+    for grp in sde_market_groups.items():
+        if name == grp[1]["nameID"]["en"]:
+            return grp  # id=grp[0], dict=grp[1]
+    return None
+
+
+def get_market_group_id_by_name(sde_market_groups, name):
+    grp = get_market_group_by_name(sde_market_groups, name)
+    return None if grp is None else grp[0]
+
+
 def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
     group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
@@ -366,14 +378,14 @@ def get_research_materials_for_blueprints(sde_bp_materials):
     return research_materials_for_bps
 
 
-def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
+def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing"):
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
     """
     for bp in sde_bp_materials:
         __bpm1 = sde_bp_materials[bp]["activities"]
-        if "manufacturing" in __bpm1:
-            __bpm2 = __bpm1["manufacturing"]
+        if activity in __bpm1:
+            __bpm2 = __bpm1[activity]
             if "products" in __bpm2:
                 __bpm3 = __bpm2["products"]
                 for m in __bpm3:
@@ -381,6 +393,16 @@ def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
                     if product_id == type_id:
                         return int(bp), sde_bp_materials[bp]
     return None, None
+
+
+def get_blueprint_type_id_by_manufacturing_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing")
+    return a, b
+
+
+def get_blueprint_type_id_by_invention_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="invention")
+    return a, b
 
 
 def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_materials):
@@ -398,42 +420,6 @@ def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_mat
                     quantity = int(m["quantity"])
                     return product_id, quantity, __bpm2["materials"]
     return None, None, None
-
-
-def get_industry_material_efficiency(
-    # признак - это чертёж или формула?
-    __is_reaction_formula,
-    # кол-во run-ов
-    runs_quantity,
-    # кол-во из исходного чертежа (до учёта всех бонусов)
-    __bpo_materials_quantity,
-    # me-параметр чертежа
-    material_efficiency):
-    if __is_reaction_formula:
-        # TODO: для формул нет расчёта материалоёмкости
-        __need = runs_quantity
-    elif __bpo_materials_quantity == 1:
-        # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
-        # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
-        __need = runs_quantity
-    else:
-        # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-        # см. 1 x run: http://prntscr.com/u0g07w
-        # см. 4 x run: http://prntscr.com/u0g0cd
-        # см.11 x run: https://prnt.sc/v3mk1m
-        # см. экономия материалов: http://prntscr.com/u0g11u
-        # ---
-        # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
-        __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
-        # учитываем бонус профиля сооружения
-        __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
-        # учитываем бонус установленного модификатора
-        __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
-        # округляем вещественное число до старшего целого
-        __stage4 = int(float(__stage3 + 0.99))
-        # ---
-        __need = __stage4
-    return __need
 
 
 def get_market_groups_tree_root(groups_tree, group_id):

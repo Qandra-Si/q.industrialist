@@ -1,6 +1,7 @@
 ﻿import render_html
 import eve_sde_tools
 import eve_esi_tools
+import eve_efficiency
 
 
 def __is_availabe_blueprints_present(
@@ -219,7 +220,7 @@ def __dump_blueprints_list_with_materials(
                                 if fixed_number_of_runs:
                                     quantity_or_runs = quantity_or_runs * fixed_number_of_runs
                             # расчёт кол-ва материала с учётом эффективности производства
-                            __need = eve_sde_tools.get_industry_material_efficiency(
+                            __need = eve_efficiency.get_industry_material_efficiency(
                                 __is_reaction_formula,
                                 quantity_or_runs,
                                 m["quantity"],  # сведения из чертежа
