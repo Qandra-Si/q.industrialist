@@ -183,12 +183,12 @@ class EveOnlineInterface:
             except:
                 raise
 
-    def get_esi_paged_data(self, url):
+    def get_esi_paged_data(self, url, fully_trust_cache=False):
         """ performs ESI GET-request in online mode and loads paginated data,
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__offline_mode:
+        if self.__offline_mode or (fully_trust_cache and not (cached_data is None) and ("json" in cached_data)):
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             return cached_data["json"] if "json" in cached_data else None
         else:
