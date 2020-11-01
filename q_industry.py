@@ -73,88 +73,89 @@ def __build_industry(
 
     # подключаемся к БД
     qidb = __get_db_connection()
-    # получаем текущий месяц с помощью sql-запроса
-    db_current_month = qidb.select_one_row("SELECT EXTRACT(MONTH FROM CURRENT_DATE)")
-    corp_industry_stat["current_month"] = int(db_current_month[0])
+    try:
+        # получаем текущий месяц с помощью sql-запроса
+        db_current_month = qidb.select_one_row("SELECT EXTRACT(MONTH FROM CURRENT_DATE)")
+        corp_industry_stat["current_month"] = int(db_current_month[0])
 
-    # сохраняем данные по производству в БД
-    wij = db.QWorkflowIndustryJobs(qidb)
-    corp_industry_stat["new_jobs_found"] = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
-    del wij
+        # сохраняем данные по производству в БД
+        wij = db.QWorkflowIndustryJobs(qidb)
+        corp_industry_stat["new_jobs_found"] = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
+        del wij
 
-    db_conveyor_jobs = qidb.select_all_rows(
-        "SELECT wmj_quantity,wmj_eft "
-        "FROM workflow_monthly_jobs "
-        "WHERE wmj_active AND wmj_conveyor;")
+        db_conveyor_jobs = qidb.select_all_rows(
+            "SELECT wmj_quantity,wmj_eft "
+            "FROM workflow_monthly_jobs "
+            "WHERE wmj_active AND wmj_conveyor;")
 
-    # конвертация ETF в список item-ов
-    conveyor_product_type_ids = []
-    conveyor_scheduled_products = []
-    for job in db_conveyor_jobs:
-        __total_quantity = job[0]
-        __eft = job[1]
-        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
-        __converted.update({"quantity": __total_quantity})
-        if not (__converted["ship"] is None):
-            __product_type_id = __converted["ship"]["type_id"]
-            if conveyor_product_type_ids.count(__product_type_id) == 0:
-                conveyor_product_type_ids.append(__product_type_id)
-                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
-                push_into_conveyor_market_groups(__market_group_id)
-                conveyor_scheduled_products.append({
-                    "name": __converted["ship"]["name"],
-                    "type_id": __product_type_id,
-                    "quantity": __total_quantity,
-                    "market": __market_group_id
-                })
-            else:
-                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
-                __job_dict["quantity"] += __total_quantity
-        for __item_dict in __converted["items"]:
-            __product_type_id = __item_dict["type_id"]
-            if conveyor_product_type_ids.count(__product_type_id) == 0:
-                conveyor_product_type_ids.append(__product_type_id)
-                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
-                push_into_conveyor_market_groups(__market_group_id)
-                conveyor_scheduled_products.append({
-                    "name": __item_dict["name"],
-                    "type_id": __product_type_id,
-                    "quantity": __total_quantity * __item_dict["quantity"],
-                    "market": __market_group_id
-                })
-            else:
-                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
-                __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
-    corp_industry_stat["conveyor_scheduled_products"] = conveyor_scheduled_products
+        # конвертация ETF в список item-ов
+        conveyor_product_type_ids = []
+        conveyor_scheduled_products = []
+        for job in db_conveyor_jobs:
+            __total_quantity = job[0]
+            __eft = job[1]
+            __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
+            __converted.update({"quantity": __total_quantity})
+            if not (__converted["ship"] is None):
+                __product_type_id = __converted["ship"]["type_id"]
+                if conveyor_product_type_ids.count(__product_type_id) == 0:
+                    conveyor_product_type_ids.append(__product_type_id)
+                    __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                    push_into_conveyor_market_groups(__market_group_id)
+                    conveyor_scheduled_products.append({
+                        "name": __converted["ship"]["name"],
+                        "type_id": __product_type_id,
+                        "quantity": __total_quantity,
+                        "market": __market_group_id
+                    })
+                else:
+                    __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                    __job_dict["quantity"] += __total_quantity
+            for __item_dict in __converted["items"]:
+                __product_type_id = __item_dict["type_id"]
+                if conveyor_product_type_ids.count(__product_type_id) == 0:
+                    conveyor_product_type_ids.append(__product_type_id)
+                    __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                    push_into_conveyor_market_groups(__market_group_id)
+                    conveyor_scheduled_products.append({
+                        "name": __item_dict["name"],
+                        "type_id": __product_type_id,
+                        "quantity": __total_quantity * __item_dict["quantity"],
+                        "market": __market_group_id
+                    })
+                else:
+                    __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                    __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
+        corp_industry_stat["conveyor_scheduled_products"] = conveyor_scheduled_products
 
-    # выбираем накопленные данные по производству из БД
-    db_workflow_industry_jobs = qidb.select_all_rows(
-        "SELECT ptid,sum(cst),sum(prdcts),mnth "
-        "FROM (SELECT "
-        "  wij_product_tid AS ptid,"
-        "  wij_cost AS cst,"
-        "  wij_quantity AS prdcts,"
-        "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
-        " FROM qi.workflow_industry_jobs"
-        " WHERE wij_activity_id=1 AND wij_bp_lid=ANY(%s) AND wij_product_tid=ANY(%s)"
-        ") AS a "
-        "WHERE mnth>=(%s-2) "
-        "GROUP BY 1,4 "
-        "ORDER BY 1;",
-        g_module_default_settings["factory:conveyor_containers"],
-        conveyor_product_type_ids,
-        db_current_month[0])
-    corp_industry_stat["workflow_industry_jobs"] = [{
-        "ptid": wij[0],
-        "cost": wij[1],
-        "products": wij[2],
-        "month": int(wij[3])
-    } for wij in db_workflow_industry_jobs]
-    del db_workflow_industry_jobs
-    del conveyor_product_type_ids
-
-    # отключение от БД
-    del qidb
+        # выбираем накопленные данные по производству из БД
+        db_workflow_industry_jobs = qidb.select_all_rows(
+            "SELECT ptid,sum(cst),sum(prdcts),mnth "
+            "FROM (SELECT "
+            "  wij_product_tid AS ptid,"
+            "  wij_cost AS cst,"
+            "  wij_quantity AS prdcts,"
+            "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
+            " FROM qi.workflow_industry_jobs"
+            " WHERE wij_activity_id=1 AND wij_bp_lid=ANY(%s) AND wij_product_tid=ANY(%s)"
+            ") AS a "
+            "WHERE mnth>=(%s-2) "
+            "GROUP BY 1,4 "
+            "ORDER BY 1;",
+            g_module_default_settings["factory:conveyor_containers"],
+            conveyor_product_type_ids,
+            db_current_month[0])
+        corp_industry_stat["workflow_industry_jobs"] = [{
+            "ptid": wij[0],
+            "cost": wij[1],
+            "products": wij[2],
+            "month": int(wij[3])
+        } for wij in db_workflow_industry_jobs]
+        del db_workflow_industry_jobs
+        del conveyor_product_type_ids
+    finally:
+        # отключение от БД
+        del qidb
 
     return corp_industry_stat
 
@@ -168,14 +169,53 @@ def __build_possible_t2_products(
     # автоматический расчёт плана производства на следующий месяц (или для корректировки текущего)
     possible_t2_products = {
         "products": [],
-        "market_groups": {}
+        "market_groups": {},
+        "materials": {}
     }
+    __now = datetime.now()
 
     def push_into_market_groups(__market_group_id):
         if possible_t2_products["market_groups"].get(str(__market_group_id), None) is None:
             possible_t2_products["market_groups"].update({
                 str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
             })
+
+    def push_into_materials(__product_type_id):
+        if possible_t2_products["materials"].get(str(__product_type_id), None) is None:
+            __product183 = {}
+
+            # Public information about market prices
+            __markets_theforge_orders_data186 = esi_interface.get_esi_paged_data(
+                "markets/{}/orders/?type_id={}&order_type=all".format(10000002, __product_type_id),
+                fully_trust_cache=True
+                )
+
+            # Public information about market prices
+            __markets_theforge_history_data190 = esi_interface.get_esi_data(
+                "markets/{}/history/?type_id={}".format(10000002, __product_type_id),
+                fully_trust_cache=True)
+
+            # 60003760: "Jita IV - Moon 4 - Caldari Navy Assembly Plant"
+            __jita_sell194 = [o["price"] for o in __markets_theforge_orders_data186 if (o["location_id"] == 60003760) and not o["is_buy_order"]]
+            __jita_buy195 = [o["price"] for o in __markets_theforge_orders_data186 if (o["location_id"] == 60003760) and o["is_buy_order"]]
+            if __jita_sell194:
+                __product183.update({"jita_sell": min(__jita_sell194)})
+            if __jita_buy195:
+                __product183.update({"jita_buy": max(__jita_buy195)})
+
+            __theforge_market201 = [{"average": h["average"], "volume": h["volume"]}
+                               for h in __markets_theforge_history_data190 if (__now-datetime.fromisoformat(h["date"])).days <= 31]
+            __month_theforge_volume203 = sum([h["volume"] for h in __theforge_market201])  # сумма (кол-во сделок по дням)
+            __month_theforge_average_isk204 = sum([h["average"]*h["volume"] for h in __theforge_market201])  # средний объём isk за последний месяц
+            __product183.update({"month": {
+                "sum_volume": __month_theforge_volume203,
+                "avg_isk": __month_theforge_average_isk204
+            }})
+
+            possible_t2_products["materials"].update({
+                str(__product_type_id): __product183
+            })
+            sys.stdout.flush()
 
     # Public information about market prices
     markets_theforge_types_data = esi_interface.get_esi_paged_data(
@@ -202,40 +242,15 @@ def __build_possible_t2_products(
                 "type_id": __product_type_id,
                 "name": __product_name,
                 "active_orders": __product_type_id in markets_theforge_types_data,
+                "materials": __materials["activities"]["manufacturing"]["materials"],
                 "market": __market_group_id
             })
+            for m in __materials["activities"]["manufacturing"]["materials"]:
+                push_into_materials(m["typeID"])
 
-    __now = datetime.now()
     for product in possible_t2_products["products"]:
         if product["active_orders"]:
-            __product_type_id = product["type_id"]
-
-            # Public information about market prices
-            markets_theforge_types_data = esi_interface.get_esi_paged_data(
-                "markets/{}/orders/?type_id={}&order_type=all".format(10000002, __product_type_id))
-
-            # Public information about market prices
-            markets_theforge_history_data = esi_interface.get_esi_data(
-                "markets/{}/history/?type_id={}".format(10000002, __product_type_id))
-
-            # 60003760: "Jita IV - Moon 4 - Caldari Navy Assembly Plant"
-            jita_sell = [o["price"] for o in markets_theforge_types_data if (o["location_id"] == 60003760) and not o["is_buy_order"]]
-            jita_buy = [o["price"] for o in markets_theforge_types_data if (o["location_id"] == 60003760) and o["is_buy_order"]]
-            if jita_sell:
-                product.update({"jita_sell": min(jita_sell)})
-            if jita_buy:
-                product.update({"jita_buy": max(jita_buy)})
-
-            theforge_market = [{"average": h["average"], "volume": h["volume"]}
-                               for h in markets_theforge_history_data if (__now-datetime.fromisoformat(h["date"])).days <= 31]
-            # month_theforge_average = sum([h["average"] for h in theforge_market])  # сумма (средняя цена сделок по дням)
-            month_theforge_volume = sum([h["volume"] for h in theforge_market])  # сумма (кол-во сделок по дням)
-            month_theforge_average_isk = sum([h["average"]*h["volume"] for h in theforge_market])  # средний объём isk за последний месяц
-            product.update({"month": {
-                # "sum_average": month_theforge_average,  # неинтересно, т.к. даже нельзя делить на 30, если есть пропуски по дням
-                "sum_volume": month_theforge_volume,
-                "avg_isk": month_theforge_average_isk
-            }})
+            push_into_materials(product["type_id"])
 
     return possible_t2_products
 

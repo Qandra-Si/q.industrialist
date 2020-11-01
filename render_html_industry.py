@@ -131,31 +131,38 @@ def __dump_industry(
 
 def __dump_market_product(
         glf,
-        product):
+        product,
+        jita_materials_market):
     # распаковка о продукте данных для вывода в отчёт
     __product_type_id = product["type_id"]
     __product_name = product["name"]
+    __product_market_dict = jita_materials_market.get(str(__product_type_id), None)
     # формирование ячеек с опциональными значениями
     __td_nao = ""
     __td_njso = ""
     __td_average = ""
     __td_volume = ""
+    __td_sell = ""
+    __td_buy = ""
     if not product["active_orders"]:
         __td_nao = '&nbsp;<span class="label label-danger">no active orders</span>'
-    elif not ("jita_sell" in product):
+    elif (__product_market_dict is None) or not ("jita_sell" in __product_market_dict):
         __td_njso = '&nbsp;<span class="label label-warning">no jita sell orders</span>'
-    if "month" in product:
-        __month_volume = product["month"]["sum_volume"]
-        __month_isk = product["month"]["avg_isk"]
-        if (__month_volume > 0) and (__month_isk >= 0.01):
-            # делим на 30, т.к. данные выбираются из market/{}/history за последние 31 день (последний отсутствует)
-            __td_average = '{mon_isk:,.0f}'\
-                           '<br><mark><span style="font-size: smaller;">&asymp;{day_isk:,.0f}</span></mark>'.\
-                           format(mon_isk=__month_isk, day_isk=__month_isk/__month_volume)
-            __td_volume = '{mon_pcs:,.0f}'.format(mon_pcs=__month_volume)
-            if __month_volume >= 30:
-                __td_volume += '<br><mark><span style="font-size: smaller;">&asymp;{dpcs:,.0f}</span></mark>'.\
-                               format(dpcs=__month_volume/30)
+    if not (__product_market_dict is None):
+        if "month" in __product_market_dict:
+            __month_volume = __product_market_dict["month"]["sum_volume"]
+            __month_isk = __product_market_dict["month"]["avg_isk"]
+            if (__month_volume > 0) and (__month_isk >= 0.01):
+                # делим на 30, т.к. данные выбираются из market/{}/history за последние 31 день (последний отсутствует)
+                __td_average = '{mon_isk:,.0f}'\
+                               '<br><mark><span style="font-size: smaller;">&asymp;{day_isk:,.0f}</span></mark>'.\
+                               format(mon_isk=__month_isk, day_isk=__month_isk/__month_volume)
+                __td_volume = '{mon_pcs:,.0f}'.format(mon_pcs=__month_volume)
+                if __month_volume >= 30:
+                    __td_volume += '<br><mark><span style="font-size: smaller;">&asymp;{dpcs:,.0f}</span></mark>'.\
+                                   format(dpcs=__month_volume/30)
+        __td_sell = '{isk:,.2f}'.format(isk=__product_market_dict["jita_sell"]) if "jita_sell" in __product_market_dict else ''
+        __td_buy = '{isk:,.2f}'.format(isk=__product_market_dict["jita_buy"]) if "jita_buy" in __product_market_dict else ''
 
     # формирование строки отчёта
     glf.write(
@@ -175,8 +182,8 @@ def __dump_market_product(
             njso=__td_njso,
             average=__td_average,
             volume=__td_volume,
-            sell='{isk:,.2f}'.format(isk=product["jita_sell"]) if "jita_sell" in product else '',
-            buy='{isk:,.2f}'.format(isk=product["jita_buy"]) if "jita_buy" in product else ''
+            sell=__td_sell,
+            buy=__td_buy
         )
     )
 
@@ -185,6 +192,7 @@ def __dump_market_analytics_products(
         glf,
         products,
         market_groups,
+        jita_materials_market,
         grouping=True):
     glf.write("""
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
@@ -212,16 +220,16 @@ def __dump_market_analytics_products(
         market_groups.sort(key=lambda g: g[1])
         for product in products:
             if product["market"] is None:
-                __dump_market_product(glf, product)
+                __dump_market_product(glf, product, jita_materials_market)
         for market in market_groups:
             glf.write('<tr><td class="active text-info" colspan="6"><strong>{nm}</strong></td></tr>\n'.format(nm=market[1]))
             __market_group_id = int(market[0])
             for product in products:
                 if product["market"] == __market_group_id:
-                    __dump_market_product(glf, product)
+                    __dump_market_product(glf, product, jita_materials_market)
     else:
         for product in products:
-            __dump_market_product(glf, product)
+            __dump_market_product(glf, product, jita_materials_market)
 
     glf.write("""
 </tbody>
@@ -234,27 +242,34 @@ def __dump_market_analytics(
         possible_t2_products):
     products = possible_t2_products["products"]
     market_groups = possible_t2_products["market_groups"]
+    jita_materials_market = possible_t2_products["materials"]
 
     products_no_active_orders = [p for p in products if not p["active_orders"]]
-    products_no_sell_jita_orders = [p for p in products if p["active_orders"] and not ("jita_sell" in p)]
-    products_active_orders = [p for p in products if p["active_orders"] and ("jita_sell" in p)]
+    prodict_type_ids_are_not_active = [p["type_id"] for p in products_no_active_orders]
+
+    products_no_sell_jita_orders = [p for p in products if p["active_orders"] and not ("jita_sell" in jita_materials_market.get(str(p["type_id"]), {}))]
+    prodict_type_ids_are_not_active.extend([p["type_id"] for p in products_no_sell_jita_orders])
+
+    products_active_orders = [p for p in products if not (p["type_id"] in prodict_type_ids_are_not_active)]
 
     if products_no_active_orders:
         glf.write("<h4>No Active orders in 'The Forge' region</h4>")
         products_no_active_orders.sort(key=lambda p: p["name"])
-        __dump_market_analytics_products(glf, products_no_active_orders, market_groups)
+        __dump_market_analytics_products(glf, products_no_active_orders, market_groups, jita_materials_market)
 
     if products_no_sell_jita_orders:
         glf.write("<h4>No Sell orders in Jita</h4>")
         products_no_sell_jita_orders.sort(key=lambda p: p["name"])
-        __dump_market_analytics_products(glf, products_no_sell_jita_orders, market_groups)
+        __dump_market_analytics_products(glf, products_no_sell_jita_orders, market_groups, jita_materials_market)
 
     glf.write('<h4>Market in Jita</h4>'
               '<var>The Forge average</var> = <span style="font-size: large;">∑<sub><sub>last month</sub></sub></span> <var>average &lowast; volume</var>, ISK<br>'
               '<var>Jita sell</var> &amp; <var>Jita buy</var> = <var>last known prices</var>, ISK <small><small>({dt})</small></small><br>'.
               format(dt=render_html.__get_render_datetime()))
-    products_active_orders.sort(key=lambda p: p["month"]["avg_isk"], reverse=True)
-    __dump_market_analytics_products(glf, products_active_orders, market_groups, grouping=False)
+
+    __dummy_history = {"month": {"avg_isk": 0}}
+    products_active_orders.sort(key=lambda p: jita_materials_market.get(str(p["type_id"]), __dummy_history)["month"]["avg_isk"], reverse=True)
+    __dump_market_analytics_products(glf, products_active_orders, market_groups, jita_materials_market, grouping=False)
 
 
 def dump_industry_into_report(
