@@ -184,7 +184,7 @@ def __dump_market_product(
 
     # формирование строки отчёта
     glf.write(
-        '<tr><!--{id}-->'
+        '<tr pid="{id}">'
         '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
         '<td>{nm}{nao}{njso}</td>'
         '<td align="right">{average}</td>'
@@ -216,12 +216,14 @@ def __dump_market_product(
 
 def __dump_market_analytics_products(
         glf,
+        sde_type_ids,
         products,
         market_groups,
         jita_materials_market,
         grouping=True):
     glf.write("""
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<div class="table-responsive">
+<table class="table table-condensed table-hover" style="padding:1px;font-size:smaller;" id="tblPrdcs">
 <thead>
  <tr>
   <th style="width:32px;" rowspan="2"></th>
@@ -267,11 +269,91 @@ def __dump_market_analytics_products(
     glf.write("""
 </tbody>
 </table>
+</div> <!--table-responsive-->
+""")
+
+    render_html.__dump_sde_type_ids_to_js(glf, sde_type_ids)  # добавляет <script></script>
+
+    glf.write("""
+<div class="modal fade" tabindex="-1" role="dialog" id="modalIndustry">
+ <div class="modal-dialog" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <h5 class="modal-title"></h5>
+   </div>
+   <div class="modal-body"></div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+<script>
+var g_prdcts_tbl = [
+""")
+
+    for p in products:
+        __materials = p["t2_bpc_materials"]
+        __materials_ls = ''
+        for m in enumerate(__materials):
+            if m[0] != 0:
+                __materials_ls += ','
+            __materials_ls += '[{},{}]'.format(m[1]["quantity"], m[1]["typeID"])
+
+        glf.write(
+            '[{id},{bpid},null,{me},{te},{runs},[{mat}]],'.
+            format(id=p['type_id'],
+                   bpid=p['blueprint_type_id'],
+                   me=p['t2_bpc_attrs']['me'],
+                   te=p['t2_bpc_attrs']['te'],
+                   runs=p['t2_bpc_attrs']['runs'],
+                   mat=__materials_ls)
+        )
+
+    glf.write("""[-1]];
+$(document).ready(function(){
+  $('#tblPrdcs > tbody > tr').click(function() {
+    var tr = $(this);
+    var pid = tr.attr('pid');
+    var pnm = getSdeItemName(pid);
+    var prdcts = null;
+    var modal = $('#modalIndustry');
+    var pnm_w_lbls = tr.find('td').eq(1).html();
+    for (var i=0; i<g_prdcts_tbl.length; i++) {
+      if (g_prdcts_tbl[i][0]==pid) {
+        prdcts = g_prdcts_tbl[i];
+        break;
+      }
+    }
+    modal.find('.modal-title').html(tr.find('td').eq(0).html() + ' ' + pnm_w_lbls);
+    if (!(prdcts === null)) {
+      var mtrls = '';
+      for (var i=0; i<prdcts[6].length; i++)
+        mtrls += '<img class="icn16" src="image_export_collection/Types/'+prdcts[6][i][1]+'_32.png" width="16px" height="16px">'+
+                 '<strong>'+prdcts[6][i][0]+'x</strong> '+getSdeItemName(prdcts[6][i][1])+'<br>';
+      var txt =
+        '<dl class="dl-horizontal">' +
+        '<dt>Продукт №'+pid+'</dt><dd>'+pnm+'</dd>' +
+        '<dt>Чертёж №'+prdcts[1]+'</dt><dd>'+pnm+' Blueprint</dd>' +
+        '<dt>ME</dt><dd>'+prdcts[3]+'%</dd>' +
+        '<dt>TE</dt><dd>'+prdcts[4]+'%</dd>' +
+        '<dt>Копия</dt><dd>'+prdcts[5]+' прогон(ов)</dd>' +
+        '<dt>Материалы</dt><dd>'+mtrls+'</dd>' +
+        '</dt>';
+      modal.find('.modal-body').html(txt);
+    }
+    modal.modal('show');
+  });
+});
+</script>
 """)
 
 
 def __dump_market_analytics(
         glf,
+        sde_type_ids,
         possible_t2_products):
     products = possible_t2_products["products"]
     market_groups = possible_t2_products["market_groups"]
@@ -291,12 +373,12 @@ def __dump_market_analytics(
     if products_no_active_orders:
         glf.write("<h4>No Active orders in 'The Forge' region</h4>")
         products_no_active_orders.sort(key=lambda p: p["name"])
-        __dump_market_analytics_products(glf, products_no_active_orders, market_groups, jita_market)
+        __dump_market_analytics_products(glf, sde_type_ids, products_no_active_orders, market_groups, jita_market)
 
     if products_no_sell_jita_orders:
         glf.write("<h4>No Sell orders in Jita</h4>")
         products_no_sell_jita_orders.sort(key=lambda p: p["name"])
-        __dump_market_analytics_products(glf, products_no_sell_jita_orders, market_groups, jita_market)
+        __dump_market_analytics_products(glf, sde_type_ids, products_no_sell_jita_orders, market_groups, jita_market)
 
     glf.write('<h4>Market in Jita</h4>'
               '<var>The Forge average</var> = <span style="font-size: large;">∑<sub><sub>last month</sub></sub></span> <var>average &lowast; volume</var>, ISK<br>'
@@ -304,7 +386,7 @@ def __dump_market_analytics(
               format(dt=render_html.__get_render_datetime()))
 
     products_active_orders.sort(key=lambda p: p["profit"] if "profit" in p else -2147483648, reverse=True)
-    __dump_market_analytics_products(glf, products_active_orders, market_groups, jita_market, grouping=False)
+    __dump_market_analytics_products(glf, sde_type_ids, products_active_orders, market_groups, jita_market, grouping=False)
 
 
 def dump_industry_into_report(
@@ -327,6 +409,7 @@ def dump_industry_into_report(
         glf.write("<h3>Jita' market analytics</h3>")
         __dump_market_analytics(
             glf,
+            sde_type_ids,
             possible_t2_products
         )
         glf.write('</div> <!--container-fluid-->')

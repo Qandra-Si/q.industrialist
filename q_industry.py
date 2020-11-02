@@ -302,6 +302,7 @@ def __build_possible_t2_products(
             # сохраняем расчёты в сведения о продукте
             possible_t2_products["products"].append({
                 "type_id": __product_type_id,
+                "blueprint_type_id": __t2_blueprint_type_id,
                 "name": __product_name,
                 "active_orders": __product_type_id in markets_theforge_types_data,
                 "market_group_id": __market_group_id,
