@@ -216,8 +216,42 @@ def __dump_corp_accounting_nested_tbl(
                                              volume=__group_dict["volume"],
                                              tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
                                                  ' <small><span class="label label-default">{flag}</span></small>'.
-                                                 format(flag=render_html.__camel_to_snake(str(__flag))
-                                            )))
+                                                 format(flag=render_html.__camel_to_snake(str(__flag)))
+                                            ))
+                            # вывод данных по кораблям, находящимся в этой локации
+                            __td_ships = ''
+                            if "ships" in __group_dict:
+                                __ships = __group_dict["ships"]
+                                # сортировка по названиям
+                                for ship in __ships:
+                                    ship.update({"nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, ship["type_id"])})
+                                __ships.sort(key=lambda s: s["nm"])
+                                # подготовка в выводу в подвале раздела Ships
+                                for ship in __ships:
+                                    __ship_type_id = ship["type_id"]
+                                    __td_cost = '{cost:,.1f}'.format(cost=ship["cost"])
+                                    __td_volume = '{volume:,.1f}'.format(volume=ship["volume"]+ship["volume_nested"])
+                                    __tag_nested = ''
+                                    if ship["volume_nested"] > 0:
+                                        __td_cost += ' <mark>+ {cost:,.1f}</mark>'.format(cost=ship["cost_nested"])
+                                    else:
+                                        __tag_nested = ' <span class="label label-primary">hull only</span>'
+                                    glf.write(
+                                        '<tr style="font-size: x-small;{hngr_clr}">'
+                                        ' <td colspan="2"></td>'
+                                        ' <td>&nbsp; <img class="icn16" src="{src}" style="display:inline;"> <strong>{q}x</strong> {nm}{tagn}</td>'
+                                        ' <td align="right">{cost}</td>'
+                                        ' <td align="right">{volume}</td>'
+                                        '</tr>\n'.
+                                        format(
+                                            hngr_clr='' if __hangar_num is None else 'background-color:#{};'.format(__hangar_colors[__hangar_num]),
+                                            src=render_html.__get_img_src(__ship_type_id, 32),
+                                            nm=ship["nm"],
+                                            tagn=__tag_nested,
+                                            q=ship["quantity"],
+                                            cost=__td_cost,
+                                            volume=__td_volume
+                                    ))
                             row_id = row_id + 1
                             __summary_cost = __group_dict["cost"] if __summary_cost is None else __summary_cost + __group_dict["cost"]
                             __summary_volume += __group_dict["volume"]
