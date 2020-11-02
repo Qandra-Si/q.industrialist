@@ -97,13 +97,17 @@ def __dump_corp_wallets_details(
                   format(nm="{nm} [{d}]".format(nm=__wallet_name,d=__wallet_division) if not (__wallet_name is None) else "{d} Wallet [{d}]".format(d=__wallet_division),
                          blnc=w["balance"]))
         __wd_keys = __corp_wallets_stat[__wallet_division-1].keys()
+        __wd_sort = []
         for __wd_key in __wd_keys:
-            __amount = __corp_wallets_stat[__wallet_division-1][__wd_key]
+            __wd_sort.append({"ref":__wd_key, "amount": __corp_wallets_stat[__wallet_division-1][__wd_key]})
+        __wd_sort.sort(key=lambda s: s["amount"], reverse=True)
+        for __wd_dict in __wd_sort:
+            __amount = __wd_dict['amount']
             glf.write('<tr>'
                       ' <td>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{ref}</th>'
                       ' <td align="right"{clr}>{amount:,.1f}</td>'
                       '</tr>\n'.
-                      format(ref=__wd_key,
+                      format(ref=__wd_dict['ref'],
                              amount=__amount,
                              clr=' class="text-danger"' if __amount < 0 else ""))
     glf.write('<tr style="font-weight:bold;">'
