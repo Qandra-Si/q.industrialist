@@ -499,17 +499,22 @@ def __dump_corp_accounting(
         __wallets_balance = sum([w["balance"] for w in __corp["wallet"]])
         # создание первой строчки - название корпорации
         # создание второй строчки - кошельки корпорации
+        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                        '  aria-hidden="true"></span></a>'. \
+                        format(isk=__wallets_balance)
         glf.write('<tr class="active">'
                   ' <td colspan="5"><span class="text-primary"><strong>{nm}</strong></span></td>'
                   '</tr>\n'
                   '<tr>'
                   ' <th scope="row">1</th>'
                   ' <td>Wallets</td>'
-                  ' <td align="right">{wallet:,.1f}</td>'
+                  ' <td align="right">{wallet:,.1f}{clbrd}</td>'
                   ' <td></td>'
                   ' <td align="center">'.
                   format(nm=__corp["corporation"],
-                         wallet=__wallets_balance))
+                         wallet=__wallets_balance,
+                         clbrd=__copy2clpbrd))
         # добавление details на страницу (подробности по кошелькам)
         __dump_corp_wallets_details(
             glf,
@@ -608,10 +613,10 @@ def __dump_corp_accounting(
             row_num = row_num + 1
 
         # добавление строки Summary
-        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
+        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
                         '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                         '  aria-hidden="true"></span></a>'. \
-                        format(cost=__summary_cost)
+                        format(isk=__summary_cost)
         glf.write('<tr>'
                   ' <th></th>\n'
                   ' <td><strong>Summary</strong></td>\n'
@@ -672,13 +677,17 @@ def __dump_corp_accounting(
             for c in __contr_dict:
                 __sum_price += c["price"]
                 __sum_volume += c["volume"]
+            __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                            '  aria-hidden="true"></span></a>'. \
+                            format(isk=__sum_price)
             glf.write('<tr>'
                       ' <th></th>\n'
                       ' <td style="color:#5058df;">Sell Contracts</td>'
-                      ' <td style="color:#5058df;" align="right">{cost:,.1f}</td>'
+                      ' <td style="color:#5058df;" align="right">{cost:,.1f}{clbrd}</td>'
                       ' <td style="color:#5058df;" align="right">{volume:,.1f}</td>'
                       ' <td align="center">'.
-                      format(cost=__sum_price, volume=__sum_volume))
+                      format(cost=__sum_price, volume=__sum_volume, clbrd=__copy2clpbrd))
             # добавление details на страницу
             __dump_corp_contracts_details(
                 glf,
