@@ -758,6 +758,9 @@ def main():
                 # в рамках отчёта accounting нас интересуют только активные контракты
                 if (c["status"] != "outstanding") and (c["status"] != "in_progress"):
                     continue
+                # пропускаем контракты на продажу, которые выставили не мы
+                if c['issuer_corporation_id'] != corporation_id:
+                    continue
                 contract_id = c["contract_id"]
                 try:
                     __contract_items = interface.get_esi_data(
