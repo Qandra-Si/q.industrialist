@@ -485,6 +485,8 @@ def __dump_corp_accounting(
                 # подсчёт общей статистики
                 __association_cost += __stat_dict["cost"]
                 __association_volume += __stat_dict["volume"]
+                __summary_cost += __stat_dict["cost"]
+                __summary_volume += __stat_dict["volume"]
             glf.write('<tr>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}</td>'
