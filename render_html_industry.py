@@ -6,15 +6,89 @@ g_month_names = [
     "July", "August", "September", "October", "November", "December"]
 
 
-def __dump__industry(
+def __dump_industry_product(
+        glf,
+        product,
+        current_month,
+        sde_type_ids,
+        workflow_industry_jobs):
+    # распаковка о продукте данных для вывода в отчёт
+    __product_type_id = product["type_id"]
+    __product_name = product["name"]
+    __product_scheduled_quantity = product["quantity"]
+    # получение справочной информации о продукте
+    __product_dict = sde_type_ids.get(str(__product_type_id), None)
+    __product_volume = __product_dict["volume"] if not (__product_dict is None) and ("volume" in __product_dict) else 0
+    __products_fee_tax_sum = 0.0
+    __products_quantity_sum = 0
+    # вычисление статистики производства, формирование отдельных ячеек таблицы
+    __td_manufactured = ["", "", ""]
+    __td_cost = ""
+    __td_volume = ""
+    for month in range(3):
+        __wij_month = (current_month - 2) + month
+        # получение информации о производстве этого продукта
+        __wij_dict = next((wij for wij in workflow_industry_jobs if
+                           (wij["ptid"] == __product_type_id) and (wij["month"] == __wij_month)), None)
+        if __wij_dict is None:
+            continue
+        __wij_products = __wij_dict["products"]
+        __products_fee_tax_sum += __wij_dict["cost"]
+        __products_quantity_sum += __wij_products
+        if __wij_products >= __product_scheduled_quantity:
+            __wij_progress_factor = 100
+        else:
+            __wij_progress_factor = float(100 * __wij_products / __product_scheduled_quantity)
+        __td_manufactured[month] = \
+            '<strong><span class="text-warning">{q:,d}</span></strong> / {sc}<br>' \
+            '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
+            ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'. \
+            format(
+                q=__wij_products,
+                sc=__product_scheduled_quantity,
+                prcnt100=" progress-bar-success" if __wij_progress_factor >= 99.999 else "",
+                prcnt=int(__wij_progress_factor),
+                fprcnt=__wij_progress_factor
+            )
+    # подсчёт того, что суммируется
+    if __products_quantity_sum > 0:
+        __td_cost = \
+            '{cost:,.1f}<br><mark><span style="font-size: smaller;">{scost:,.2f}</span></mark>'. \
+            format(cost=__products_fee_tax_sum, scost=__products_fee_tax_sum / __products_quantity_sum)
+        __td_volume = \
+            '{volume:,.1f}<br><mark><span style="font-size: smaller;">{svolume:,.2f}</span></mark>'. \
+            format(volume=__product_volume * __products_quantity_sum, svolume=__product_volume)
+    # формирование строки отчёта
+    glf.write(
+        '<tr><!--{id}-->'
+        '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
+        '<td>{nm}</td>'
+        '<td align="right">{mnf0}</td> <td align="right">{mnf1}</td> <td align="right">{mnf2}</td>'
+        '<td align="right">{cost}</td>'
+        '<td align="right">{volume}</td>'
+        '</tr>\n'.
+        format(
+            id=__product_type_id,
+            img=render_html.__get_img_src(__product_type_id, 32),
+            nm=__product_name,
+            scheduled=__product_scheduled_quantity,
+            mnf0=__td_manufactured[0],
+            mnf1=__td_manufactured[1],
+            mnf2=__td_manufactured[2],
+            cost=__td_cost,
+            volume=__td_volume
+        )
+    )
+
+
+def __dump_industry(
         glf,
         sde_type_ids,
         corp_industry_stat):
     conveyor_scheduled_products = corp_industry_stat["conveyor_scheduled_products"]
-    conveyor_scheduled_products.sort(key=lambda p: p["name"])
-
     workflow_industry_jobs = corp_industry_stat["workflow_industry_jobs"]
     current_month = corp_industry_stat["current_month"]
+    conveyor_market_groups = corp_industry_stat["conveyor_market_groups"]
 
     glf.write("""
 <div class="container-fluid">
@@ -41,73 +115,16 @@ def __dump__industry(
 <tbody>
 """)
 
-    for product in conveyor_scheduled_products:
-        # распаковка о продукте данных для вывода в отчёт
-        __product_type_id = product["type_id"]
-        __product_name = product["name"]
-        __product_scheduled_quantity = product["quantity"]
-        # получение справочной информации о продукте
-        __product_dict = sde_type_ids.get(str(__product_type_id), None)
-        __product_volume = __product_dict["volume"] if not (__product_dict is None) and ("volume" in __product_dict) else 0
-        __products_fee_tax_sum = 0.0
-        __products_quantity_sum = 0
-        # вычисление статистики производства, формирование отдельных ячеек таблицы
-        __td_manufactured = ["", "", ""]
-        __td_cost = ""
-        __td_volume = ""
-        for month in range(3):
-            __wij_month = (current_month - 2) + month
-            # получение информации о производстве этого продукта
-            __wij_dict = next((wij for wij in workflow_industry_jobs if (wij["ptid"] == __product_type_id) and (wij["month"] == __wij_month)), None)
-            if __wij_dict is None:
+    conveyor_scheduled_products.sort(key=lambda p: p["name"])
+    conveyor_market_groups = list(conveyor_market_groups.items())
+    conveyor_market_groups.sort(key=lambda m: m[1])
+    for market in conveyor_market_groups:
+        glf.write('<tr><td class="active text-info" colspan="8"><strong>{nm}</strong></td></tr>\n'.format(nm=market[1]))
+        __market_group_id = int(market[0])
+        for product in conveyor_scheduled_products:
+            if product["market"] != __market_group_id:
                 continue
-            __wij_products = __wij_dict["products"]
-            __products_fee_tax_sum += __wij_dict["cost"]
-            __products_quantity_sum += __wij_products
-            if __wij_products >= __product_scheduled_quantity:
-                __wij_progress_factor = 100
-            else:
-                __wij_progress_factor = float(100 * __wij_products / __product_scheduled_quantity)
-            __td_manufactured[month] = \
-                '<strong><span class="text-warning">{q:,d}</span></strong> / {sc}<br>' \
-                '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
-                ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'. \
-                format(
-                    q=__wij_products,
-                    sc=__product_scheduled_quantity,
-                    prcnt100=" progress-bar-success" if __wij_progress_factor >= 99.999 else "",
-                    prcnt=int(__wij_progress_factor),
-                    fprcnt=__wij_progress_factor
-                )
-        # подсчёт того, что суммируется
-        if __products_quantity_sum > 0:
-            __td_cost = \
-                '{cost:,.1f}<br><mark><span style="font-size: smaller;">{scost:,.2f}</span></mark>'. \
-                format(cost=__products_fee_tax_sum, scost=__products_fee_tax_sum/__products_quantity_sum)
-            __td_volume = \
-                '{volume:,.1f}<br><mark><span style="font-size: smaller;">{svolume:,.2f}</span></mark>'. \
-                format(volume=__product_volume*__products_quantity_sum, svolume=__product_volume)
-        # формирование строки отчёта
-        glf.write(
-            '<tr><!--{id}-->'
-            '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
-            '<td>{nm}</td>'
-            '<td align="right">{mnf0}</td> <td align="right">{mnf1}</td> <td align="right">{mnf2}</td>'
-            '<td align="right">{cost}</td>'
-            '<td align="right">{volume}</td>'
-            '</tr>\n'.
-            format(
-                id=__product_type_id,
-                img=render_html.__get_img_src(__product_type_id, 32),
-                nm=__product_name,
-                scheduled=__product_scheduled_quantity,
-                mnf0=__td_manufactured[0],
-                mnf1=__td_manufactured[1],
-                mnf2=__td_manufactured[2],
-                cost=__td_cost,
-                volume=__td_volume
-            )
-        )
+            __dump_industry_product(glf, product, current_month, sde_type_ids, workflow_industry_jobs)
 
     glf.write("""
 </tbody>
@@ -127,7 +144,7 @@ def dump_industry_into_report(
     glf = open('{dir}/industry.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Industry")
-        __dump__industry(
+        __dump_industry(
             glf,
             sde_type_ids,
             corp_industry_stat)
