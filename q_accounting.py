@@ -534,6 +534,55 @@ def __build_wallets_stat(corp_wallet_journal_data):
     return corp_wallet_stat
 
 
+def __build_contracts_stat(
+        sde_type_ids,
+        sde_market_groups,
+        corp_contracts_data,
+        corp_contract_items_data,
+        various_characters_data):
+    corp_sell_contracts = []
+    # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
+    # ищем публичные контракты типа "обмен предметами"
+    for __contract_items_dict in corp_contract_items_data:
+        __contract_id_key = __contract_items_dict.keys()
+        for __contract_id in __contract_id_key:
+            __items = __contract_items_dict[str(__contract_id)]
+            __is_it_ship = None
+            for __items_dict in __items:
+                # пропускаем отклонения от нормы, а также контракты на покупку, а не на продажу
+                if not ("is_included" in __items_dict):
+                   continue
+                elif not bool(__items_dict["is_included"]):
+                   continue
+                __type_id = __items_dict["type_id"]
+                __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if not (__group_id is None) and (__group_id == 4):  # Ships (добавляем только этот тип)
+                    __type_desc = sde_type_ids[str(__type_id)]
+                    __is_it_ship = {"type_id": __type_id, "name": __type_desc["name"]["en"]}
+                    break
+            # проверяем, найдены ли контракты на продажу кораблей?
+            if not (__is_it_ship is None):
+                # # получение общих данных данных по контракту
+                __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
+                # добавляем контракт в список для формирование отчёта по балансу
+                __issuer_id = __contract_dict["issuer_id"]
+                __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
+                corp_sell_contracts.append({
+                    "loc": __contract_dict["start_location_id"],
+                    "ship_type_id": __is_it_ship["type_id"],
+                    "ship_name": __is_it_ship["name"],
+                    "flag": __contract_dict["title"],
+                    "price": __contract_dict["price"],
+                    "volume": __contract_dict["volume"],
+                    "cntrct_sta": __contract_dict["status"],
+                    "cntrct_typ": __contract_dict["type"],
+                    "cntrct_issuer": __issuer_id,
+                    "cntrct_issuer_name": __issuer_name
+                })
+    return corp_sell_contracts
+
+
+
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -580,6 +629,7 @@ def main():
 
     corps_accounting = {}
     eve_market_prices_data = None
+    various_characters_data = []
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -685,7 +735,64 @@ def main():
             print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
         sys.stdout.flush()
 
-        # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+        # Requires role(s): access token
+        corp_contracts_data = interface.get_esi_paged_data(
+            "corporations/{}/contracts/".format(corporation_id))
+        print("'{}' corporation has {} contracts\n".format(corporation_name, len(corp_contracts_data)))
+        sys.stdout.flush()
+
+        # Получение подробной информации о каждому из контракту в списке
+        corp_contract_items_data = []
+        corp_contract_items_len = 0
+        corp_contract_items_not_found = []
+        if len(corp_contracts_data) > 0:
+            # Requires: access token
+            for c in corp_contracts_data:
+                # для удалённых контрактов нельзя загрузить items (см. ниже 404-ошибку), поэтому пропускаем запись
+                if c["status"] == "deleted":
+                    continue
+                # в рамках отчёта accounting, нас интересует только набор контрактов, в которых продаются Ships
+                # ищем любые контракты типа "обмен предметами"
+                if c["type"] != "item_exchange":
+                    continue
+                # в рамках отчёта accounting нас интересуют только активные контракты
+                if (c["status"] != "outstanding") and (c["status"] != "in_progress"):
+                    continue
+                contract_id = c["contract_id"]
+                try:
+                    __contract_items = interface.get_esi_data(
+                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                        fully_trust_cache=True)
+                    corp_contract_items_len += len(__contract_items)
+                    corp_contract_items_data.append({str(contract_id): __contract_items})
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # это нормально, что часть доп.инфы по контрактам может быть не найдена!
+                        corp_contract_items_not_found.append(contract_id)
+                    else:
+                        # print(sys.exc_info())
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+                # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                issuer_id = c["issuer_id"]
+                __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                if __issuer_dict is None:
+                    # Public information about a character
+                    issuer_data = interface.get_esi_data(
+                        "characters/{}/".format(issuer_id),
+                        fully_trust_cache=True)
+                    various_characters_data.append({str(issuer_id): issuer_data})
+                sys.stdout.flush()
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
+
+        print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
+        if len(corp_contract_items_not_found) > 0:
+            print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+        sys.stdout.flush()
+
+        # Построение дерева ассетов, с узлами в роли станций и систем, и листьями в роли хранящихся
         # элементов, в виде:
         # { location1: {items:[item1,item2,...],type_id,location_id},
         #   location2: {items:[item3],type_id} }
@@ -710,6 +817,13 @@ def main():
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_tree.{}".format(corporation_name), corp_accounting_tree)
         corp_wallet_stat = __build_wallets_stat(corp_wallet_journal_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_wallet_stat.{}".format(corporation_name), corp_wallet_stat)
+        corp_sell_contracts = __build_contracts_stat(
+            sde_type_ids,
+            sde_market_groups,
+            corp_contracts_data,
+            corp_contract_items_data,
+            various_characters_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_sell_contracts.{}".format(corporation_name), corp_sell_contracts)
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
@@ -717,7 +831,8 @@ def main():
             "wallet": corp_wallets_data,
             "wallet_stat": corp_wallet_stat,
             "stat": corp_accounting_stat,
-            "tree": corp_accounting_tree
+            "tree": corp_accounting_tree,
+            "sell_contracts": corp_sell_contracts
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_accounting", corps_accounting)

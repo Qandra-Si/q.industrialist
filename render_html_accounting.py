@@ -2,6 +2,67 @@
 import eve_sde_tools
 
 
+def __dump_corp_contracts_details(
+        glf,
+        corporation_name,
+        corporation_id,
+        __corp_contracts):
+    render_html.__dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> Contracts'.format(nm=corporation_name),
+        unique_id='{nm}_contracts'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
+    # собираем названия всех кораблей выставленных на продажу (сортируем и пропускаем дубликаты)
+    __ship_type_id = -1
+    __ship_names = []
+    __corp_contracts.sort(key=lambda s: s["ship_name"])
+    for c in __corp_contracts:
+        if __ship_type_id == c["ship_type_id"]:
+            continue
+        __ship_type_id = c["ship_type_id"]
+        __ship_names.append({"id":__ship_type_id, "nm": c["ship_name"]})
+    # выводим названия кораблей
+    for cn in __ship_names:
+        __ship_type_id = cn["id"]
+        __ship_name = cn["nm"]
+        glf.write('<h4>{}</h4>'.format(__ship_name))
+        glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th>Contract</th>
+  <th style="text-align:right;">Issuer</th>
+  <th style="text-align:right; width:120px;">Sell price,&nbsp;ISK</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        __sum_price = 0.0
+        for c in [c for c in __corp_contracts if c['ship_type_id']==__ship_type_id]:
+            __sum_price += c['price']
+            glf.write('<tr style="font-size: x-small;">'
+                      ' <td>{flag}</th>'
+                      ' <td align="right">{issuer}</td>'
+                      ' <td align="right">{price:,.0f}</td>'
+                      '</tr>\n'.
+                      format(flag=c['flag'],
+                             price=c['price'],
+                             issuer=c['cntrct_issuer_name']))
+        glf.write('<tr style="font-weight:bold;">'
+                  ' <td>Summary</td>'
+                  ' <td colspan="2" align="right">{sum:,.0f}</td>'
+                  '</tr>\n'.
+                  format(sum=__sum_price))
+        glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+    render_html.__dump_any_into_modal_footer(glf)
+
+
 def __dump_corp_wallets_details(
         glf,
         corporation_name,
@@ -600,6 +661,30 @@ def __dump_corp_accounting(
                 __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
                 sde_type_ids,
                 sde_icon_ids)
+            glf.write('</td>'
+                      '</tr>\n')
+
+        # добавление в подвал (под summary) информацию о контрактах
+        __contr_dict = __corp["sell_contracts"]
+        if __contr_dict:
+            __sum_price = 0.0
+            __sum_volume = 0.0
+            for c in __contr_dict:
+                __sum_price += c["price"]
+                __sum_volume += c["volume"]
+            glf.write('<tr>'
+                      ' <th></th>\n'
+                      ' <td style="color:#5058df;">Sell Contracts</td>'
+                      ' <td style="color:#5058df;" align="right">{cost:,.1f}</td>'
+                      ' <td style="color:#5058df;" align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(cost=__sum_price, volume=__sum_volume))
+            # добавление details на страницу
+            __dump_corp_contracts_details(
+                glf,
+                __corp["corporation"],
+                corporation_id,
+                __contr_dict)
             glf.write('</td>'
                       '</tr>\n')
 
