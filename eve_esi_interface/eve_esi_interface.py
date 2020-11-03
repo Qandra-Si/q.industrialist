@@ -146,7 +146,12 @@ class EveOnlineInterface:
         :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__offline_mode or (fully_trust_cache and not (cached_data is None) and ("json" in cached_data)):
+        if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
+            # иногда возникает ситуация, когда данные по указанному url не закачались (упали с ошибкой), и так
+            # и будут вечно восстанавливаться из кеша, - все ошибки обновляем в online-режиме!
+            if not ("Http-Error" in cached_data["headers"]):
+                return cached_data["json"] if "json" in cached_data else None
+        if self.__offline_mode:
             if cached_data is None:
                 return None
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
@@ -188,7 +193,11 @@ class EveOnlineInterface:
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
-        if self.__offline_mode or (fully_trust_cache and not (cached_data is None) and ("json" in cached_data)):
+        if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
+            # аналогично методу get_esi_data, хотя вроде в этом методе HttpError-ы не ожидаются?!
+            if not ("Http-Error" in cached_data["headers"]):
+                return cached_data["json"] if "json" in cached_data else None
+        if self.__offline_mode:
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             return cached_data["json"] if "json" in cached_data else None
         else:
