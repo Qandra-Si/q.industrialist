@@ -57,11 +57,13 @@ def __dump_header(glf, header_name):
 .icn64 { width:64px; height:64px; }
 </style>
 """)
+    if header_name is None:
+        glf.write(' <title>Q.Industrialist</title>\n')
+    else:
+        glf.write(' <title>{nm} - Q.Industrialist</title>\n'.format(nm=header_name))
     glf.write(
-        ' <title>{nm} - Q.Industrialist</title>\n'
         ' <link rel="stylesheet" href="{bs_css}">\n'.
         format(
-            nm=header_name,
             bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous'
         ))
     glf.write("""
@@ -106,20 +108,21 @@ def __dump_header(glf, header_name):
 <body>
 """)
     glf.write(
-        ' <div class="page-header"><h1>Q.Industrialist <small>{nm}</small></h1></div>\n'
+        ' <div class="page-header"><h1>Q.Industrialist{nm}</h1></div>\n'
         ' <script src="{jq_js}"></script>\n'
         ' <script src="{bs_js}"></script>\n'.
         format(
-            nm=header_name,
+            nm='' if header_name is None else ' <small>{nm}</small>'.format(nm=header_name),
             jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
             bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
     ))
 
 
-def __dump_footer(glf):
+def __dump_footer(glf, show_generated_datetime=True):
+    if show_generated_datetime:
+        glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
+            dt=datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
     # Don't remove line below !
-    glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
-        dt=datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
     glf.write("""</br>
 &copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
 </br>
