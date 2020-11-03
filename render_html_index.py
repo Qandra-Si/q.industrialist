@@ -8,25 +8,30 @@ import render_html
 def __dump_index(glf):
     glf.write("""
 <div class="well center-block" style="max-width: 400px;">
-  <button type="button" class="btn btn-primary btn-lg btn-block">Accounting</button>
-  <button type="button" class="btn btn-primary btn-lg btn-block">Blueprints</button>
-  <button type="button" class="btn btn-primary btn-lg btn-block">Conveyor</button>
-  <button type="button" class="btn btn-primary btn-lg btn-block">Cyno Network</button>
-  <button type="button" class="btn btn-primary btn-lg btn-block">Industry</button>
-  <button type="button" class="btn btn-primary btn-lg btn-block">Vanquisher</button>
-  <div class="btn-group">
-    <button type="button" class="btn btn-primary btn-lg btn-block">Workflow</button>
-    <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-    <span class="caret"></span>
-    <span class="sr-only">Toggle Dropdown</span>
-  </button>
-  <ul class="dropdown-menu">
-    <li><a href="#">Action</a></li>
-    <li><a href="#">Another action</a></li>
-    <li><a href="#">Something else here</a></li>
-    <li role="separator" class="divider"></li>
-    <li><a href="#">Separated link</a></li>
-  </ul>
+  <a href="accounting.html" class="btn btn-primary btn-lg btn-block" role="button">Accounting</a>
+  <a href="blueprints.html" class="btn btn-primary btn-lg btn-block" role="button">Blueprints</a>
+  <a href="conveyor.html" class="btn btn-primary btn-lg btn-block" role="button">Conveyor</a>
+  <a href="acynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
+  <div class="btn-group btn-block">
+    <a href="industry.html" class="btn btn-primary btn-lg" role="button" style="width: 89%;">Industry</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="float: right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left: 200px;">
+      <li><a href="qi_industry.php">Archive</a></li>
+    </ul>
+  </div>
+  <a href="vanquisher.html" class="btn btn-primary btn-lg btn-block" role="button">Vanquisher</a>
+  <div class="btn-group btn-block">
+    <a href="workflow.html" class="btn btn-primary btn-lg" role="button" style="width: 89%;">Workflow</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="float: right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left: 200px;">
+      <li><a href="qi_workflow.php">Settings</a></li>
+    </ul>
   </div>
 </div>
 """)
