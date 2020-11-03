@@ -2,6 +2,65 @@
 import eve_sde_tools
 
 
+def __dump_industry_jobs_details(
+        glf,
+        corporation_name,
+        corporation_id,
+        __jobs):
+    render_html.__dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> Contracts'.format(nm=corporation_name),
+        unique_id='{nm}_industry'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
+    # собираем названия всех продуктов
+    __ship_type_id = -1
+    __ship_names = []
+    __jobs.sort(key=lambda s: s["name"])
+    for a in range(2):
+        if a == 0:
+            __activity = [1]
+            glf.write('<h4>Manufacturing</h4>')
+        else:
+            __activity = [9, 11]
+            glf.write('<h4>Reactions</h4>')
+        __jobs_activity = [j for j in __jobs if j['activity_id'] in __activity]
+        glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th>Product</th>
+  <th style="text-align:right;">Quantity</th>
+  <th style="text-align:right; width:120px;">Price,&nbsp;ISK</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        __sum_price = 0.0
+        for j in __jobs_activity:
+            __sum_price += j['price']
+            glf.write('<tr style="font-size: x-small;">'
+                      ' <td>{nm}</th>'
+                      ' <td align="right">{q}</td>'
+                      ' <td align="right">{price:,.1f}</td>'
+                      '</tr>\n'.
+                      format(nm=j['name'],
+                             q=j['quantity'],
+                             price=j['price']))
+        glf.write('<tr style="font-weight:bold;">'
+                  ' <td>Summary</td>'
+                  ' <td colspan="2" align="right">{sum:,.0f}</td>'
+                  '</tr>\n'.
+                  format(sum=__sum_price))
+        glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+    render_html.__dump_any_into_modal_footer(glf)
+
+
 def __dump_corp_contracts_details(
         glf,
         corporation_name,
@@ -558,7 +617,8 @@ def __dump_corp_accounting(
             __unnumbered_key = __key[:-1]
             # https://github.com/esi/eve-glue/blob/master/eve_glue/location_flag.py
             if (__key == "AutoFit") or (__unnumbered_key == "ServiceSlot") or \
-               (__key == "StructureFuel") or (__unnumbered_key == "RigSlot"):
+               (__key == "StructureFuel") or (__unnumbered_key == "RigSlot") or \
+               (__key == "QuantumCoreRoom"):
                 # собираем структурные keys (AutoFit, ServiceSlot? => Structures)
                 add_into_sorted_keys("Structures", __key, __stat_dict)
             else:
@@ -698,6 +758,34 @@ def __dump_corp_accounting(
                 __corp["corporation"],
                 corporation_id,
                 __contr_dict)
+            glf.write('</td>'
+                      '</tr>\n')
+
+        # добавление в подвал (под summary) информацию о запущеных работах
+        __jobs_dict = __corp["jobs_stat"]
+        if __jobs_dict:
+            __sum_price = 0.0
+            __sum_volume = 0.0
+            for c in __jobs_dict:
+                __sum_price += c["price"]
+                __sum_volume += c["item_volume"] * c['quantity']
+            __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                            '  aria-hidden="true"></span></a>'. \
+                            format(isk=__sum_price)
+            glf.write('<tr>'
+                      ' <th></th>\n'
+                      ' <td style="color:#914600;">Industrial Jobs</td>'
+                      ' <td style="color:#914600;" align="right">{cost:,.1f}{clbrd}</td>'
+                      ' <td style="color:#914600;" align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(cost=__sum_price, volume=__sum_volume, clbrd=__copy2clpbrd))
+            # добавление details на страницу
+            __dump_industry_jobs_details(
+                glf,
+                __corp["corporation"],
+                corporation_id,
+                __jobs_dict)
             glf.write('</td>'
                       '</tr>\n')
 

@@ -22,6 +22,8 @@ Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-universe.read_structures.v1 - Requires: access token
     * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
+    * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
+    * esi-contracts.read_corporation_contracts.v1 - Requires: access token
 """
 import json
 import sys
@@ -582,6 +584,62 @@ def __build_contracts_stat(
     return corp_sell_contracts
 
 
+def __build_industry_jobs_stat(
+        sde_type_ids,
+        sde_bp_materials,
+        eve_market_prices_data,
+        corp_industry_jobs_data):
+    corp_jobs_stat = []
+    for j in corp_industry_jobs_data:
+        # получаем информацию о чертеже
+        __blueprint_type_id = j["blueprint_type_id"]
+        __runs = j["runs"]
+        __activity_id = j["activity_id"]
+        # пропускаем инвенты (усовершенствования) ,т.к. в результате получаются чертежи, стоимость которых - х.з.
+        if __activity_id == 8:
+            continue
+        # получаем информацию о работе и делаем вывод о продукте, который будет получен в результате
+        __product_type_id, __quantity, __dummy1 = eve_sde_tools.get_product_by_blueprint_type_id(
+            __blueprint_type_id,
+            __activity_id,
+            sde_bp_materials)
+        # пропускаем me, te, copying и проч. работы, продукты которых не приводят к получению продуктов
+        # которые можно посчитать
+        if __product_type_id is None:
+            continue
+        __type_dict = sde_type_ids.get(str(__product_type_id))
+        # рассчитываем стоимость продукта
+        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__product_type_id)), None)
+        __price = 0.0
+        if not (__price_dict is None):
+            if "average_price" in __price_dict:
+                __price = __price_dict["average_price"]
+            elif "adjusted_price" in __price_dict:
+                __price = __price_dict["adjusted_price"]
+            elif "basePrice" in __type_dict:
+                __price = __type_dict["basePrice"]
+        elif "basePrice" in __type_dict:
+            __price = __type_dict["basePrice"]
+        # учитываем количество в цене (если цена не будет найдена, то... в окне подробностей это должно быть видно)
+        __price = __price * __quantity * __runs
+        # добавляем в список продуктов недоделанные работы
+        __jobs = next((j for j in corp_jobs_stat if j['type_id'] == __product_type_id), None)
+        if __jobs is None:
+            corp_jobs_stat.append({
+                "type_id": __product_type_id,
+                "name": __type_dict["name"]["en"],
+                "activity_id": __activity_id,
+                "quantity": __quantity * __runs,
+                "price": __price,
+                "item_volume": __type_dict['volume']
+            })
+            # __job = corp_jobs_stat[-1:][0]
+        else:
+            __jobs["quantity"] += __quantity * __runs
+            __jobs["price"] += __price
+
+    return corp_jobs_stat
+
 
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -593,6 +651,7 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
     """
     === Сведения по рассчёту цены ===
@@ -802,6 +861,12 @@ def main():
         corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
 
+        # Requires role(s): Factory_Manager
+        corp_industry_jobs_data = interface.get_esi_paged_data(
+            "corporations/{}/industry/jobs/".format(corporation_id))
+        print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
+        sys.stdout.flush()
+
         # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
         print("\nBuilding {} accounting tree and stat...".format(corporation_name))
         sys.stdout.flush()
@@ -827,6 +892,12 @@ def main():
             corp_contract_items_data,
             various_characters_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_sell_contracts.{}".format(corporation_name), corp_sell_contracts)
+        corp_industry_jobs_stat = __build_industry_jobs_stat(
+            sde_type_ids,
+            sde_bp_materials,
+            eve_market_prices_data,
+            corp_industry_jobs_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_industry_jobs_stat.{}".format(corporation_name), corp_industry_jobs_stat)
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
@@ -835,7 +906,8 @@ def main():
             "wallet_stat": corp_wallet_stat,
             "stat": corp_accounting_stat,
             "tree": corp_accounting_tree,
-            "sell_contracts": corp_sell_contracts
+            "sell_contracts": corp_sell_contracts,
+            "jobs_stat": corp_industry_jobs_stat
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_accounting", corps_accounting)
