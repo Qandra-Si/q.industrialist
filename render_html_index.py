@@ -11,25 +11,25 @@ def __dump_index(glf):
   <a href="accounting.html" class="btn btn-primary btn-lg btn-block" role="button">Accounting</a>
   <a href="blueprints.html" class="btn btn-primary btn-lg btn-block" role="button">Blueprints</a>
   <a href="conveyor.html" class="btn btn-primary btn-lg btn-block" role="button">Conveyor</a>
-  <a href="acynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
+  <a href="cynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
   <div class="btn-group btn-block">
-    <a href="industry.html" class="btn btn-primary btn-lg" role="button" style="width: 89%;">Industry</a>
-    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="float: right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    <a href="industry.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Industry</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
       <span class="caret"></span>
       <span class="sr-only">Variants</span>
     </button>
-    <ul class="dropdown-menu" style="left: 200px;">
+    <ul class="dropdown-menu" style="left:201px;">
       <li><a href="qi_industry.php">Archive</a></li>
     </ul>
   </div>
   <a href="vanquisher.html" class="btn btn-primary btn-lg btn-block" role="button">Vanquisher</a>
   <div class="btn-group btn-block">
-    <a href="workflow.html" class="btn btn-primary btn-lg" role="button" style="width: 89%;">Workflow</a>
-    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="float: right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    <a href="workflow.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Workflow</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
       <span class="caret"></span>
       <span class="sr-only">Variants</span>
     </button>
-    <ul class="dropdown-menu" style="left: 200px;">
+    <ul class="dropdown-menu" style="left:201px;">
       <li><a href="qi_workflow.php">Settings</a></li>
     </ul>
   </div>
