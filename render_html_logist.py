@@ -549,6 +549,9 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
     if (!ls.getItem('CynoNetNum')) {
       ls.setItem('CynoNetNum', 0);
     }
+    if (!ls.getItem('Ship')) {
+      ls.setItem('Ship', 'Rhea');
+    }
     if (!ls.getItem('Jump Drive Calibration')) {
       ls.setItem('Jump Drive Calibration', 5);
     }
