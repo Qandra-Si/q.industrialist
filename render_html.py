@@ -107,12 +107,14 @@ def __dump_header(glf, header_name):
 </head>
 <body>
 """)
+    if header_name is None:
+        glf.write(' <title>Q.Industrialist</title>\n')
+    else:
+        glf.write(' <div class="page-header"><h1>Q.Industrialist <small>{nm}</small></h1></div>\n'.format(nm=header_name))
     glf.write(
-        ' <div class="page-header"><h1>Q.Industrialist{nm}</h1></div>\n'
         ' <script src="{jq_js}"></script>\n'
         ' <script src="{bs_js}"></script>\n'.
         format(
-            nm='' if header_name is None else ' <small>{nm}</small>'.format(nm=header_name),
             jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
             bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
     ))
