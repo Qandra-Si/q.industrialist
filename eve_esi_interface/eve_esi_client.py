@@ -236,16 +236,24 @@ class EveESIClient:
                         if 'Etag' in res.headers:
                             log_line = log_line + " " + str(res.headers['Etag'])
                         print(log_line)
-                    # обработка исключительных ситуаций
-                    if (res.status_code in [502, 504]) and (proxy_error_times < self.__attempts_to_reconnect):
+                    if res.status_code == 401:
+                        print(res.json())
+                        # переаутентификация
+                        self.re_auth(self.__auth_cache.auth_cache["scope"])
+                        headers.update({"Authorization": "Bearer {}".format(self.__auth_cache.access_token)})
+                        sys.stdout.flush()
+                        continue
+                    elif (res.status_code in [502, 504]) and (proxy_error_times < self.__attempts_to_reconnect):
                         # пять раз пытаемся повторить отправку сломанного запроса (часто случается
                         # при подключении через 3G-модем)
                         proxy_error_times = proxy_error_times + 1
                         continue
                     elif (res.status_code in [503]) and (proxy_error_times < self.__attempts_to_reconnect):
-                        # иногда падает интерфейс к серверу tranquility (почему-то как правило на загрузке item-ов контракта)
+                        # иногда падает интерфейс к серверу tranquility (почему-то как правило на загрузке
+                        # item-ов контракта)
                         print(res.json())
-                        # 503 Server Error: service unavailable for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                        # 503 Server Error: service unavailable for url:
+                        #     https://esi.evetech.net/latest/corporations/?/contracts/?/items/
                         # {'error': 'The datasource tranquility is temporarily unavailable'}
                         proxy_error_times = proxy_error_times + 1
                         time.sleep(2*proxy_error_times)
@@ -255,7 +263,8 @@ class EveESIClient:
                         # срабатывания находится около 20 запросов в 10 секунд от одного персонажа), см. подробнее
                         # здесь: https://github.com/esi/esi-issues/issues/636#issuecomment-342150532
                         print(res.json())
-                        # 520 Server Error: status code 520 for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                        # 520 Server Error: status code 520 for url:
+                        #     https://esi.evetech.net/latest/corporations/?/contracts/?/items/
                         # {'error': 'ConStopSpamming, details: {"remainingTime": 12038505}'}
                         throttle_error_times = throttle_error_times + 1
                         time.sleep(5)
@@ -277,9 +286,20 @@ class EveESIClient:
                     continue
                 raise
             except requests.exceptions.HTTPError as err:
+                # встречаются ошибки типа: 403 Client Error: Forbidden for url:
+                #     https://esi.evetech.net/latest/corporations/98615601/contracts/163946879/items/
+                # {'error': 'token is expired', 'sso_status': 200}
+                if (res.status_code == 403) and (res.json().get('error', {'error': ''}) == 'token is expired'):
+                    print(res.json())
+                    # переаутентификация
+                    self.re_auth(self.__auth_cache.auth_cache["scope"])
+                    headers.update({"Authorization": "Bearer {}".format(self.__auth_cache.access_token)})
+                    sys.stdout.flush()
+                    continue
+                # сюда попадают 403 и 404 ошибки, и это нормально, т.к. CCP использует их для передачи
+                # application-информации
                 print(err)
                 print(res.json())
-                # сюда попадают 403 и 404 ошибки, и это нормально, т.к. CCP использует их для передачи application-информации
                 raise
             except:
                 print(sys.exc_info())
