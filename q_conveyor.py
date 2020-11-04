@@ -63,7 +63,6 @@ def __build_conveyors(
         # кешируем признак того, что контейнеры являются стоком материалов
         same_stock_container = False if __manuf_dict["same_stock_container"] is None else bool(__manuf_dict["same_stock_container"])
         fixed_number_of_runs = None if __manuf_dict["fixed_number_of_runs"] is None else __manuf_dict["fixed_number_of_runs"]
-        print(same_stock_container, fixed_number_of_runs)
         # находим станцию, где расположены найденные контейнеры
         for id in blueprint_loc_ids:
             __loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -136,7 +135,6 @@ def main():
         "same_stock_container": cs[3],
         "fixed_number_of_runs": cs[4]
     } for cs in db_conveyor_settings]
-    print(conveyor_settings)
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -264,6 +262,7 @@ def main():
         corp_assets_tree,
         corp_ass_names_data,
         foreign_structures_data)
+    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "conveyour_entities", conveyour_entities)
 
     # перечисляем станции и контейнеры, которые были найдены
     print('\nFound conveyor containters and station ids...')
