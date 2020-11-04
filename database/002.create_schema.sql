@@ -4,6 +4,10 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+DROP INDEX IF EXISTS qi.idx_cs_pk;
+DROP TABLE IF EXISTS qi.conveyor_settings;
+DROP SEQUENCE IF EXISTS qi.seq_cs;
+
 DROP INDEX IF EXISTS qi.idx_wij_bp_tid;
 DROP INDEX IF EXISTS qi.idx_wij_bp_id;
 DROP INDEX IF EXISTS qi.idx_wij_pk;
@@ -188,6 +192,41 @@ TABLESPACE pg_default;
 CREATE INDEX idx_wij_bp_tid
     ON qi.workflow_industry_jobs USING btree
     (wij_bp_tid ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- conveyor_settings
+-- список работ по производству, которые выполнены корпорацией
+--------------------------------------------------------------------------------
+CREATE SEQUENCE qi.seq_cs
+    INCREMENT 1
+    START 1000
+    MINVALUE 1
+    MAXVALUE 2147483647
+    CACHE 1;
+
+ALTER SEQUENCE qi.seq_cs OWNER TO qi_user;
+
+CREATE TABLE qi.conveyor_settings
+(
+    cs_id INTEGER NOT NULL DEFAULT NEXTVAL('qi.seq_cs'::regclass),
+    cs_bp_nms CHARACTER VARYING(127) NOT NULL, -- названия контейнеров, в которых находятся чертежи для запуска конвейеров (r"^\[prod\] conveyor .$" example: "[prod] conveyor 1", "[prod] conveyor 2")
+    cs_stock_nms CHARACTER VARYING(127), -- названия контейнеров, в которых хранятся материалы для работы конвейеров (r"^\.\.stock ALL$" example: "..stock ALL")
+    cs_exclude_nms CHARACTER VARYING(127), -- названия контейнеров, из которых нельзя доставать чертежи для производства материалов ("^\[SCIENCE\] .+" example: "[SCIENCE] invention", "[SCIENCE] copy", ...)
+    cs_same_stock BOOLEAN, -- признак того, что контейнер с чертежами является также стоком материалов
+    cs_fixed_runs INTEGER, -- фиксированное кол-во ранов БПО, находящихся в контейнерах (для расчёта необходимого кол-ва материалов)
+    cs_remarks CHARACTER VARYING(2047), -- примечание (название конвейера)
+    cs_active BOOLEAN, -- признак использования конвейера (если false, то отключен)
+    CONSTRAINT pk_cs PRIMARY KEY (cs_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.conveyor_settings OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_cs_pk
+    ON qi.conveyor_settings USING btree
+    (cs_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

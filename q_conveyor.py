@@ -31,18 +31,113 @@ import requests
 import re
 
 import eve_esi_interface as esi
+import postgresql_interface as db
 
 import eve_esi_tools
 import eve_sde_tools
 import console_app
 import render_html_conveyor
 import q_industrialist_settings
-import q_conveyor_settings
 
 from __init__ import __version__
 
 
+def __get_db_connection():
+    qidb = db.QIndustrialistDatabase("conveyor", debug=True)
+    qidb.connect(q_industrialist_settings.g_database)
+    return qidb
+
+
+def __build_conveyors(
+        conveyor_settings,
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data):
+    conveyour_entities = []
+    for __manuf_dict in conveyor_settings:
+        # находим контейнеры по заданным названиям
+        blueprint_loc_ids = []
+        blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(__manuf_dict["conveyor_container_names"], n['name'])])
+        # кешируем признак того, что контейнеры являются стоком материалов
+        same_stock_container = False if __manuf_dict["same_stock_container"] is None else bool(__manuf_dict["same_stock_container"])
+        fixed_number_of_runs = None if __manuf_dict["fixed_number_of_runs"] is None else __manuf_dict["fixed_number_of_runs"]
+        print(same_stock_container, fixed_number_of_runs)
+        # находим станцию, где расположены найденные контейнеры
+        for id in blueprint_loc_ids:
+            __loc_dict = eve_esi_tools.get_universe_location_by_item(
+                id,
+                sde_inv_names,
+                sde_inv_items,
+                corp_assets_tree,
+                corp_ass_names_data,
+                foreign_structures_data
+            )
+            if not ("station_id" in __loc_dict):
+                continue
+            __station_id = __loc_dict["station_id"]
+            __conveyor_entity = next((id for id in conveyour_entities if id["station_id"] == __station_id), None)
+            if __conveyor_entity is None:
+                __conveyor_entity = __loc_dict
+                __conveyor_entity.update({"containers": [], "stock": [], "exclude": []})
+                conveyour_entities.append(__conveyor_entity)
+                # на этой же станции находим контейнер со стоком материалов
+                if same_stock_container:
+                    __conveyor_entity["stock"].append({"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
+                else:
+                    __stock_ids = [n["item_id"] for n in corp_ass_names_data if re.search(__manuf_dict["stock_container_names"], n['name'])]
+                    for __stock_id in __stock_ids:
+                        __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
+                            __stock_id,
+                            sde_inv_names,
+                            sde_inv_items,
+                            corp_assets_tree,
+                            corp_ass_names_data,
+                            foreign_structures_data
+                        )
+                        if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
+                            __conveyor_entity["stock"].append({"id": __stock_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __stock_id), None)})
+                # на этой же станции находим контейнеры, из которых нельзя доставать чертежи для производства материалов
+                if not (__manuf_dict["exclude_container_names"] is None):
+                    __exclude_ids = [n["item_id"] for n in corp_ass_names_data if re.search(__manuf_dict["exclude_container_names"], n['name'])]
+                    for __exclude_id in __exclude_ids:
+                        __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
+                            __exclude_id,
+                            sde_inv_names,
+                            sde_inv_items,
+                            corp_assets_tree,
+                            corp_ass_names_data,
+                            foreign_structures_data
+                        )
+                        if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
+                            __conveyor_entity["exclude"].append({"id": __exclude_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __exclude_id), None)})
+            # добавляем к текущей станции контейнер с чертежами
+            # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
+            __conveyor_entity["containers"].append({
+                "id": id,
+                "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None),
+                "fixed_number_of_runs": fixed_number_of_runs})
+    return conveyour_entities
+
+
 def main():
+    qidb = __get_db_connection()
+    db_conveyor_settings = qidb.select_all_rows(
+        "SELECT cs_bp_nms,cs_stock_nms,cs_exclude_nms,cs_same_stock,cs_fixed_runs "
+        "FROM conveyor_settings "
+        "WHERE cs_active;")
+    del qidb
+
+    conveyor_settings = [{
+        "conveyor_container_names": cs[0],
+        "stock_container_names": cs[1],
+        "exclude_container_names": cs[2],
+        "same_stock_container": cs[3],
+        "fixed_number_of_runs": cs[4]
+    } for cs in db_conveyor_settings]
+    print(conveyor_settings)
+
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
@@ -161,71 +256,14 @@ def main():
     corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
-    # Поиск контейнеров, которые участвуют в производстве
-    conveyour_entities = []
-    for __manuf_dict in enumerate(q_conveyor_settings.g_manufacturing):
-        # находим контейнеры по заданным названиям
-        blueprint_loc_ids = []
-        for tmplt in __manuf_dict[1]["conveyor_container_names"]:
-            blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
-        # кешируем признак того, что контейнеры являются стоком материалов
-        same_stock_container = ("same_stock_container" in __manuf_dict[1]) and bool(__manuf_dict[1]["same_stock_container"])
-        fixed_number_of_runs = __manuf_dict[1]["fixed_number_of_runs"] if "fixed_number_of_runs" in __manuf_dict[1] else None
-        # находим станцию, где расположены найденные контейнеры
-        for id in blueprint_loc_ids:
-            __loc_dict = eve_esi_tools.get_universe_location_by_item(
-                id,
-                sde_inv_names,
-                sde_inv_items,
-                corp_assets_tree,
-                corp_ass_names_data,
-                foreign_structures_data
-            )
-            if not ("station_id" in __loc_dict):
-                continue
-            __station_id = __loc_dict["station_id"]
-            __conveyor_entity = next((id for id in conveyour_entities if id["station_id"] == __station_id), None)
-            if __conveyor_entity is None:
-                __conveyor_entity = __loc_dict
-                __conveyor_entity.update({"containers": [], "stock": [], "exclude": []})
-                conveyour_entities.append(__conveyor_entity)
-                # на этой же станции находим контейнер со стоком материалов
-                if same_stock_container:
-                    __conveyor_entity["stock"].append({"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
-                else:
-                    for tmplt in __manuf_dict[1]["stock_container_names"]:
-                        __stock_ids = [n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])]
-                        for __stock_id in __stock_ids:
-                            __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
-                                __stock_id,
-                                sde_inv_names,
-                                sde_inv_items,
-                                corp_assets_tree,
-                                corp_ass_names_data,
-                                foreign_structures_data
-                            )
-                            if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
-                                __conveyor_entity["stock"].append({"id": __stock_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __stock_id), None)})
-                # на этой же станции находим контейнеры, из которых нельзя доставать чертежи для производства материалов
-                for tmplt in __manuf_dict[1]["exclude_container_names"]:
-                    __exclude_ids = [n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])]
-                    for __exclude_id in __exclude_ids:
-                        __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
-                            __exclude_id,
-                            sde_inv_names,
-                            sde_inv_items,
-                            corp_assets_tree,
-                            corp_ass_names_data,
-                            foreign_structures_data
-                        )
-                        if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
-                            __conveyor_entity["exclude"].append({"id": __exclude_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __exclude_id), None)})
-            # добавляем к текущей станции контейнер с чертежами
-            # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
-            __conveyor_entity["containers"].append({
-                "id": id,
-                "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None),
-                "fixed_number_of_runs": fixed_number_of_runs})
+    # поиск контейнеров, которые участвуют в производстве
+    conveyour_entities = __build_conveyors(
+        conveyor_settings,
+        sde_inv_names,
+        sde_inv_items,
+        corp_assets_tree,
+        corp_ass_names_data,
+        foreign_structures_data)
 
     # перечисляем станции и контейнеры, которые были найдены
     print('\nFound conveyor containters and station ids...')
@@ -234,9 +272,9 @@ def main():
         for cec in ce["containers"]:
             print('    {} = {}'.format(cec["id"], cec["name"]))
         for ces in ce["stock"]:
-            print('    {} = {}'.format(ces["id"], ces["name"]))
+            print('    {} = stock : {}'.format(ces["id"], ces["name"]))
         for cee in ce["exclude"]:
-            print('    {} = {}'.format(cee["id"], cee["name"]))
+            print('    {} = exclude : {}'.format(cee["id"], cee["name"]))
     sys.stdout.flush()
 
     print("\nBuilding report...")
