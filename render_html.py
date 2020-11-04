@@ -9,7 +9,15 @@ __g_local_timezone = tzlocal.get_localzone()
 __g_render_datetime = None
 __g_pattern_c2s1 = re.compile(r'(.)([A-Z][a-z]+)')
 __g_pattern_c2s2 = re.compile(r'([a-z0-9])([A-Z])')
-
+__g_bootstrap_css_local = 'bootstrap/3.4.1/css/bootstrap.min.css'
+__g_jquery_js_local = 'jquery/jquery-1.12.4.min.js'
+__g_bootstrap_js_local = 'bootstrap/3.4.1/js/bootstrap.min.js'
+__g_bootstrap_css_external = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous'
+__g_jquery_js_external = 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous'
+__g_bootstrap_js_external = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
+# __g_bootstrap_css_external = 'https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous'
+# __g_jquery_js_external = 'https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous'
+# __g_bootstrap_js_external = 'https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous'
 
 def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
   name = __g_pattern_c2s1.sub(r'\1_\2', name)
@@ -66,13 +74,14 @@ def __dump_header(glf, header_name):
 .icn64 { width:64px; height:64px; }
 </style>
 """)
-    glf.write(
-        ' <title>{nm} - Q.Industrialist</title>\n'
-        ' <link rel="stylesheet" href="{bs_css}">\n'.
-        format(
-            nm=header_name,
-            bs_css='bootstrap/3.4.1/css/bootstrap.min.css' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous'
-        ))
+    if header_name is None:
+        glf.write(' <title>Q.Industrialist</title>\n')
+    else:
+        glf.write(' <title>{nm} - Q.Industrialist</title>\n'.format(nm=header_name))
+    if q_industrialist_settings.g_use_filesystem_resources:
+        glf.write(' <link rel="stylesheet" href="{css}">\n'.format(css=__g_bootstrap_css_local))
+    else:
+        glf.write(' <link rel="stylesheet" href="{css}">\n'.format(css=__g_bootstrap_css_external))
     glf.write("""
  <!-- Android  -->
  <meta name="theme-color" content="#1e2021">
@@ -114,20 +123,26 @@ def __dump_header(glf, header_name):
 </head>
 <body>
 """)
-    glf.write(
-        ' <div class="page-header"><h1>Q.Industrialist <small>{nm}</small></h1></div>\n'
-        ' <script src="{jq_js}"></script>\n'
-        ' <script src="{bs_js}"></script>\n'.
-        format(
-            nm=header_name,
-            jq_js='jquery/jquery-1.12.4.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous',
-            bs_js='bootstrap/3.4.1/js/bootstrap.min.js' if q_industrialist_settings.g_use_filesystem_resources else 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous'
-    ))
+    if header_name is None:
+        glf.write(' <title>Q.Industrialist</title>\n')
+    else:
+        glf.write(' <div class="page-header"><h1>Q.Industrialist <small>{nm}</small></h1></div>\n'.format(nm=header_name))
+    if q_industrialist_settings.g_use_filesystem_resources:
+        glf.write(
+            ' <script src="{jq_js}"></script>\n'
+            ' <script src="{bs_js}"></script>\n'.
+            format(jq_js=__g_jquery_js_local, bs_js=__g_bootstrap_js_local))
+    else:
+        glf.write(
+            ' <script src="{jq_js}"></script>\n'
+            ' <script src="{bs_js}"></script>\n'.
+            format(jq_js=__g_jquery_js_external, bs_js=__g_bootstrap_js_external))
 
 
-def __dump_footer(glf):
+def __dump_footer(glf, show_generated_datetime=True):
+    if show_generated_datetime:
+        glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(dt=__get_render_datetime()))
     # Don't remove line below !
-    glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(dt=__get_render_datetime()))
     glf.write("""</br>
 &copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
 </br>

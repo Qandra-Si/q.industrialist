@@ -22,6 +22,8 @@ Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-universe.read_structures.v1 - Requires: access token
     * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
+    * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
+    * esi-contracts.read_corporation_contracts.v1 - Requires: access token
 """
 import json
 import sys
@@ -35,6 +37,43 @@ import q_industrialist_settings
 import render_html_accounting
 
 from __init__ import __version__
+
+
+def __build_ship_append(
+        __is_root,
+        __root_type_id,
+        __quantity,
+        __ca6_hangar_group,
+        __volume,
+        __price):
+    if not __is_root:
+        __quantity = 0  # quantity=0 для всех вложенных в корабль предметов, чтобы не менялось кол-во кораблей
+    __ca7_ships = __ca6_hangar_group.get("ships",None)
+    if __ca7_ships is None:
+        __ca6_hangar_group.update({"ships": []})
+        __ca7_ships = __ca6_hangar_group["ships"]
+    __ca8_ship = next((s for s in __ca7_ships if s['type_id'] == int(__root_type_id)), None)
+    if __ca8_ship is None:
+        __ca7_ships.append({
+            'type_id': __root_type_id,
+            'quantity': 0,
+            'volume': 0.0,
+            'cost': 0.0,
+            'volume_nested': 0.0,
+            'cost_nested': 0.0
+        })
+        __ca8_ship = __ca7_ships[-1:][0]
+    if __is_root:
+        __ca8_ship["quantity"] += __quantity
+        if not (__volume is None):
+            __ca8_ship["volume"] += __volume
+        if not (__price is None):
+            __ca8_ship["cost"] += __price
+    else:
+        if not (__volume is None):
+            __ca8_ship["volume_nested"] += __volume
+        if not (__price is None):
+            __ca8_ship["cost_nested"] += __price
 
 
 def __build_accounting_append(
@@ -51,13 +90,18 @@ def __build_accounting_append(
         process_only_specified_groups,
         prefer_base_price,
         do_not_use_any_price,
-        top_level_hangar):
+        top_level_hangar,
+        append_as_nested):
     if not (skip_certain_groups is None):
         if __group_id in skip_certain_groups:  # напр. Blueprints & Reactions (пропускаем)
             return
     if not (process_only_specified_groups is None):
         if not (__group_id in process_only_specified_groups):  # напр. Blueprints & Reactions (обрабатываем)
             return
+    # если обнаружим виртуальную вложенность, то подменяем ключ, т.е. group_id
+    if not (append_as_nested is None):
+        __group_id = append_as_nested["nested_group_id"]
+    # начинаем добавлять данные в aorp_accounting_tree...
     __hangar_num = None if top_level_hangar is None else int(top_level_hangar)
     __ca5_key = str(__group_id) if __hangar_num is None else '{}_{}'.format(__group_id, __hangar_num)
     if not (__ca5_key in __ca5_station_flag):
@@ -70,13 +114,15 @@ def __build_accounting_append(
             "cost": 0
         }})
     __ca6_hangar_group = __ca5_station_flag[__ca5_key]  # верим в лучшее, данные по маркету тут должны быть...
+    # считаем объём с стоимость полученного предмета
     __type_dict = sde_type_ids[str(__type_id)]
+    __volume = None
+    __price = None
     if "volume" in __type_dict:
-        __sum = __type_dict["volume"] * __quantity
-        __ca6_hangar_group["volume"] += __sum
-        __cas1_stat_flag["volume"] += __sum
+        __volume = __type_dict["volume"] * __quantity
+        __ca6_hangar_group["volume"] += __volume
+        __cas1_stat_flag["volume"] += __volume
     if not do_not_use_any_price:
-        __price = None
         if prefer_base_price and ("basePrice" in __type_dict):
             __price = __type_dict["basePrice"]
         if __price is None:
@@ -91,9 +137,20 @@ def __build_accounting_append(
             elif "basePrice" in __type_dict:
                 __price = __type_dict["basePrice"]
         if not (__price is None):
-            __sum = __price * __quantity
-            __ca6_hangar_group["cost"] += __sum
-            __cas1_stat_flag["cost"] += __sum
+            __price = __price * __quantity
+            __ca6_hangar_group["cost"] += __price
+            __cas1_stat_flag["cost"] += __price
+    # теперь регистрируем вложенную категорию
+    if not (append_as_nested is None):
+        __root_type_id = append_as_nested["nested_type_id"]
+        __is_root = __root_type_id == __type_id
+        __build_ship_append(
+            __is_root,
+            __root_type_id,
+            __quantity,
+            __ca6_hangar_group,
+            __volume,
+            __price)
 
 
 def __build_accounting_nested(
@@ -107,7 +164,8 @@ def __build_accounting_nested(
         __ca5_station_flag,
         skip_certain_groups,
         process_only_specified_groups,
-        top_level_hangar):
+        top_level_hangar,
+        append_as_nested):
     __tree_dict = corp_assets_tree[str(itm_id)]
     __item_dict = corp_assets_data[int(__tree_dict["index"])]
     __type_id = int(__item_dict["type_id"])
@@ -119,6 +177,12 @@ def __build_accounting_nested(
         if __item_dict["location_flag"][:-1] == "CorpSAG":
             top_level_hangar = int(__item_dict["location_flag"][-1:])
     if not (__group_id is None):
+        # если в процессе обработки иерархии находится корабль (с патронами, дронами,...) то создаём
+        # новую виртуальную вложенность 
+        if append_as_nested is None:
+            if __group_id == 4:  # Ships
+                append_as_nested = {"nested_type_id": __type_id, "nested_group_id": __group_id}
+        # добавляем в copr_accounting_tree информацию о цене и объёме предмета(ов)
         __build_accounting_append(
             __type_id,
             __quantity,
@@ -133,7 +197,8 @@ def __build_accounting_nested(
             process_only_specified_groups,
             False,
             False,
-            top_level_hangar)
+            top_level_hangar,
+            append_as_nested)  # Ships, и может быть ещё что-то вложенное?
     if str(itm_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(itm_id)]
         if "items" in __cat1:
@@ -149,7 +214,8 @@ def __build_accounting_nested(
                     __ca5_station_flag,
                     skip_certain_groups,
                     process_only_specified_groups,
-                    top_level_hangar)
+                    top_level_hangar,
+                    append_as_nested)
     return
 
 
@@ -222,7 +288,8 @@ def __build_accounting_station(
                 __ca5_station_flag,
                 skip_certain_groups,
                 process_only_specified_groups,
-                None)  # корпоративный ангар всегда вложен в OfficeFolder и находится уровнем ниже
+                None,  # корпоративный ангар всегда вложен в OfficeFolder и находится уровнем ниже
+                None)  # начинаем добавлять данные по отдельным категориям, не вложенные "как фит в корабль"
 
 
 def __build_accounting_blueprints_nested(
@@ -268,7 +335,8 @@ def __build_accounting_blueprints_nested(
             [2],   # ...обработку только Blueprints and Reactions
             not __is_blueprint_copy,  # признак использования base_price
             __is_blueprint_copy,  # поправка: для БПЦ-чертежей любая цена от ЦЦП невалидна
-            None)  #TODO: номер ангара
+            None,  #TODO: номер ангара
+            None) # это не Ship и не какая-то другая возможная вложенность
     if str(__item_id) in corp_assets_tree:
         __cat1 = corp_assets_tree[str(__item_id)]
         if "items" in __cat1:
@@ -384,7 +452,8 @@ def __build_accounting(
                                     None, # Обрабатываем все остальные типы и группы имущества
                                     False,
                                     False,
-                                    None)  #TODO: а какой тут номер ангара?
+                                    None,  #TODO: а какой тут номер ангара?
+                                    None) # это не Ship и не какая-то другая возможная вложенность
                 # на текущей станции получаем все location_flag и собираем сводную статистику по каждой группе
                 __build_accounting_station(
                     itm,
@@ -467,6 +536,111 @@ def __build_wallets_stat(corp_wallet_journal_data):
     return corp_wallet_stat
 
 
+def __build_contracts_stat(
+        sde_type_ids,
+        sde_market_groups,
+        corp_contracts_data,
+        corp_contract_items_data,
+        various_characters_data):
+    corp_sell_contracts = []
+    # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
+    # ищем публичные контракты типа "обмен предметами"
+    for __contract_items_dict in corp_contract_items_data:
+        __contract_id_key = __contract_items_dict.keys()
+        for __contract_id in __contract_id_key:
+            __items = __contract_items_dict[str(__contract_id)]
+            __is_it_ship = None
+            for __items_dict in __items:
+                # пропускаем отклонения от нормы, а также контракты на покупку, а не на продажу
+                if not ("is_included" in __items_dict):
+                   continue
+                elif not bool(__items_dict["is_included"]):
+                   continue
+                __type_id = __items_dict["type_id"]
+                __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if not (__group_id is None) and (__group_id == 4):  # Ships (добавляем только этот тип)
+                    __type_desc = sde_type_ids[str(__type_id)]
+                    __is_it_ship = {"type_id": __type_id, "name": __type_desc["name"]["en"]}
+                    break
+            # проверяем, найдены ли контракты на продажу кораблей?
+            if not (__is_it_ship is None):
+                # # получение общих данных данных по контракту
+                __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
+                # добавляем контракт в список для формирование отчёта по балансу
+                __issuer_id = __contract_dict["issuer_id"]
+                __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
+                corp_sell_contracts.append({
+                    "loc": __contract_dict["start_location_id"],
+                    "ship_type_id": __is_it_ship["type_id"],
+                    "ship_name": __is_it_ship["name"],
+                    "flag": __contract_dict["title"],
+                    "price": __contract_dict["price"],
+                    "volume": __contract_dict["volume"],
+                    "cntrct_sta": __contract_dict["status"],
+                    "cntrct_typ": __contract_dict["type"],
+                    "cntrct_issuer": __issuer_id,
+                    "cntrct_issuer_name": __issuer_name
+                })
+    return corp_sell_contracts
+
+
+def __build_industry_jobs_stat(
+        sde_type_ids,
+        sde_bp_materials,
+        eve_market_prices_data,
+        corp_industry_jobs_data):
+    corp_jobs_stat = []
+    for j in corp_industry_jobs_data:
+        # получаем информацию о чертеже
+        __blueprint_type_id = j["blueprint_type_id"]
+        __runs = j["runs"]
+        __activity_id = j["activity_id"]
+        # пропускаем инвенты (усовершенствования) ,т.к. в результате получаются чертежи, стоимость которых - х.з.
+        if __activity_id == 8:
+            continue
+        # получаем информацию о работе и делаем вывод о продукте, который будет получен в результате
+        __product_type_id, __quantity, __dummy1 = eve_sde_tools.get_product_by_blueprint_type_id(
+            __blueprint_type_id,
+            __activity_id,
+            sde_bp_materials)
+        # пропускаем me, te, copying и проч. работы, продукты которых не приводят к получению продуктов
+        # которые можно посчитать
+        if __product_type_id is None:
+            continue
+        __type_dict = sde_type_ids.get(str(__product_type_id))
+        # рассчитываем стоимость продукта
+        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__product_type_id)), None)
+        __price = 0.0
+        if not (__price_dict is None):
+            if "average_price" in __price_dict:
+                __price = __price_dict["average_price"]
+            elif "adjusted_price" in __price_dict:
+                __price = __price_dict["adjusted_price"]
+            elif "basePrice" in __type_dict:
+                __price = __type_dict["basePrice"]
+        elif "basePrice" in __type_dict:
+            __price = __type_dict["basePrice"]
+        # учитываем количество в цене (если цена не будет найдена, то... в окне подробностей это должно быть видно)
+        __price = __price * __quantity * __runs
+        # добавляем в список продуктов недоделанные работы
+        __jobs = next((j for j in corp_jobs_stat if j['type_id'] == __product_type_id), None)
+        if __jobs is None:
+            corp_jobs_stat.append({
+                "type_id": __product_type_id,
+                "name": __type_dict["name"]["en"],
+                "activity_id": __activity_id,
+                "quantity": __quantity * __runs,
+                "price": __price,
+                "item_volume": __type_dict['volume']
+            })
+            # __job = corp_jobs_stat[-1:][0]
+        else:
+            __jobs["quantity"] += __quantity * __runs
+            __jobs["price"] += __price
+
+    return corp_jobs_stat
+
+
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -477,6 +651,7 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
     """
     === Сведения по рассчёту цены ===
@@ -513,6 +688,7 @@ def main():
 
     corps_accounting = {}
     eve_market_prices_data = None
+    various_characters_data = []
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -618,12 +794,78 @@ def main():
             print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
         sys.stdout.flush()
 
-        # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
+        # Requires role(s): access token
+        corp_contracts_data = interface.get_esi_paged_data(
+            "corporations/{}/contracts/".format(corporation_id))
+        print("'{}' corporation has {} contracts\n".format(corporation_name, len(corp_contracts_data)))
+        sys.stdout.flush()
+
+        # Получение подробной информации о каждому из контракту в списке
+        corp_contract_items_data = []
+        corp_contract_items_len = 0
+        corp_contract_items_not_found = []
+        if len(corp_contracts_data) > 0:
+            # Requires: access token
+            for c in corp_contracts_data:
+                # для удалённых контрактов нельзя загрузить items (см. ниже 404-ошибку), поэтому пропускаем запись
+                if c["status"] == "deleted":
+                    continue
+                # в рамках отчёта accounting, нас интересует только набор контрактов, в которых продаются Ships
+                # ищем любые контракты типа "обмен предметами"
+                if c["type"] != "item_exchange":
+                    continue
+                # в рамках отчёта accounting нас интересуют только активные контракты
+                if (c["status"] != "outstanding") and (c["status"] != "in_progress"):
+                    continue
+                # пропускаем контракты на продажу, которые выставили не мы
+                if c['issuer_corporation_id'] != corporation_id:
+                    continue
+                contract_id = c["contract_id"]
+                try:
+                    __contract_items = interface.get_esi_data(
+                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                        fully_trust_cache=True)
+                    corp_contract_items_len += len(__contract_items)
+                    corp_contract_items_data.append({str(contract_id): __contract_items})
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # это нормально, что часть доп.инфы по контрактам может быть не найдена!
+                        corp_contract_items_not_found.append(contract_id)
+                    else:
+                        # print(sys.exc_info())
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+                # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                issuer_id = c["issuer_id"]
+                __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                if __issuer_dict is None:
+                    # Public information about a character
+                    issuer_data = interface.get_esi_data(
+                        "characters/{}/".format(issuer_id),
+                        fully_trust_cache=True)
+                    various_characters_data.append({str(issuer_id): issuer_data})
+                sys.stdout.flush()
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
+
+        print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
+        if len(corp_contract_items_not_found) > 0:
+            print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+        sys.stdout.flush()
+
+        # Построение дерева ассетов, с узлами в роли станций и систем, и листьями в роли хранящихся
         # элементов, в виде:
         # { location1: {items:[item1,item2,...],type_id,location_id},
         #   location2: {items:[item3],type_id} }
         corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
+
+        # Requires role(s): Factory_Manager
+        corp_industry_jobs_data = interface.get_esi_paged_data(
+            "corporations/{}/industry/jobs/".format(corporation_id))
+        print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
+        sys.stdout.flush()
 
         # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
         print("\nBuilding {} accounting tree and stat...".format(corporation_name))
@@ -643,6 +885,19 @@ def main():
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_accounting_tree.{}".format(corporation_name), corp_accounting_tree)
         corp_wallet_stat = __build_wallets_stat(corp_wallet_journal_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_wallet_stat.{}".format(corporation_name), corp_wallet_stat)
+        corp_sell_contracts = __build_contracts_stat(
+            sde_type_ids,
+            sde_market_groups,
+            corp_contracts_data,
+            corp_contract_items_data,
+            various_characters_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_sell_contracts.{}".format(corporation_name), corp_sell_contracts)
+        corp_industry_jobs_stat = __build_industry_jobs_stat(
+            sde_type_ids,
+            sde_bp_materials,
+            eve_market_prices_data,
+            corp_industry_jobs_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_industry_jobs_stat.{}".format(corporation_name), corp_industry_jobs_stat)
 
         corps_accounting.update({str(corporation_id): {
             "corporation": corporation_name,
@@ -650,7 +905,9 @@ def main():
             "wallet": corp_wallets_data,
             "wallet_stat": corp_wallet_stat,
             "stat": corp_accounting_stat,
-            "tree": corp_accounting_tree
+            "tree": corp_accounting_tree,
+            "sell_contracts": corp_sell_contracts,
+            "jobs_stat": corp_industry_jobs_stat
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_accounting", corps_accounting)

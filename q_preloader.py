@@ -219,7 +219,7 @@ def main():
                         continue
                     # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
                     # ищем публичные контракты типа "обмен предметами"
-                    if (c["availability"] != "public") or (c["type"] != "item_exchange"):
+                    if c["type"] != "item_exchange":
                         continue
                     contract_id = c["contract_id"]
                     try:

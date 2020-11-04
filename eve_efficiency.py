@@ -85,7 +85,7 @@ def get_industry_material_efficiency(
         material_efficiency):
     if __is_reaction_formula:
         # TODO: для формул нет расчёта материалоёмкости
-        __need = runs_quantity
+        __need = runs_quantity * __bpo_materials_quantity
     elif __bpo_materials_quantity == 1:
         # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
         # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
