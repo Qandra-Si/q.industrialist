@@ -54,6 +54,53 @@ def __is_availabe_blueprints_present(
     return vacant_originals, vacant_copies, False
 
 
+def __dump_materials_list(
+        glf,
+        glyphicon_name,  # glyphicon-info-sign
+        heading_name,  # Used materials in progress
+        materials_list,
+        with_copy_to_clipboard,
+        with_horizontal_row):
+    if len(materials_list) > 0:
+        glf.write('<div class="qind-materials-used">')
+        if with_horizontal_row:
+            glf.write('<hr>\n')
+        glf.write("""
+<div class="media">
+ <div class="media-left">
+""")
+        glf.write('<span class="glyphicon {}" aria-hidden="false" style="font-size: 64px;"></span>\n'.format(glyphicon_name))
+        glf.write("""
+ </div>
+ <div class="media-body">
+""")
+        glf.write('<h4 class="media-heading">{}</h4>\n'.format(heading_name))
+        if with_copy_to_clipboard:
+            glf.write("""
+  <a data-target="#" role="button" class="qind-copy-btn" data-toggle="tooltip" data-source="span">
+   <button type="button" class="btn btn-default btn-xs"><span class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button>
+  </a><br>
+""")
+        materials_list.sort(key=lambda bp: bp['nm'])
+        for m_usd in materials_list:
+            # вывод наименования ресурса
+            glf.write(
+                '<span style="white-space:nowrap"{qq}>'
+                '<img class="icn24" src="{src}"> {q:,d} x {nm} '
+                '</span>\n'.format(
+                    src=render_html.__get_img_src(m_usd['id'], 32),
+                    q=m_usd['q'],
+                    nm=m_usd['nm'],
+                    qq=' quantity="{}"'.format(m_usd['q']) if with_copy_to_clipboard else ''
+                )
+            )
+        glf.write("""
+ </div>
+</div>
+</div>
+""")  # qind-materials-used, media, media-body
+
+
 def __dump_blueprints_list_with_materials(
         glf,
         conveyor_entity,
@@ -304,38 +351,10 @@ def __dump_blueprints_list_with_materials(
 </div> <!--table-responsive-->
 """)
 
-        if len(materials_used) > 0:
-            glf.write("""
-<div class="qind-materials-used">
- <hr>
- <div class="media">
-  <div class="media-left">
-   <span class="glyphicon glyphicon-info-sign" aria-hidden="false" style="font-size: 64px;"></span>
-  </div>
-  <div class="media-body">
-   <h4 class="media-heading">Used materials in progress</h4>
-   <a data-target="#" role="button" class="qind-copy-btn" data-toggle="tooltip" data-source="span">
-    <button type="button" class="btn btn-default btn-xs"><span class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button>
-   </a><br>
-""")
-            materials_used.sort(key=lambda bp: bp['nm'])
-            for m_usd in materials_used:
-                # вывод наименования ресурса
-                glf.write(
-                    '<span style="white-space:nowrap" quantity="{q}">'
-                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
-                    '</span>\n'.format(
-                        src=render_html.__get_img_src(m_usd['id'], 32),
-                        q=m_usd['q'],
-                        nm=m_usd['nm']
-                    )
-                )
-            glf.write("""
-  </div>
- </div>
-</div>""")  # qind-materials-used, media, media-body
+        __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', materials_used, True, True)
+        __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', materials_summary, False, True)
 
-        # отображение в отчёте summary-информаци по недостающим материалам
+        # отображение в отчёте summary-информации по недостающим материалам
         if len(materials_summary) > 0:
             # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
             # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
@@ -350,32 +369,6 @@ def __dump_blueprints_list_with_materials(
                     material_groups[str(__market_group)].append(__material_dict)
                 else:
                     material_groups.update({str(__market_group): [__material_dict]})
-            # сортировка summary materials списка по названиям элементов
-            materials_summary.sort(key=lambda m: m["nm"])
-            glf.write(
-                '<hr><div class="media">\n'
-                ' <div class="media-left">\n'
-                '  <span class="glyphicon glyphicon-question-sign" aria-hidden="false" style="font-size: 64px;"></span>\n'
-                ' </div>\n'
-                ' <div class="media-body">\n'
-                '  <div class="qind-materials-used">'
-                '  <h4 class="media-heading">Summary materials</h4>\n'
-            )
-            for __summary_dict in materials_summary:
-                __quantity = __summary_dict["q"]
-                __type_id = __summary_dict["id"]
-                __item_name = __summary_dict["nm"]
-                glf.write(
-                    '<span style="white-space:nowrap">'
-                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
-                    '</span>\n'.format(
-                        src=render_html.__get_img_src(__type_id, 32),
-                        q=__quantity,
-                        nm=__item_name
-                    )
-                )
-            glf.write('<hr></div>\n')  # qind-materials-used
-
             # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
             not_available_row_num = 1
             ms_groups = material_groups.keys()
@@ -400,18 +393,23 @@ def __dump_blueprints_list_with_materials(
                         # вывод сведений в отчёт
                         if not_available_row_num == 1:
                             glf.write("""
-<h4 class="media-heading">Not available materials</h4>
-<div class="table-responsive">
-<table class="table table-condensed table-hover">
-<thead>
-<tr>
-<th style="width:40px;">#</th>
-<th>Materials</th>
-<th>Not available</th>
-<th>In progress</th>
-</tr>
-</thead>
-<tbody>
+<div class="media">
+ <div class="media-left">
+  <span class="glyphicon glyphicon-remove-sign" aria-hidden="false" style="font-size: 64px;"></span>
+ </div>
+ <div class="media-body">
+  <h4 class="media-heading">Not available materials</h4>
+  <div class="table-responsive">
+   <table class="table table-condensed table-hover">
+   <thead>
+    <tr>
+     <th style="width:40px;">#</th>
+     <th>Materials</th>
+     <th>Not available</th>
+     <th>In progress</th>
+    </tr>
+   </thead>
+   <tbody>
 """)
                         # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
                         if not group_diplayed:
@@ -489,14 +487,12 @@ def __dump_blueprints_list_with_materials(
                         not_available_row_num = not_available_row_num + 1
             if not_available_row_num != 1:
                 glf.write("""
-</tbody>
-</table>
-</div>
+   </tbody>
+   </table>
+  </div> <!--table-responsive-->
+ </div> <!--media-body-->
+</div> <!--media-->
 """)
-            glf.write(
-                ' </div>\n'
-                '</div>\n'
-            )
 
         glf.write("""
    </div> <!--panel-body-->
