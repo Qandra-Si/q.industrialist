@@ -241,7 +241,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             materials_summary.append({"id": bpmm1_blueprint_type_id,
                                       "q": bpmm1_efficiency,
                                       "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
-                                      "b": bpmm1_blueprints})
+                                      "b": bpmm1_blueprints,
+                                      "ajp": bpmm1_in_progress + bpmm1_available})
             # вывод списка материалов для постройки по чертежу
             for m2 in bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"]:
                 row2_num = row2_num + 1
@@ -251,16 +252,18 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 bpmm2_efficiency = bpmm2_quantity * bpmm1_efficiency  # поправка на эффективность материалов
                 bpmm2_not_enough = bpmm2_quantity * bpmm1_not_enough
                 bpmm2_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
-                if not bpmm2_is_reaction_formula:
-                    # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
-                    material_efficiency = 10
-                    # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-                    # см. 1 x run: http://prntscr.com/u0g07w
-                    # см. 4 x run: http://prntscr.com/u0g0cd
-                    # см. экономия материалов: http://prntscr.com/u0g11u
-                    __me = float(100 - material_efficiency - 1 - 4.2)
-                    bpmm2_efficiency = int(float((bpmm2_efficiency * __me) / 100) + 0.99999)
-                    bpmm2_not_enough = int(float((bpmm2_not_enough * __me) / 100) + 0.99999)
+                # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
+                material_efficiency = 10
+                bpmm2_efficiency = eve_sde_tools.get_industry_material_efficiency(
+                    bpmm2_is_reaction_formula,
+                    1,
+                    bpmm2_efficiency,
+                    material_efficiency)
+                bpmm2_not_enough = eve_sde_tools.get_industry_material_efficiency(
+                    bpmm2_is_reaction_formula,
+                    1,
+                    bpmm2_not_enough,
+                    material_efficiency)
                 # вывод наименования ресурса
                 glf.write(
                     '<tr>\n'
@@ -319,8 +322,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
   <th>Need<br/>(Efficiency)</th>
   <th>Progress, %</th>
   <th style="text-align:right;">Price per<br/>Unit, ISK</th>
-  <th style="text-align:right;">Sum, ISK</th>
-  <th style="text-align:right;">Volume, m&sup3;</th>
+  <th style="text-align:right;">Sum,&nbsp;ISK</th>
+  <th style="text-align:right;">Volume,&nbsp;m&sup3;</th>
  </tr>
 </thead>
 <tbody>
@@ -364,9 +367,14 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         __assets = __summary_dict["a"] if "a" in __summary_dict else 0
         __blueprints = __summary_dict["b"] if "b" in __summary_dict else []
         __in_progress = __summary_dict["j"] if "j" in __summary_dict else 0
+        __products_available_and_in_progress = __summary_dict.get("ajp", 0)
         __type_id = __summary_dict["id"]
         __item_name = __summary_dict["nm"]
-        #---
+        # ---
+        __quantity -= __products_available_and_in_progress
+        if __quantity < 0:
+            __quantity = 0
+        # ---
         __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
         __material_dict = {
             "id": __type_id,
@@ -508,8 +516,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             glf.write('<tr style="font-weight:bold">'
                       ' <th></th>'
                       ' <td colspan="4">Summary&nbsp;(<small>{nm}</small>)</td>'
-                      ' <td colspan="2" align="right">{cost:,.1f} ISK</td>'
-                      ' <td align="right">{volume:,.1f} m&sup3;</td>'
+                      ' <td colspan="2" align="right">{cost:,.1f}&nbsp;ISK</td>'
+                      ' <td align="right">{volume:,.1f}&nbsp;m&sup3;</td>'
                       '</tr>\n'.
                       format(nm=__group_name,
                              cost=__summary_cost,
