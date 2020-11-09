@@ -127,6 +127,7 @@ def __dump_blueprints_list_with_materials(
 """)
         # вывод в отчёт инфорации о чертежах
         materials_summary = []
+        materials_used = []
         for type_dict in type_keys:
             type_id = type_dict["id"]
             blueprint_name = type_dict["name"]
@@ -200,6 +201,24 @@ def __dump_blueprints_list_with_materials(
                     __jobs_cost = sum([i["jc"] for i in bp["itm"] if "jc" in i])
                     glf.write('&nbsp;<span class="label badge-light">{:,.1f} ISK</span>'.format(__jobs_cost))
                     # ---
+                    if not (__blueprint_materials is None):
+                        for m in __blueprint_materials:
+                            # расчёт кол-ва материала с учётом эффективности производства
+                            __need = eve_sde_tools.get_industry_material_efficiency(
+                                __is_reaction_formula,
+                                quantity_or_runs,
+                                m["quantity"],  # сведения из чертежа
+                                material_efficiency)
+                            # сохраняем материалы для производства в список их суммарного кол-ва
+                            bpmm_tid = int(m["typeID"])
+                            bpmm_tnm = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm_tid)
+                            __used_dict = next((ms for ms in materials_used if ms['id'] == bpmm_tid), None)
+                            if __used_dict is None:
+                                __used_dict = {"id": bpmm_tid, "q": __need, "nm": bpmm_tnm}
+                                materials_used.append(__used_dict)
+                            else:
+                                __used_dict["q"] += __need
+                    # ---
                     glf.write('</br></span>')  # qind-blueprints-?
                 elif __blueprint_materials is None:
                     glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
@@ -211,7 +230,7 @@ def __dump_blueprints_list_with_materials(
                     for m in __blueprint_materials:
                         bp_manuf_need_all = 0
                         bp_manuf_need_min = 0
-                        for __bp3 in __bp2[type_id][bpk]["itm"]:
+                        for __bp3 in bp["itm"]:
                             if is_blueprint_copy:
                                 quantity_or_runs = __bp3["r"]
                             else:
@@ -284,6 +303,38 @@ def __dump_blueprints_list_with_materials(
  </table>
 </div> <!--table-responsive-->
 """)
+
+        if len(materials_used) > 0:
+            glf.write("""
+<div class="qind-materials-used">
+ <hr>
+ <div class="media">
+  <div class="media-left">
+   <span class="glyphicon glyphicon-info-sign" aria-hidden="false" style="font-size: 64px;"></span>
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Used materials in progress</h4>
+   <a data-target="#" role="button" class="qind-copy-btn" data-toggle="tooltip" data-source="span">
+    <button type="button" class="btn btn-default btn-xs"><span class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button>
+   </a><br>
+""")
+            materials_used.sort(key=lambda bp: bp['nm'])
+            for m_usd in materials_used:
+                # вывод наименования ресурса
+                glf.write(
+                    '<span style="white-space:nowrap">'
+                    '<img class="icn24" src="{src}"> {q:,d} x {nm} '
+                    '</span>\n'.format(
+                        src=render_html.__get_img_src(m_usd['id'], 32),
+                        q=m_usd['q'],
+                        nm=m_usd['nm']
+                    )
+                )
+            glf.write("""
+  </div>
+ </div>
+</div>""")  # qind-materials-used, media, media-body
+
         # отображение в отчёте summary-информаци по недостающим материалам
         if len(materials_summary) > 0:
             # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
@@ -304,7 +355,7 @@ def __dump_blueprints_list_with_materials(
             glf.write(
                 '<hr><div class="media">\n'
                 ' <div class="media-left">\n'
-                '  <span class="glyphicon glyphicon-alert" aria-hidden="false" style="font-size: 64px;"></span>\n'
+                '  <span class="glyphicon glyphicon-question-sign" aria-hidden="false" style="font-size: 64px;"></span>\n'
                 ' </div>\n'
                 ' <div class="media-body">\n'
                 '  <div class="qind-materials-used">'
@@ -368,7 +419,7 @@ def __dump_blueprints_list_with_materials(
                             __icon_id = sde_market_groups[ms_group_id]["iconID"] if "iconID" in sde_market_groups[ms_group_id] else 0
                             # подготовка элементов управления копирования данных в clipboard
                             __copy2clpbrd = '' if not enable_copy_to_clipboard else \
-                                '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
+                                '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
                                 '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
                                 '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
                             glf.write(
@@ -413,7 +464,7 @@ def __dump_blueprints_list_with_materials(
                                 absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
                         # подготовка элементов управления копирования данных в clipboard
                         __copy2clpbrd = '' if not enable_copy_to_clipboard else \
-                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
                             '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
                             '  aria-hidden="true"></span></a>'. \
                             format(nm=ms_item_name)
@@ -446,6 +497,7 @@ def __dump_blueprints_list_with_materials(
                 ' </div>\n'
                 '</div>\n'
             )
+
         glf.write("""
    </div> <!--panel-body-->
   </div> <!--panel-collapse-->
@@ -934,22 +986,34 @@ def __dump_corp_conveyor(
     $('a.qind-copy-btn').bind('click', function () {
       var data_copy = $(this).attr('data-copy');
       if (data_copy === undefined) {
-        var tr = $(this).parent().parent();
-        var tbody = tr.parent();
-        var rows = tbody.children('tr');
-        var start_row = rows.index(tr);
-        data_copy = '';
-        rows.each( function(idx) {
-          if (!(start_row === undefined) && (idx > start_row)) {
-            var td = $(this).find('td').eq(0);
-            if (!(td.attr('class') === undefined))
-              start_row = undefined;
-            else {
-              if (data_copy) data_copy += "\\n"; 
-              data_copy += td.find('a').attr('data-copy') + "\\t" + $(this).find('td').eq(1).attr('quantity');
+        var data_source = $(this).attr('data-source');
+        if (data_source == 'table') {
+          var tr = $(this).parent().parent();
+          var tbody = tr.parent();
+          var rows = tbody.children('tr');
+          var start_row = rows.index(tr);
+          data_copy = '';
+          rows.each( function(idx) {
+            if (!(start_row === undefined) && (idx > start_row)) {
+              var td = $(this).find('td').eq(0);
+              if (!(td.attr('class') === undefined))
+                start_row = undefined;
+              else {
+                if (data_copy) data_copy += "\\n"; 
+                data_copy += td.find('a').attr('data-copy') + "\\t" + $(this).find('td').eq(1).attr('quantity');
+              }
             }
-          }
-        });
+          });
+        } else if (data_source == 'span') {
+          var div = $(this).parent().parent();
+          var spans = tbody.children('span');
+          data_copy = '';
+          spans.each( function(idx) {
+            var span = $(this);
+            if (data_copy) data_copy += "\\n"; 
+            data_copy += span.text();
+          });
+        }
       }
       var $temp = $("<textarea>");
       $("body").append($temp);
