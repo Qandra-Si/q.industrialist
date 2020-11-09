@@ -942,7 +942,7 @@ def __dump_corp_conveyor(
         $(this).addClass('hidden');
     })
     sort_by = ls.getItem('Sort By');
-    sort_by = 0 ? (sort_by === null) : sort_by;
+    sort_by = (sort_by === null) ? 0 : sort_by;
     $('table.qind-blueprints-tbl').each(function() {
       sortConveyor($(this),g_tbl_col_orders[sort_by],sort_by,g_tbl_col_types[sort_by]);
     })
