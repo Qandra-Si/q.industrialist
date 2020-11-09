@@ -145,3 +145,5 @@ dmypy.json
 /*.~json
 /*.html
 /*.csv
+/database/*.dmp
+/database/*.dump
