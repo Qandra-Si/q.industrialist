@@ -322,7 +322,7 @@ def __dump_blueprints_list_with_materials(
             for m_usd in materials_used:
                 # вывод наименования ресурса
                 glf.write(
-                    '<span style="white-space:nowrap">'
+                    '<span style="white-space:nowrap" quantity="{q}">'
                     '<img class="icn24" src="{src}"> {q:,d} x {nm} '
                     '</span>\n'.format(
                         src=render_html.__get_img_src(m_usd['id'], 32),
@@ -1005,13 +1005,14 @@ def __dump_corp_conveyor(
             }
           });
         } else if (data_source == 'span') {
-          var div = $(this).parent().parent();
-          var spans = tbody.children('span');
+          var div = $(this).parent();
+          var spans = div.children('span');
           data_copy = '';
           spans.each( function(idx) {
             var span = $(this);
-            if (data_copy) data_copy += "\\n"; 
-            data_copy += span.text();
+            if (data_copy) data_copy += "\\n";
+            var txt = span.text();
+            data_copy += txt.substring(txt.indexOf(' x ')+3) + "\\t" + span.attr('quantity');
           });
         }
       }

@@ -196,7 +196,6 @@ def main():
                 else:
                     for tmplt in __manuf_dict[1]["stock_container_names"]:
                         __stock_ids = [n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])]
-                        print(__stock_ids)
                         for __stock_id in __stock_ids:
                             __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
                                 __stock_id,
