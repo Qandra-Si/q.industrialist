@@ -118,7 +118,8 @@ def __build_blueprints(
                 __blueprint.update({
                     "st": __job_dict["status"],
                     "act": __job_dict["activity_id"],
-                    "loc": __location_id  # переопределяем!!!
+                    "loc": __location_id,  # переопределяем!!!
+                    "out": __job_dict["output_location_id"],
                 })
         # выясняем стоимость чертежа
         if "basePrice" in __type_desc:
