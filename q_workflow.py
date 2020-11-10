@@ -242,12 +242,19 @@ def __get_monthly_manufacturing_scheduler(
     missing_blueprints = scheduler["missing_blueprints"]
     overplus_blueprints = scheduler["overplus_blueprints"]
 
-    def push_into_scheduled_blueprints(type_id, quantity, name, product_type_id):
+    def push_into_scheduled_blueprints(type_id, quantity, name, product_type_id, conveyor_flag):
         __sbd227 = next((sb for sb in scheduled_blueprints if sb["type_id"] == type_id), None)
         if __sbd227 is None:
             __sbd227 = {"type_id": type_id,
                         "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, type_id),
-                        "product": {"scheduled_quantity": int(quantity), "name": name, "type_id": product_type_id}}
+                        "product": {"scheduled_quantity": 0,
+                                    "conveyor_quantity": 0,
+                                    "name": name,
+                                    "type_id": product_type_id}}
+            if conveyor_flag:
+                __sbd227["product"]["conveyor_quantity"] += int(quantity)
+            else:
+                __sbd227["product"]["scheduled_quantity"] += int(quantity)
             # получаем данные по чертежу, - продукция, кол-во производимой продукции, материалы
             __ptid227, __pq227, __pm227 = \
                 eve_sde_tools.get_manufacturing_product_by_blueprint_type_id(type_id, sde_bp_materials)
@@ -258,7 +265,10 @@ def __get_monthly_manufacturing_scheduler(
                 __sbd227["manufacturing"] = {"materials": __pm227}
             scheduled_blueprints.append(__sbd227)
         else:
-            __sbd227["product"]["scheduled_quantity"] += int(quantity)
+            if conveyor_flag:
+                __sbd227["product"]["conveyor_quantity"] += int(quantity)
+            else:
+                __sbd227["product"]["scheduled_quantity"] += int(quantity)
 
     def push_into_factory_blueprints(type_id, runs):
         __fbd235 = next((fb for fb in factory_blueprints if fb["type_id"] == type_id), None)
@@ -278,8 +288,9 @@ def __get_monthly_manufacturing_scheduler(
     for ship in scheduler_job_settings:
         __eft = ship["eft"]
         __total_quantity = ship["quantity"]
+        __conveyor_flag = ship["conveyor"]
         __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
-        __converted.update({"quantity": __total_quantity})
+        __converted.update({"quantity": __total_quantity, "conveyor": __conveyor_flag})
         if not (__converted["ship"] is None):
             __blueprint_type_id, __blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 __converted["ship"]["type_id"],
@@ -307,6 +318,7 @@ def __get_monthly_manufacturing_scheduler(
     for job in scheduler["monthly_jobs"]:
         __ship = job["ship"]
         __total_quantity = job["quantity"]
+        __conveyor_flag = job["conveyor"]
         __items = job["items"]
         # добавляем в список БПЦ чертёж хула корабля (это может быть и БПО в итоге...)
         if not (__ship is None):
@@ -315,7 +327,8 @@ def __get_monthly_manufacturing_scheduler(
                     __ship["blueprint"]["type_id"],
                     __total_quantity,
                     __ship["name"],
-                    __ship["type_id"]
+                    __ship["type_id"],
+                    __conveyor_flag
                 )
         # подсчитываем количество БПЦ, необходимых для постройки T2-модулей этого фита
         __bpc_for_fit = [{"id": i["blueprint"]["type_id"],
@@ -331,7 +344,8 @@ def __get_monthly_manufacturing_scheduler(
                 bpc["id"],
                 bpc["q"],
                 bpc["nm"],
-                bpc["prod"]
+                bpc["prod"],
+                __conveyor_flag
             )
 
     # формирование списка чертежей имеющихся на станции в указанных контейнерах
@@ -399,6 +413,7 @@ def __get_monthly_manufacturing_scheduler(
         __blueprint_type_id = __sb_dict["type_id"]
         __product_type_id = __sb_dict["product"]["type_id"]
         __scheduled_products = __sb_dict["product"]["scheduled_quantity"]
+        __conveyor_products = __sb_dict["product"]["conveyor_quantity"]
         __products_per_run = __sb_dict["products_per_run"]
         __blueprint_copy_runs = __sb_dict["blueprint_copy_runs"]
         __single_run_quantity = __blueprint_copy_runs * __products_per_run
@@ -408,12 +423,21 @@ def __get_monthly_manufacturing_scheduler(
         __exist_runs = sum([fb["runs"] for fb in __exist])  # напр. 3 рана...
         __exist_run_products = __exist_runs * __products_per_run  # ...по 1000 шт продукции, итого 3000 продукций
         # расчитываем недостающее кол-во чертежей
-        if __exist_run_products >= __scheduled_products:
-            __missing_blueprints = 0
+        __all_products = __scheduled_products + __conveyor_products
+        if __exist_run_products >= __all_products:
+            __missing_scheduled = 0
+            __missing_conveyor = 0
+        elif __exist_run_products >= __scheduled_products:
+            __missing_scheduled = 0
+            __rest_products = __scheduled_products - __exist_run_products
+            __missing_conveyor = (__rest_products + __conveyor_products + __single_run_quantity - 1) // __single_run_quantity
         else:
-            __missing_blueprints = (__scheduled_products - __exist_run_products + __single_run_quantity + 1) // __single_run_quantity
+            __missing_scheduled = (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
+            __rest_products = __scheduled_products - __exist_run_products
+            __missing_conveyor = (__rest_products + __conveyor_products + __single_run_quantity - 1) // __single_run_quantity
+
         #print(__sb_dict["name"],
-        #      "scheduled=", __scheduled_products,
+        #      "scheduled=", __all_products,
         #      ",  per run=", __blueprint_copy_runs, '*', __products_per_run,
         #      ",  required=", __sb_dict["blueprints_quantity"],
         #      ",  missing=", __missing_blueprints,
@@ -424,9 +448,11 @@ def __get_monthly_manufacturing_scheduler(
             "type_id": __blueprint_type_id,
             "name": __sb_dict["name"],
             "product_type_id": __product_type_id,
-            "missing_blueprints": __missing_blueprints,  # подразумевается как недостающее кол-во
+            "missing_scheduled_blueprints": __missing_scheduled,  # подразумевается как недостающее scheduled' кол-во
+            "missing_conveyor_blueprints": __missing_conveyor,  # подразумевается как недостающее conveyor' кол-во
             "available_quantity": (__exist_run_products + __single_run_quantity - 1) // __single_run_quantity,
-            "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
+            "scheduled_quantity": (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity,
+            "conveyor_quantity": (__conveyor_products + __single_run_quantity - 1) // __single_run_quantity
         })
 
     # формирование списка избыточных чертежей
@@ -525,7 +551,7 @@ def main():
     qidb = __get_db_connection()
     module_settings = qidb.load_module_settings(g_module_default_settings)
     db_monthly_jobs = qidb.select_all_rows(
-        "SELECT wmj_quantity,wmj_eft "
+        "SELECT wmj_quantity,wmj_eft,wmj_conveyor "
         "FROM workflow_monthly_jobs "
         "WHERE wmj_active;")
     db_factory_containers = qidb.select_all_rows(
@@ -533,7 +559,7 @@ def main():
         "FROM workflow_factory_containers;")
     del qidb
 
-    db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0]} for wmj in db_monthly_jobs]
+    db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0], "conveyor": bool(wmj[2])} for wmj in db_monthly_jobs]
     db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3]} for wfc in db_factory_containers]
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
