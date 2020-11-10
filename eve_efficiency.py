@@ -84,8 +84,14 @@ def get_industry_material_efficiency(
         # me-параметр чертежа
         material_efficiency):
     if __is_reaction_formula:
-        # TODO: для формул нет расчёта материалоёмкости
-        __need = runs_quantity * __bpo_materials_quantity
+        # TODO: хардкодим -2.2% structure role bonus
+        __stage1 = runs_quantity * __bpo_materials_quantity
+        # учитываем бонус профиля сооружения
+        __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
+        # округляем вещественное число до старшего целого
+        __stage3 = int(float(__stage2 + 0.99))
+        # ---
+        __need = __stage3
     elif __bpo_materials_quantity == 1:
         # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
         # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт

@@ -187,7 +187,7 @@ def main():
 
     # Public information about market prices
     eve_market_prices_data = interface.get_esi_data("markets/prices/")
-    print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
+    print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
     sys.stdout.flush()
 
     # # Public information with list of public structures

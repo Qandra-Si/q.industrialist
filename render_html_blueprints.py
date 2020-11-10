@@ -261,6 +261,7 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show Price tags</a></li>
        <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
        <li><a id="btnToggleBox" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBox"></span> Show Box column</a></li>
+       <li><a id="btnToggleOut" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowOut"></span> Show Output Box column</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleShowContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowContracts"></span> Show Contracts</a></li>
        <li><a id="btnToggleShowFinishedContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowFinishedContracts"></span> Show Finished Contracts</a></li>
@@ -372,6 +373,7 @@ tr.qind-bp-row {
   <th class="hvr-icon-fade" id="thSortSel" col="5">Location<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-plc hvr-icon-fade" id="thSortSel" col="6">Place<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-box hvr-icon-fade" id="thSortSel" col="7">Box<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="qind-td-out hvr-icon-fade" id="thSortSel" col="8">Output<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
  </tr>
 </thead>
 <tbody>
@@ -399,6 +401,7 @@ tr.qind-bp-row {
             __activity = ""
             __blueprint_activity = None
             __blueprint_contract_activity = None
+            __output_location_id = None
             if "st" in __blueprint_dict:
                 # [ active, cancelled, delivered, paused, ready, reverted ]
                 __blueprint_status = __blueprint_dict["st"]
@@ -455,6 +458,15 @@ tr.qind-bp-row {
             __place = __blueprint_dict["flag"]
             if __place[:-1] == "CorpSAG":
                 __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+            # определяем выход готовой продукции
+            __output_location_id = __blueprint_dict.get("out", None)
+            __output_location_box = __blueprint_dict.get("out", "")
+            if not (__output_location_id is None):
+                if str(__output_location_id) in __corp["locations"]:
+                    # определяем название контейнера выхода готовой продукции (названия ingame задают игроки)
+                    __loc_dict = __corp["locations"][str(__output_location_id)]
+                    if not (__loc_dict["name"] is None):
+                        __output_location_box = __loc_dict["name"]
             # вывод в таблицу информацию о чертеже
             glf.write('<tr class="qind-bp-row"{job}{cntrct}>'
                       ' <th scope="row">{num}</th>\n'
@@ -466,6 +478,7 @@ tr.qind-bp-row {
                       ' <td>{loc}</td>'
                       ' <td class="qind-td-plc">{plc}</td>'
                       ' <td class="qind-td-box">{box}</td>'
+                      ' <td class="qind-td-out">{out}</td>'
                       '</tr>\n'.
                       format(num=row_num,
                              nm=__blueprint_dict["name"],
@@ -480,7 +493,8 @@ tr.qind-bp-row {
                              iprice=__fprice,
                              loc=__location_name,
                              plc=__place,
-                             box=__location_box))
+                             box=__location_box,
+                             out=__output_location_box))
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
@@ -496,6 +510,7 @@ tr.qind-bp-row {
  <td></td>
  <td class="qind-td-plc"></td>
  <td class="qind-td-box"></td>
+ <td class="qind-td-out"></td>
 </tr>
 <tr class="qind-summary-contracts" style="font-weight:bold;">
  <th></th>
@@ -505,6 +520,7 @@ tr.qind-bp-row {
  <td></td>
  <td class="qind-td-plc"></td>
  <td class="qind-td-box"></td>
+ <td class="qind-td-out"></td>
 </tr>
 </tfoot>
       </table>
@@ -580,7 +596,7 @@ tr.qind-bp-row {
     'Reverse Engineering', 'Invention', 'Reactions', '', '',
     'Show', 'Hide'
   ];
-  var g_tbl_col_types = [0,1,1,1,2,0,0,0]; // 0:str, 1:num, 2:x-data
+  var g_tbl_col_types = [0,1,1,1,2,0,0,0,0]; // 0:str, 1:num, 2:x-data
   var g_tbl_filter = null;
 
   // Blueprints Options storage (prepare)
@@ -697,6 +713,11 @@ tr.qind-bp-row {
       $('#imgShowBox').removeClass('hidden');
     else
       $('#imgShowBox').addClass('hidden');
+    show = ls.getItem('Show Out');
+    if (show == 1)
+      $('#imgShowOut').removeClass('hidden');
+    else
+      $('#imgShowOut').addClass('hidden');
     show = ls.getItem('Show Unused Blueprints');
     if (show == 1)
       $('#imgShowUnusedBlueprints').removeClass('hidden');
@@ -766,6 +787,10 @@ tr.qind-bp-row {
           if (!_res) {
             txt = el.find('td').eq(7).text().toLowerCase();
             _res = txt.includes(g_tbl_filter);
+            if (!_res) {
+              txt = el.find('td').eq(8).text().toLowerCase();
+              _res = txt.includes(g_tbl_filter);
+            }
           }
         }
       }
@@ -802,6 +827,13 @@ tr.qind-bp-row {
     })
     show = ls.getItem('Show Box');
     $('.qind-td-box').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    show = ls.getItem('Show Out');
+    $('.qind-td-out').each(function() {
       if (show == 1)
         $(this).removeClass('hidden');
       else
@@ -933,6 +965,12 @@ tr.qind-bp-row {
     $('#btnToggleBox').on('click', function () {
       show = (ls.getItem('Show Box') == 1) ? 0 : 1;
       ls.setItem('Show Box', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleOut').on('click', function () {
+      show = (ls.getItem('Show Out') == 1) ? 0 : 1;
+      ls.setItem('Show Out', show);
       rebuildOptionsMenu();
       rebuildBody();
     });

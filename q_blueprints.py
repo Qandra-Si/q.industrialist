@@ -118,8 +118,18 @@ def __build_blueprints(
                 __blueprint.update({
                     "st": __job_dict["status"],
                     "act": __job_dict["activity_id"],
-                    "loc": __location_id  # переопределяем!!!
+                    "loc": __location_id,  # переопределяем!!!
+                    "out": __job_dict["output_location_id"],
                 })
+                # осуществляем поиск местоположения чертежа
+                __push_location_into_blueprints_locations(
+                    __job_dict["output_location_id"],
+                    blueprints_locations,
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_assets_tree,
+                    corp_ass_names_data,
+                    foreign_structures_data)
         # выясняем стоимость чертежа
         if "basePrice" in __type_desc:
             __blueprint.update({"base_price": __type_desc["basePrice"]})
