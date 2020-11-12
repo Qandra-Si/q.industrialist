@@ -432,9 +432,13 @@ def __get_monthly_manufacturing_scheduler(
             __rest_products = __scheduled_products - __exist_run_products
             __missing_conveyor = (__rest_products + __conveyor_products + __single_run_quantity - 1) // __single_run_quantity
         else:
-            __missing_scheduled = (__scheduled_products + __single_run_quantity - 1) // __single_run_quantity
-            __rest_products = __scheduled_products - __exist_run_products
-            __missing_conveyor = (__rest_products + __conveyor_products + __single_run_quantity - 1) // __single_run_quantity
+            __rest_products = __scheduled_products - __exist_run_products  # 182 need - 110 exist => 72 rest
+            __missing_scheduled = (__rest_products + __single_run_quantity - 1) // __single_run_quantity  # (72+9)/10=8
+            __rest_products = __single_run_quantity - __rest_products % __single_run_quantity  # 10-(72%10)=8
+            if __conveyor_products >= __rest_products:  # (11-8+9)/10=1
+                __missing_conveyor = (__conveyor_products - __rest_products + __single_run_quantity - 1) // __single_run_quantity
+            else:  # 7<8 => 0
+                __missing_conveyor = 0
 
         #print(__sb_dict["name"],
         #      "scheduled=", __all_products,
