@@ -44,172 +44,108 @@ g_module_default_settings = {
     "factory:station_id": 60003760,
     "factory:station_name": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
     # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars": [1]
+    "factory:blueprints_hangars": [1],
+
+    "factory:station_id2": 60003760,
+    "factory:station_name2": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
+    # hangar, which stores blueprint copies to build T2 modules
+    "factory:blueprints_hangars2": [1]
 }
 
 
-def __get_blueprints_containers_with_data_loading(
-        # esi input & output
-        esi_interface,
+def __get_blueprints_containers(
         # настройки
         module_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        corp_assets_data):
-    # esi input
-    interface = esi_interface["interface"]
-    corporation_id = esi_interface["corporation_id"]
-    corporation_name = esi_interface["corporation_name"]
-    # esi output
-    esi_interface["corp_ass_names_data"] = []
-    esi_interface["foreign_structures_data"] = {}
+        corp_assets_data,
+        # esi данные, загруженные с серверов CCP
+        foreign_structures_data,
+        corp_ass_names_data):
+    factories_containers = []
+    for station_num in range(1, 6):
+        station_num_str = '' if station_num == 1 else str(station_num)
+        # input setings
+        hangars_filter = module_settings.get("factory:blueprints_hangars"+station_num_str, None)
+        # output factory containers
+        factory_containers = {
+            "station_id": module_settings.get("factory:station_id"+station_num_str, None),
+            "station_name": module_settings.get("factory:station_name"+station_num_str, None),
+            "station_num": station_num,
+            "station_foreign": None,
+            "hangars_filter": hangars_filter,
+            "containers": None
+        }
+        if (hangars_filter is None) or (factory_containers['station_id'] is None) and (factory_containers['station_name'] is None):
+            continue
 
-    # input setings
-    hangars_filter = module_settings["factory:blueprints_hangars"]
-    # output factory containers
-    factory_containers = {
-        "station_id": module_settings["factory:station_id"] if "factory:station_id" in module_settings else None,
-        "station_name": module_settings["factory:station_name"] if "factory:station_name" in module_settings else None,
-        "station_foreign": None,
-        "containers": None
-    }
+        # пытаемся определить недостающее звено, либо station_id, либо station_name (если неизвестны)
+        if not (factory_containers["station_id"] is None):
+            station_id = factory_containers["station_id"]
+            station_name = None
+            factory_containers["station_foreign"] = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None) is None
 
-    # пытаемся определить недостающее звено, либо station_id, либо station_name (если неизвестны)
-    if not (factory_containers["station_id"] is None):
-        station_id = factory_containers["station_id"]
-        station_name = None
-        factory_containers["station_foreign"] = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None) is None
+            # поиск контейнеров на станции station_id в ангарах hangars_filter
+            factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
+                station_id,
+                hangars_filter,
+                sde_type_ids,
+                corp_assets_data)
 
-        # поиск контейнеров на станции station_id в ангарах hangars_filter
-        factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
-            station_id,
-            hangars_filter,
-            sde_type_ids,
-            corp_assets_data)
+            if not factory_containers["station_foreign"]:
+                station_name = next((an['name'] for an in corp_ass_names_data if an["item_id"] == station_id), None)
 
-        esi_interface["corp_ass_names_data"] = []
-        corp_ass_named_ids = [bc["id"] for bc in factory_containers["containers"]]
-        if not factory_containers["station_foreign"]:
-            corp_ass_named_ids.append(station_id)
-            station_name = next((an for an in esi_interface["corp_ass_names_data"] if an["item_id"] == station_id), None)
+            if factory_containers["station_foreign"]:
+                # поиск одной единственной станции, которая не принадлежат корпорации (на них имеется офис,
+                # но самой станции в ассетах нет)
+                if str(station_id) in foreign_structures_data:
+                    station_name = foreign_structures_data[str(station_id)]["name"]
 
-        if len(corp_ass_named_ids) > 0:
-            # Requires role(s): Director
-            esi_interface["corp_ass_names_data"] = interface.get_esi_data(
-                "corporations/{}/assets/names/".format(corporation_id),
-                json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
-        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(esi_interface["corp_ass_names_data"])))
-        sys.stdout.flush()
+            # вывод на экран найденных station_id и station_name
+            if station_name is None:
+                raise Exception('Not found station name for factory {}!!!'.format(station_id))
 
-        if factory_containers["station_foreign"]:
-            # поиск одной единственной станции, которая не принадлежат корпорации (на них имеется офис,
-            # но самой станции в ассетах нет)
-            esi_interface["foreign_structures_data"] = {}
-            foreign_structures_ids = [station_id]
-            foreign_structures_forbidden_ids = []
-            if len(foreign_structures_ids) > 0:
-                # Requires: access token
-                for structure_id in foreign_structures_ids:
-                    try:
-                        universe_structure_data = interface.get_esi_data(
-                            "universe/structures/{}/".format(structure_id),
-                            fully_trust_cache=True)
-                        esi_interface["foreign_structures_data"].update({str(structure_id): universe_structure_data})
-                    except requests.exceptions.HTTPError as err:
-                        status_code = err.response.status_code
-                        if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                            foreign_structures_forbidden_ids.append(structure_id)
-                        else:
-                            raise
-                    except:
-                        print(sys.exc_info())
-                        raise
-            print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(esi_interface["foreign_structures_data"])))
-            if len(foreign_structures_forbidden_ids) > 0:
-                print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
-            sys.stdout.flush()
+        elif not (factory_containers["station_name"] is None):
+            station_name = factory_containers["station_name"]
+            station_id = next((an for an in corp_ass_names_data if an["name"] == station_name), None)
+            factory_containers["station_foreign"] = station_id is None
 
-            if str(station_id) in esi_interface["foreign_structures_data"]:
-                station_name = esi_interface["foreign_structures_data"][str(station_id)]["name"]
+            if factory_containers["station_foreign"]:
+                # поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+                __foreign_keys = foreign_structures_data.keys()
+                for __foreign_id in __foreign_keys:
+                    __foreign_dict = foreign_structures_data[str(__foreign_id)]
+                    if __foreign_dict["name"] == station_name:
+                        station_id = int(__foreign_id)
+                        break
 
-        # вывод на экран найденных station_id и station_name
-        if station_name is None:
-            raise Exception('Not found station name for factory {}!!!'.format(station_id))
+            # вывод на экран найденных station_id и station_name
+            if station_id is None:
+                raise Exception('Not found station identity for factory {}!!!'.format(station_name))
 
-    elif not (factory_containers["station_name"] is None):
-        station_name = factory_containers["station_name"]
+            # поиск контейнеров на станции station_id в ангарах hangars_filter
+            factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
+                station_id,
+                hangars_filter,
+                sde_type_ids,
+                corp_assets_data)
 
-        esi_interface["corp_ass_names_data"] = []
-        corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-        if len(corp_ass_named_ids) > 0:
-            # Requires role(s): Director
-            esi_interface["corp_ass_names_data"] = interface.get_esi_data(
-                "corporations/{}/assets/names/".format(corporation_id),
-                json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
-        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(esi_interface["corp_ass_names_data"])))
-        sys.stdout.flush()
+        else:
+            raise Exception('Not found station identity and name!!!')
 
-        station_id = next((an for an in esi_interface["corp_ass_names_data"] if an["name"] == station_name), None)
-        factory_containers["station_foreign"] = station_id is None
+        factory_containers["station_id"] = station_id
+        factory_containers["station_name"] = station_name
 
-        if factory_containers["station_foreign"]:
-            # поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-            esi_interface["foreign_structures_data"] = {}
-            foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
-            foreign_structures_forbidden_ids = []
-            if len(foreign_structures_ids) > 0:
-                # Requires: access token
-                for structure_id in foreign_structures_ids:
-                    try:
-                        universe_structure_data = interface.get_esi_data(
-                            "universe/structures/{}/".format(structure_id))
-                        esi_interface["foreign_structures_data"].update({str(structure_id): universe_structure_data})
-                    except requests.exceptions.HTTPError as err:
-                        status_code = err.response.status_code
-                        if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                            foreign_structures_forbidden_ids.append(structure_id)
-                        else:
-                            raise
-                    except:
-                        print(sys.exc_info())
-                        raise
-            print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(esi_interface["foreign_structures_data"])))
-            if len(foreign_structures_forbidden_ids) > 0:
-                print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
-            sys.stdout.flush()
+        # получение названий контейнеров и сохранение из в списке контейнеров
+        for __cont_dict in factory_containers["containers"]:
+            __item_id = __cont_dict["id"]
+            __item_name = next((an for an in corp_ass_names_data if an["item_id"] == __item_id), None)
+            if not (__item_name is None):
+                __cont_dict["name"] = __item_name["name"]
 
-            __foreign_keys = esi_interface["foreign_structures_data"].keys()
-            for __foreign_id in __foreign_keys:
-                __foreign_dict = esi_interface["foreign_structures_data"][str(__foreign_id)]
-                if __foreign_dict["name"] == station_name:
-                    station_id = int(__foreign_id)
-                    break
+        factories_containers.append(factory_containers)
 
-        # вывод на экран найденных station_id и station_name
-        if station_id is None:
-            raise Exception('Not found station identity for factory {}!!!'.format(station_name))
-
-        # поиск контейнеров на станции station_id в ангарах hangars_filter
-        factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
-            station_id,
-            hangars_filter,
-            sde_type_ids,
-            corp_assets_data)
-
-    else:
-        raise Exception('Not found station identity and name!!!')
-
-    factory_containers["station_id"] = station_id
-    factory_containers["station_name"] = station_name
-
-    # получение названий контейнеров и сохранение из в списке контейнеров
-    for __cont_dict in factory_containers["containers"]:
-        __item_id = __cont_dict["id"]
-        __item_name = next((an for an in esi_interface["corp_ass_names_data"] if an["item_id"] == __item_id), None)
-        if not (__item_name is None):
-            __cont_dict["name"] = __item_name["name"]
-
-    return factory_containers
+    return factories_containers
 
 
 def __get_monthly_manufacturing_scheduler(
@@ -225,12 +161,12 @@ def __get_monthly_manufacturing_scheduler(
         corp_blueprints_data,
         corp_industry_jobs_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        factory_containers):
+        factories_containers):
     # конвертация ETF в список item-ов
     scheduler = {
         "monthly_jobs": [],
         "scheduled_blueprints": [],
-        "factory_containers": factory_containers,
+        "factories_containers": factories_containers,
         "factory_repository": [],
         "factory_blueprints": [],
         "missing_blueprints": [],
@@ -349,7 +285,9 @@ def __get_monthly_manufacturing_scheduler(
             )
 
     # формирование списка чертежей имеющихся на станции в указанных контейнерах
-    factory_container_ids = [fc["id"] for fc in factory_containers["containers"]]
+    factory_container_ids = []
+    for factory_containers in factories_containers:
+        factory_container_ids.extend([fc["id"] for fc in factory_containers["containers"]])
     db_factory_container_ids = [dbfc["id"] for dbfc in db_factory_containers if dbfc["active"] and not dbfc["disabled"]]
     # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
     # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
@@ -490,7 +428,7 @@ def __get_db_connection():
     return qidb
 
 
-def __actualize_factory_containers(db_factory_containers, real_factory_containers):
+def __actualize_factory_containers(db_factory_containers, real_factory_containers, station_num):
     # "containers": [
     #    {"id": 1032456650838,
     #     "type_id": 33011,
@@ -506,42 +444,61 @@ def __actualize_factory_containers(db_factory_containers, real_factory_container
                 qidb = __get_db_connection()
             if db_fc is None:
                 qidb.execute(  # контейнер с заданным id отсутствует в БД - добавляем выключенным
-                    "INSERT INTO workflow_factory_containers(wfc_id,wfc_name,wfc_active) VALUES(%s,%s,%s);",
-                    fc["id"], fc["name"] if "name" in fc else None, default_active)
+                    "INSERT INTO workflow_factory_containers(wfc_id,wfc_name,wfc_active,wfc_station_num) "
+                    "VALUES(%s,%s,%s,%s);",
+                    fc["id"], fc["name"] if "name" in fc else None, default_active, station_num)
                 db_factory_containers.append({
                     "id": fc["id"],
                     "name": fc["name"] if "name" in fc else None,
                     "active": default_active,
                     "disabled": False,
+                    "station_num": station_num,
                     "processed": True})
             elif ("name" in fc) and (db_fc["name"] != fc["name"]):
                 if db_fc["disabled"]:
+                    if qidb is None:
+                        qidb = __get_db_connection()
                     qidb.execute(  # контейнер был переименован и вернулся в ангар (раньше там отсутствовал)
                         "UPDATE workflow_factory_containers SET wfc_name=%s,wfc_disabled=FALSE WHERE wfc_id=%s;",
                         fc["name"], fc["id"])
                     db_fc["disabled"] = False
                 else:
+                    if qidb is None:
+                        qidb = __get_db_connection()
                     qidb.execute(  # контейнер был переименован
                         "UPDATE workflow_factory_containers SET wfc_name=%s WHERE wfc_id=%s;",
                         fc["name"], fc["id"])
                 db_fc["name"] = fc["name"]
             elif db_fc["disabled"]:
+                if qidb is None:
+                    qidb = __get_db_connection()
                 qidb.execute(  # контейнер вернулся в ангар (раньше там отсутствовал)
                     "UPDATE workflow_factory_containers SET wfc_disabled=FALSE WHERE wfc_id=%s;",
                     fc["id"])
                 db_fc["disabled"] = False
         if not (db_fc is None):
+            if db_fc['station_num'] != station_num:
+                if qidb is None:
+                    qidb = __get_db_connection()
+                qidb.execute(  # контейнер перемещён на другую станцию (раньше обнаруживался на другой)
+                    "UPDATE workflow_factory_containers SET wfc_station_num=%s WHERE wfc_id=%s;",
+                    station_num, db_fc["id"])
+                db_fc["station_num"] = station_num
             db_fc.update({"processed": True})
     if len(db_factory_containers) > 0:
         for db_fc in db_factory_containers:
             # пропускаем актуализированные контейнеры (имеющиеся сейчас в ангарах)
             if "processed" in db_fc:
                 continue
+            # пропускаем контейнеры других станций
+            if db_fc['station_num'] != station_num:
+                continue
             # пропускаем уже помеченные "отсутствующими" контейнеры
             if db_fc["disabled"]:
                 continue
             if qidb is None:
                 qidb = __get_db_connection()
+            print(db_fc)
             qidb.execute(  # контейнер исчез из ангара (помечаем "отсутствующим", оставляем в БД)
                 "UPDATE workflow_factory_containers SET wfc_disabled=TRUE WHERE wfc_id=%s;",
                 db_fc["id"])
@@ -559,12 +516,12 @@ def main():
         "FROM workflow_monthly_jobs "
         "WHERE wmj_active;")
     db_factory_containers = qidb.select_all_rows(
-        "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled "
+        "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled,wfc_station_num "
         "FROM workflow_factory_containers;")
     del qidb
 
     db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0], "conveyor": bool(wmj[2])} for wmj in db_monthly_jobs]
-    db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3]} for wfc in db_factory_containers]
+    db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3], "station_num": wfc[4]} for wfc in db_factory_containers]
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -618,27 +575,62 @@ def main():
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
-    esi_interface = {
-        "interface": interface,
-        "corporation_id": corporation_id,
-        "corporation_name": corporation_name,
-        "corp_ass_names_data": None,
-        "foreign_structures_data": None
-    }
-    factory_containers = __get_blueprints_containers_with_data_loading(
-        esi_interface,
+    # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+    corp_ass_names_data = []
+    corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+    if len(corp_ass_named_ids) > 0:
+        # Requires role(s): Director
+        corp_ass_names_data = interface.get_esi_data(
+            "corporations/{}/assets/names/".format(corporation_id),
+            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+    sys.stdout.flush()
+
+    # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+    foreign_structures_data = {}
+    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+    foreign_structures_forbidden_ids = []
+    if len(foreign_structures_ids) > 0:
+        # Requires: access token
+        for structure_id in foreign_structures_ids:
+            try:
+                universe_structure_data = interface.get_esi_data(
+                    "universe/structures/{}/".format(structure_id),
+                    fully_trust_cache=True)
+                foreign_structures_data.update({str(structure_id): universe_structure_data})
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                    foreign_structures_forbidden_ids.append(structure_id)
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+    print(
+        "\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+    if len(foreign_structures_forbidden_ids) > 0:
+        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(
+            foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
+    sys.stdout.flush()
+
+    factories_containers = __get_blueprints_containers(
         module_settings,
         sde_type_ids,
-        corp_assets_data
+        corp_assets_data,
+        foreign_structures_data,
+        corp_ass_names_data
     )
     # обновление данных в БД (названия контейнеров, и первичное автозаполнение)
-    __actualize_factory_containers(db_factory_containers, factory_containers["containers"])
+    for factory_containers in factories_containers:
+        station_num = factory_containers["station_num"]
+        __actualize_factory_containers(db_factory_containers, factory_containers["containers"], station_num)
 
-    print('\nFound factory station {} with containers in hangars...'.format(factory_containers["station_name"]))
-    print('  {} = {}'.format(factory_containers["station_id"], factory_containers["station_name"]))
-    print('  blueprint hangars = {}'.format(module_settings["factory:blueprints_hangars"]))
-    print('  blueprint containers = {}'.format(len([fc["id"] for fc in factory_containers["containers"]])))
-    print('  database containers = {}'.format(len(db_factory_containers)))
+        print('\nFound factory station {} with containers in hangars...'.format(factory_containers["station_name"]))
+        print('  {} = {}'.format(factory_containers["station_id"], factory_containers["station_name"]))
+        print('  blueprint hangars = {}'.format(factory_containers["hangars_filter"]))
+        print('  blueprint containers = {}'.format(len(factory_containers["containers"])))
+        print('  database containers = {}'.format(len([dfc["id"] for dfc in db_factory_containers if dfc['station_num'] == station_num])))
     sys.stdout.flush()
 
     # Requires role(s): Director
@@ -667,11 +659,11 @@ def main():
         corp_blueprints_data,
         corp_industry_jobs_data,
         # данные полученные в результате анализа и перекомпоновки входных списков
-        factory_containers
+        factories_containers
     )
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_manufacturing_scheduler", corp_manufacturing_scheduler)
 
-    print('\nFound {} EFT fits in settings...'.format(len(factory_containers)))
+    print('\nFound in {} stations...'.format(len(factories_containers)))
     print('  scheduled blueprints = {}'.format(len(corp_manufacturing_scheduler["scheduled_blueprints"])))
     print('  factory repository = {}'.format(len(corp_manufacturing_scheduler["factory_repository"])))
     print('  factory blueprints = {}'.format(len(corp_manufacturing_scheduler["factory_blueprints"])))

@@ -516,14 +516,27 @@ def find_containers_in_hangars(
     # пытаемся получить станцию, как item (это возможно, если она есть в корп-ассетах, т.е. является
     # имуществом корпорации, иначе она принадлежит альянсу, или корпорация просто имеет там офис)
     __station_dict = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None)
-    if __station_dict is None:
-        __office_dict = next((a for a in corp_assets_data if (a["location_id"] == int(station_id)) and (a["location_flag"] == "OfficeFolder")), None)
+    # на своих станциях тоже офис бывает
+    __office_dict = next((a for a in corp_assets_data if (a["location_id"] == int(station_id)) and (a["location_flag"] == "OfficeFolder")), None)
+
     if (__station_dict is None) and (__office_dict is None):
         raise Exception('Not found station or office {} in assets!!!'.format(station_id))
 
     # поиск контейнеров на станции station_id в ангарах hangars_filter
-    return __find_containers_in_hangars_nested(
-        station_id if not (__station_dict is None) else __office_dict["item_id"],
-        hangars_filter,
-        sde_type_ids,
-        corp_assets_data)
+    __containers = []
+    if not (__station_dict is None):
+        __containers = __find_containers_in_hangars_nested(
+            station_id,
+            hangars_filter,
+            sde_type_ids,
+            corp_assets_data)
+    if not (__office_dict is None):
+        __containers2 = __find_containers_in_hangars_nested(
+            __office_dict["item_id"],
+            hangars_filter,
+            sde_type_ids,
+            corp_assets_data)
+        for __cont in __containers2:
+            if next((c for c in __containers if c['id'] == __cont['id']), None) is None:
+                __containers.append(__cont)
+    return __containers

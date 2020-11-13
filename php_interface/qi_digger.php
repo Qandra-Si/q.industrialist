@@ -99,13 +99,26 @@ elseif (isset($_POST['module'])) {
                 $ms_val_id = htmlentities($_POST['id']);
                 $ms_val_name = htmlentities($_POST['name']);
                 $ms_val_hangars = htmlentities($_POST['hangars']);
+                $station_num = ''; // 1
+                if (isset($_POST['station_num'])) {
+                    $station_num = htmlentities($_POST['station_num']);
+                    if ($station_num == '1')
+                        $station_num = '';
+                    else if (!is_numeric($station_num))
+                        $station_num = '';
+                }
                 if (is_numeric($ms_val_id)) {
                     $query = <<<EOD
 UPDATE modules_settings SET ms_val=v.v
-FROM (VALUES ('factory:station_id',$1),('factory:station_name',$2),('factory:blueprints_hangars',$3)) AS v(k,v)
-WHERE ms_key=v.k AND ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$4);
+FROM (VALUES ($1,$2),($3,$4),($5,$6)) AS v(k,v)
+WHERE ms_key=v.k AND ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$7);
 EOD;
-                    $params = array($ms_val_id, $ms_val_name, '['.$ms_val_hangars.']', 'workflow');
+                    $params = array(
+                        'factory:station_id'.$station_num, $ms_val_id,
+                        'factory:station_name'.$station_num, $ms_val_name,
+                        'factory:blueprints_hangars'.$station_num, '['.$ms_val_hangars.']',
+                        'workflow'
+                    );
                 }
             }
             //---
