@@ -64,8 +64,8 @@ def __dump_industry_product(
         '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
         '<td>{nm}</td>'
         '<td align="right">{mnf0}</td> <td align="right">{mnf1}</td> <td align="right">{mnf2}</td>'
-        '<td align="right">{cost}</td>'
-        '<td align="right">{volume}</td>'
+        '<td align="right" class="qind-td-feetax">{cost}</td>'
+        '<td align="right" class="qind-td-volume">{volume}</td>'
         '</tr>\n'.
         format(
             id=__product_type_id,
@@ -91,6 +91,41 @@ def __dump_industry(
     conveyor_market_groups = corp_industry_stat["conveyor_market_groups"]
 
     glf.write("""
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-tasks" aria-hidden="true"></span></a>
+  </div>
+
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a id="btnToggleShowFeeTax" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowFeeTax"></span> Show Fee &amp; Tax</a></li>
+       <li><a id="btnToggleShowVolume" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowVolume"></span> Show Volume</a></li>
+       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show Legend</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+      </ul>
+    </li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <div class="form-group">
+     <input type="text" class="form-control" placeholder="Item" disabled>
+    </div>
+    <button type="button" class="btn btn-default disabled">Search</button>
+   </form>
+  </div>
+ </div>
+</nav>
+
 <div class="container-fluid">
 <h3>Scheduled Industry Jobs</h3>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
@@ -99,8 +134,8 @@ def __dump_industry(
   <th style="width:32px;" rowspan="2"></th>
   <th rowspan="2">Products</th>
   <th style="text-align: center;" colspan="3">Manufactured / Scheduled<br>Progress of Monthly Jobs</th>
-  <th style="text-align: right;" rowspan="2">Fee &amp; Tax, ISK</th>
-  <th style="text-align: right;" rowspan="2">Volume, m&sup3;</th>
+  <th style="text-align: right;" rowspan="2" class="qind-td-feetax">Fee &amp; Tax, ISK</th>
+  <th style="text-align: right;" rowspan="2" class="qind-td-volume">Volume, m&sup3;</th>
  </tr>
  <tr>
 """)
@@ -130,6 +165,80 @@ def __dump_industry(
 </tbody>
 </table>
 </div> <!--container-fluid-->
+""")
+
+    # __dump_sde_type_ids_to_js(glf, sde_type_ids)
+    glf.write("""
+<script>
+  // Industry Options storage (prepare)
+  ls = window.localStorage;
+  function setupOptionDefaultValue(ls_name, val) {
+    if (!ls.getItem(ls_name))
+      ls.setItem(ls_name, val);
+  }
+  function makeVisibleByOption(ls_name, element_id) {
+    show = ls.getItem(ls_name);
+    $(element_id).each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+  }
+  function toggleOptionValue(ls_name) {
+    toggle = (ls.getItem(ls_name) == 1) ? 0 : 1;
+    ls.setItem(ls_name, toggle);
+    return toggle;
+  }
+
+  // Industry Options storage (init)
+  function resetOptionsMenuToDefault() {
+    setupOptionDefaultValue('Show FeeTax', 0);
+    setupOptionDefaultValue('Show Volume', 0);
+    setupOptionDefaultValue('Show Legend', 1);
+  }
+  // Industry Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    makeVisibleByOption('Show FeeTax', '#imgShowFeeTax');
+    makeVisibleByOption('Show Volume', '#imgShowVolume');
+    makeVisibleByOption('Show Legend', '#imgShowLegend');
+  }
+  // Industry Options storage (rebuild body components)
+  function rebuildBody() {
+    makeVisibleByOption('Show FeeTax', '.qind-td-feetax');
+    makeVisibleByOption('Show Volume', '.qind-td-volume');
+    makeVisibleByOption('Show Legend', '#legend-block');
+    rebuildMissingBlueprints();
+  }
+  // Industry Options menu and submenu setup
+  $(document).ready(function(){
+    $('#btnToggleShowFeeTax').on('click', function () {
+      toggleOptionValue('Show FeeTax');
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleShowVolume').on('click', function () {
+      toggleOptionValue('Show Volume');
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleLegend').on('click', function () {
+      toggleOptionValue('Show Legend');
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildBody();
+  })
+</script>
 """)
 
 

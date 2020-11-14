@@ -365,7 +365,7 @@ def __dump_workflow_tools(
        <li><a id="btnToggleShowT2Only" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowT2Only"></span> Show T2 only</a></li>
        <li><a id="btnToggleShowBPCConver" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBPCConver"></span> Show Conveyor</a></li>
        <li><a id="btnToggleShowBPCSchdld" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBPCSchdld"></span> Show Scheduled</a></li>
-       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
+       <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show Legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
@@ -608,7 +608,7 @@ def __dump_workflow_tools(
     makeVisibleByOption('Show Scheduled', '#imgShowBPCSchdld');
     makeVisibleByOption('Show Legend', '#imgShowLegend');
   }
-  // Worflow Options storage (rebuild body components)
+  // Workflow Options storage (rebuild body components)
   function rebuildBody() {
     makeVisibleByOption('Show Legend', '#legend-block');
     refreshT2ButtonsAndTables();
