@@ -6,12 +6,32 @@ g_month_names = [
     "July", "August", "September", "October", "November", "December"]
 
 
+def __get_progress_element(current_num, max_num):
+    if current_num >= max_num:
+        __progress_factor = 100
+    else:
+        __progress_factor = float(100 * current_num / max_num)
+    prgrs = \
+        '<strong><span class="text-warning">{q:,d}</span></strong> / {sc}<br>' \
+        '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
+        ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'. \
+        format(
+            q=current_num,
+            sc=max_num,
+            prcnt100=" progress-bar-success" if __progress_factor >= 99.999 else "",
+            prcnt=int(__progress_factor),
+            fprcnt=__progress_factor
+        )
+    return prgrs
+
+
 def __dump_industry_product(
         glf,
         product,
         current_month,
         sde_type_ids,
-        workflow_industry_jobs):
+        workflow_industry_jobs,
+        workflow_last_industry_jobs):
     # распаковка о продукте данных для вывода в отчёт
     __product_type_id = product["type_id"]
     __product_name = product["name"]
@@ -23,6 +43,7 @@ def __dump_industry_product(
     __products_quantity_sum = 0
     # вычисление статистики производства, формирование отдельных ячеек таблицы
     __td_manufactured = ["", "", ""]
+    __td_manufactured_last30days = ""
     __td_cost = ""
     __td_volume = ""
     for month in range(3):
@@ -35,21 +56,7 @@ def __dump_industry_product(
         __wij_products = __wij_dict["products"]
         __products_fee_tax_sum += __wij_dict["cost"]
         __products_quantity_sum += __wij_products
-        if __wij_products >= __product_scheduled_quantity:
-            __wij_progress_factor = 100
-        else:
-            __wij_progress_factor = float(100 * __wij_products / __product_scheduled_quantity)
-        __td_manufactured[month] = \
-            '<strong><span class="text-warning">{q:,d}</span></strong> / {sc}<br>' \
-            '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
-            ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'. \
-            format(
-                q=__wij_products,
-                sc=__product_scheduled_quantity,
-                prcnt100=" progress-bar-success" if __wij_progress_factor >= 99.999 else "",
-                prcnt=int(__wij_progress_factor),
-                fprcnt=__wij_progress_factor
-            )
+        __td_manufactured[month] = __get_progress_element(__wij_products, __product_scheduled_quantity)
     # подсчёт того, что суммируется
     if __products_quantity_sum > 0:
         __td_cost = \
@@ -58,12 +65,18 @@ def __dump_industry_product(
         __td_volume = \
             '{volume:,.1f}<br><mark><span style="font-size: smaller;">{svolume:,.2f}</span></mark>'. \
             format(volume=__product_volume * __products_quantity_sum, svolume=__product_volume)
+    # получение информации о производстве этого продукта за последние 30 дней
+    __wij_dict = next((wij for wij in workflow_last_industry_jobs if (wij["ptid"] == __product_type_id)), None)
+    if not (__wij_dict is None):
+        __wij_products = __wij_dict["products"]
+        __td_manufactured_last30days = __get_progress_element(__wij_products, __product_scheduled_quantity)
     # формирование строки отчёта
     glf.write(
         '<tr><!--{id}-->'
         '<td><img class="icn32" src="{img}" width="32px" height="32px"></td>'
         '<td>{nm}</td>'
         '<td align="right">{mnf0}</td> <td align="right">{mnf1}</td> <td align="right">{mnf2}</td>'
+        '<td align="right">{mnf30}</td>'
         '<td align="right" class="qind-td-feetax">{cost}</td>'
         '<td align="right" class="qind-td-volume">{volume}</td>'
         '</tr>\n'.
@@ -75,6 +88,7 @@ def __dump_industry_product(
             mnf0=__td_manufactured[0],
             mnf1=__td_manufactured[1],
             mnf2=__td_manufactured[2],
+            mnf30=__td_manufactured_last30days,
             cost=__td_cost,
             volume=__td_volume
         )
@@ -87,6 +101,7 @@ def __dump_industry(
         corp_industry_stat):
     conveyor_scheduled_products = corp_industry_stat["conveyor_scheduled_products"]
     workflow_industry_jobs = corp_industry_stat["workflow_industry_jobs"]
+    workflow_last_industry_jobs = corp_industry_stat["workflow_last_industry_jobs"]
     current_month = corp_industry_stat["current_month"]
     conveyor_market_groups = corp_industry_stat["conveyor_market_groups"]
 
@@ -133,7 +148,7 @@ def __dump_industry(
  <tr>
   <th style="width:32px;" rowspan="2"></th>
   <th rowspan="2">Products</th>
-  <th style="text-align: center;" colspan="3">Manufactured / Scheduled<br>Progress of Monthly Jobs</th>
+  <th style="text-align: center;" colspan="4">Manufactured / Scheduled<br>Progress of Monthly Jobs</th>
   <th style="text-align: right;" rowspan="2" class="qind-td-feetax">Fee &amp; Tax, ISK</th>
   <th style="text-align: right;" rowspan="2" class="qind-td-volume">Volume, m&sup3;</th>
  </tr>
@@ -142,7 +157,8 @@ def __dump_industry(
     glf.write(
         '<th style="text-align: center;">{}</th>'
         '<th style="text-align: center;">{}</th>'
-        '<th style="text-align: center;">{}</th>'.
+        '<th style="text-align: center;">{}</th>'
+        '<th style="text-align: center;">Last 30 days</th>'.
         format(g_month_names[(current_month+9)%12+1], g_month_names[(current_month+10)%12+1], g_month_names[current_month]))
     glf.write("""
  </tr>
@@ -159,7 +175,13 @@ def __dump_industry(
         for product in conveyor_scheduled_products:
             if product["market"] != __market_group_id:
                 continue
-            __dump_industry_product(glf, product, current_month, sde_type_ids, workflow_industry_jobs)
+            __dump_industry_product(
+                glf,
+                product,
+                current_month,
+                sde_type_ids,
+                workflow_industry_jobs,
+                workflow_last_industry_jobs)
 
     glf.write("""
 </tbody>

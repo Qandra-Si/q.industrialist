@@ -55,6 +55,7 @@ def __build_industry(
         "current_month": -1,
         "conveyor_scheduled_products": [],
         "workflow_industry_jobs": [],
+        "workflow_last_industry_jobs": [],
         "conveyor_market_groups": {}
     }
 
@@ -121,28 +122,49 @@ def __build_industry(
     corp_industry_stat["conveyor_scheduled_products"] = conveyor_scheduled_products
 
     # выбираем накопленные данные по производству из БД
-    db_workflow_industry_jobs = qidb.select_all_rows(
-        "SELECT ptid,sum(cst),sum(prdcts),mnth "
-        "FROM (SELECT "
-        "  wij_product_tid AS ptid,"
-        "  wij_cost AS cst,"
-        "  wij_quantity AS prdcts,"
-        "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
-        " FROM qi.workflow_industry_jobs"
-        " WHERE wij_activity_id=1 AND wij_bp_lid IN (1032846295901,1033675076928) AND wij_product_tid=ANY(%s)"
-        ") AS a "
-        "WHERE mnth>=(%s-2) "
-        "GROUP BY 1,4 "
-        "ORDER BY 1;",
-        conveyor_product_type_ids,
-        db_current_month[0])
-    corp_industry_stat["workflow_industry_jobs"] = [{
-        "ptid": wij[0],
-        "cost": wij[1],
-        "products": wij[2],
-        "month": int(wij[3])
-    } for wij in db_workflow_industry_jobs]
-    del db_workflow_industry_jobs
+    if conveyor_product_type_ids:
+        db_workflow_industry_jobs = qidb.select_all_rows(
+            "SELECT ptid,SUM(cst),SUM(prdcts),mnth "
+            "FROM (SELECT "
+            "  wij_product_tid AS ptid,"
+            "  wij_cost AS cst,"
+            "  wij_quantity AS prdcts,"
+            "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
+            " FROM qi.workflow_industry_jobs"
+            " WHERE wij_activity_id=1 AND"
+            "  wij_bp_lid IN (1032846295901,1033675076928) AND"
+            "  wij_product_tid=ANY(%s) AND"
+            "  wij_end_date > (current_date - interval '93' day)"
+            ") AS a "
+            "WHERE mnth>=(%s-2) "
+            "GROUP BY 1,4 "
+            "ORDER BY 1;",
+            conveyor_product_type_ids,
+            db_current_month[0])
+        corp_industry_stat["workflow_industry_jobs"] = [{
+            "ptid": wij[0],
+            "cost": wij[1],
+            "products": wij[2],
+            "month": int(wij[3])
+        } for wij in db_workflow_industry_jobs]
+        del db_workflow_industry_jobs
+
+        # выбираем накопленные данные по производству из БД (за последние 30 дней)
+        db_workflow_last_industry_jobs = qidb.select_all_rows(
+            "SELECT wij_product_tid,SUM(wij_quantity) "
+            "FROM qi.workflow_industry_jobs "
+            "WHERE wij_activity_id=1 AND"
+            " wij_bp_lid IN (1032846295901,1033675076928) AND"
+            " wij_product_tid=ANY(%s) AND"
+            " wij_end_date > (current_date - interval '30' day) "
+            "GROUP BY 1 "
+            "ORDER BY 1;",
+            conveyor_product_type_ids)
+        corp_industry_stat["workflow_last_industry_jobs"] = [{
+            "ptid": wij[0],
+            "products": wij[1]
+        } for wij in db_workflow_last_industry_jobs]
+        del db_workflow_last_industry_jobs
     del conveyor_product_type_ids
 
     # отключение от БД
