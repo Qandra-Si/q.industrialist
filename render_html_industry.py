@@ -12,7 +12,7 @@ def __get_progress_element(current_num, max_num):
     else:
         __progress_factor = float(100 * current_num / max_num)
     prgrs = \
-        '<strong><span class="text-warning">{q:,d}</span></strong> / {sc}<br>' \
+        '<strong><span class="text-warning">{q:,d}</span></strong> / {sc:,d}<br>' \
         '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
         ' aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" style="width: {prcnt}%;">{fprcnt:.1f}%</div></div>'. \
         format(
