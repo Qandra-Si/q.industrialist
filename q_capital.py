@@ -152,7 +152,13 @@ def main():
     # находим контейнеры по заданным названиям
     report_options = {
         "product": "Vanquisher",
-        "blueprints": []  # контейнеры, в которых находятся БПО и БПЦ для постройки корабля
+        "blueprints": [{'id': 1033027695027, 'name': 'VANQUISHER COMP'}],  # контейнеры, в которых находятся БПО и БПЦ для постройки корабля
+        "stock": [{'id': 1034716977305, 'name': '.VANQUISHER STOCK'},  # контейнеры, в ктоорых находится сток для постройки корабля
+                  {'id': 1033543333602, 'name': '.VANQUISHER'},
+                  {'id': 1032801035805, 'flag': 'CorpSAG6'}],
+        "missing_blueprints": {
+            "material_efficiency": 10,  # me чертежей, которых "нет", но которые будут инвентиться для постройки корабля
+        }
     }
     containers = []
     for tmplt in [r"^\.VANQUISHER$"]:
@@ -164,6 +170,8 @@ def main():
     print('\nFound report containters and station ids for {}...'.format(report_options["product"]))
     for bpl in report_options["blueprints"]:
         print('  {} = {}'.format(bpl["id"], bpl["name"]))
+    for bpl in report_options["stock"]:
+        print('  {} = {}'.format(bpl["id"], bpl.get("name", bpl.get("flag"))))
 
     print("\nBuilding report...")
     sys.stdout.flush()

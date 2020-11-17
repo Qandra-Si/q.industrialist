@@ -18,6 +18,8 @@ def __dump_corp_capital(
         eve_market_prices_data):
     product_name = report_options["product"]
     blueprint_containter_ids = [c["id"] for c in report_options["blueprints"]]
+    stock_containter_ids = [c['id'] for c in report_options["stock"]]
+    stock_containter_flag_ids = [{'id': c['id'], 'flag': c['flag']} for c in report_options['stock'] if 'flag' in c]
     enable_copy_to_clipboard = True
 
     __type_id = eve_sde_tools.get_type_id_by_item_name(sde_type_ids, product_name)
@@ -183,6 +185,13 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         # подсчёт кол-ва имеющихся в наличии материалов
         bpmm1_available = 0
         for a in corp_assets_data:
+            __location_id = int(a["location_id"])
+            if not (__location_id in stock_containter_ids):
+                continue
+            __stock_flag_dict = next((c for c in stock_containter_flag_ids if c['id'] == __location_id), None)
+            if not (__stock_flag_dict is None):
+                if not (__stock_flag_dict['flag'] == a['location_flag']):
+                    continue
             __type_id = int(a["type_id"])
             if bpmm1_tid != __type_id:
                 continue
@@ -252,8 +261,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 bpmm2_efficiency = bpmm2_quantity * bpmm1_efficiency  # поправка на эффективность материалов
                 bpmm2_not_enough = bpmm2_quantity * bpmm1_not_enough
                 bpmm2_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
-                # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
-                material_efficiency = 10
+                # берём из настроек me=??, которая подразумевается одинаковой на всех БПО и БПЦ в коллекции
+                material_efficiency = report_options["missing_blueprints"]["material_efficiency"]
                 bpmm2_efficiency = eve_sde_tools.get_industry_material_efficiency(
                     bpmm2_is_reaction_formula,
                     1,
@@ -336,6 +345,13 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # подсчёт кол-ва имеющихся в наличии материалов
     materials_summary_without_a = [int(ms["id"]) for ms in materials_summary if not ("a" in ms)]
     for a in corp_assets_data:
+        __location_id = int(a["location_id"])
+        if not (__location_id in stock_containter_ids):
+            continue
+        __stock_flag_dict = next((c for c in stock_containter_flag_ids if c['id'] == __location_id), None)
+        if not (__stock_flag_dict is None):
+            if not (__stock_flag_dict['flag'] == a['location_flag']):
+                continue
         __type_id = int(a["type_id"])
         if __type_id in materials_summary_without_a:
             __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
