@@ -240,7 +240,7 @@ def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
 
 def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
-    if groups_chain is None:
+    if (groups_chain is None) or not groups_chain:
         return None
     return groups_chain[0]
 
