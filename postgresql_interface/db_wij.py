@@ -95,7 +95,9 @@ class QWorkflowIndustryJobs:
                 products_quantity = job["runs"]
                 blueprint_type_id = job["blueprint_type_id"]
                 __bp_dict = sde_bp_materials[str(blueprint_type_id)]["activities"] if str(blueprint_type_id) in sde_bp_materials else None
-                if job["activity_id"] == 1:
+                if __bp_dict is None:
+                    print('ERROR: unknown job blueprint_type_id={}'.format(blueprint_type_id))
+                elif job["activity_id"] == 1:
                     if "manufacturing" in __bp_dict:
                         if "products" in __bp_dict["manufacturing"]:
                             products_quantity *= __bp_dict["manufacturing"]["products"][0]["quantity"]
