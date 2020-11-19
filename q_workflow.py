@@ -514,6 +514,7 @@ def __actualize_factory_containers(db_factory_containers, real_factory_container
 
 def __build_industry(
         # настройки
+        qidb,
         module_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
@@ -537,8 +538,6 @@ def __build_industry(
                 str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
             })
 
-    # подключаемся к БД
-    qidb = __get_db_connection()
     # получаем текущий месяц с помощью sql-запроса
     db_current_month = qidb.select_one_row("SELECT EXTRACT(MONTH FROM CURRENT_DATE)")
     corp_industry_stat["current_month"] = int(db_current_month[0])
@@ -640,9 +639,6 @@ def __build_industry(
         del db_workflow_last_industry_jobs
     del conveyor_product_type_ids
 
-    # отключение от БД
-    del qidb
-
     return corp_industry_stat
 
 
@@ -711,7 +707,8 @@ def main():
 
         # строим данные для генерации отчёта
         corp_industry_stat = __build_industry(
-            # настройки
+            # настройки и подключение к БД
+            qidb,
             module_settings,
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
