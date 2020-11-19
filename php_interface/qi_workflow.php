@@ -36,16 +36,16 @@ include_once '.settings.php';
         $cmnt = substr(strstr($fit_first_line, ','), 2, -1);
         $nm = substr(strtok($fit_first_line, ","), 1);
 ?>
-<div class="panel panel-<?=($active=='f')?'warning':'default'?>">
+<div class="panel panel-<?=($active=='f')?'warning':(($conveyor=='t')?'success':'default')?>">
  <div class="panel-heading" role="tab" id="monthjob_hd<?=$id?>">
   <h4 class="panel-title">
    <a role="button" data-toggle="collapse"
     href="#monthjob_collapse<?=$id?>" aria-expanded="true"
     aria-controls="monthjob_collapse<?=$id?>"><strong><?=$nm?></strong>&nbsp;<?=($active=='f')?'(archival copy)&nbsp;':''?><span
-    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span><?=($conveyor=='t')?'&nbsp;<span class="label label-info">conveyor</span>':''?></a>
+    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span><?=($conveyor=='t')?'&nbsp;<span class="label label-info" id="qind-job-conv'.$id.'">conveyor</span>':''?></a>
   </h4>
-  <span id="qind-job-eft-cmnt<?=$id?>" class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
-  <span id="qind-job-rmrks<?=$id?>" class="text-success"><small><strong>Your remark: </strong><?=$rmrk?></small></span>
+  <span class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
+  <span class="text-success"><small><strong>Your remark: </strong><span id="qind-job-rmrks<?=$id?>"><?=$rmrk?></span></small></span>
  </div>
  <div id="monthjob_collapse<?=$id?>" class="panel-collapse collapse"
   role="tabpanel" aria-labelledby="monthjob_hd<?=$id?>">
@@ -150,6 +150,11 @@ $(document).ready(function(){
       <label for="eft">EFT</label>
       <textarea class="form-control" id="eft" name="eft" rows="15" style="resize:none; font-size: 11px;" spellcheck="false"></textarea>
      </div>
+     <div class="checkbox">
+      <label>
+       <input type="checkbox" checked id="conveyor" name="conveyor"> <strong>Conveyor</strong>
+      </label>
+     </div>
      <div class="form-group">
       <label for="quantity">Quantity</label>
       <input type="number" class="form-control" id="quantity" name="quantity" min="1" max="100000">
@@ -173,6 +178,7 @@ $(document).ready(function(){
     $(this).on('click', function () {
       var job = $(this).attr('job');
       var ship = $(this).attr('ship');
+      var conv = !($("#qind-job-conv"+job).html() === undefined);
       var q = $("#qind-job-q"+job).text();
       var rmrks = $('#qind-job-rmrks'+job).text();
       var eft = $('#qind-job-eft'+job).html();
@@ -180,6 +186,7 @@ $(document).ready(function(){
       $('#modalFitLabel').html(q + 'x ' + ship);
       modal.find('textarea').html(eft);
       modal.find("input[name='remarks']").val(rmrks);
+      modal.find("input[name='conveyor']").prop("checked", conv);
       modal.find("input[name='quantity']").val(q);
       modal.find("input[name='fit']").val(job);
       modal.find("input[name='action']").val('edit');
@@ -192,6 +199,7 @@ $(document).ready(function(){
       $('#modalFitLabel').html('Scheduling new monthly job...');
       modal.find('textarea').html('');
       modal.find("input[name='remarks']").val('');
+      modal.find("input[name='conveyor']").prop("checked", false);
       modal.find("input[name='quantity']").val(1);
       modal.find("input[name='fit']").val(0);
       modal.find("input[name='action']").val('add');
@@ -238,6 +246,43 @@ $(document).ready(function(){
 
 
 <?php function __dump_settings_and_containers($settings, $conn) {
+    $conveyor_boxes = NULL;
+    foreach ($settings as &$row)
+    {
+        $key = $row['ms_key'];
+        $val = $row['ms_val'];
+        if ($key == 'industry:conveyor_boxes')
+        {
+            $conveyor_boxes = str_replace(array('[',']'),'',$val);
+            break; // больше (пока) ничего не ищем
+        }
+    }
+?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="settings_hd_icb">
+  <h4 class="panel-title">
+   <a role="button" data-toggle="collapse"
+    href="#settings_collapse_icb" aria-expanded="true"
+    aria-controls="settings_collapse_icb"><strong>Industry</strong></a>
+  </h4>
+ </div>
+ <div id="settings_collapse_icb" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="settings_hd_icb">
+  <div class="panel-body">
+
+<form action="qi_digger.php" method="post">
+  <input type="hidden" name="module" value="industry">
+  <input type="hidden" name="action" value="settings">
+  <div class="form-group">
+    <label for="settingsConvBoxes">Conveyor container numbers</label>
+    <input name="conveyor_boxes" class="form-control" id="settingsConvBoxes" placeholder="Comma separated numbers" value="<?=$conveyor_boxes?>">
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+  </div>
+ </div>
+</div>
+<?php
     if (!is_null($settings))
     {
         for ($station_num = 1; $station_num <= 5; ++$station_num)
@@ -278,7 +323,7 @@ $(document).ready(function(){
   role="tabpanel" aria-labelledby="settings_hd<?=$station_num?>">
   <div class="panel-body">
 
-<form action="qi_digger.php" method="post" id="frmSettings">
+<form action="qi_digger.php" method="post">
   <input type="hidden" name="module" value="workflow">
   <input type="hidden" name="action" value="settings">
   <input type="hidden" name="station_num" value="<?=$station_num?>">

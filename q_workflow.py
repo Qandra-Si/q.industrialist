@@ -33,6 +33,7 @@ import eve_esi_tools
 import eve_sde_tools
 import console_app
 import render_html_workflow
+import render_html_industry
 
 from __init__ import __version__
 
@@ -49,7 +50,10 @@ g_module_default_settings = {
     "factory:station_id2": 60003760,
     "factory:station_name2": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
     # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars2": [1]
+    "factory:blueprints_hangars2": [1],
+
+    # номера контейнеров, в которых располагаются чертежи для конвейера
+    "industry:conveyor_boxes": [],
 }
 
 
@@ -508,61 +512,222 @@ def __actualize_factory_containers(db_factory_containers, real_factory_container
         del qidb
 
 
-def main():
+def __build_industry(
+        # настройки
+        module_settings,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups,
+        sde_named_type_ids,
+        # esi данные, загруженные с серверов CCP
+        corp_industry_jobs_data):
+    corp_industry_stat = {
+        "new_jobs_found": 0,
+        "current_month": -1,
+        "conveyor_scheduled_products": [],
+        "workflow_industry_jobs": [],
+        "workflow_last_industry_jobs": [],
+        "conveyor_market_groups": {}
+    }
+
+    def push_into_conveyor_market_groups(__market_group_id):
+        if corp_industry_stat["conveyor_market_groups"].get(str(__market_group_id), None) is None:
+            corp_industry_stat["conveyor_market_groups"].update({
+                str(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
+            })
+
+    # подключаемся к БД
     qidb = __get_db_connection()
-    module_settings = qidb.load_module_settings(g_module_default_settings)
-    db_monthly_jobs = qidb.select_all_rows(
-        "SELECT wmj_quantity,wmj_eft,wmj_conveyor "
+    # получаем текущий месяц с помощью sql-запроса
+    db_current_month = qidb.select_one_row("SELECT EXTRACT(MONTH FROM CURRENT_DATE)")
+    corp_industry_stat["current_month"] = int(db_current_month[0])
+
+    # сохраняем данные по производству в БД
+    wij = db.QWorkflowIndustryJobs(qidb)
+    corp_industry_stat["new_jobs_found"] = wij.actualize(corp_industry_jobs_data, sde_bp_materials)
+    del wij
+
+    db_conveyor_jobs = qidb.select_all_rows(
+        "SELECT wmj_quantity,wmj_eft "
         "FROM workflow_monthly_jobs "
-        "WHERE wmj_active;")
-    db_factory_containers = qidb.select_all_rows(
-        "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled,wfc_station_num "
-        "FROM workflow_factory_containers;")
+        "WHERE wmj_active AND wmj_conveyor;")
+
+    # конвертация ETF в список item-ов
+    conveyor_product_type_ids = []
+    conveyor_scheduled_products = []
+    for job in db_conveyor_jobs:
+        __total_quantity = job[0]
+        __eft = job[1]
+        __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
+        __converted.update({"quantity": __total_quantity})
+        if not (__converted["ship"] is None):
+            __product_type_id = __converted["ship"]["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                push_into_conveyor_market_groups(__market_group_id)
+                conveyor_scheduled_products.append({
+                    "name": __converted["ship"]["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity,
+                    "market": __market_group_id
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity
+        for __item_dict in __converted["items"]:
+            __product_type_id = __item_dict["type_id"]
+            if conveyor_product_type_ids.count(__product_type_id) == 0:
+                conveyor_product_type_ids.append(__product_type_id)
+                __market_group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __product_type_id)
+                push_into_conveyor_market_groups(__market_group_id)
+                conveyor_scheduled_products.append({
+                    "name": __item_dict["name"],
+                    "type_id": __product_type_id,
+                    "quantity": __total_quantity * __item_dict["quantity"],
+                    "market": __market_group_id
+                })
+            else:
+                __job_dict = next((j for j in conveyor_scheduled_products if j["type_id"] == __product_type_id), None)
+                __job_dict["quantity"] += __total_quantity * __item_dict["quantity"]
+    corp_industry_stat["conveyor_scheduled_products"] = conveyor_scheduled_products
+
+    # выбираем накопленные данные по производству из БД
+    if conveyor_product_type_ids:
+        db_workflow_industry_jobs = qidb.select_all_rows(
+            "SELECT ptid,SUM(cst),SUM(prdcts),mnth "
+            "FROM (SELECT "
+            "  wij_product_tid AS ptid,"
+            "  wij_cost AS cst,"
+            "  wij_quantity AS prdcts,"
+            "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
+            " FROM qi.workflow_industry_jobs"
+            " WHERE wij_activity_id=1 AND"
+            "  wij_bp_lid=ANY(%s) AND"
+            "  wij_product_tid=ANY(%s) AND"
+            "  wij_end_date > (current_date - interval '93' day)"
+            ") AS a "
+            "WHERE mnth>=(%s-2) "
+            "GROUP BY 1,4 "
+            "ORDER BY 1;",
+            module_settings["industry:conveyor_boxes"],
+            conveyor_product_type_ids,
+            db_current_month[0])
+        corp_industry_stat["workflow_industry_jobs"] = [{
+            "ptid": wij[0],
+            "cost": wij[1],
+            "products": wij[2],
+            "month": int(wij[3])
+        } for wij in db_workflow_industry_jobs]
+        del db_workflow_industry_jobs
+
+        # выбираем накопленные данные по производству из БД (за последние 30 дней)
+        db_workflow_last_industry_jobs = qidb.select_all_rows(
+            "SELECT wij_product_tid,SUM(wij_quantity) "
+            "FROM qi.workflow_industry_jobs "
+            "WHERE wij_activity_id=1 AND"
+            " wij_bp_lid=ANY(%s) AND"
+            " wij_product_tid=ANY(%s) AND"
+            " wij_end_date > (current_date - interval '30' day) "
+            "GROUP BY 1;",
+            module_settings["industry:conveyor_boxes"],
+            conveyor_product_type_ids)
+        corp_industry_stat["workflow_last_industry_jobs"] = [{
+            "ptid": wij[0],
+            "products": wij[1]
+        } for wij in db_workflow_last_industry_jobs]
+        del db_workflow_last_industry_jobs
+    del conveyor_product_type_ids
+
+    # отключение от БД
     del qidb
 
-    db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0], "conveyor": bool(wmj[2])} for wmj in db_monthly_jobs]
-    db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3], "station_num": wfc[4]} for wfc in db_factory_containers]
+    return corp_industry_stat
 
-    # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
-    # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
-    argv_prms = console_app.get_argv_prms()
 
-    # настройка Eve Online ESI Swagger interface
-    auth = esi.EveESIAuth(
-        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        debug=True)
-    client = esi.EveESIClient(
-        auth,
-        debug=False,
-        logger=True,
-        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
-    interface = esi.EveOnlineInterface(
-        client,
-        q_industrialist_settings.g_client_scope,
-        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        offline_mode=argv_prms["offline_mode"])
+def main():
+    qidb = __get_db_connection()
+    try:
+        module_settings = qidb.load_module_settings(g_module_default_settings)
+        db_monthly_jobs = qidb.select_all_rows(
+            "SELECT wmj_quantity,wmj_eft,wmj_conveyor "
+            "FROM workflow_monthly_jobs "
+            "WHERE wmj_active;")
+        db_factory_containers = qidb.select_all_rows(
+            "SELECT wfc_id,wfc_name,wfc_active,wfc_disabled,wfc_station_num "
+            "FROM workflow_factory_containers;")
 
-    authz = interface.authenticate(argv_prms["character_names"][0])
-    character_id = authz["character_id"]
-    character_name = authz["character_name"]
+        db_monthly_jobs = [{"eft": wmj[1], "quantity": wmj[0], "conveyor": bool(wmj[2])} for wmj in db_monthly_jobs]
+        db_factory_containers = [{"id": wfc[0], "name": wfc[1], "active": wfc[2], "disabled": wfc[3], "station_num": wfc[4]} for wfc in db_factory_containers]
 
-    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
-    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
-    sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
+        # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
+        # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
+        argv_prms = console_app.get_argv_prms()
 
-    # Public information about a character
-    character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id),
-        fully_trust_cache=True)
-    # Public information about a corporation
-    corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]),
-        fully_trust_cache=True)
+        # настройка Eve Online ESI Swagger interface
+        auth = esi.EveESIAuth(
+            '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            debug=True)
+        client = esi.EveESIClient(
+            auth,
+            debug=False,
+            logger=True,
+            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+        interface = esi.EveOnlineInterface(
+            client,
+            q_industrialist_settings.g_client_scope,
+            cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            offline_mode=argv_prms["offline_mode"])
 
-    corporation_id = character_data["corporation_id"]
-    corporation_name = corporation_data["name"]
-    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+        authz = interface.authenticate(argv_prms["character_names"][0])
+        character_id = authz["character_id"]
+        character_name = authz["character_name"]
+
+        sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+        sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+        sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+        sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
+
+        # Public information about a character
+        character_data = interface.get_esi_data(
+            "characters/{}/".format(character_id),
+            fully_trust_cache=True)
+        # Public information about a corporation
+        corporation_data = interface.get_esi_data(
+            "corporations/{}/".format(character_data["corporation_id"]),
+            fully_trust_cache=True)
+
+        corporation_id = character_data["corporation_id"]
+        corporation_name = corporation_data["name"]
+        print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+        sys.stdout.flush()
+
+        # Requires role(s): Factory_Manager
+        corp_industry_jobs_data = interface.get_esi_paged_data(
+            "corporations/{}/industry/jobs/".format(corporation_id))
+        print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
+        sys.stdout.flush()
+
+        # строим данные для генерации отчёта
+        corp_industry_stat = __build_industry(
+            # настройки
+            module_settings,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            sde_named_type_ids,
+            # esi данные, загруженные с серверов CCP
+            corp_industry_jobs_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_industry_stat", corp_industry_stat)
+    except:
+        print(sys.exc_info())
+        sys.exit(1)  # errno.h : EPERM=1 /* Operation not permitted */
+    del qidb
+
+    # вывод отчёта на экран
+    print("\n'{}' corporation has {} new jobs since last update".format(corporation_name, corp_industry_stat["new_jobs_found"]))
     sys.stdout.flush()
 
     # для того, чтобы получить названия коробок и в каком ангаре они расположены, надо загрузить
@@ -639,12 +804,6 @@ def main():
     print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
     sys.stdout.flush()
 
-    # Requires role(s): Factory_Manager
-    corp_industry_jobs_data = interface.get_esi_paged_data(
-        "corporations/{}/industry/jobs/".format(corporation_id))
-    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
-    sys.stdout.flush()
-
     # формирование набора данных для построения отчёта
     corp_manufacturing_scheduler = __get_monthly_manufacturing_scheduler(
         # данные полученные из БД
@@ -669,7 +828,7 @@ def main():
     print('  factory blueprints = {}'.format(len(corp_manufacturing_scheduler["factory_blueprints"])))
     sys.stdout.flush()
 
-    print("\nBuilding report...")
+    print("\nBuilding workflow report...")
     sys.stdout.flush()
 
     render_html_workflow.dump_workflow_into_report(
@@ -681,6 +840,17 @@ def main():
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_manufacturing_scheduler
     )
+
+    print("\nBuilding industry report...")
+    sys.stdout.flush()
+
+    render_html_industry.dump_industry_into_report(
+        # путь, где будет сохранён отчёт
+        argv_prms["workspace_cache_files_dir"],
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        corp_industry_stat)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

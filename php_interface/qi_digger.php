@@ -57,19 +57,24 @@ elseif (isset($_POST['module'])) {
             $params = NULL;
             //---
             $action = htmlentities($_POST['action']);
-            if (($action == 'edit') && isset($_POST['fit']) && isset($_POST['quantity']) && isset($_POST['eft'])) {
+            if (($action == 'edit') &&
+                isset($_POST['fit']) &&
+                isset($_POST['quantity']) &&
+                isset($_POST['eft']))
+            {
                 $wmj_id = htmlentities($_POST['fit']);
+                $wmj_conveyor = isset($_POST['conveyor']) ? 't' : 'f'; // всегда установлен в on (в список не попадают off значения)
                 $wmj_quantity = htmlentities($_POST['quantity']);
                 if (is_numeric($wmj_id) && is_numeric($wmj_quantity) &&
                     (get_numeric($wmj_id) >= 1) && (get_numeric($wmj_quantity) >= 1)) {
                     $wmj_eft = $_POST['eft'];
                     if (!empty($wmj_eft)) {
-                        $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3 WHERE wmj_id=$1;';
-                        $params = array($wmj_id, $wmj_quantity, $wmj_eft);
+                        $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_conveyor=$4 WHERE wmj_id=$1;';
+                        $params = array($wmj_id, $wmj_quantity, $wmj_eft, $wmj_conveyor);
                         if (isset($_POST['remarks'])) {
                             $wmj_remarks = $_POST['remarks'];
                             if (!empty($wmj_remarks)) {
-                                $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_remarks=$4 WHERE wmj_id=$1;';
+                                $query = 'UPDATE workflow_monthly_jobs SET wmj_quantity=$2,wmj_eft=$3,wmj_conveyor=$4,wmj_remarks=$5 WHERE wmj_id=$1;';
                                 array_push($params, $wmj_remarks);
                             }
                         }
@@ -77,17 +82,20 @@ elseif (isset($_POST['module'])) {
                 }
             }
             //---
-            elseif (($action == 'add') && isset($_POST['quantity']) && isset($_POST['eft'])) {
+            elseif (($action == 'add') &&
+                    isset($_POST['quantity']) &&
+                    isset($_POST['eft'])) {
+                $wmj_conveyor = isset($_POST['conveyor']) ? 't' : 'f'; // всегда установлен в on (в список не попадают off значения)
                 $wmj_quantity = htmlentities($_POST['quantity']);
                 if (is_numeric($wmj_quantity) && (get_numeric($wmj_quantity) >= 1)) {
                     $wmj_eft = $_POST['eft'];
                     if (!empty($wmj_eft)) {
-                        $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft) VALUES($1,$2);';
-                        $params = array($wmj_quantity, $wmj_eft);
+                        $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_conveyor) VALUES($1,$2,$3);';
+                        $params = array($wmj_quantity, $wmj_eft, $wmj_conveyor);
                         if (isset($_POST['remarks'])) {
                             $wmj_remarks = $_POST['remarks'];
                             if (!empty($wmj_remarks)) {
-                                $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_remarks) VALUES($1,$2,$3);';
+                                $query = 'INSERT INTO workflow_monthly_jobs(wmj_quantity,wmj_eft,wmj_conveyor,wmj_remarks) VALUES($1,$2,$3,$4);';
                                 array_push($params, $wmj_remarks);
                             }
                         }
@@ -152,6 +160,32 @@ EOD;
                 pg_query($conn, 'COMMIT;');
                 pg_close($conn);
             }
+        }
+    }
+    else if ($method == 'industry') {
+        $conn = NULL;
+        $query = NULL;
+        $params = NULL;
+        $action = htmlentities($_POST['action']);
+        if (($action == 'settings') && isset($_POST['conveyor_boxes'])) {
+            $ms_val_convboxes = htmlentities($_POST['conveyor_boxes']);
+            $query = <<<EOD
+UPDATE modules_settings SET ms_val=v.v
+FROM (VALUES ($2,$3)) AS v(k,v)
+WHERE ms_key=v.k AND ms_module IN (SELECT ml_id FROM modules_list WHERE ml_name=$1);
+EOD;
+            $params = array(
+                'workflow',
+                'industry:conveyor_boxes', '['.$ms_val_convboxes.']'
+            );
+        }
+        //---
+        if (!is_null($query)) {
+            $conn = get_conn();
+            pg_query_params($conn, $query, $params)
+                    or die('pg_query_params err: '.pg_last_error());
+            pg_query($conn, 'COMMIT;');
+            pg_close($conn);
         }
     }
 }
