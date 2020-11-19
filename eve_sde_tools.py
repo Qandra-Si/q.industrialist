@@ -3,6 +3,7 @@
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
+>>> python q_dictionaries.py --cache_dir=~/.q_industrialist
 """
 import sys
 import os

@@ -132,6 +132,9 @@ time python eve_sde_tools.py --cache_dir=./.q_industrialist
 #   Rebuilding invPositions.yaml file...
 #   ...
 #   real 24m39,000s
+time python q_dictionaries.py --cache_dir=./.q_industrialist
+# for example:
+#   real 1m2,000s
 ```
 
 ### Шаг 3. Подготовка к первому запуску программного обеспечения Q.Industrialist

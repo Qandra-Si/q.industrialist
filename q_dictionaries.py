@@ -12,10 +12,7 @@ Prerequisites:
       callback URL "https://localhost/callback/".
       Note: never use localhost as a callback in released applications.
 
-To run this example, make sure you have completed the prerequisites and then
-run the following command from this directory as the root:
-
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_dictionaries.py --cache_dir=~/.q_industrialist
 """
 import sys
