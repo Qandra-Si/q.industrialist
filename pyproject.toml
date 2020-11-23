@@ -2,7 +2,7 @@
 name = "q.industrialist"
 version = "0.8.0"
 description = "Entry point of q.industrialist applications"
-authors = ["Aliaksandr Klimasheuski <gladiator1988@gmail.com>"]
+authors = ["Qandra Si <https://github.com/Qandra-Si>","Aliaksandr Klimasheuski <gladiator1988@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
