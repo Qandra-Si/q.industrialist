@@ -1,6 +1,10 @@
-﻿import render_html
+﻿from typing import Dict
+
+import render_html
 import eve_sde_tools
 import eve_esi_tools
+from eve.esi import MarketPrice
+from eve.sde import SDEItem
 
 
 def __dump_corp_assets_tree_nested(
@@ -11,10 +15,10 @@ def __dump_corp_assets_tree_nested(
         corp_assets_tree,
         corp_ass_names_data,
         foreign_structures_data,
-        eve_market_prices_data,
+        eve_market_prices_data: Dict[int, MarketPrice],
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items,
+        sde_inv_items: Dict[int, SDEItem],
         sde_market_groups):
     region_id, region_name, loc_name, foreign = eve_esi_tools.get_assets_location_name(
         location_id,
@@ -44,9 +48,9 @@ def __dump_corp_assets_tree_nested(
             if "volume" in __type_dict:
                 volume = __type_dict["volume"] * items_quantity
     if type_id is None:
-        __price_dict = None
+        market_price = None
     else:
-        __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
+        market_price = eve_market_prices_data.get(type_id, None)
     glf.write(
         '<div class="media">\n'
         ' <div class="media-left media-top">{img}</div>\n'
@@ -66,8 +70,8 @@ def __dump_corp_assets_tree_nested(
             foreign='<br/><span class="label label-warning">foreign</span>' if foreign else "",
             grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[str(group_id)]["nameID"]["en"]) if not (group_id is None) else "",
             base='</br>base: {:,.1f} ISK'.format(base_price) if not (base_price is None) else "",
-            average='</br>average: {:,.1f} ISK'.format(__price_dict["average_price"]*items_quantity) if not (items_quantity is None) and not (__price_dict is None) and ("average_price" in __price_dict) else "",
-            adjusted='</br>adjusted: {:,.1f} ISK'.format(__price_dict["adjusted_price"]*items_quantity) if not (items_quantity is None) and not (__price_dict is None) and ("adjusted_price" in __price_dict) else "",
+            average='</br>average: {:,.1f} ISK'.format(market_price.average_price*items_quantity) if not (items_quantity is None) and not (market_price is None) and (market_price.average_price >0) else "",
+            adjusted='</br>adjusted: {:,.1f} ISK'.format(market_price.adjusted_price*items_quantity) if not (items_quantity is None) and not (market_price is None) and (market_price.average_price >0) else "",
             volume='</br>{:,.1f} m&sup3'.format(volume) if not (volume is None) else ""
         )
     )
@@ -101,7 +105,7 @@ def __dump_corp_assets_tree(
         eve_market_prices_data,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items,
+        sde_inv_items: Dict[int, SDEItem],
         sde_market_groups):
     glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
@@ -137,12 +141,12 @@ def dump_assets_tree_into_report(
         ws_dir,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items,
+        sde_inv_items: Dict[int, SDEItem],
         sde_market_groups,
         corp_assets_data,
         corp_ass_names_data,
         foreign_structures_data,
-        eve_market_prices_data,
+        eve_market_prices_data: Dict[int, MarketPrice],
         corp_assets_tree):
     glf = open('{dir}/assets_tree.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:

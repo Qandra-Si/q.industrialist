@@ -9,6 +9,7 @@ import os
 import getopt
 import yaml
 import json
+import orjson
 from yaml import SafeLoader
 
 import pyfa_conversions as conversions
@@ -53,7 +54,7 @@ def read_converted(ws_dir, name):
     f_name_json = __get_converted_name(ws_dir, name)
     with open(f_name_json, 'r', encoding='utf8') as f:
         s = f.read()
-        json_data = (json.loads(s))
+        json_data = (orjson.loads(s))
         return json_data
 
 

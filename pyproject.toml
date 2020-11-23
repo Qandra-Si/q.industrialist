@@ -21,9 +21,13 @@ six = "==1.11.0"
 tzlocal = "==2.1"
 urllib3 = "==1.24.2"
 psycopg2-binary = "^2.8.6"
+memory-profiler = "^0.58.0"
+dataclasses-json = "^0.5.2"
+orjson = "^3.4.3"
 
 [tool.poetry.dev-dependencies]
 pytest-pylint = "^0.18.0"
+pyprof2calltree = "^1.4.5"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
