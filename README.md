@@ -98,8 +98,8 @@ git clone --origin github --branch master --single-branch https://github.com/Qan
 
 ```bash
 cd ~/q_industrialist
-# setup Python 3 environment requirements
-pip install -r requirements.txt
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+poetry install
 exit
 ```
 
