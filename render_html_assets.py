@@ -1,9 +1,9 @@
-﻿from typing import Dict, Optional
+﻿from typing import Dict, Optional, List
 
 import render_html
 import eve_sde_tools
 import eve_esi_tools
-from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo, MarketGroup
+from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo, MarketGroup, AssetName
 
 
 def __dump_corp_assets_tree_nested(
@@ -12,7 +12,7 @@ def __dump_corp_assets_tree_nested(
         location_id,
         corp_assets_data,
         corp_assets_tree,
-        corp_ass_names_data,
+        corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
         sde_type_ids: Dict[int, TypeInfo],
@@ -99,7 +99,7 @@ def __dump_corp_assets_tree(
         glf,
         corp_assets_data,
         corp_assets_tree,
-        corp_ass_names_data,
+        corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data,
         sde_type_ids: Dict[int, TypeInfo],
@@ -143,7 +143,7 @@ def dump_assets_tree_into_report(
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups: Dict[int, MarketGroup],
         corp_assets_data,
-        corp_ass_names_data,
+        corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
         corp_assets_tree):

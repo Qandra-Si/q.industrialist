@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Dict
 
 from eve.esi import StructureData
-from eve.domain import Asset, InventoryLocation
+from eve.domain import Asset, InventoryLocation, AssetName
 
 
 def __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
@@ -332,7 +332,7 @@ def get_assets_location_name(
         location_id,
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
-        corp_ass_names_data,
+        corp_ass_names_data: List[AssetName],
         foreign_structures_data: Dict[str, StructureData]):
     region_id = None
     region_name = None
@@ -353,7 +353,7 @@ def get_assets_location_name(
         if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":
             loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])
         else:
-            loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
+            loc_name = next((n.name for n in corp_ass_names_data if n.item_id == location_id), None)
             if loc_name is None:
                 loc_name = next((foreign_structures_data[fs].name for fs in foreign_structures_data if int(fs) == location_id), None)
                 foreign = False if loc_name is None else True
