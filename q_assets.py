@@ -49,7 +49,7 @@ from __init__ import __version__
 from eve.esi import StructureData
 from eve.domain import Asset, MarketPrice
 from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway, \
-    GetMarketGroupsGateway, GetCorpAssetsNamesGateway, GetForeignStructuresGateway
+    GetMarketGroupsGateway, GetCorpAssetsNamesGateway, GetForeignStructuresGateway, GetInventoryLocationNamesGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -153,7 +153,8 @@ def main():
     # Построение дерева asset-ов:
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
-    sde_inv_names = eve_sde_tools.read_converted(cache_dir, "invNames")
+    inv_location_names_gateway = GetInventoryLocationNamesGateway(cache_dir=cache_dir)
+    sde_inv_names = inv_location_names_gateway.names()
     render_html_assets.dump_assets_tree_into_report(
         # путь, где будет сохранён отчёт
         cache_dir,

@@ -16,7 +16,7 @@ def __dump_corp_assets_tree_nested(
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
         sde_type_ids: Dict[int, TypeInfo],
-        sde_inv_names,
+        sde_inv_names: Dict[int,str],
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups: Dict[int, MarketGroup]):
     region_id, region_name, loc_name, foreign = eve_esi_tools.get_assets_location_name(
@@ -103,7 +103,7 @@ def __dump_corp_assets_tree(
         foreign_structures_data,
         eve_market_prices_data,
         sde_type_ids: Dict[int, TypeInfo],
-        sde_inv_names,
+        sde_inv_names: Dict[int, str],
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups: Dict[int, MarketGroup]):
     glf.write("""
@@ -139,7 +139,7 @@ def __dump_corp_assets_tree(
 def dump_assets_tree_into_report(
         ws_dir,
         sde_type_ids: Dict[int, TypeInfo],
-        sde_inv_names,
+        sde_inv_names: Dict[int, str],
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups: Dict[int, MarketGroup],
         corp_assets_data,
