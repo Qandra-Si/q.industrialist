@@ -46,9 +46,9 @@ from __init__ import __version__
 #  * <number> : значение type_id, поиск которого осуществляется (солнечная система, или топляк)
 #               при type_id > 0 поиск осуществляется вверх по дереву
 #               при type_id < 0 поиск осуществляется вниз по дереву
-from eve.esi import map_market_price_list_to_dict, MarketPrice, StructureData
-from eve.domain import Asset
-from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway
+from eve.esi import StructureData
+from eve.domain import Asset, MarketPrice
+from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -144,8 +144,8 @@ def main():
     sys.stdout.flush()
 
     # Public information about market prices
-    eve_market_prices_data_raw = interface.get_esi_data("markets/prices/")
-    eve_market_prices_data: Dict[int, MarketPrice] = map_market_price_list_to_dict(eve_market_prices_data_raw)
+    market_prices_gateway = GetMarketPricesGateway(eve_interface = interface)
+    eve_market_prices_data = market_prices_gateway.market_prices()
     print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
     sys.stdout.flush()
 

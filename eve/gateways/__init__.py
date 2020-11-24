@@ -1,2 +1,3 @@
 from eve.gateways._get_corp_assets import GetCorpAssetsGateway
 from eve.gateways._get_inventory_locations import GetInventoryLocationGateway
+from eve.gateways._get_market_prices import GetMarketPricesGateway

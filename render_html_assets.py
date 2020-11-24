@@ -3,8 +3,7 @@
 import render_html
 import eve_sde_tools
 import eve_esi_tools
-from eve.esi import MarketPrice
-from eve.domain import Asset, InventoryLocation
+from eve.domain import Asset, InventoryLocation, MarketPrice
 
 def __dump_corp_assets_tree_nested(
         glf,
