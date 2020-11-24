@@ -7,6 +7,8 @@ run the following command from this directory as the root:
 import sys
 import os
 import getopt
+from typing import Dict
+
 import yaml
 import json
 import orjson
@@ -16,6 +18,9 @@ import pyfa_conversions as conversions
 
 
 # type=static_data_interface : unpacked SDE-yyyymmdd-TRANQUILITY.zip
+from eve.domain import TypeInfo
+
+
 def __get_yaml(type, sub_url, item):
     f_name = '{cwd}/{type}/{url}'.format(type=type, cwd=os.getcwd(), url=sub_url)
     item_to_search = "\n{}\n".format(item)
@@ -149,16 +154,12 @@ def __rebuild_list2dict_by_key(ws_dir, name, key, val=None):
     del lst
 
 
-def get_item_name_by_type_id(type_ids, type_id):
-    if not (str(type_id) in type_ids):
-        name = type_id
-    else:
-        type_dict = type_ids[str(type_id)]
-        if ("name" in type_dict) and ("en" in type_dict["name"]):
-            name = type_dict["name"]["en"]
-        else:
-            name = type_id
-    return name
+def get_item_name_by_type_id(type_ids: Dict[int, TypeInfo], type_id:int):
+    if not type_id in type_ids:
+        return str(type_id)
+
+    type_dict = type_ids[type_id]
+    return type_dict.name.get("en", str(type_id))
 
 
 def convert_sde_type_ids(type_ids):
@@ -214,13 +215,11 @@ def get_market_group_name_by_id(sde_type_ids, group_id):
     return group_sid
 
 
-def get_market_group_by_type_id(sde_type_ids, type_id):
-    if not (str(type_id) in sde_type_ids):
+def get_market_group_by_type_id(sde_type_ids: Dict[int, TypeInfo], type_id:int):
+    if not (type_id in sde_type_ids):
         return None
-    type_dict = sde_type_ids[str(type_id)]
-    if "marketGroupID" in type_dict:
-        return type_dict["marketGroupID"]
-    return None
+    type_dict = sde_type_ids[type_id]
+    return type_dict.market_group_id
 
 
 def get_market_group_by_name(sde_market_groups, name):
@@ -258,7 +257,10 @@ def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     return groups_chain[0]
 
 
-def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+def get_basis_market_group_by_type_id(
+        sde_type_ids: Dict[int, TypeInfo],
+        sde_market_groups,
+        type_id):
     group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return None
@@ -716,20 +718,20 @@ def main():  # rebuild .yaml files
     print("Rebuilding marketGroups.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
-    
+
     print("Rebuilding iconIDs.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "iconIDs", ["iconFile"])
     print("Reindexing .converted_iconIDs.json file...")
     __rebuild_icons(workspace_cache_files_dir, "iconIDs")
-    
+
     print("Rebuilding invNames.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "bsd", "invNames", ["itemID", "itemName"])
     print("Reindexing .converted_invNames.json file...")
     sys.stdout.flush()
     __rebuild_list2dict_by_key(workspace_cache_files_dir, "invNames", "itemID", "itemName")
-    
+
     print("Rebuilding invItems.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "bsd", "invItems", ["itemID", "locationID", "typeID"])

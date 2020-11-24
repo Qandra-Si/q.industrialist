@@ -3,7 +3,8 @@
 import render_html
 import eve_sde_tools
 import eve_esi_tools
-from eve.domain import Asset, InventoryLocation, MarketPrice
+from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo
+
 
 def __dump_corp_assets_tree_nested(
         glf,
@@ -14,7 +15,7 @@ def __dump_corp_assets_tree_nested(
         corp_ass_names_data,
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
-        sde_type_ids,
+        sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups):
@@ -39,12 +40,12 @@ def __dump_corp_assets_tree_nested(
         itm_dict = corp_assets_data[loc_dict["index"]] if "index" in loc_dict else None
     if not (itm_dict is None):
         items_quantity = itm_dict.quantity
-        if str(type_id) in sde_type_ids:
-            __type_dict = sde_type_ids[str(type_id)]
-            if "basePrice" in __type_dict:
-                base_price = __type_dict["basePrice"] * items_quantity
-            if "volume" in __type_dict:
-                volume = __type_dict["volume"] * items_quantity
+        if type_id in sde_type_ids:
+            __type_dict = sde_type_ids[type_id]
+            if __type_dict.basePrice:
+                base_price = __type_dict.basePrice * items_quantity
+            if __type_dict.volume:
+                volume = __type_dict.volume * items_quantity
     if type_id is None:
         market_price = None
     else:
@@ -101,7 +102,7 @@ def __dump_corp_assets_tree(
         corp_ass_names_data,
         foreign_structures_data,
         eve_market_prices_data,
-        sde_type_ids,
+        sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups):
@@ -137,7 +138,7 @@ def __dump_corp_assets_tree(
 
 def dump_assets_tree_into_report(
         ws_dir,
-        sde_type_ids,
+        sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups,

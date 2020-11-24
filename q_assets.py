@@ -48,7 +48,7 @@ from __init__ import __version__
 #               при type_id < 0 поиск осуществляется вниз по дереву
 from eve.esi import StructureData
 from eve.domain import Asset, MarketPrice
-from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway
+from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -92,7 +92,8 @@ def main():
     print("\n{} is from '{}' corporation".format(character_name, corporation_name))
     sys.stdout.flush()
 
-    sde_type_ids = eve_sde_tools.read_converted(cache_dir, "typeIDs")
+    type_info_gateway = GetTypeInfoGateway(cache_dir=cache_dir)
+    sde_type_ids = type_info_gateway.type_info()
 
     inventory_location_gateway = GetInventoryLocationGateway(cache_dir = cache_dir)
     sde_inv_items = inventory_location_gateway.get_inventory_locations()
