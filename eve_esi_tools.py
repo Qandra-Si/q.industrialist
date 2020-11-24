@@ -2,6 +2,8 @@
 from pathlib import Path
 from typing import List, Dict
 
+import orjson
+
 from eve.esi import StructureData
 from eve.domain import Asset, InventoryLocation, AssetName
 
@@ -310,9 +312,9 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
 
 def dump_debug_into_file(ws_dir, nm, data):
     f_name = '{dir}/debug/{nm}.json'.format(dir=ws_dir, nm=nm)
-    s = json.dumps(data, indent=1, sort_keys=False)
+    s = orjson.dumps(data, option=orjson.OPT_INDENT_2)
     Path('{dir}/debug'.format(dir=ws_dir)).mkdir(parents=True, exist_ok=True)
-    with open(f_name, 'wt+', encoding='utf8') as f:
+    with open(f_name, 'wb+') as f:
         try:
             f.write(s)
         finally:

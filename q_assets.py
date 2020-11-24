@@ -50,7 +50,7 @@ from eve.esi import StructureData
 from eve.domain import Asset, MarketPrice
 from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway, \
     GetMarketGroupsGateway, GetCorpAssetsNamesGateway, GetForeignStructuresGateway, GetInventoryLocationNamesGateway
-from eve.esi import get_assets_tree
+from eve.domain import get_assets_tree
 
 #@profile
 def main():

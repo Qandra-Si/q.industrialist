@@ -4,6 +4,7 @@ import render_html
 import eve_sde_tools
 import eve_esi_tools
 from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo, MarketGroup, AssetName
+from eve.domain import AssetTreeItem
 
 
 def __dump_corp_assets_tree_nested(
@@ -11,7 +12,7 @@ def __dump_corp_assets_tree_nested(
         parent_location_id,
         location_id,
         corp_assets_data,
-        corp_assets_tree,
+        corp_assets_tree: Dict[str, AssetTreeItem],
         corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
@@ -27,9 +28,9 @@ def __dump_corp_assets_tree_nested(
         foreign_structures_data)
     itm_dict: Optional[Asset] = None
     loc_dict = corp_assets_tree[str(location_id)]
-    type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
+    type_id = loc_dict.type_id
     group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
-    items = loc_dict["items"] if "items" in loc_dict else None
+    items = loc_dict.items
     nested_quantity = None
     items_quantity = None
     base_price = None
@@ -37,7 +38,7 @@ def __dump_corp_assets_tree_nested(
     if not (items is None):
         nested_quantity = len(items)
     if itm_dict is None:
-        itm_dict = corp_assets_data[loc_dict["index"]] if "index" in loc_dict else None
+        itm_dict = corp_assets_data[loc_dict.index] if loc_dict.index else None
     if not (itm_dict is None):
         items_quantity = itm_dict.quantity
         if type_id in sde_type_ids:
@@ -98,7 +99,7 @@ def __dump_corp_assets_tree_nested(
 def __dump_corp_assets_tree(
         glf,
         corp_assets_data,
-        corp_assets_tree,
+        corp_assets_tree: Dict[str, AssetTreeItem],
         corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data,
@@ -146,7 +147,7 @@ def dump_assets_tree_into_report(
         corp_ass_names_data: List[AssetName],
         foreign_structures_data,
         eve_market_prices_data: Dict[int, MarketPrice],
-        corp_assets_tree):
+        corp_assets_tree: Dict[str, AssetTreeItem]):
     glf = open('{dir}/assets_tree.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Corp Assets")
