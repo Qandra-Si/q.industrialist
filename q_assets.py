@@ -49,7 +49,7 @@ from __init__ import __version__
 from eve.esi import StructureData
 from eve.domain import Asset, MarketPrice
 from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway, \
-    GetMarketGroupsGateway, GetCorpAssetsNamesGateway
+    GetMarketGroupsGateway, GetCorpAssetsNamesGateway, GetForeignStructuresGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -119,30 +119,11 @@ def main():
     sys.stdout.flush()
 
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-    foreign_structures_data: Dict[str, StructureData] = {}
-    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
-    foreign_structures_forbidden_ids = []
-    if len(foreign_structures_ids) > 0:
-        # Requires: access token
-        for structure_id in foreign_structures_ids:
-            try:
-                universe_structure_data = interface.get_esi_data(
-                    "universe/structures/{}/".format(structure_id),
-                    fully_trust_cache=True)
-                foreign_structures_data.update({str(structure_id): StructureData.from_dict(universe_structure_data)})
-            except requests.exceptions.HTTPError as err:
-                status_code = err.response.status_code
-                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                    foreign_structures_forbidden_ids.append(structure_id)
-                else:
-                    raise
-            except:
-                print(sys.exc_info())
-                raise
-    print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
-    if len(foreign_structures_forbidden_ids) > 0:
-        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
-    sys.stdout.flush()
+    foreign_structures_gateway = GetForeignStructuresGateway(interface)
+    foreign_structures_data = foreign_structures_gateway.structures(
+        corp_assets_data= corp_assets_data,
+        corporation_name= corporation_name
+    )
 
     # Public information about market prices
     market_prices_gateway = GetMarketPricesGateway(eve_interface = interface)
