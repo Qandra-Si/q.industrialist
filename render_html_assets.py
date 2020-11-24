@@ -3,7 +3,7 @@
 import render_html
 import eve_sde_tools
 import eve_esi_tools
-from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo
+from eve.domain import Asset, InventoryLocation, MarketPrice, TypeInfo, MarketGroup
 
 
 def __dump_corp_assets_tree_nested(
@@ -18,7 +18,7 @@ def __dump_corp_assets_tree_nested(
         sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
-        sde_market_groups):
+        sde_market_groups: Dict[int, MarketGroup]):
     region_id, region_name, loc_name, foreign = eve_esi_tools.get_assets_location_name(
         location_id,
         sde_inv_names,
@@ -67,7 +67,7 @@ def __dump_corp_assets_tree_nested(
             iq=' <span class="label label-info">{}</span>'.format(nested_quantity) if not (nested_quantity is None) and (nested_quantity > 1) else "",
             loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict.location_flag) if not (itm_dict is None) else "",
             foreign='<br/><span class="label label-warning">foreign</span>' if foreign else "",
-            grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[str(group_id)]["nameID"]["en"]) if not (group_id is None) else "",
+            grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[group_id].name["en"]) if not (group_id is None) else "",
             base='</br>base: {:,.1f} ISK'.format(base_price) if not (base_price is None) else "",
             average='</br>average: {:,.1f} ISK'.format(market_price.average_price*items_quantity) if not (items_quantity is None) and not (market_price is None) and (market_price.average_price >0) else "",
             adjusted='</br>adjusted: {:,.1f} ISK'.format(market_price.adjusted_price*items_quantity) if not (items_quantity is None) and not (market_price is None) and (market_price.average_price >0) else "",
@@ -105,7 +105,7 @@ def __dump_corp_assets_tree(
         sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
-        sde_market_groups):
+        sde_market_groups: Dict[int, MarketGroup]):
     glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
@@ -141,7 +141,7 @@ def dump_assets_tree_into_report(
         sde_type_ids: Dict[int, TypeInfo],
         sde_inv_names,
         sde_inv_items: Dict[int, InventoryLocation],
-        sde_market_groups,
+        sde_market_groups: Dict[int, MarketGroup],
         corp_assets_data,
         corp_ass_names_data,
         foreign_structures_data,

@@ -18,7 +18,7 @@ import pyfa_conversions as conversions
 
 
 # type=static_data_interface : unpacked SDE-yyyymmdd-TRANQUILITY.zip
-from eve.domain import TypeInfo
+from eve.domain import TypeInfo, MarketGroup
 
 
 def __get_yaml(type, sub_url, item):
@@ -259,7 +259,7 @@ def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
 
 def get_basis_market_group_by_type_id(
         sde_type_ids: Dict[int, TypeInfo],
-        sde_market_groups,
+        sde_market_groups: Dict[int, MarketGroup],
         type_id):
     group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
@@ -274,9 +274,9 @@ def get_basis_market_group_by_type_id(
                           1112,  # Subsystems (parent:955)
                          ]:
             return __group_id
-        __grp1 = sde_market_groups[str(__group_id)]
-        if "parentGroupID" in __grp1:
-            __parent_group_id = __grp1["parentGroupID"]
+        __grp1 = sde_market_groups[__group_id]
+        if __grp1.parent_group_id:
+            __parent_group_id = __grp1.parent_group_id
             # группа материалов для целей производства должна делиться на подгруппы (производство и заказы
             # в каждой из них решается индивидуально)
             if __parent_group_id in [533,  # Materials

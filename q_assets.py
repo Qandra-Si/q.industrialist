@@ -48,7 +48,8 @@ from __init__ import __version__
 #               при type_id < 0 поиск осуществляется вниз по дереву
 from eve.esi import StructureData
 from eve.domain import Asset, MarketPrice
-from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway
+from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway, GetMarketPricesGateway, GetTypeInfoGateway, \
+    GetMarketGroupsGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -98,7 +99,8 @@ def main():
     inventory_location_gateway = GetInventoryLocationGateway(cache_dir = cache_dir)
     sde_inv_items = inventory_location_gateway.get_inventory_locations()
 
-    sde_market_groups = eve_sde_tools.read_converted(cache_dir, "marketGroups")
+    market_groups_gateway = GetMarketGroupsGateway(cache_dir=cache_dir)
+    sde_market_groups = market_groups_gateway.market_groups()
 
     # Requires role(s): Director
     corp_assets_gateway = GetCorpAssetsGateway(eve_interface=interface, corporation_id=corporation_id)
