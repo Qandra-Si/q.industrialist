@@ -1,11 +1,11 @@
-﻿from typing import Dict
+﻿from typing import Dict, Optional
 
 import render_html
 import eve_sde_tools
 import eve_esi_tools
 from eve.esi import MarketPrice
 from eve.sde import SDEItem
-
+from eve.domain import Asset
 
 def __dump_corp_assets_tree_nested(
         glf,
@@ -26,7 +26,7 @@ def __dump_corp_assets_tree_nested(
         sde_inv_items,
         corp_ass_names_data,
         foreign_structures_data)
-    itm_dict = None
+    itm_dict: Optional[Asset] = None
     loc_dict = corp_assets_tree[str(location_id)]
     type_id = loc_dict["type_id"] if "type_id" in loc_dict else None
     group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
@@ -40,7 +40,7 @@ def __dump_corp_assets_tree_nested(
     if itm_dict is None:
         itm_dict = corp_assets_data[loc_dict["index"]] if "index" in loc_dict else None
     if not (itm_dict is None):
-        items_quantity = itm_dict["quantity"]
+        items_quantity = itm_dict.quantity
         if str(type_id) in sde_type_ids:
             __type_dict = sde_type_ids[str(type_id)]
             if "basePrice" in __type_dict:
@@ -66,7 +66,7 @@ def __dump_corp_assets_tree_nested(
             id=location_id,
             nq=' <span class="badge">{}</span>'.format(items_quantity) if not (items_quantity is None) and (items_quantity > 1) else "",
             iq=' <span class="label label-info">{}</span>'.format(nested_quantity) if not (nested_quantity is None) and (nested_quantity > 1) else "",
-            loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict["location_flag"]) if not (itm_dict is None) else "",
+            loc_flag=' <span class="label label-default">{}</span>'.format(itm_dict.location_flag) if not (itm_dict is None) else "",
             foreign='<br/><span class="label label-warning">foreign</span>' if foreign else "",
             grp='</br><span class="label label-success">{}</span>'.format(sde_market_groups[str(group_id)]["nameID"]["en"]) if not (group_id is None) else "",
             base='</br>base: {:,.1f} ISK'.format(base_price) if not (base_price is None) else "",

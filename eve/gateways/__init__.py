@@ -1,0 +1,1 @@
+from eve.gateways._get_corp_assets import GetCorpAssetsGateway

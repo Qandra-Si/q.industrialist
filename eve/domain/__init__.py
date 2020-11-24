@@ -1,0 +1,1 @@
+from eve.domain._asset import Asset

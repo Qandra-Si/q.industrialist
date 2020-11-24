@@ -46,19 +46,23 @@ from __init__ import __version__
 #  * <number> : значение type_id, поиск которого осуществляется (солнечная система, или топляк)
 #               при type_id > 0 поиск осуществляется вверх по дереву
 #               при type_id < 0 поиск осуществляется вниз по дереву
-from eve.esi import map_market_price_list_to_dict, MarketPrice
+from eve.esi import map_market_price_list_to_dict, MarketPrice, StructureData
+from eve.domain import Asset
+from eve.gateways import GetCorpAssetsGateway
 from eve.sde import map_json_to_sde_item_dictionary
 from eve.esi import get_assets_tree
 
-@profile
+#@profile
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
+    cache_dir = argv_prms["workspace_cache_files_dir"]
+
     # настройка Eve Online ESI Swagger interface
     auth = esi.EveESIAuth(
-        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        '{}/auth_cache'.format(cache_dir),
         debug=True)
     client = esi.EveESIClient(
         auth,
@@ -68,7 +72,7 @@ def main():
     interface = esi.EveOnlineInterface(
         client,
         q_industrialist_settings.g_client_scope,
-        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        cache_dir='{}/esi_cache'.format(cache_dir),
         offline_mode=argv_prms["offline_mode"])
 
     authz = interface.authenticate(argv_prms["character_names"][0])
@@ -89,15 +93,16 @@ def main():
     print("\n{} is from '{}' corporation".format(character_name, corporation_name))
     sys.stdout.flush()
 
-    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_inv_itemsRaw = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_type_ids = eve_sde_tools.read_converted(cache_dir, "typeIDs")
+    sde_inv_itemsRaw = eve_sde_tools.read_converted(cache_dir, "invItems")
     sde_inv_items = map_json_to_sde_item_dictionary(sde_inv_itemsRaw)
     del sde_inv_itemsRaw
-    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+    sde_market_groups = eve_sde_tools.read_converted(cache_dir, "marketGroups")
 
     # Requires role(s): Director
-    corp_assets_data = interface.get_esi_paged_data(
-        "corporations/{}/assets/".format(corporation_id))
+    corp_assets_gateway = GetCorpAssetsGateway(eve_interface=interface, corporation_id=corporation_id)
+    corp_assets_data = corp_assets_gateway.assets()
+
     print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
     sys.stdout.flush()
 
@@ -113,7 +118,7 @@ def main():
     sys.stdout.flush()
 
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-    foreign_structures_data = {}
+    foreign_structures_data: Dict[str, StructureData] = {}
     foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
     foreign_structures_forbidden_ids = []
     if len(foreign_structures_ids) > 0:
@@ -123,7 +128,7 @@ def main():
                 universe_structure_data = interface.get_esi_data(
                     "universe/structures/{}/".format(structure_id),
                     fully_trust_cache=True)
-                foreign_structures_data.update({str(structure_id): universe_structure_data})
+                foreign_structures_data.update({str(structure_id): StructureData.from_dict(universe_structure_data)})
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
                 if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
@@ -161,15 +166,15 @@ def main():
         sde_inv_items,
         virtual_hierarchy_by_corpsag=True
     )
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+    eve_esi_tools.dump_debug_into_file(cache_dir, "corp_assets_tree", corp_assets_tree)
 
     # Построение дерева asset-ов:
     print("\nBuilding assets tree report...")
     sys.stdout.flush()
-    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_names = eve_sde_tools.read_converted(cache_dir, "invNames")
     render_html_assets.dump_assets_tree_into_report(
         # путь, где будет сохранён отчёт
-        argv_prms["workspace_cache_files_dir"],
+        cache_dir,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_inv_names,
