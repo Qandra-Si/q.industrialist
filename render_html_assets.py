@@ -4,8 +4,7 @@ import render_html
 import eve_sde_tools
 import eve_esi_tools
 from eve.esi import MarketPrice
-from eve.sde import SDEItem
-from eve.domain import Asset
+from eve.domain import Asset, InventoryLocation
 
 def __dump_corp_assets_tree_nested(
         glf,
@@ -18,7 +17,7 @@ def __dump_corp_assets_tree_nested(
         eve_market_prices_data: Dict[int, MarketPrice],
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items: Dict[int, SDEItem],
+        sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups):
     region_id, region_name, loc_name, foreign = eve_esi_tools.get_assets_location_name(
         location_id,
@@ -105,7 +104,7 @@ def __dump_corp_assets_tree(
         eve_market_prices_data,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items: Dict[int, SDEItem],
+        sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups):
     glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
@@ -141,7 +140,7 @@ def dump_assets_tree_into_report(
         ws_dir,
         sde_type_ids,
         sde_inv_names,
-        sde_inv_items: Dict[int, SDEItem],
+        sde_inv_items: Dict[int, InventoryLocation],
         sde_market_groups,
         corp_assets_data,
         corp_ass_names_data,

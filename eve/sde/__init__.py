@@ -1,2 +1,0 @@
-from eve.sde.SDEItem import SDEItem
-from eve.sde.map_json_to_SDEItemDictionary import map_json_to_sde_item_dictionary

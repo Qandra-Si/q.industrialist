@@ -48,8 +48,7 @@ from __init__ import __version__
 #               при type_id < 0 поиск осуществляется вниз по дереву
 from eve.esi import map_market_price_list_to_dict, MarketPrice, StructureData
 from eve.domain import Asset
-from eve.gateways import GetCorpAssetsGateway
-from eve.sde import map_json_to_sde_item_dictionary
+from eve.gateways import GetCorpAssetsGateway, GetInventoryLocationGateway
 from eve.esi import get_assets_tree
 
 #@profile
@@ -94,9 +93,10 @@ def main():
     sys.stdout.flush()
 
     sde_type_ids = eve_sde_tools.read_converted(cache_dir, "typeIDs")
-    sde_inv_itemsRaw = eve_sde_tools.read_converted(cache_dir, "invItems")
-    sde_inv_items = map_json_to_sde_item_dictionary(sde_inv_itemsRaw)
-    del sde_inv_itemsRaw
+
+    inventory_location_gateway = GetInventoryLocationGateway(cache_dir = cache_dir)
+    sde_inv_items = inventory_location_gateway.get_inventory_locations()
+
     sde_market_groups = eve_sde_tools.read_converted(cache_dir, "marketGroups")
 
     # Requires role(s): Director

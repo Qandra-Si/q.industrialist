@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import List, Dict
 
 from eve.esi import StructureData
-from eve.domain import Asset
-from eve.sde import SDEItem
+from eve.domain import Asset, InventoryLocation
 
 
 def __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
@@ -332,7 +331,7 @@ def __represents_int(s):
 def get_assets_location_name(
         location_id,
         sde_inv_names,
-        sde_inv_items: Dict[int, SDEItem],
+        sde_inv_items: Dict[int, InventoryLocation],
         corp_ass_names_data,
         foreign_structures_data: Dict[str, StructureData]):
     region_id = None
@@ -345,10 +344,10 @@ def get_assets_location_name(
             loc_name = sde_inv_names[str(location_id)]
             if location_id in sde_inv_items:
                 root_item = sde_inv_items[location_id]
-                if root_item.typeID == 5:  # Solar System
+                if root_item.type_id == 5:  # Solar System
                     # constellation_name = sde_inv_names[str(root_item["locationID"])]
-                    constellation_item = sde_inv_items[root_item.locationID]  # Constellation
-                    region_id = constellation_item.locationID
+                    constellation_item = sde_inv_items[root_item.parent_location_id]  # Constellation
+                    region_id = constellation_item.parent_location_id
                     region_name = sde_inv_names[str(region_id)]
     else:
         if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":

@@ -1,14 +1,14 @@
 from typing import Dict, List
 
-from eve.domain._asset import Asset
+from eve.domain import Asset
 from eve.esi.structure_data import StructureData
-from eve.sde import SDEItem
+from eve.domain import InventoryLocation
 
 
 def get_assets_tree(
         corp_assets_data: List[Asset],
         foreign_structures_data: Dict[str, StructureData],
-        sde_inv_items: Dict[int, SDEItem],
+        sde_inv_items: Dict[int, InventoryLocation],
         virtual_hierarchy_by_corpsag= False
 ) -> Dict[str, Dict]:
     """
@@ -112,14 +112,14 @@ def get_assets_tree(
     return asset_tree
 
 
-def _fill_ass_tree_with_sde_data(location_id: int, ass_tree, sde_inv_items: Dict[int, SDEItem]):
+def _fill_ass_tree_with_sde_data(location_id: int, ass_tree, sde_inv_items: Dict[int, InventoryLocation]):
     if location_id <= 5:
         return
     if not (location_id in sde_inv_items):
         return
     sde_item = sde_inv_items[location_id]
-    type_id = sde_item.typeID
-    new_location_id = sde_item.locationID
+    type_id = sde_item.type_id
+    new_location_id = sde_item.parent_location_id
     if not (str(location_id) in ass_tree):
         ass_tree.update({str(location_id): {"type_id": type_id}})
     else:
