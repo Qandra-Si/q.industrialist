@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List
 
-
-from eve.domain import Asset
+from eve.domain import Asset, TypeIds
 from eve.esi.structure_data import StructureData
 from eve.domain import InventoryLocation
 
@@ -12,7 +11,7 @@ class AssetTreeItem:
     type_id: int = None
     index: int = None
     location_id: str = None
-    items: List[int] = None
+    items: List[str] = None
 
 
 def get_assets_tree(
@@ -37,43 +36,17 @@ def get_assets_tree(
         location_flag = asset.location_flag
         type_id = asset.type_id
 
-        if virtual_hierarchy_by_corpsag and (location_flag[:-1] == "CorpSAG"):
-            corpsag_root: str = '{}_{}'.format(location_id, location_flag)
-            virtual_root = str(location_id)
-            if (corpsag_root in asset_tree) and asset_tree[corpsag_root].items:
-                asset_tree[corpsag_root].items.append(item_id)
-            else:
-                item = AssetTreeItem(
-                    items=[item_id],
-                    location_id=virtual_root,
-                    type_id=41567,
-                )
-                asset_tree.update({corpsag_root: item})  # Hangar Container
-            if (virtual_root in asset_tree) and asset_tree[virtual_root].items:
-                if asset_tree[virtual_root].items.count(corpsag_root) == 0:
-                    asset_tree[virtual_root].items.append(corpsag_root)
-            else:
-                asset_tree.update({virtual_root: AssetTreeItem(items=[corpsag_root])})
-        else:
-            locstr_root = str(location_id)
-            if (locstr_root in asset_tree) and asset_tree[locstr_root].items:
-                asset_tree[locstr_root].items.append(item_id)
-            else:
-                asset_tree.update({locstr_root: AssetTreeItem(items=[item_id])})
-                location_type = asset.location_type
-                if location_type == "solar_system":
-                    asset_tree[locstr_root].type_id = 5  # Solar System
-                elif location_type == "station":
-                    if stations.count(location_id) == 0:
-                        stations.append(location_id)
         if not (str(item_id) in asset_tree):
-            asset_tree.update({str(item_id): AssetTreeItem(type_id=type_id, index=index)})
+            tree_item = AssetTreeItem(type_id=type_id, index=index, items=[])
+            asset_tree[str(item_id)] = tree_item
         else:
-            __a = asset_tree[str(item_id)]
-            if not __a.type_id:
-                __a.type_id = type_id
-            if not __a.index:
-                __a.index = index
+            _update_tree_item(asset_tree, index, item_id, type_id)
+
+        if virtual_hierarchy_by_corpsag and (location_flag[:-1] == "CorpSAG"):
+            _update_copr_angar(asset_tree, item_id, location_flag, location_id)
+        else:
+            _create_or_update_location(asset, asset_tree, item_id, location_id, stations)
+
     # прописываем location_id парамтеры в каждом элементе по известному item_id
     for index, asset in enumerate(corp_assets_data):
         item_id = str(asset.item_id)
@@ -85,13 +58,13 @@ def get_assets_tree(
         else:
             virtual_root = location_id
         if item_id in asset_tree:
-            __a = asset_tree[item_id]
-            if not __a.location_id:
-                __a.location_id = virtual_root
-            if not __a.type_id:
-                __a.type_id = asset.type_id
-            if not __a.index:
-                __a.index = index
+            tree_item = asset_tree[item_id]
+            if not tree_item.location_id:
+                tree_item.location_id = virtual_root
+            if not tree_item.type_id:
+                tree_item.type_id = asset.type_id
+            if not tree_item.index:
+                tree_item.index = index
     # дополняем дерево сведениями о станциях, не принадлежащих корпорации (всё равно,
     # что добавить в список NPC-станции)
     foreign_station_ids = foreign_structures_data.keys()
@@ -126,6 +99,48 @@ def get_assets_tree(
     return asset_tree
 
 
+def _create_or_update_location(asset, asset_tree, item_id, location_id, stations):
+    locstr_root = str(location_id)
+    location_type = asset.location_type
+    if locstr_root not in asset_tree:
+        location_type_id = TypeIds.SOLAR_SYSTEM.value if location_type == "solar_system" else None
+        tree_item = AssetTreeItem(type_id=location_type_id, items=[])
+        asset_tree[locstr_root] = tree_item
+    asset_tree[locstr_root].items.append(item_id)
+    if location_type == "station" and stations.count(location_id) == 0:
+        stations.append(location_id)
+
+
+def _update_copr_angar(asset_tree, item_id, location_flag, location_id):
+    corpsag_root: str = '{}_{}'.format(location_id, location_flag)
+    virtual_root = str(location_id)
+    if corpsag_root not in asset_tree:
+        item = AssetTreeItem(
+            items=[],
+            location_id=virtual_root,
+            type_id=TypeIds.HANGAR_CONTAINER.value,
+        )
+        asset_tree[corpsag_root] = item
+
+        _add_corp_angar_to_parent_location_if_need(asset_tree, corpsag_root, virtual_root)
+    asset_tree[corpsag_root].items.append(str(item_id))
+
+
+def _update_tree_item(asset_tree, index, item_id, type_id):
+    tree_item = asset_tree[str(item_id)]
+    if not tree_item.type_id:
+        tree_item.type_id = type_id
+    if not tree_item.index:
+        tree_item.index = index
+
+
+def _add_corp_angar_to_parent_location_if_need(asset_tree, corpsag_root, virtual_root):
+    if (virtual_root in asset_tree) and asset_tree[virtual_root].items.count(corpsag_root) == 0:
+        asset_tree[virtual_root].items.append(corpsag_root)
+    else:
+        asset_tree.update({virtual_root: AssetTreeItem(items=[corpsag_root])})
+
+
 def _fill_ass_tree_with_sde_data(
         location_id: int,
         ass_tree: Dict[str, AssetTreeItem],
@@ -145,16 +160,15 @@ def _fill_ass_tree_with_sde_data(
     if type_id > 5:  # останавливаем глубину на Constellation (и не добавляем её в ass_tree)
         ass_tree[str(location_id)].location_id = new_location_id
         if not (str(new_location_id) in ass_tree):
-            ass_tree.update({str(new_location_id): AssetTreeItem(items=[location_id])})
+            ass_tree.update({str(new_location_id): AssetTreeItem(items=[str(location_id)])})
     if type_id == 5:  # останавливаемся а глубине Solar System
         return
     _fill_ass_tree_with_sde_data(new_location_id, ass_tree, sde_inv_items)
 
 
-def _get_assets_tree_root(ass_tree: Dict[str, AssetTreeItem], location_id: str):
-    if not (str(location_id) in ass_tree):
-        return location_id
-    itm = ass_tree[str(location_id)]
-    if not itm.location_id:
-        return location_id
-    return _get_assets_tree_root(ass_tree, itm.location_id)
+def _get_assets_tree_root(asset_tree: Dict[str, AssetTreeItem], location_id: str):
+    item = asset_tree.get(location_id, None)
+    while (item is not None) and item.location_id:
+        location_id = item.location_id
+        item = asset_tree.get(location_id, None)
+    return location_id
