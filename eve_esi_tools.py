@@ -328,10 +328,12 @@ def __represents_int(s):
         return True
     except ValueError:
         return False
+    except TypeError:
+        return False
 
 
 def get_assets_location_name(
-        location_id,
+        location_id: str,
         sde_inv_names: Dict[int,str],
         sde_inv_items: Dict[int, InventoryLocation],
         corp_ass_names_data: List[AssetName],

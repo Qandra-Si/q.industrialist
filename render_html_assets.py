@@ -77,10 +77,17 @@ def __dump_corp_assets_tree_nested(
     )
     if not (items is None):
         for itm in items:
+            new_loc = None
+            if isinstance(itm, int) :
+                new_loc = itm
+            elif isinstance(itm, str):
+                new_loc = itm
+            else:
+                new_loc = itm.item_id
             __dump_corp_assets_tree_nested(
                 glf,
                 location_id,
-                itm,
+                new_loc,
                 corp_assets_data,
                 corp_assets_tree,
                 corp_ass_names_data,
