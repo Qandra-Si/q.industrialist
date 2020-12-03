@@ -185,10 +185,20 @@ def main():
         print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
-    # Public information about market prices
-    eve_market_prices_data = interface.get_esi_data("markets/prices/")
-    print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
-    sys.stdout.flush()
+    try:
+        # Public information about market prices
+        eve_market_prices_data = interface.get_esi_data("markets/prices/")
+        print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+        sys.stdout.flush()
+    except requests.exceptions.HTTPError as err:
+        status_code = err.response.status_code
+        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+            eve_market_prices_data = []
+        else:
+            raise
+    except:
+        print(sys.exc_info())
+        raise
 
     # # Public information with list of public structures
     # universe_structures_data = eve_esi_interface.get_esi_data(

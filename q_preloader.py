@@ -94,10 +94,20 @@ def main():
             various_characters_data.append({str(corporation_id): character_data})
 
             if eve_market_prices_data is None:
-                # Public information about market prices
-                eve_market_prices_data = interface.get_esi_data("markets/prices/")
-                print("EVE market has {} prices\n".format(len(eve_market_prices_data)))
-                sys.stdout.flush()
+                try:
+                    # Public information about market prices
+                    eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                    print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                    sys.stdout.flush()
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                        eve_market_prices_data = []
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
 
             # Requires role(s): Accountant, Junior_Accountant
             corp_wallets_data = interface.get_esi_paged_data(
