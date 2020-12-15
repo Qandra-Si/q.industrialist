@@ -105,7 +105,7 @@ CREATE TABLE qi.workflow_monthly_jobs
     wmj_quantity INTEGER NOT NULL, -- кол-во кораблей (фитов) запланированных для ежемесячного производства
     wmj_eft CHARACTER VARYING(16383), -- 16 Кб для текстового представления фита (очень много всего в карго?)
     wmj_remarks CHARACTER VARYING(127), -- дополнительная информация
-    wmj_conveyor NOT NULL DEFAULT FALSE, -- признак того, что список модулей предназначаен для производства на конвейере
+    wmj_conveyor BOOLEAN NOT NULL DEFAULT FALSE, -- признак того, что список модулей предназначаен для производства на конвейере
     CONSTRAINT pk_wmj PRIMARY KEY (wmj_id)
 )
 TABLESPACE pg_default;
