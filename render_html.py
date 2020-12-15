@@ -18,8 +18,11 @@ __g_bootstrap_js_external = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/
 # __g_jquery_js_external = 'https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous'
 # __g_bootstrap_js_external = 'https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous'
 
-def __camel_to_snake(name):  # https://stackoverflow.com/a/1176023
+
+def __camel_to_snake(name, trim_spaces=False):  # https://stackoverflow.com/a/1176023
   name = __g_pattern_c2s1.sub(r'\1_\2', name)
+  if trim_spaces:
+      name = name.replace(" ", "")
   return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
 
 

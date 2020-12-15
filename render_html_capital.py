@@ -630,7 +630,7 @@ def dump_capital_into_report(
         corp_blueprints_data,
         eve_market_prices_data):
     product_name = report_options["product"]
-    glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=render_html.__camel_to_snake(product_name)), "wt+", encoding='utf8')
+    glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=render_html.__camel_to_snake(product_name, True)), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, product_name)
         __dump_corp_capital(

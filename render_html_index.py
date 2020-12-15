@@ -1,7 +1,7 @@
 ﻿import sys
-import os
 import getopt
 
+import q_capital_settings
 import render_html
 
 
@@ -22,10 +22,6 @@ def __dump_index(glf):
       <li><a href="qi_industry.php">Archive</a></li>
     </ul>
   </div>
-  <a href="vanquisher.html" class="btn btn-primary btn-lg btn-block" role="button">Vanquisher</a>
-  <a href="vehement.html" class="btn btn-primary btn-lg btn-block" role="button">Vehement</a>
-  <a href="vendetta.html" class="btn btn-primary btn-lg btn-block" role="button">Vendetta</a>
-  <a href="upwell%20_palatine%20_keepstar.html" class="btn btn-primary btn-lg btn-block" role="button">Upwell Palatine Keepstar</a>
   <div class="btn-group btn-block">
     <a href="workflow.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Workflow</a>
     <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -36,6 +32,11 @@ def __dump_index(glf):
       <li><a href="qi_workflow.php">Settings</a></li>
     </ul>
   </div>
+""")
+    for ro in q_capital_settings.g_report_options:
+        glf.write('<a href="{fnm}.html" class="btn btn-primary btn-lg btn-block" role="button">{nm}</a>\n'.
+                  format(fnm=render_html.__camel_to_snake(ro['product'], True), nm=ro['product']))
+    glf.write("""
 </div>
 """)
 
