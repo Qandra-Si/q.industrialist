@@ -23,6 +23,9 @@ def __dump_index(glf):
     </ul>
   </div>
   <a href="vanquisher.html" class="btn btn-primary btn-lg btn-block" role="button">Vanquisher</a>
+  <a href="vehement.html" class="btn btn-primary btn-lg btn-block" role="button">Vehement</a>
+  <a href="vendetta.html" class="btn btn-primary btn-lg btn-block" role="button">Vendetta</a>
+  <a href="upwell%20_palatine%20_keepstar.html" class="btn btn-primary btn-lg btn-block" role="button">Upwell Palatine Keepstar</a>
   <div class="btn-group btn-block">
     <a href="workflow.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Workflow</a>
     <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

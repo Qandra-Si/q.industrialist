@@ -318,8 +318,15 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
    <h4 class="media-heading">Summary raw materials</h4>
 <p>The number of Minerals and Components is counted for <mark>all assets</mark> owned by the corporation.</p>
 """)
-    glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container <mark>{}</mark>.</p>\n'.
-              format(report_options["blueprints"][0]["name"]))  # Materials
+    str_bp_cont_names = ""
+    for bp in report_options["blueprints"]:
+        if str_bp_cont_names:
+            str_bp_cont_names = str_bp_cont_names + ', '
+        str_bp_cont_names += '<mark>' + bp['name'] + '</mark>'
+    if not str_bp_cont_names:
+        str_bp_cont_names = '<mark></mark>'
+    glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container(s) {}.</p>\n'.
+              format(str_bp_cont_names))  # Materials
     glf.write("""
 <div class="table-responsive">
  <table class="table table-condensed" style="font-size:small">
