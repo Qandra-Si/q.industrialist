@@ -738,27 +738,28 @@ def __dump_corp_conveyor(
  <!-- END: collapsable group (locations) -->
 """)
 
-    # получение списков контейнеров и станок из экземпляра контейнера
-    conveyor_entity = conveyour_entities[0]
-    stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
-    render_html.__dump_any_into_modal_header_wo_button(
-        glf,
-        conveyor_entity["stock"][0]["name"],
-        'StockAll')
-    # формируем содержимое модального диалога
-    __dump_conveyor_stock_all(
-        glf,
-        corp_industry_jobs_data,
-        corp_ass_loc_data,
-        materials_for_bps,
-        research_materials_for_bps,
-        sde_type_ids,
-        sde_market_groups,
-        stock_all_loc_ids,
-        stock_not_enough_materials)
-    # закрываем footer модального диалога
-    render_html.__dump_any_into_modal_footer(glf)
+    if conveyour_entities:
+        # получение списков контейнеров и станок из экземпляра контейнера
+        conveyor_entity = conveyour_entities[0]
+        stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
+        # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+        render_html.__dump_any_into_modal_header_wo_button(
+            glf,
+            conveyor_entity["stock"][0]["name"],
+            'StockAll')
+        # формируем содержимое модального диалога
+        __dump_conveyor_stock_all(
+            glf,
+            corp_industry_jobs_data,
+            corp_ass_loc_data,
+            materials_for_bps,
+            research_materials_for_bps,
+            sde_type_ids,
+            sde_market_groups,
+            stock_all_loc_ids,
+            stock_not_enough_materials)
+        # закрываем footer модального диалога
+        render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
 <div id="legend-block">
