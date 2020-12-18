@@ -7,7 +7,6 @@ def __is_availabe_blueprints_present(
         type_id,
         corp_bp_loc_data,
         sde_bp_materials,
-        exclude_loc_ids,
         blueprint_station_ids,
         corp_assets_tree):
     # определем type_id чертежа по известному type_id материала
@@ -20,9 +19,6 @@ def __is_availabe_blueprints_present(
     loc_ids = corp_bp_loc_data.keys()
     for loc in loc_ids:
         loc_id = int(loc)
-        # пропускаем контейнеры, их которых нельзя доставать чертежи для достройки недостающих материалов
-        if int(loc_id) in exclude_loc_ids:
-            continue
         # пропускаем прочие станции, на которых нет текущего stock-а и нет конвейеров (ищем свою станку)
         if not eve_esi_tools.is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
             continue
@@ -114,9 +110,16 @@ def __dump_blueprints_list_with_materials(
         sde_icon_ids,
         enable_copy_to_clipboard=False):
     # получение списков контейнеров и станок из экземпляра контейнера
-    stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-    exclude_loc_ids = [int(cee["id"]) for cee in conveyor_entity["exclude"]]
-    blueprint_loc_ids = conveyor_entity["containers"]
+    blueprint_loc_ids = conveyor_entity["blueprints"]
+    # пытаемся понять где находится сток... из-за особенностей реализации предудыщей версии алгоритма,
+    # сток обрабатывается динамически... следовало бы перевести поиск материалов на проверку
+    # флага same_stock_container в каждой индивидуальной коробке конвейера...
+    if 'stock' in conveyor_entity:
+        stock_all_loc_ids = [int(ces['id']) for ces in conveyor_entity['stock']]
+    elif (len(blueprint_loc_ids) == 1) and (blueprint_loc_ids[0].get('same_stock_container',False)):
+        stock_all_loc_ids = blueprint_loc_ids
+    else:
+        stock_all_loc_ids = []
     blueprint_station_ids = [conveyor_entity["station_id"]]
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
@@ -142,6 +145,9 @@ def __dump_blueprints_list_with_materials(
         if __container is None:
             continue
         loc_name = __container["name"]
+        if loc_name is None:  # обычно это означает, что нет названия контейера, тогда проверяем, что это м.б. пара станция/ангар
+            if "hangar_num" in __container:
+                loc_name = 'Hangar {}'.format(__container["hangar_num"])
         fixed_number_of_runs = __container["fixed_number_of_runs"]
         glf.write(
             ' <div class="panel panel-default">\n'
@@ -446,7 +452,6 @@ def __dump_blueprints_list_with_materials(
                             ms_type_id,
                             corp_bp_loc_data,
                             sde_bp_materials,
-                            exclude_loc_ids,
                             blueprint_station_ids,
                             corp_assets_tree)
                         # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
@@ -741,25 +746,27 @@ def __dump_corp_conveyor(
     if conveyour_entities:
         # получение списков контейнеров и станок из экземпляра контейнера
         conveyor_entity = conveyour_entities[0]
-        stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-        # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
-        render_html.__dump_any_into_modal_header_wo_button(
-            glf,
-            conveyor_entity["stock"][0]["name"],
-            'StockAll')
-        # формируем содержимое модального диалога
-        __dump_conveyor_stock_all(
-            glf,
-            corp_industry_jobs_data,
-            corp_ass_loc_data,
-            materials_for_bps,
-            research_materials_for_bps,
-            sde_type_ids,
-            sde_market_groups,
-            stock_all_loc_ids,
-            stock_not_enough_materials)
-        # закрываем footer модального диалога
-        render_html.__dump_any_into_modal_footer(glf)
+        if 'stock' in conveyor_entity:
+            stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
+            # создаём заголовок модального окна, где будем показывать список имеющихся
+            # материалов в контейнере "..stock ALL"
+            render_html.__dump_any_into_modal_header_wo_button(
+                glf,
+                conveyor_entity["stock"][0]["name"],
+                'StockAll')
+            # формируем содержимое модального диалога
+            __dump_conveyor_stock_all(
+                glf,
+                corp_industry_jobs_data,
+                corp_ass_loc_data,
+                materials_for_bps,
+                research_materials_for_bps,
+                sde_type_ids,
+                sde_market_groups,
+                stock_all_loc_ids,
+                stock_not_enough_materials)
+            # закрываем footer модального диалога
+            render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
 <div id="legend-block">
