@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "q.industrialist"
+version = "0.8.0"
+description = "Entry point of q.industrialist applications"
+authors = ["Qandra Si <https://github.com/Qandra-Si>","Aliaksandr Klimasheuski <gladiator1988@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+certifi = "==2018.8.24"
+chardet = "==3.0.4"
+ecdsa = "==0.13.3"
+future = "==0.16.0"
+idna = "==2.7"
+psycopg2 = "==2.8.6"
+pyasn1 = "==0.4.4"
+python-jose = "==3.0.1"
+pyyaml = "==5.3.1"
+requests = "==2.20.0"
+rsa = "==3.4.2"
+six = "==1.11.0"
+tzlocal = "==2.1"
+urllib3 = "==1.24.2"
+psycopg2-binary = "^2.8.6"
+
+[tool.poetry.dev-dependencies]
+pytest-pylint = "^0.18.0"
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.dephell.main]
+from = {format = "pip", path="requirements.txt"}
+to = {format = "poetry", path="pyproject.toml"}
+
+[tool.pytest]
+addopts = "--pylint"
