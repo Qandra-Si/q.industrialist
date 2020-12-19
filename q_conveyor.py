@@ -51,11 +51,14 @@ def register_conveyor_entity(
         # universe_location - сведения о местоположении локации во вселенной (сведения о станции)
         location_id,
         universe_location,
+        # blueprints_settings - сведения о том, как используются чертежи
         # stock_settings - сведения о том, гда находится сток чертежей
+        blueprints_settings,
         stock_settings,
         # esi данные, загруженные с серверов CCP
         corp_ass_names_data):
-    same_stock_container = stock_settings.get("same_stock_container", False)
+    same_stock_container = stock_settings.get('same_stock_container', False)
+    fixed_number_of_runs = blueprints_settings.get('fixed_number_of_runs', None)
     # пытаемся найти возможно уже существующий экземпляр конвейера
     station_id = universe_location["station_id"]
     conveyor_entity = next((id for id in conveyor_entities if (id["station_id"] == station_id) and (id["num"] == conveyor_entity_num)), None)
@@ -71,12 +74,15 @@ def register_conveyor_entity(
             })
         conveyor_entities.append(conveyor_entity)
     # добавляем к текущей станции контейнер с чертежами
-    # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
     container_dict = {
         "id": location_id,
-        "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None),
-        "fixed_number_of_runs": stock_settings.get("fixed_number_of_runs", None),
+        "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
     }
+    # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
+    if not (fixed_number_of_runs is None):
+        container_dict.update({
+            "fixed_number_of_runs": fixed_number_of_runs
+        })
     # сохраняем признак того, что контейнер являются стоком материалов
     if same_stock_container:
         container_dict.update({
@@ -317,6 +323,7 @@ def main():
                 conveyor_entity_num,
                 location_id,
                 loc_dict,
+                blueprints_settings,
                 materials_settings,
                 corp_ass_names_data
             )
@@ -343,8 +350,7 @@ def main():
                                 "hangar_num": stock_dict["hangar_num"]
                             })
                         conveyor_entity["stock"].append(container_stock_dict)
-
-    print("conveyor_entities:", conveyor_entities)  # TODO: debug
+    # print("conveyor_entities:", conveyor_entities)  # TODO: debug
 
     # перечисляем станции и контейнеры, которые были найдены
     print('\nFound conveyor containters and station ids...')

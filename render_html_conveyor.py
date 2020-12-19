@@ -111,32 +111,9 @@ def __dump_blueprints_list_with_materials(
         enable_copy_to_clipboard=False):
     # получение списков контейнеров и станок из экземпляра контейнера
     blueprint_loc_ids = conveyor_entity["blueprints"]
-    # пытаемся понять где находится сток... из-за особенностей реализации предудыщей версии алгоритма,
-    # сток обрабатывается динамически... следовало бы перевести поиск материалов на проверку
-    # флага same_stock_container в каждой индивидуальной коробке конвейера...
-    if 'stock' in conveyor_entity:
-        stock_all_loc_ids = [int(ces['id']) for ces in conveyor_entity['stock']]
-    elif (len(blueprint_loc_ids) == 1) and (blueprint_loc_ids[0].get('same_stock_container',False)):
-        stock_all_loc_ids = blueprint_loc_ids
-    else:
-        stock_all_loc_ids = []
     blueprint_station_ids = [conveyor_entity["station_id"]]
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
-    # формирование списка ресурсов, которые используются в производстве
-    stock_resources = {}
-    if not (stock_all_loc_ids is None):
-        for loc_id in stock_all_loc_ids:
-            loc_flags = corp_ass_loc_data.keys()
-            for loc_flag in loc_flags:
-                __a1 = corp_ass_loc_data[loc_flag]
-                if str(loc_id) in __a1:
-                    __a2 = __a1[str(loc_id)]
-                    for itm in __a2:
-                        if str(itm) in stock_resources:
-                            stock_resources[itm] = stock_resources[itm] + __a2[itm]
-                        else:
-                            stock_resources.update({itm: __a2[itm]})
 
     loc_ids = corp_bp_loc_data.keys()
     for loc in loc_ids:
@@ -148,7 +125,27 @@ def __dump_blueprints_list_with_materials(
         if loc_name is None:  # обычно это означает, что нет названия контейера, тогда проверяем, что это м.б. пара станция/ангар
             if "hangar_num" in __container:
                 loc_name = 'Hangar {}'.format(__container["hangar_num"])
-        fixed_number_of_runs = __container["fixed_number_of_runs"]
+        fixed_number_of_runs = __container.get("fixed_number_of_runs", None)
+        # пытаемся понять где находится сток, если нет элемента stock, то это м.б. same_stock_container
+        if 'stock' in conveyor_entity:
+            stock_all_loc_ids = [int(ces['id']) for ces in conveyor_entity['stock']]
+        elif __container.get('same_stock_container', False):
+            stock_all_loc_ids = [loc_id]
+        else:
+            stock_all_loc_ids = []
+        # формирование списка ресурсов, которые используются в производстве
+        stock_resources = {}
+        for salid in stock_all_loc_ids:
+            salid_flags = corp_ass_loc_data.keys()
+            for loc_flag in salid_flags:
+                __a1s = corp_ass_loc_data[loc_flag]
+                if str(salid) in __a1s:
+                    __a2s = __a1s[str(salid)]
+                    for itm in __a2s:
+                        if str(itm) in stock_resources:
+                            stock_resources[itm] = stock_resources[itm] + __a2s[itm]
+                        else:
+                            stock_resources.update({itm: __a2s[itm]})
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
