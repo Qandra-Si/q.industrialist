@@ -17,7 +17,12 @@ def get_blueprints_in_location(corp_bp_loc_data, place_id, hangar_num=None):
     else:
         # если номер ангара не указан, то это не офис... поэтому выдаём чертежи в контейнере
         # предполагая, что place_id является номером контейнера (это может быть и не так...)
-        return bp1
+        bp1_keys = bp1.keys()
+        bp1_keys_lst = list(bp1_keys)
+        if len(bp1_keys_lst) == 1:
+            return bp1[bp1_keys_lst[0]]
+        else:
+            raise Exception('Can''t locate container in different locations {}!!!'.format(place_id))
 
 
 def is_availabe_blueprints_present(
