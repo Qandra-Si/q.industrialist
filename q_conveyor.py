@@ -454,10 +454,10 @@ def main():
     for ce in conveyor_entities:
         print('  {} = {}'.format(ce["station_id"], ce["station"]))
         for cec in ce["blueprints"]:
-            print('    {} = {}'.format(cec["id"], cec["name"]))
+            print('    {} = {}'.format(cec["id"], 'Hangar {}'.format(cec["hangar_num"]) if cec["name"] is None else cec["name"]))
         if "stock" in ce:
             for ces in ce["stock"]:
-                print('    {} = {}'.format(ces["id"], ces["name"]))
+                print('    {} = {}'.format(ces["id"], 'Hangar {}'.format(ces["hangar_num"]) if ces["name"] is None else ces["name"]))
     sys.stdout.flush()
 
     print("\nBuilding report...")
