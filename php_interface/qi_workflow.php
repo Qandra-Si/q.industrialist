@@ -36,16 +36,16 @@ include_once '.settings.php';
         $cmnt = substr(strstr($fit_first_line, ','), 2, -1);
         $nm = substr(strtok($fit_first_line, ","), 1);
 ?>
-<div class="panel panel-<?=($active=='f')?'warning':'default'?>">
+<div class="panel panel-<?=($active=='f')?'warning':(($conveyor=='t')?'success':'default')?>">
  <div class="panel-heading" role="tab" id="monthjob_hd<?=$id?>">
   <h4 class="panel-title">
    <a role="button" data-toggle="collapse"
     href="#monthjob_collapse<?=$id?>" aria-expanded="true"
     aria-controls="monthjob_collapse<?=$id?>"><strong><?=$nm?></strong>&nbsp;<?=($active=='f')?'(archival copy)&nbsp;':''?><span
-    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span><?=($conveyor=='t')?'&nbsp;<span class="label label-info">conveyor</span>':''?></a>
+    class="badge" id="qind-job-q<?=$id?>"><?=$q?></span><?=($conveyor=='t')?'&nbsp;<span class="label label-info" id="qind-job-conv'.$id.'">conveyor</span>':''?></a>
   </h4>
-  <span id="qind-job-eft-cmnt<?=$id?>" class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
-  <span id="qind-job-rmrks<?=$id?>" class="text-success"><small><strong>Your remark: </strong><?=$rmrk?></small></span>
+  <span class="text-info"><small><strong>EFT comment: </strong><?=$cmnt?></small></span><br>
+  <span class="text-success"><small><strong>Your remark: </strong><span id="qind-job-rmrks<?=$id?>"><?=$rmrk?></span></small></span>
  </div>
  <div id="monthjob_collapse<?=$id?>" class="panel-collapse collapse"
   role="tabpanel" aria-labelledby="monthjob_hd<?=$id?>">
@@ -150,6 +150,11 @@ $(document).ready(function(){
       <label for="eft">EFT</label>
       <textarea class="form-control" id="eft" name="eft" rows="15" style="resize:none; font-size: 11px;" spellcheck="false"></textarea>
      </div>
+     <div class="checkbox">
+      <label>
+       <input type="checkbox" checked id="conveyor" name="conveyor"> <strong>Conveyor</strong>
+      </label>
+     </div>
      <div class="form-group">
       <label for="quantity">Quantity</label>
       <input type="number" class="form-control" id="quantity" name="quantity" min="1" max="100000">
@@ -173,6 +178,7 @@ $(document).ready(function(){
     $(this).on('click', function () {
       var job = $(this).attr('job');
       var ship = $(this).attr('ship');
+      var conv = !($("#qind-job-conv"+job).html() === undefined);
       var q = $("#qind-job-q"+job).text();
       var rmrks = $('#qind-job-rmrks'+job).text();
       var eft = $('#qind-job-eft'+job).html();
@@ -180,6 +186,7 @@ $(document).ready(function(){
       $('#modalFitLabel').html(q + 'x ' + ship);
       modal.find('textarea').html(eft);
       modal.find("input[name='remarks']").val(rmrks);
+      modal.find("input[name='conveyor']").prop("checked", conv);
       modal.find("input[name='quantity']").val(q);
       modal.find("input[name='fit']").val(job);
       modal.find("input[name='action']").val('edit');
@@ -192,6 +199,7 @@ $(document).ready(function(){
       $('#modalFitLabel').html('Scheduling new monthly job...');
       modal.find('textarea').html('');
       modal.find("input[name='remarks']").val('');
+      modal.find("input[name='conveyor']").prop("checked", false);
       modal.find("input[name='quantity']").val(1);
       modal.find("input[name='fit']").val(0);
       modal.find("input[name='action']").val('add');
@@ -203,74 +211,22 @@ $(document).ready(function(){
 <?php } ?>
 
 
-<?php function __dump_settings($settings) {
-    $id = $name = $hangars = NULL;
-    if (!is_null($settings))
-    {
-        foreach ($settings as &$row)
-        {
-            $key = $row['ms_key'];
-            $val = $row['ms_val'];
-            if ($key == 'factory:station_id')
-                $id = $val;
-            elseif ($key == 'factory:station_name')
-                $name = $val;
-            elseif ($key == 'factory:blueprints_hangars')
-                $hangars = str_replace(array('[',']'),'',$val);
-        }
-    }
-?>
+<?php function __dump_containers($containers, $station_num) { ?>
 <div class="panel panel-default">
- <div class="panel-heading" role="tab" id="settings_hd">
+ <div class="panel-heading" role="tab" id="containers_hd<?=$station_num?>">
   <h4 class="panel-title">
    <a role="button" data-toggle="collapse"
-    href="#settings_collapse" aria-expanded="true"
-    aria-controls="settings_collapse"><strong>Factory Location</strong></a>
+    href="#containers_collapse<?=$station_num?>" aria-expanded="true"
+    aria-controls="containers_collapse<?=$station_num?>"><strong>Containers #<?=$station_num?> with Blueprint Copies</strong></a>
   </h4>
  </div>
- <div id="settings_collapse" class="panel-collapse collapse"
-  role="tabpanel" aria-labelledby="settings_hd">
-  <div class="panel-body">
-
-<form action="qi_digger.php" method="post" id="frmSettings">
-  <input type="hidden" name="module" value="workflow">
-  <input type="hidden" name="action" value="settings">
-  <div class="form-group">
-    <label for="settingsId">Station (structure) Id</label>
-    <input name="id" class="form-control" id="settingsId" placeholder="64-bit number" value="<?=$id?>">
-  </div>
-  <div class="form-group">
-    <label for="settingsName">Station (structure) Name</label>
-    <input name="name" class="form-control" id="settingsName" placeholder="Name" value="<?=$name?>">
-  </div>
-  <div class="form-group">
-    <label for="settingsHangars">Hangar numbers</label>
-    <input name="hangars" class="form-control" id="settingsHangars" placeholder="Comma separated numbers" value="<?=$hangars?>">
-  </div>
-  <button type="submit" class="btn btn-primary">Save</button>
-</form>
-
-  </div>
- </div>
-</div>
-<?php } ?>
-
-
-<?php function __dump_containers($containers) { ?>
-<div class="panel panel-default">
- <div class="panel-heading" role="tab" id="containers_hd">
-  <h4 class="panel-title">
-   <a role="button" data-toggle="collapse"
-    href="#containers_collapse" aria-expanded="true"
-    aria-controls="containers_collapse"><strong>Containers with Blueprint Copies</strong></a>
-  </h4>
- </div>
- <div id="containers_collapse" class="panel-collapse collapse"
-  role="tabpanel" aria-labelledby="containers_hd">
+ <div id="containers_collapse<?=$station_num?>" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="containers_hd<?=$station_num?>">
   <div class="panel-body">
    <form action="qi_digger.php" method="post" id="frmContainers">
     <input type="hidden" name="module" value="workflow">
     <input type="hidden" name="action" value="containers">
+    <input type="hidden" name="station_num" value="<?=$station_num?>">
 <?php if (!is_null($containers)) { foreach ($containers as &$cont) { ?>
 <div class="checkbox">
  <label class="form-check-label">
@@ -287,6 +243,113 @@ $(document).ready(function(){
  </div>
 </div>
 <?php } ?>
+
+
+<?php function __dump_settings_and_containers($settings, $conn) {
+    $conveyor_boxes = NULL;
+    foreach ($settings as &$row)
+    {
+        $key = $row['ms_key'];
+        $val = $row['ms_val'];
+        if ($key == 'industry:conveyor_boxes')
+        {
+            $conveyor_boxes = str_replace(array('[',']'),'',$val);
+            break; // больше (пока) ничего не ищем
+        }
+    }
+?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="settings_hd_icb">
+  <h4 class="panel-title">
+   <a role="button" data-toggle="collapse"
+    href="#settings_collapse_icb" aria-expanded="true"
+    aria-controls="settings_collapse_icb"><strong>Industry</strong></a>
+  </h4>
+ </div>
+ <div id="settings_collapse_icb" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="settings_hd_icb">
+  <div class="panel-body">
+
+<form action="qi_digger.php" method="post">
+  <input type="hidden" name="module" value="industry">
+  <input type="hidden" name="action" value="settings">
+  <div class="form-group">
+    <label for="settingsConvBoxes">Conveyor container numbers</label>
+    <input name="conveyor_boxes" class="form-control" id="settingsConvBoxes" placeholder="Comma separated numbers" value="<?=$conveyor_boxes?>">
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+  </div>
+ </div>
+</div>
+<?php
+    if (!is_null($settings))
+    {
+        for ($station_num = 1; $station_num <= 5; ++$station_num)
+        {
+            $id = $name = $hangars = NULL;
+            foreach ($settings as &$row)
+            {
+                $key = $row['ms_key'];
+                $val = $row['ms_val'];
+                $postfix = ($station_num >= 2) ? $station_num : '';
+                if ($key == 'factory:station_id'.$postfix)
+                    $id = $val;
+                elseif ($key == 'factory:station_name'.$postfix)
+                    $name = $val;
+                elseif ($key == 'factory:blueprints_hangars'.$postfix)
+                    $hangars = str_replace(array('[',']'),'',$val);
+            }
+            if (is_null($id) && is_null($name) && is_null($hangars)) continue;
+            //---
+            $query = 'SELECT wfc_id,wfc_name,wfc_active,wfc_disabled FROM workflow_factory_containers WHERE wfc_station_num=$1 ORDER BY 4,2;';
+            $params = array($station_num);
+            $containers_cursor = pg_query_params($conn, $query, $params)
+                    or die('pg_query err: '.pg_last_error());
+            if (pg_num_rows($containers_cursor) > 0)
+                $containers = pg_fetch_all($containers_cursor);
+            else
+                $containers = NULL;
+?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="settings_hd<?=$station_num?>">
+  <h4 class="panel-title">
+   <a role="button" data-toggle="collapse"
+    href="#settings_collapse<?=$station_num?>" aria-expanded="true"
+    aria-controls="settings_collapse<?=$station_num?>"><strong>Factory #<?=$station_num?> Location</strong></a>
+  </h4>
+ </div>
+ <div id="settings_collapse<?=$station_num?>" class="panel-collapse collapse"
+  role="tabpanel" aria-labelledby="settings_hd<?=$station_num?>">
+  <div class="panel-body">
+
+<form action="qi_digger.php" method="post">
+  <input type="hidden" name="module" value="workflow">
+  <input type="hidden" name="action" value="settings">
+  <input type="hidden" name="station_num" value="<?=$station_num?>">
+  <div class="form-group">
+    <label for="settingsId">Station (structure) Id</label>
+    <input name="id" class="form-control" id="settingsId" placeholder="64-bit number" value="<?=$id?>">
+  </div>
+  <div class="form-group">
+    <label for="settingsName">Station (structure) Name</label>
+    <input name="name" class="form-control" id="settingsName" placeholder="Name" value="<?=$name?>">
+  </div>
+  <div class="form-group">
+    <label for="settingsHangars">Hangar numbers</label>
+    <input name="hangars" class="form-control" id="settingsHangars" placeholder="Comma separated numbers" value="<?=$hangars?>">
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+   <?php __dump_containers($containers, $station_num); ?>
+  </div>
+ </div>
+</div>
+<?php
+        }
+    }
+}
+?>
 
 
 <?php
@@ -309,16 +372,6 @@ $(document).ready(function(){
         $settings = pg_fetch_all($settings_cursor);
     else
         $settings = NULL;
-    //---
-    $query = 'SELECT wfc_id,wfc_name,wfc_active,wfc_disabled FROM workflow_factory_containers ORDER BY 4,2;';
-    $containers_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
-    if (pg_num_rows($containers_cursor) > 0)
-        $containers = pg_fetch_all($containers_cursor);
-    else
-        $containers = NULL;
-    //---
-    pg_close($conn);
 ?>
 <div class="container-fluid">
  <div class="row">
@@ -328,9 +381,12 @@ $(document).ready(function(){
   </div>
   <div class="col-md-6">
    <h3>Settings</h3>
-   <?php __dump_settings($settings); ?>
-   <?php __dump_containers($containers); ?>
+   <?php __dump_settings_and_containers($settings, $conn); ?>
   </div>
  </div> <!--row-->
 </div> <!--container-fluid-->
-<?php __dump_footer(); ?>
+<?php
+    pg_close($conn);
+    //---
+    __dump_footer();
+?>

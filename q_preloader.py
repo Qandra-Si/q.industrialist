@@ -94,10 +94,20 @@ def main():
             various_characters_data.append({str(corporation_id): character_data})
 
             if eve_market_prices_data is None:
-                # Public information about market prices
-                eve_market_prices_data = interface.get_esi_data("markets/prices/")
-                print("EVE market has {} prices\n".format(len(eve_market_prices_data)))
-                sys.stdout.flush()
+                try:
+                    # Public information about market prices
+                    eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                    print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                    sys.stdout.flush()
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                        eve_market_prices_data = []
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
 
             # Requires role(s): Accountant, Junior_Accountant
             corp_wallets_data = interface.get_esi_paged_data(
@@ -109,10 +119,20 @@ def main():
             corp_wallet_journal_data = [None, None, None, None, None, None, None]
             for w in corp_wallets_data:
                 division = w["division"]
-                corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
-                    "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
-                print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
-                sys.stdout.flush()
+                try:
+                    corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
+                        "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
+                    print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
+                    sys.stdout.flush()
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.11.26 поломался доступ к журналу кошелька (ССР-шники "внесли правки")
+                        corp_wallet_journal_data[division-1] = None
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
 
             # Requires one of the following EVE corporation role(s): Director
             corp_divisions_data = interface.get_esi_data(

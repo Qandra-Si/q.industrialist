@@ -164,6 +164,7 @@ def main():
     # Поиск контейнеров, которые участвуют в производстве
     conveyour_entities = []
     for __manuf_dict in enumerate(q_conveyor_settings.g_manufacturing):
+        __manuf_dict_num = __manuf_dict[0]
         # находим контейнеры по заданным названиям
         blueprint_loc_ids = []
         for tmplt in __manuf_dict[1]["conveyor_container_names"]:
@@ -184,10 +185,10 @@ def main():
             if not ("station_id" in __loc_dict):
                 continue
             __station_id = __loc_dict["station_id"]
-            __conveyor_entity = next((id for id in conveyour_entities if id["station_id"] == __station_id), None)
+            __conveyor_entity = next((id for id in conveyour_entities if (id["station_id"] == __station_id) and (id["num"] == __manuf_dict_num)), None)
             if __conveyor_entity is None:
                 __conveyor_entity = __loc_dict
-                __conveyor_entity.update({"containers": [], "stock": [], "exclude": []})
+                __conveyor_entity.update({"containers": [], "stock": [], "exclude": [], "num": __manuf_dict_num})
                 conveyour_entities.append(__conveyor_entity)
                 # на этой же станции находим контейнер со стоком материалов
                 if same_stock_container:

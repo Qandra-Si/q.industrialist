@@ -31,6 +31,7 @@ import re
 import eve_esi_interface as esi
 
 import q_industrialist_settings
+import q_capital_settings
 import eve_esi_tools
 import eve_sde_tools
 import console_app
@@ -84,9 +85,20 @@ def main():
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
     # Public information about market prices
-    eve_market_prices_data = interface.get_esi_data("markets/prices/")
-    print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-    sys.stdout.flush()
+    try:
+        # Public information about market prices
+        eve_market_prices_data = interface.get_esi_data("markets/prices/")
+        print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+        sys.stdout.flush()
+    except requests.exceptions.HTTPError as err:
+        status_code = err.response.status_code
+        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+            eve_market_prices_data = []
+        else:
+            raise
+    except:
+        print(sys.exc_info())
+        raise
 
     # Requires role(s): Director
     corp_assets_data = interface.get_esi_paged_data(
@@ -150,39 +162,40 @@ def main():
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
 
     # находим контейнеры по заданным названиям
-    report_options = {
-        "product": "Vanquisher",
-        "blueprints": []  # контейнеры, в которых находятся БПО и БПЦ для постройки корабля
-    }
-    containers = []
-    for tmplt in [r"^\.VANQUISHER$"]:
-        containers.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
-        for id in containers:
-            report_options["blueprints"].append({"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
+    for ro in q_capital_settings.g_report_options:
+        containers = []
+        if "bp_cont_templates" in ro:
+            for tmplt in ro["bp_cont_templates"]:
+                containers.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
+                for id in containers:
+                    ro["blueprints"].append(
+                        {"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
 
         # перечисляем станции и контейнеры, которые были найдены
-    print('\nFound report containters and station ids for {}...'.format(report_options["product"]))
-    for bpl in report_options["blueprints"]:
-        print('  {} = {}'.format(bpl["id"], bpl["name"]))
+        print('\nFound report containters and station ids for {}...'.format(ro["product"]))
+        for bpl in ro["blueprints"]:
+            print('  {} = {}'.format(bpl["id"], bpl["name"]))
+        for bpl in ro["stock"]:
+            print('  {} = {}'.format(bpl["id"], bpl.get("name", bpl.get("flag"))))
 
-    print("\nBuilding report...")
-    sys.stdout.flush()
+        print("\nBuilding report...")
+        sys.stdout.flush()
 
-    render_html_capital.dump_capital_into_report(
-        # путь, где будет сохранён отчёт
-        argv_prms["workspace_cache_files_dir"],
-        # настройки генерации отчёта
-        report_options,
-        # sde данные, загруженные из .converted_xxx.json файлов
-        sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
-        sde_icon_ids,
-        # esi данные, загруженные с серверов CCP
-        corp_assets_data,
-        corp_industry_jobs_data,
-        corp_blueprints_data,
-        eve_market_prices_data)
+        render_html_capital.dump_capital_into_report(
+            # путь, где будет сохранён отчёт
+            argv_prms["workspace_cache_files_dir"],
+            # настройки генерации отчёта
+            ro,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            sde_icon_ids,
+            # esi данные, загруженные с серверов CCP
+            corp_assets_data,
+            corp_industry_jobs_data,
+            corp_blueprints_data,
+            eve_market_prices_data)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")

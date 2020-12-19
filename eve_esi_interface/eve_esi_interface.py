@@ -195,9 +195,17 @@ class EveOnlineInterface:
         cached_data = self.__take_cache_from_file(url)
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # аналогично методу get_esi_data, хотя вроде в этом методе HttpError-ы не ожидаются?!
-            if not ("Http-Error" in cached_data["headers"]):
+            if not ("Http-Error" in cached_data["headers"][0]):
                 return cached_data["json"] if "json" in cached_data else None
         if self.__offline_mode:
+            if cached_data is None:
+                return None
+            # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
+            if "Http-Error" in cached_data["headers"][0]:
+                code = int(cached_data["headers"][0]["Http-Error"])
+                self.__esi_raise_for_status(
+                    code,
+                    '{} Client Error: Offline-cache for url: {}'.format(code, url))
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             return cached_data["json"] if "json" in cached_data else None
         else:
@@ -235,7 +243,17 @@ class EveOnlineInterface:
                 #   200 corporations/98615601/contracts/?page=1 14:10:23 "3f60dac1..."
                 #   304 corporations/98615601/contracts/?page=2 14:10:23 "fb294fda..." (из кеша)
                 # в этом случае, если уже встречались 200-коды, то etag не отправляем
-                page_data = self.__client.send_esi_request_http(data_path, etag)
+                try:
+                    page_data = self.__client.send_esi_request_http(data_path, etag)
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # это нормально, CCP используют 404-ответ для индикации "нет данных" ingame-доступа
+                        if 1 == page:
+                            # сохраняем информацию в кеше и выходим с тем же кодом ошибки
+                            self.__dump_cache_into_file(url, [{"Http-Error": 404}], None)
+                        raise
+                except:
+                    raise
                 if page_data.status_code == 304:
                     # ускоренный вывод данных из этого метода - если находимся в цикле загрузке данных с сервера
                     # и при первом же обращении к первой же странице совпал etag, следовательно весь набор актуален

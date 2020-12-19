@@ -19,6 +19,8 @@ def __dump_corp_capital(
         eve_market_prices_data):
     product_name = report_options["product"]
     blueprint_containter_ids = [c["id"] for c in report_options["blueprints"]]
+    stock_containter_ids = [c['id'] for c in report_options["stock"]]
+    stock_containter_flag_ids = [{'id': c['id'], 'flag': c['flag']} for c in report_options['stock'] if 'flag' in c]
     enable_copy_to_clipboard = True
 
     __type_id = eve_sde_tools.get_type_id_by_item_name(sde_type_ids, product_name)
@@ -184,6 +186,13 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         # подсчёт кол-ва имеющихся в наличии материалов
         bpmm1_available = 0
         for a in corp_assets_data:
+            __location_id = int(a["location_id"])
+            if not (__location_id in stock_containter_ids):
+                continue
+            __stock_flag_dict = next((c for c in stock_containter_flag_ids if c['id'] == __location_id), None)
+            if not (__stock_flag_dict is None):
+                if not (__stock_flag_dict['flag'] == a['location_flag']):
+                    continue
             __type_id = int(a["type_id"])
             if bpmm1_tid != __type_id:
                 continue
@@ -242,7 +251,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             materials_summary.append({"id": bpmm1_blueprint_type_id,
                                       "q": bpmm1_efficiency,
                                       "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
-                                      "b": bpmm1_blueprints})
+                                      "b": bpmm1_blueprints,
+                                      "ajp": bpmm1_in_progress + bpmm1_available})
             # вывод списка материалов для постройки по чертежу
             for m2 in bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"]:
                 row2_num = row2_num + 1
@@ -252,16 +262,18 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 bpmm2_efficiency = bpmm2_quantity * bpmm1_efficiency  # поправка на эффективность материалов
                 bpmm2_not_enough = bpmm2_quantity * bpmm1_not_enough
                 bpmm2_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
-                if not bpmm2_is_reaction_formula:
-                    # TODO: хардкодим тут me, которая пока что одинакова на всех БПО и БПЦ в коллекции
-                    material_efficiency = 10
-                    # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-                    # см. 1 x run: http://prntscr.com/u0g07w
-                    # см. 4 x run: http://prntscr.com/u0g0cd
-                    # см. экономия материалов: http://prntscr.com/u0g11u
-                    __me = float(100 - material_efficiency - 1 - 4.2)
-                    bpmm2_efficiency = int(float((bpmm2_efficiency * __me) / 100) + 0.99999)
-                    bpmm2_not_enough = int(float((bpmm2_not_enough * __me) / 100) + 0.99999)
+                # берём из настроек me=??, которая подразумевается одинаковой на всех БПО и БПЦ в коллекции
+                material_efficiency = report_options["missing_blueprints"]["material_efficiency"]
+                bpmm2_efficiency = eve_sde_tools.get_industry_material_efficiency(
+                    bpmm2_is_reaction_formula,
+                    1,
+                    bpmm2_efficiency,
+                    material_efficiency)
+                bpmm2_not_enough = eve_sde_tools.get_industry_material_efficiency(
+                    bpmm2_is_reaction_formula,
+                    1,
+                    bpmm2_not_enough,
+                    material_efficiency)
                 # вывод наименования ресурса
                 glf.write(
                     '<tr>\n'
@@ -307,8 +319,15 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
    <h4 class="media-heading">Summary raw materials</h4>
 <p>The number of Minerals and Components is counted for <mark>all assets</mark> owned by the corporation.</p>
 """)
-    glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container <mark>{}</mark>.</p>\n'.
-              format(report_options["blueprints"][0]["name"]))  # Materials
+    str_bp_cont_names = ""
+    for bp in report_options["blueprints"]:
+        if str_bp_cont_names:
+            str_bp_cont_names = str_bp_cont_names + ', '
+        str_bp_cont_names += '<mark>' + bp['name'] + '</mark>'
+    if not str_bp_cont_names:
+        str_bp_cont_names = '<mark></mark>'
+    glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container(s) {}.</p>\n'.
+              format(str_bp_cont_names))  # Materials
     glf.write("""
 <div class="table-responsive">
  <table class="table table-condensed" style="font-size:small">
@@ -320,8 +339,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
   <th>Need<br/>(Efficiency)</th>
   <th>Progress, %</th>
   <th style="text-align:right;">Price per<br/>Unit, ISK</th>
-  <th style="text-align:right;">Sum, ISK</th>
-  <th style="text-align:right;">Volume, m&sup3;</th>
+  <th style="text-align:right;">Sum,&nbsp;ISK</th>
+  <th style="text-align:right;">Volume,&nbsp;m&sup3;</th>
  </tr>
 </thead>
 <tbody>
@@ -334,6 +353,13 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # подсчёт кол-ва имеющихся в наличии материалов
     materials_summary_without_a = [int(ms["id"]) for ms in materials_summary if not ("a" in ms)]
     for a in corp_assets_data:
+        __location_id = int(a["location_id"])
+        if not (__location_id in stock_containter_ids):
+            continue
+        __stock_flag_dict = next((c for c in stock_containter_flag_ids if c['id'] == __location_id), None)
+        if not (__stock_flag_dict is None):
+            if not (__stock_flag_dict['flag'] == a['location_flag']):
+                continue
         __type_id = int(a["type_id"])
         if __type_id in materials_summary_without_a:
             __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
@@ -365,9 +391,14 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         __assets = __summary_dict["a"] if "a" in __summary_dict else 0
         __blueprints = __summary_dict["b"] if "b" in __summary_dict else []
         __in_progress = __summary_dict["j"] if "j" in __summary_dict else 0
+        __products_available_and_in_progress = __summary_dict.get("ajp", 0)
         __type_id = __summary_dict["id"]
         __item_name = __summary_dict["nm"]
-        #---
+        # ---
+        __quantity -= __products_available_and_in_progress
+        if __quantity < 0:
+            __quantity = 0
+        # ---
         __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
         __material_dict = {
             "id": __type_id,
@@ -509,8 +540,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             glf.write('<tr style="font-weight:bold">'
                       ' <th></th>'
                       ' <td colspan="4">Summary&nbsp;(<small>{nm}</small>)</td>'
-                      ' <td colspan="2" align="right">{cost:,.1f} ISK</td>'
-                      ' <td align="right">{volume:,.1f} m&sup3;</td>'
+                      ' <td colspan="2" align="right">{cost:,.1f}&nbsp;ISK</td>'
+                      ' <td align="right">{volume:,.1f}&nbsp;m&sup3;</td>'
                       '</tr>\n'.
                       format(nm=__group_name,
                              cost=__summary_cost,
@@ -600,7 +631,7 @@ def dump_capital_into_report(
         corp_blueprints_data,
         eve_market_prices_data):
     product_name = report_options["product"]
-    glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=render_html.__camel_to_snake(product_name)), "wt+", encoding='utf8')
+    glf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=render_html.__camel_to_snake(product_name, True)), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, product_name)
         __dump_corp_capital(

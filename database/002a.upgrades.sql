@@ -34,3 +34,9 @@ SELECT DISTINCT
  (SELECT sdei_number FROM eve_sde_integers WHERE sdei_id=wij_bp_tid AND sdei_category=6) AS iq,
  (SELECT sdei_number FROM eve_sde_integers WHERE sdei_id=wij_bp_tid AND sdei_category=7) AS rq
 FROM workflow_industry_jobs;
+
+insert into qi.modules_settings(ms_module,ms_key,ms_val) values(1000, 'factory:blueprints_hangars2', '[6,7]');
+insert into qi.modules_settings(ms_module,ms_key,ms_val) values(1000, 'factory:station_id2', '1032809060173');
+insert into qi.modules_settings(ms_module,ms_key,ms_val) values(1000, 'factory:station_name2', 'JK-Q77 - Copy & Invent (t1 rigs)');
+
+ALTER TABLE qi.workflow_factory_containers ADD COLUMN wfc_station_num integer NOT NULL DEFAULT 1;

@@ -118,8 +118,18 @@ def __build_blueprints(
                 __blueprint.update({
                     "st": __job_dict["status"],
                     "act": __job_dict["activity_id"],
-                    "loc": __location_id  # переопределяем!!!
+                    "loc": __location_id,  # переопределяем!!!
+                    "out": __job_dict["output_location_id"],
                 })
+                # осуществляем поиск местоположения чертежа
+                __push_location_into_blueprints_locations(
+                    __job_dict["output_location_id"],
+                    blueprints_locations,
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_assets_tree,
+                    corp_ass_names_data,
+                    foreign_structures_data)
         # выясняем стоимость чертежа
         if "basePrice" in __type_desc:
             __blueprint.update({"base_price": __type_desc["basePrice"]})
@@ -254,10 +264,20 @@ def main():
         various_characters_data.append({str(corporation_id): character_data})
 
         if eve_market_prices_data is None:
-            # Public information about market prices
-            eve_market_prices_data = interface.get_esi_data("markets/prices/")
-            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-            sys.stdout.flush()
+            try:
+                # Public information about market prices
+                eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                    eve_market_prices_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
 
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(

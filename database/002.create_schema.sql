@@ -105,7 +105,7 @@ CREATE TABLE qi.workflow_monthly_jobs
     wmj_quantity INTEGER NOT NULL, -- кол-во кораблей (фитов) запланированных для ежемесячного производства
     wmj_eft CHARACTER VARYING(16383), -- 16 Кб для текстового представления фита (очень много всего в карго?)
     wmj_remarks CHARACTER VARYING(127), -- дополнительная информация
-    wmj_conveyor NOT NULL DEFAULT FALSE, -- признак того, что список модулей предназначаен для производства на конвейере
+    wmj_conveyor BOOLEAN NOT NULL DEFAULT FALSE, -- признак того, что список модулей предназначаен для производства на конвейере
     CONSTRAINT pk_wmj PRIMARY KEY (wmj_id)
 )
 TABLESPACE pg_default;
@@ -128,6 +128,7 @@ CREATE TABLE qi.workflow_factory_containers
     wfc_name CHARACTER VARYING(63), -- наименование контейнера (может устаревать, нужен для сигнализации)
     wfc_active BOOLEAN NOT NULL DEFAULT TRUE, -- признак использования контейнера (отключенные нужны для наблюдения содержимого заданных ангаров)
     wfc_disabled BOOLEAN NOT NULL DEFAULT FALSE, -- признак отсутствия контейнера в ангаре (был перемещён, и актуализирован как "сейчас отсутствует")
+    wfc_station_num INTEGER NOT NULL DEFAULT 1, -- номер станции (т.е. группы настроек factory:station_id2, factory:station_id3,...)
     CONSTRAINT pk_wfc PRIMARY KEY (wfc_id)
 )
 TABLESPACE pg_default;
