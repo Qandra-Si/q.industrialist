@@ -149,20 +149,29 @@ def __dump_blueprints_list_with_materials(
                 loc_name = 'Hangar {}'.format(blueprints_hangar_num)
         fixed_number_of_runs = __container.get("fixed_number_of_runs", None)
         # пытаемся понять где находится сток, если нет элемента stock, то это м.б. same_stock_container
-        if 'stock' in conveyor_entity:
-            stock_all_loc_ids = [int(ces['id']) for ces in conveyor_entity['stock']]
-        elif __container.get('same_stock_container', False):
-            stock_all_loc_ids = [loc_id]
-        else:
+        if __container.get('same_stock_container', False):
+            stock_all_loc_ids = [{
+                'place_id': loc_id,
+                'hangar_num': blueprints_hangar_num
+            }]
+        elif not ('stock' in conveyor_entity):
             stock_all_loc_ids = []
+        elif 'stock' in conveyor_entity:
+            stock_all_loc_ids = [{
+                'place_id': int(ces['id']),
+                'hangar_num': ces.get('hangar_num', None)
+            } for ces in conveyor_entity['stock']]
         # формирование списка ресурсов, которые используются в производстве
         stock_resources = {}
-        for salid in stock_all_loc_ids:
-            salid_flags = corp_ass_loc_data.keys()
-            for loc_flag in salid_flags:
+        for stock_place in stock_all_loc_ids:
+            corp_ass_loc_flags = corp_ass_loc_data.keys()
+            for loc_flag in corp_ass_loc_flags:
+                if not (stock_place['hangar_num'] is None) and eve_esi_tools.is_location_flag_hangar(loc_flag):
+                    if stock_place['hangar_num'] != eve_esi_tools.get_hangar_number(loc_flag):
+                        continue
                 __a1s = corp_ass_loc_data[loc_flag]
-                if str(salid) in __a1s:
-                    __a2s = __a1s[str(salid)]
+                if str(stock_place['place_id']) in __a1s:
+                    __a2s = __a1s[str(stock_place['place_id'])]
                     for itm in __a2s:
                         if str(itm) in stock_resources:
                             stock_resources[itm] = stock_resources[itm] + __a2s[itm]
