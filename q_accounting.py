@@ -174,8 +174,7 @@ def __build_accounting_nested(
     __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
     # номер ангара добывается на первом и сохраняется на всех последующих уровнях вложенности
     if top_level_hangar is None:
-        if __item_dict["location_flag"][:-1] == "CorpSAG":
-            top_level_hangar = int(__item_dict["location_flag"][-1:])
+        top_level_hangar = eve_esi_tools.is_location_flag_hangar(__item_dict["location_flag"])
     if not (__group_id is None):
         # если в процессе обработки иерархии находится корабль (с патронами, дронами,...) то создаём
         # новую виртуальную вложенность 

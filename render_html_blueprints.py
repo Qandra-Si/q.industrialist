@@ -1,4 +1,5 @@
-﻿import render_html
+﻿import eve_esi_tools
+import render_html
 import q_blueprints_settings
 
 
@@ -37,8 +38,8 @@ def __dump_corp_blueprints_sales(
                         continue
                 __blueprint_id = __blueprint_dict["item_id"]
                 __place = __blueprint_dict["flag"]
-                if __place[:-1] == "CorpSAG":
-                    __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+                if eve_esi_tools.is_location_flag_hangar(__place):
+                    __place = 'Hangar {}'.format(eve_esi_tools.get_hangar_number(__place))  # Corp Security Access Group
                 # добавляем в список обнаруженных мест, локацию с ангарами (исключая локации только с контрактами)
                 if __used_name is None:
                     __used_name = {"name": __location_name, "places": [__place], "ids": [], "types": []}
@@ -116,8 +117,8 @@ def __dump_corp_blueprints_sales(
                 if not __blueprint_dict["item_id"] in __used_name["ids"]:
                     continue
                 __place = __blueprint_dict["flag"]
-                if __place[:-1] == "CorpSAG":
-                    __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+                if eve_esi_tools.is_location_flag_hangar(__place):
+                    __place = 'Hangar {}'.format(eve_esi_tools.get_hangar_number(__place))  # Corp Security Access Group
                 __me = __blueprint_dict["me"]
                 __te = __blueprint_dict["te"]
                 __type_id = __blueprint_dict["type_id"]
@@ -456,8 +457,8 @@ tr.qind-bp-row {
                     __location_box = __loc_dict["name"]
             # определяем ангар и коробку, где лежит чертёж
             __place = __blueprint_dict["flag"]
-            if __place[:-1] == "CorpSAG":
-                __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+            if eve_esi_tools.is_location_flag_hangar(__place):
+                __place = 'Hangar {}'.format(eve_esi_tools.get_hangar_number(__place))  # Corp Security Access Group
             # определяем выход готовой продукции
             __output_location_id = __blueprint_dict.get("out", None)
             __output_location_box = __blueprint_dict.get("out", "")

@@ -3,7 +3,24 @@ import eve_sde_tools
 import eve_esi_tools
 
 
-def __is_availabe_blueprints_present(
+def get_blueprints_in_location(corp_bp_loc_data, place_id, hangar_num=None):
+    # поиск контейнера (офиса) по указанному id
+    bp1 = corp_bp_loc_data.get(str(place_id), None)
+    if bp1 is None:
+        return []
+    if not (hangar_num is None):
+        # если указан номер ангара, то пытаемся найти чертежи в указанном ангаре
+        bp2 = bp1.get("CorpSAG{}".format(hangar_num), None)
+        if bp1 is None:
+            return []
+        return bp2
+    else:
+        # если номер ангара не указан, то это не офис... поэтому выдаём чертежи в контейнере
+        # предполагая, что place_id является номером контейнера (это может быть и не так...)
+        return bp1
+
+
+def is_availabe_blueprints_present(
         type_id,
         corp_bp_loc_data,
         sde_bp_materials,
@@ -23,24 +40,27 @@ def __is_availabe_blueprints_present(
         if not eve_esi_tools.is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
             continue
         # проверяем состояния чертежей
-        __bp2 = corp_bp_loc_data[str(loc)]
-        __bp2_keys = __bp2.keys()
-        for __blueprint_type_id in __bp2_keys:
-            if int(__blueprint_type_id) != int(blueprint_type_id):
-                continue
-            bp_keys = __bp2[__blueprint_type_id].keys()
-            for bpk in bp_keys:
-                bp = __bp2[__blueprint_type_id][bpk]
-                if not (bp["st"] is None):  # пропускаем чертежи, по которым ведётся работы
+        bp2 = corp_bp_loc_data[str(loc)]
+        bp2_keys = bp2.keys()
+        for location_flag in bp2_keys:
+            bp3 = bp2[location_flag]
+            bp3_keys = bp3.keys()
+            for __blueprint_type_id in bp3_keys:
+                if int(__blueprint_type_id) != int(blueprint_type_id):
                     continue
-                if bp["cp"]:
-                    vacant_copies = True
-                else:
-                    vacant_originals = True
+                bp_keys = bp3[__blueprint_type_id].keys()
+                for bpk in bp_keys:
+                    bp = bp3[__blueprint_type_id][bpk]
+                    if not (bp["st"] is None):  # пропускаем чертежи, по которым ведётся работы
+                        continue
+                    if bp["cp"]:
+                        vacant_copies = True
+                    else:
+                        vacant_originals = True
+                    if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
+                        break
                 if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
                     break
-            if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
-                break
         if not (vacant_copies is None) and vacant_copies and not (vacant_originals is None) and vacant_originals:
             break
     if vacant_copies is None:
@@ -122,9 +142,11 @@ def __dump_blueprints_list_with_materials(
         if __container is None:
             continue
         loc_name = __container["name"]
-        if loc_name is None:  # обычно это означает, что нет названия контейера, тогда проверяем, что это м.б. пара станция/ангар
-            if "hangar_num" in __container:
-                loc_name = 'Hangar {}'.format(__container["hangar_num"])
+        blueprints_hangar_num = __container.get('hangar_num', None)
+        if loc_name is None:
+            # обычно это означает, что нет названия контейера, тогда проверяем, что это м.б. пара станция/ангар
+            if not (blueprints_hangar_num is None):
+                loc_name = 'Hangar {}'.format(blueprints_hangar_num)
         fixed_number_of_runs = __container.get("fixed_number_of_runs", None)
         # пытаемся понять где находится сток, если нет элемента stock, то это м.б. same_stock_container
         if 'stock' in conveyor_entity:
@@ -146,6 +168,19 @@ def __dump_blueprints_list_with_materials(
                             stock_resources[itm] = stock_resources[itm] + __a2s[itm]
                         else:
                             stock_resources.update({itm: __a2s[itm]})
+        # формирование списка чертежей с учётом либо выбранного ангара, либо всех ангаров
+        if not (blueprints_hangar_num is None):
+            __bp2 = get_blueprints_in_location(corp_bp_loc_data, loc_id, hangar_num=blueprints_hangar_num)
+        else:
+            __bp2 = get_blueprints_in_location(corp_bp_loc_data, loc_id)
+        if not __bp2:
+            continue
+        __type_keys = __bp2.keys()
+        # сортировка чертежей по их названиям
+        type_keys = []
+        for type_id in __type_keys:
+            type_keys.append({"id": int(type_id), "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, int(type_id))})
+        type_keys.sort(key=lambda bp: bp["name"])
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
@@ -162,13 +197,6 @@ def __dump_blueprints_list_with_materials(
                 nm=loc_name
             )
         )
-        __bp2 = corp_bp_loc_data[str(loc_id)]
-        __type_keys = __bp2.keys()
-        # сортировка чертежей по их названиям
-        type_keys = []
-        for type_id in __type_keys:
-            type_keys.append({"id": int(type_id), "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, int(type_id))})
-        type_keys.sort(key=lambda bp: bp["name"])
         # инициализация скрытой таблицы, которая предназначена для сортировки чертежей по различным критериям
         glf.write("""
 <div class="table-responsive">
@@ -445,7 +473,7 @@ def __dump_blueprints_list_with_materials(
                         if not (__bp_dict is None):
                             in_progress *= __bp_dict["activities"]["manufacturing"]["products"][0]["quantity"]
                         # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
-                        vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
+                        vacant_originals, vacant_copies, not_a_product = is_availabe_blueprints_present(
                             ms_type_id,
                             corp_bp_loc_data,
                             sde_bp_materials,

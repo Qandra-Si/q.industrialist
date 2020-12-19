@@ -2,105 +2,21 @@
 from pathlib import Path
 
 
-def __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
+def get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id):
     for bp in corp_industry_jobs_data:
         if blueprint_id == bp["blueprint_id"]:
             return bp["status"]
     return None
 
 
-def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
-    """
-    Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
-    """
-    corp_bp_loc_data = {}
-    for bp in corp_blueprints_data:
-        loc_id = int(bp["location_id"])
-        blueprint_id = int(bp["item_id"])
-        # особенность : чертежи могут отсутствовать в assets по указанному location_id, при этом чертёж будет в
-        # blueprints, но его location_id будет указывать на станцию, а не на контейнер, в то же время в industrial
-        # jobs этот же самый чертёж будет находиться в списке и иметь blueprint_location_id который указывает на
-        # искомый контейнер
-        __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(blueprint_id)), None)
-        if not (__job_dict is None):
-            loc_id = __job_dict["blueprint_location_id"]
-        # { "1033160348166": {} }
-        if not (str(loc_id) in corp_bp_loc_data):
-            corp_bp_loc_data.update({str(loc_id): {}})
-        __bp2 = corp_bp_loc_data[str(loc_id)]
-        # { "1033160348166": { "30014": {} } }
-        type_id = int(bp["type_id"])
-        if not (type_id in __bp2):
-            __bp2.update({type_id: {}})
-        # { "1033160348166": { "30014": { "o_10_20": {} } } }
-        quantity = int(bp["quantity"])
-        is_blueprint_copy = quantity < -1
-        bp_type = 'c' if is_blueprint_copy else 'o'
-        material_efficiency = int(bp["material_efficiency"])
-        time_efficiency = int(bp["time_efficiency"])
-        bp_status = __get_blueprint_progress_status(corp_industry_jobs_data, blueprint_id)
-        bp_key = '{bpt}_{me}_{te}_{st}'.format(
-            bpt=bp_type,
-            me=material_efficiency,
-            te=time_efficiency,
-            st="" if bp_status is None else bp_status[:2])
-        runs = int(bp["runs"])
-        quantity_or_runs = runs if is_blueprint_copy else quantity if quantity > 0 else 1
-        # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [] } } } }
-        if not (bp_key in __bp2[type_id]):
-            __bp2[type_id].update({bp_key: {
-                "cp": is_blueprint_copy,
-                "me": material_efficiency,
-                "te": time_efficiency,
-                "qr": quantity_or_runs,
-                "st": bp_status,
-                "itm": []
-            }})
-        else:
-            __bp2[type_id][bp_key]["qr"] = __bp2[type_id][bp_key]["qr"] + quantity_or_runs
-        # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } }
-        __itm_dict = {
-            "id": blueprint_id,
-            "q": quantity,
-            "r": runs
-        }
-        if not (__job_dict is None):
-            __itm_dict.update({"jc": __job_dict["cost"]})
-        __bp2[type_id][bp_key]["itm"].append(__itm_dict)
-    return corp_bp_loc_data
+def is_location_flag_hangar(location_flag):
+    return location_flag[:-1] == "CorpSAG"
 
 
-def get_corp_ass_loc_data(corp_assets_data, containers_filter=None):
-    """
-    Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
-    которые предназначены для использования в чертежах
-    """
-    corp_ass_loc_data = {}
-    for a in corp_assets_data:
-        type_id = int(a["type_id"])
-        # if materials_for_bps.count(type_id) > 0:
-        loc_flag = str(a["location_flag"])
-        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
-            continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
-        loc_id = int(a["location_id"])
-        if not (containers_filter is None):
-            if not (loc_id in containers_filter):
-                continue  # пропускаем все контейнеры, кроме тех, откуда ведётся производство
-        quantity = int(a["quantity"])
-        # { "CorpSAG6": {} }
-        if not (str(loc_flag) in corp_ass_loc_data):
-            corp_ass_loc_data.update({str(loc_flag): {}})
-        __a1 = corp_ass_loc_data[str(loc_flag)]
-        # { "CorpSAG6": {"1033692665735": {} } }
-        if not (str(loc_id) in __a1):
-            __a1.update({str(loc_id): {}})
-        __a2 = __a1[str(loc_id)]
-        # { "CorpSAG6": {"1033692665735": { "2488": <quantity> } } }
-        if not (type_id in __a2):
-            __a2.update({type_id: quantity})
-        else:
-            __a2[type_id] = quantity + __a2[type_id]
-    return corp_ass_loc_data
+def get_hangar_number(location_flag):
+    if is_location_flag_hangar(location_flag):
+        return int(location_flag[-1:])
+    return None
 
 
 def get_assets_named_ids(corp_assets_data):
@@ -109,7 +25,7 @@ def get_assets_named_ids(corp_assets_data):
         if not a["is_singleton"]:
             continue  # пропускаем экземпляры контейнеров, сложенные в стопки (у них нет уник. id и названий тоже не будет)
         loc_flag = str(a["location_flag"])
-        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
+        if not (is_location_flag_hangar(loc_flag)) and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
         if a["type_id"] in [17363,   # Small Audit Log Secure Container
                             17364,   # Medium Audit Log Secure Container
@@ -219,7 +135,7 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
         location_id = int(a[1]["location_id"])
         location_flag = a[1]["location_flag"]
         type_id = int(a[1]["type_id"])
-        if virtual_hierarchy_by_corpsag and (location_flag[:-1] == "CorpSAG"):
+        if virtual_hierarchy_by_corpsag and is_location_flag_hangar(location_flag):
             corpsag_root = '{}_{}'.format(location_id, location_flag)
             virt_root = str(location_id)
             if (corpsag_root in ass_tree) and ("items" in ass_tree[corpsag_root]):
@@ -259,7 +175,7 @@ def get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, vi
         location_id = str(a[1]["location_id"])
         if virtual_hierarchy_by_corpsag:
             location_flag = a[1]["location_flag"]
-            virt_root = '{}_{}'.format(location_id, location_flag) if location_flag[:-1] == "CorpSAG" else location_id
+            virt_root = '{}_{}'.format(location_id, location_flag) if is_location_flag_hangar(location_flag) else location_id
         else:
             virt_root = location_id
         if item_id in ass_tree:
@@ -346,8 +262,8 @@ def get_assets_location_name(
                     region_id = constellation_item["locationID"]
                     region_name = sde_inv_names[str(region_id)]
     else:
-        if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":
-            loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])
+        if not loc_is_not_virtual and (location_id[:-1])[-7:] == "CorpSAG":  # ???_CorpSAG1
+            loc_name = 'Corp Security Access Group {}'.format(location_id[-1:])  # ???_CorpSAG1
         else:
             loc_name = next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
             if loc_name is None:
@@ -399,7 +315,12 @@ def get_universe_location_by_item(
         corp_ass_names_data,
         foreign_structures_data)
     if not (region_id is None):
-        __loc_dict.update({"region_id": region_id, "region": region_name, "solar": loc_name, "solar_id": int(__root_location_id)})
+        __loc_dict.update({
+            "region_id": region_id,
+            "region": region_name,
+            "solar": loc_name,
+            "solar_id": int(__root_location_id)
+        })
         if __prev_location_id != __root_location_id:
             __dummy1, __dummy2, loc_name, foreign = get_assets_location_name(
                 int(__prev_location_id),
@@ -407,7 +328,11 @@ def get_universe_location_by_item(
                 sde_inv_items,
                 corp_ass_names_data,
                 foreign_structures_data)
-            __loc_dict.update({"station": loc_name, "station_id": int(__prev_location_id), "foreign": foreign})
+            __loc_dict.update({
+                "station": loc_name,
+                "station_id": int(__prev_location_id),
+                "foreign": foreign
+            })
     return __loc_dict
 
 
@@ -457,8 +382,8 @@ def __find_containers_in_hangars_nested(
         # ангаров уже остановлен и идёт поиск контейнеров в ангарах
         __item_id = __item_dict["item_id"]
         __location_flag = __item_dict["location_flag"]
-        if __location_flag[:-1] == "CorpSAG":
-            str_hangar_num = __location_flag[-1:]
+        if is_location_flag_hangar(__location_flag):
+            str_hangar_num = get_hangar_number(__location_flag)
             if not (int(str_hangar_num) in blueprints_hangars):
                 continue
             # debug: print(str_hangar_num, "  ", __item_id)
