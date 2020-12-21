@@ -207,7 +207,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             bpmm1_in_progress += __runs
         # расчёт кол-ва материала с учётом эффективности производства
         bpmm1_efficiency = eve_sde_tools.get_industry_material_efficiency(
-            __is_reaction_formula,
+            'reaction' if __is_reaction_formula else 'manufacturing',
             1,
             bpmm1_standard,  # сведения из чертежа
             __capital_material_efficiency)
@@ -264,12 +264,12 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 # берём из настроек me=??, которая подразумевается одинаковой на всех БПО и БПЦ в коллекции
                 material_efficiency = report_options["missing_blueprints"]["material_efficiency"]
                 bpmm2_efficiency = eve_sde_tools.get_industry_material_efficiency(
-                    bpmm2_is_reaction_formula,
+                    'reaction' if bpmm2_is_reaction_formula else 'manufacturing',
                     1,
                     bpmm2_efficiency,
                     material_efficiency)
                 bpmm2_not_enough = eve_sde_tools.get_industry_material_efficiency(
-                    bpmm2_is_reaction_formula,
+                    'reaction' if bpmm2_is_reaction_formula else 'manufacturing',
                     1,
                     bpmm2_not_enough,
                     material_efficiency)

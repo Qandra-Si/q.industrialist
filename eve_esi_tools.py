@@ -80,7 +80,7 @@ def get_corp_ass_loc_data(corp_assets_data, containers_filter=None):
         type_id = int(a["type_id"])
         # if materials_for_bps.count(type_id) > 0:
         loc_flag = str(a["location_flag"])
-        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
+        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
         loc_id = int(a["location_id"])
         if not (containers_filter is None):

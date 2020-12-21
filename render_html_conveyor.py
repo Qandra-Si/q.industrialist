@@ -143,6 +143,7 @@ def __dump_blueprints_list_with_materials(
             continue
         loc_name = __container["name"]
         fixed_number_of_runs = __container["fixed_number_of_runs"]
+        manufacturing_activity = __container["manufacturing_activity"]
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
@@ -179,29 +180,38 @@ def __dump_blueprints_list_with_materials(
             type_id = type_dict["id"]
             blueprint_name = type_dict["name"]
             # ---
-            __activity_time = 0
-            __blueprint_materials = None
-            __is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(type_id, [1849], sde_type_ids, sde_market_groups)
-            if __is_reaction_formula:  # Reaction Formulas
-                __reaction = eve_sde_tools.get_blueprint_reaction_activity(sde_bp_materials, type_id)
-                __blueprint_materials = __reaction["materials"]
-                __activity_time = __reaction["time"]
-            else:
-                __manufacturing = eve_sde_tools.get_blueprint_manufacturing_activity(sde_bp_materials, type_id)
-                __blueprint_materials = __manufacturing["materials"]
-                __activity_time = __manufacturing["time"]
-            __min_activity_time = None
+            is_invention_activity = manufacturing_activity == 'invention'
+            show_me_te = manufacturing_activity in ['manufacturing', 'research_material', 'research_time']
+            activity_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, manufacturing_activity, type_id)
+            activity_time = 0 if activity_dict is None else activity_dict.get('time', -1)
+            activity_blueprint_materials = None if activity_dict is None else activity_dict.get('materials')
             # ---
+            if is_invention_activity and activity_blueprint_materials:
+                # Добавляем декрипторы (замечения и ограничения):
+                # - всегда все хулы запускаются с декриптором Parity Decryptor
+                # - всегда все риги запускаются с декриптором Symmetry Decryptor
+                # - всегда все модули запускаются без декрипторов
+                # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
+                # в 3 и выше. Если ваши скилы меньше - лучше запускайте ресерч или ждите задач по копирке. Будьте
+                # внимательны, игнорируя эти замечения вы сильно усложняете работу производственников.
+                groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+                if not (groups_chain is None):
+                    if 204 in groups_chain:  # Ships
+                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34204})  # Parity Decryptor
+                    elif 943 in groups_chain:  # Ship Modifications
+                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
+            # ---
+            min_activity_time = None
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
                 for itm in bp["itm"]:
                     __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
-                    __time = __runs * __activity_time
-                    if __min_activity_time is None:
-                        __min_activity_time = __time
-                    elif __min_activity_time > __time:
-                        __min_activity_time = __time
+                    __time = __runs * activity_time
+                    if min_activity_time is None:
+                        min_activity_time = __time
+                    elif min_activity_time > __time:
+                        min_activity_time = __time
             # ---
             glf.write(
                 '<tr><td class="hidden">{nm}</td><td class="hidden">{time}</td><td>\n'
@@ -213,7 +223,7 @@ def __dump_blueprints_list_with_materials(
                 '  <h4 class="media-heading">{nm}</h4>\n'.format(
                     src=render_html.__get_img_src(type_id, 64),
                     nm=blueprint_name,
-                    time=__min_activity_time
+                    time=0 if min_activity_time is None else min_activity_time
                 )
             )
             for bpk in bp_keys:
@@ -231,7 +241,7 @@ def __dump_blueprints_list_with_materials(
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
-                        me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if not __is_reaction_formula else "",
+                        me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if show_me_te else "",
                         status=blueprint_status if not (blueprint_status is None) else ""
                     )
                 )
@@ -248,11 +258,11 @@ def __dump_blueprints_list_with_materials(
                     __jobs_cost = sum([i["jc"] for i in bp["itm"] if "jc" in i])
                     glf.write('&nbsp;<span class="label badge-light">{:,.1f} ISK</span>'.format(__jobs_cost))
                     # ---
-                    if not (__blueprint_materials is None):
-                        for m in __blueprint_materials:
+                    if not (activity_blueprint_materials is None):
+                        for m in activity_blueprint_materials:
                             # расчёт кол-ва материала с учётом эффективности производства
                             __need = eve_sde_tools.get_industry_material_efficiency(
-                                __is_reaction_formula,
+                                manufacturing_activity,
                                 quantity_or_runs,
                                 m["quantity"],  # сведения из чертежа
                                 material_efficiency)
@@ -267,14 +277,14 @@ def __dump_blueprints_list_with_materials(
                                 __used_dict["q"] += __need
                     # ---
                     glf.write('</br></span>')  # qind-blueprints-?
-                elif __blueprint_materials is None:
-                    glf.write('&nbsp;<span class="label label-warning">manufacturing impossible</span>')
+                elif activity_blueprint_materials is None:
+                    glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(manufacturing_activity))
                     glf.write('</br></span>')  # qind-blueprints-?
                 else:
                     glf.write('</br></span>')  # qind-blueprints-?
                     glf.write('<div class="qind-materials-used">\n')  # div(materials)
                     not_enough_materials = []
-                    for m in __blueprint_materials:
+                    for m in activity_blueprint_materials:
                         bp_manuf_need_all = 0
                         bp_manuf_need_min = 0
                         for __bp3 in bp["itm"]:
@@ -286,7 +296,7 @@ def __dump_blueprints_list_with_materials(
                                     quantity_or_runs = quantity_or_runs * fixed_number_of_runs
                             # расчёт кол-ва материала с учётом эффективности производства
                             __need = eve_sde_tools.get_industry_material_efficiency(
-                                __is_reaction_formula,
+                                manufacturing_activity,
                                 quantity_or_runs,
                                 m["quantity"],  # сведения из чертежа
                                 material_efficiency)
