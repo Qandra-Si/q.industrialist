@@ -156,6 +156,7 @@ def register_conveyor_entity(
         corp_ass_names_data):
     same_stock_container = stock_settings.get('same_stock_container', False)
     fixed_number_of_runs = blueprints_settings.get('fixed_number_of_runs', None)
+    manufacturing_activity = blueprints_settings.get('manufacturing_activity', 'manufacturing')
     # пытаемся найти возможно уже существующий экземпляр конвейера
     station_id = universe_location["station_id"]
     conveyor_entity = next((id for id in conveyor_entities if (id["station_id"] == station_id) and (id["num"] == conveyor_entity_num)), None)
@@ -173,7 +174,8 @@ def register_conveyor_entity(
     # добавляем к текущей станции контейнер с чертежами
     container_dict = {
         "id": location_id,
-        "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None)
+        "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == location_id), None),
+        "manufacturing_activity": manufacturing_activity,
     }
     # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
     if not (fixed_number_of_runs is None):
@@ -314,7 +316,6 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
-    sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
     # Построение списка модулей и ресурсов, которые используются в производстве
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
@@ -472,10 +473,8 @@ def main():
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
-        corp_ass_names_data,
         # данные, полученные в результате анализа и перекомпоновки входных списков
         corp_ass_loc_data,
         corp_bp_loc_data,

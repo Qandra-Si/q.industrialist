@@ -825,6 +825,7 @@ def main():
         corp_contract_items_data = []
         corp_contract_items_len = 0
         corp_contract_items_not_found = []
+        corp_contract_individual = []
         if len(corp_contracts_data) > 0:
             # Requires: access token
             for c in corp_contracts_data:
@@ -842,6 +843,11 @@ def main():
                 if c['issuer_corporation_id'] != corporation_id:
                     continue
                 contract_id = c["contract_id"]
+                # пропускаем контракты на продажу, которые выставлены не от имени корпорации, и доход от продажи
+                # которых упадёт в кошелёк пилота, а не корпорации
+                if not c['for_corporation']:
+                    corp_contract_individual.append(contract_id)
+                    continue
                 try:
                     __contract_items = interface.get_esi_data(
                         "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
@@ -873,6 +879,8 @@ def main():
         print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
         if len(corp_contract_items_not_found) > 0:
             print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+        if corp_contract_individual:
+            print("'{}' corporation has {} individual contracts : {}\n".format(corporation_name, len(corp_contract_individual), corp_contract_individual))
         sys.stdout.flush()
 
         # Построение дерева ассетов, с узлами в роли станций и систем, и листьями в роли хранящихся
