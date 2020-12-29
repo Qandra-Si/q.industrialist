@@ -202,7 +202,8 @@ def __dump_blueprints_list_with_materials(
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
             '   <h4 class="panel-title">\n'
             '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>\n'
+            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station}'
+            '       <mark>{nm}</mark><span class="label label-default">{activity}</span></a>\n'
             '   </h4>\n'
             '  </div>\n'
             '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
@@ -210,7 +211,8 @@ def __dump_blueprints_list_with_materials(
             '   <div class="panel-body">\n'.format(
                 id=media_heading_id,
                 station=conveyor_entity["station"],
-                nm=loc_name
+                nm=loc_name,
+                activity=manufacturing_activity
             )
         )
         media_heading_id += 1
