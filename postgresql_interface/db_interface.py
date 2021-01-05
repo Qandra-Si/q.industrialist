@@ -141,7 +141,7 @@ class QIndustrialistDatabase:
             # if self.debug:
             #     print(f"{cur.rowcount} rows affected.")
 
-    def load_module_settings(self, default_settings):
+    def load_module_settings(self, default_settings, default_types=None):
         settings = self.select_all_rows(
             "SELECT ms_key,ms_val "
             "FROM modules_settings WHERE ms_module=%s;",
@@ -179,6 +179,20 @@ class QIndustrialistDatabase:
                     settings[__key] = int(settings[__key])
                 elif isinstance(__default_val, (list, dict)):
                     settings[__key] = (json.loads(settings[__key]))
+        for kt in default_types.items():
+            __key = kt[0]
+            if default_settings.get(__key) is None:
+                __default_type = kt[1]
+                # конвертируем считанные строки из БД в тип, соответствующий default type
+                # если в default_settings настройки нет, а из БД она считалась, то
+                # храниться в settings она будет как строка
+                if __key in settings:
+                    if issubclass(__default_type, str):
+                        pass
+                    elif issubclass(__default_type, int):
+                        settings[__key] = int(settings[__key])
+                    elif issubclass(__default_type, (list, dict)):
+                        settings[__key] = (json.loads(settings[__key]))
         # если набор данных в БД менялся, то подтверждаем транзацию
         if some_missing:
             self.commit()
