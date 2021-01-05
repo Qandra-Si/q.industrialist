@@ -47,7 +47,7 @@ def __dump_industry_product(
     __td_cost = ""
     __td_volume = ""
     for month in range(3):
-        __wij_month = (current_month - 2) + month
+        __wij_month = (current_month - 1 - (2-month) + 12) % 12 + 1
         # получение информации о производстве этого продукта
         __wij_dict = next((wij for wij in workflow_industry_jobs if
                            (wij["ptid"] == __product_type_id) and (wij["month"] == __wij_month)), None)
@@ -159,7 +159,9 @@ def __dump_industry(
         '<th style="text-align: center;">{}</th>'
         '<th style="text-align: center;">{}</th>'
         '<th style="text-align: center;">Last 30 days</th>'.
-        format(g_month_names[(current_month+9)%12+1], g_month_names[(current_month+10)%12+1], g_month_names[current_month]))
+        format(g_month_names[(current_month+9)%12+1],
+               g_month_names[(current_month+10)%12+1],
+               g_month_names[current_month]))
     glf.write("""
  </tr>
 </thead>

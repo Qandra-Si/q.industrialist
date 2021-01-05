@@ -607,12 +607,15 @@ def __build_industry(
             "  wij_product_tid=ANY(%s) AND"
             "  wij_end_date > (current_date - interval '93' day)"
             ") AS a "
-            "WHERE mnth>=(%s-2) "
+            "WHERE mnth=%s OR mnth=%s OR mnth=%s "
             "GROUP BY 1,4 "
             "ORDER BY 1;",
             module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids,
-            db_current_month[0])
+            int(db_current_month[0]),  # january=1, december=12
+            int((db_current_month[0]-2+12)%12+1),
+            int((db_current_month[0]-3+12)%12+1)
+        )
         corp_industry_stat["workflow_industry_jobs"] = [{
             "ptid": wij[0],
             "cost": wij[1],
