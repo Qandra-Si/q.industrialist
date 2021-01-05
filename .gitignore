@@ -131,6 +131,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Git patches
+*.diff
+*.patch
+
 # Q.Industrialist
 /static_data_interface
 /image_export_collection

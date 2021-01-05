@@ -47,13 +47,25 @@ g_module_default_settings = {
     # hangar, which stores blueprint copies to build T2 modules
     "factory:blueprints_hangars": [1],
 
-    "factory:station_id2": 60003760,
-    "factory:station_name2": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-    # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars2": [1],
-
     # номера контейнеров, в которых располагаются чертежи для конвейера
     "industry:conveyor_boxes": [],
+}
+g_module_default_types = {
+    "factory:station_id2": int,
+    "factory:station_name2": str,
+    "factory:blueprints_hangars2": list,
+
+    "factory:station_id3": int,
+    "factory:station_name3": str,
+    "factory:blueprints_hangars3": list,
+
+    "factory:station_id4": int,
+    "factory:station_name4": str,
+    "factory:blueprints_hangars4": list,
+
+    "factory:station_id5": int,
+    "factory:station_name5": str,
+    "factory:blueprints_hangars5": list,
 }
 
 
@@ -648,7 +660,7 @@ def __build_industry(
 def main():
     qidb = __get_db_connection()
     try:
-        module_settings = qidb.load_module_settings(g_module_default_settings)
+        module_settings = qidb.load_module_settings(g_module_default_settings, g_module_default_types)
         db_monthly_jobs = qidb.select_all_rows(
             "SELECT wmj_quantity,wmj_eft,wmj_conveyor "
             "FROM workflow_monthly_jobs "
