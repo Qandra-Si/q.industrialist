@@ -47,7 +47,7 @@ def __dump_industry_product(
     __td_cost = ""
     __td_volume = ""
     for month in range(3):
-        __wij_month = (current_month - 1 - month + 12) % 12 + 1
+        __wij_month = (current_month - 1 - (2-month) + 12) % 12 + 1
         # получение информации о производстве этого продукта
         __wij_dict = next((wij for wij in workflow_industry_jobs if
                            (wij["ptid"] == __product_type_id) and (wij["month"] == __wij_month)), None)
