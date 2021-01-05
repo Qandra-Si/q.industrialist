@@ -7,10 +7,10 @@ g_month_names = [
 
 
 def __get_progress_element(current_num, max_num):
-    if current_num >= max_num:
-        __progress_factor = 100
+    if max_num == 0:
+        __progress_factor: float = 100.0
     else:
-        __progress_factor = float(100 * current_num / max_num)
+        __progress_factor: float = float(100 * current_num / max_num)
     prgrs = \
         '<strong><span class="text-warning">{q:,d}</span></strong> / {sc:,d}<br>' \
         '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
@@ -18,8 +18,8 @@ def __get_progress_element(current_num, max_num):
         format(
             q=current_num,
             sc=max_num,
-            prcnt100=" progress-bar-success" if __progress_factor >= 99.999 else "",
-            prcnt=int(__progress_factor),
+            prcnt100=" progress-bar-success" if (__progress_factor > 95.999) and (__progress_factor < 104.999) else (" progress-bar-warning" if __progress_factor > 104.999 else ""),
+            prcnt=int(__progress_factor) if __progress_factor < 100.001 else 100,
             fprcnt=__progress_factor
         )
     return prgrs
