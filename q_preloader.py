@@ -183,15 +183,13 @@ def main():
             # print("'{}' corporation has {} customs offices\n".format(corporation_name, len(corp_customs_offices_data)))
             # sys.stdout.flush()
 
-            # Получение названий контейнеров, станций, кошельков, и т.п. - всё что переименовывается ingame
-            corp_ass_names_data = []
+            # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
             corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-            if len(corp_ass_named_ids) > 0:
-                # Requires role(s): Director
-                corp_ass_names_data = interface.get_esi_data(
-                    "corporations/{}/assets/names/".format(corporation_id),
-                    json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
-            print("'{}' corporation has {} custom asset's names\n".format(corporation_name, len(corp_ass_names_data)))
+            # Requires role(s): Director
+            corp_ass_names_data = interface.get_esi_piece_data(
+                "corporations/{}/assets/names/".format(corporation_id),
+                corp_ass_named_ids)
+            print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
             sys.stdout.flush()
 
             # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)

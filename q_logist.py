@@ -155,13 +155,11 @@ def main():
     sys.stdout.flush()
 
     # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_names_data = []
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
-        # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
-            "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    # Requires role(s): Director
+    corp_ass_names_data = interface.get_esi_piece_data(
+        "corporations/{}/assets/names/".format(corporation_id),
+        corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
