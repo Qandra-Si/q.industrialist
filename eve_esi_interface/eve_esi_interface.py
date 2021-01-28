@@ -246,6 +246,7 @@ class EveOnlineInterface:
                             # сохраняем информацию в кеше и выходим с тем же кодом ошибки
                             self.__dump_cache_into_file(url, [{"Http-Error": 404}], None)
                         raise
+                    raise
                 except:
                     raise
                 if page_data.status_code == 304:

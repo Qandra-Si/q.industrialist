@@ -109,11 +109,21 @@ def main():
                     print(sys.exc_info())
                     raise
 
-            # Requires role(s): Accountant, Junior_Accountant
-            corp_wallets_data = interface.get_esi_paged_data(
-                "corporations/{}/wallets/".format(corporation_id))
-            print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
-            sys.stdout.flush()
+            try:
+                # Requires role(s): Accountant, Junior_Accountant
+                corp_wallets_data = interface.get_esi_paged_data(
+                    "corporations/{}/wallets/".format(corporation_id))
+                print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                    corp_wallets_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
 
             # Requires role(s): Accountant, Junior_Accountant
             corp_wallet_journal_data = [None, None, None, None, None, None, None]
@@ -127,6 +137,8 @@ def main():
                 except requests.exceptions.HTTPError as err:
                     status_code = err.response.status_code
                     if status_code == 404:  # 2020.11.26 поломался доступ к журналу кошелька (ССР-шники "внесли правки")
+                        corp_wallet_journal_data[division-1] = None
+                    elif status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
                         corp_wallet_journal_data[division-1] = None
                     else:
                         raise
