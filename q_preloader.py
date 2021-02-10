@@ -57,6 +57,7 @@ def main():
     try:
         eve_market_prices_data = None
         various_characters_data = []
+        various_corporations_data = []
         for pilot_name in argv_prms["character_names"]:
             # настройка Eve Online ESI Swagger interface
             auth = esi.EveESIAuth(
@@ -91,7 +92,8 @@ def main():
             print("{} is from '{}' corporation\n".format(character_name, corporation_name))
             sys.stdout.flush()
 
-            various_characters_data.append({str(corporation_id): character_data})
+            various_characters_data.append({str(character_id): character_data})
+            various_corporations_data.append({str(corporation_id): corporation_data})
 
             if eve_market_prices_data is None:
                 try:
@@ -152,6 +154,50 @@ def main():
                 fully_trust_cache=True)
             print("'{}' corporation has {} hangar and {} wallet names\n".format(corporation_name, len(corp_divisions_data["hangar"]) if "hangar" in corp_divisions_data else 0, len(corp_divisions_data["wallet"]) if "wallet" in corp_divisions_data else 0))
             sys.stdout.flush()
+
+            try:
+                # Requires role(s): Director
+                corp_shareholders_data = interface.get_esi_paged_data(
+                    "corporations/{}/shareholders/".format(corporation_id))
+                print("'{}' corporation has {} shareholders\n".format(corporation_name, len(corp_shareholders_data)))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                    corp_shareholders_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+
+            for shareholder in corp_shareholders_data:
+                # Получение сведений о пилотах, имеющих акции корпорации
+                corp_id = None
+                if shareholder['shareholder_type'] == 'character':
+                    pilot_id = shareholder['shareholder_id']
+                    __pilot_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(pilot_id)), None)
+                    if __pilot_dict is None:
+                        # Public information about a character
+                        pilot_data = interface.get_esi_data(
+                            "characters/{}/".format(pilot_id),
+                            fully_trust_cache=True)
+                        corp_id = pilot_data["corporation_id"]
+                        various_characters_data.append({str(pilot_id): pilot_data})
+                    else:
+                        corp_id = __pilot_dict[str(pilot_id)]["corporation_id"]
+                    sys.stdout.flush()
+                elif shareholder['shareholder_type'] == 'corporation':
+                    corp_id = shareholder['shareholder_id']
+                # Получение сведений о корпорациях, которым принадлежат акции, либо в которых состоят пилоты
+                __corp_dict = next((i for i in various_corporations_data if int(list(i.keys())[0]) == int(corp_id)), None)
+                if __corp_dict is None:
+                    # Public information about a character
+                    corp_data = interface.get_esi_data(
+                        "corporations/{}/".format(corp_id),
+                        fully_trust_cache=True)
+                    various_corporations_data.append({str(corp_id): corp_data})
+                sys.stdout.flush()
 
             # Requires role(s): Director
             corp_assets_data = interface.get_esi_paged_data(
