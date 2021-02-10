@@ -32,7 +32,7 @@ def get_argv_prms():
                 exit_or_wrong_getopt = 0
                 print_version_only = True
                 break
-            elif opt in ("--pilot", "--pilot1", "--pilot2", "--pilot3"):
+            elif opt in ("--pilot", "--pilot1", "--pilot2", "--pilot3", "--pilot4"):
                 res["character_names"].append(arg)
             elif opt in ("--signup"):
                 res["signup_new_character"] = True
