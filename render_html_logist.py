@@ -302,7 +302,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            cnn=cynonetwork_num,
@@ -410,7 +410,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name))
