@@ -222,7 +222,10 @@ def main():
                             if str(loc_id) in sde_inv_items:
                                 root_item = sde_inv_items[str(loc_id)]
                                 # print("root_item", root_item)
-                                if root_item["typeID"] != 5:  # not Solar System (may be Station?)
+                                if root_item["typeID"] == 5:  # Solar System
+                                    system_id = loc_id
+                                    # print(" >>> >>> ", loc_name)
+                                else:  # not Solar System (may be Station?)
                                     loc_id = root_item["locationID"]
                                     root_item = sde_inv_items[str(loc_id)]
                                     # print(" >>> ", loc_id, root_item)
