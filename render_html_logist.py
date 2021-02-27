@@ -530,6 +530,13 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                                  ox=oxygen_isotope_num,
                                  he=helium_isotope_num,
                                  ly=lightyears))
+            else:
+                glf.write("      [{rn},'{nm}','{signal}',{ly},0,0,0,0]{comma}\n".
+                          format(comma=',' if not last_route else ']',
+                                 rn=route_num,
+                                 nm=system_name,
+                                 signal=__get_route_signalling_type(3),
+                                 ly=lightyears))
             route_num = route_num + 1
         glf.write('    ]{comma}\n'.format(comma=',' if cynonetwork_num != len(q_logist_settings.g_cynonetworks) else ''))
         cynonetwork_num = cynonetwork_num + 1
