@@ -43,6 +43,7 @@ def __dump_index(glf):
       <li><a href="shareholders_r_initiative5.html">R Initiative 5</a></li>
       <li><a href="shareholders_r_strike.html">R Strike</a></li>
       <li><a href="shareholders_night_trade_team.html">Night Trade Team</a></li>
+      <li><a href="shareholders_just_a_trade_corp.html">Just A Trade Corp</a></li>
     </ul>
   </div>
 """)
