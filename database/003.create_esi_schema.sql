@@ -34,7 +34,7 @@ CREATE TABLE qi.esi_universe_structures
     -- eus_y DOUBLE PRECISION NOT NULL,
     -- eus_z DOUBLE PRECISION NOT NULL,
     eus_created_at TIMESTAMP NULL DEFAULT NULL,
-    -- eus_updated_at TIMESTAMP NULL DEFAULT NULL,
+    eus_updated_at TIMESTAMP NULL DEFAULT NULL,
     CONSTRAINT pk_eus PRIMARY KEY (eus_structure_id)
 )
 TABLESPACE pg_default;
@@ -81,8 +81,8 @@ CREATE TABLE qi.esi_corporation_structures
     -- ecs_next_reinforce_hour INTEGER DEFAULT NULL,
     -- ecs_next_reinforce_apply TIMESTAMP DEFAULT NULL,
     ecs_created_at TIMESTAMP NULL DEFAULT NULL,
-    -- ecs_updated_at TIMESTAMP NULL DEFAULT NULL,
-	CONSTRAINT pk_ecs PRIMARY KEY (ecs_structure_id)
+    ecs_updated_at TIMESTAMP NULL DEFAULT NULL,
+    CONSTRAINT pk_ecs PRIMARY KEY (ecs_structure_id)
 )
 TABLESPACE pg_default;
 

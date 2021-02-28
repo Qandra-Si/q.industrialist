@@ -23,49 +23,14 @@ Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
 """
 import sys
-import requests
 
-import eve_esi_interface as esi
-import postgresql_interface as db
-
+import eve_db_tools
 import console_app
-import q_industrialist_settings
-
-from __init__ import __version__
-
-
-def get_db_connection():
-    qidb = db.QIndustrialistDatabase("universe_structures", debug=False)
-    qidb.connect(q_industrialist_settings.g_database)
-    return qidb
-
-
-def actualize_universe_structure(interface, dbstructures, structure_id):
-    try:
-        # Requires: access token
-        universe_structure_data = interface.get_esi_data(
-            "universe/structures/{}/".format(structure_id),
-            fully_trust_cache=True)
-        # сохраняем в БД данные о структуре
-        dbstructures.insert_universe_structure(
-            structure_id,
-            universe_structure_data
-        )
-    except requests.exceptions.HTTPError as err:
-        status_code = err.response.status_code
-        if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-            pass
-        else:
-            # print(sys.exc_info())
-            raise
-    except:
-        print(sys.exc_info())
-        raise
 
 
 def main():
     qidb = None
-    dbstructures = None
+    dbswagger = None
     first_time = True
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -74,93 +39,64 @@ def main():
 
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
-        auth = esi.EveESIAuth(
-            '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
-            debug=True)
-        client = esi.EveESIClient(
-            auth,
-            debug=False,
-            logger=True,
-            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
-        interface = esi.EveOnlineInterface(
-            client,
-            q_industrialist_settings.g_client_scope,
-            cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
-            offline_mode=argv_prms["offline_mode"])
-
-        authz = interface.authenticate(pilot_name)
+        interface, authz = eve_db_tools.auth_pilot_by_name(
+            pilot_name,
+            argv_prms["offline_mode"],
+            argv_prms["workspace_cache_files_dir"])
         character_id = authz["character_id"]
         character_name = authz["character_name"]
 
-        # Public information about a character
-        character_data = interface.get_esi_data(
-            "characters/{}/".format(character_id),
-            fully_trust_cache=True)
-        # Public information about a corporation
-        corporation_data = interface.get_esi_data(
-            "corporations/{}/".format(character_data["corporation_id"]),
-            fully_trust_cache=True)
+        # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
+        qidb, dbswagger = eve_db_tools.get_db_connection("universe_structures", debug=False)
 
+        # Public information about a character
+        character_data = eve_db_tools.actualize_character(
+            interface,
+            dbswagger,
+            character_id)
+        # Public information about a corporation
         corporation_id = character_data["corporation_id"]
+        corporation_data = eve_db_tools.actualize_corporation(
+            interface,
+            dbswagger,
+            corporation_id)
+
         corporation_name = corporation_data["name"]
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
-        # подключаемся к БД для сохранения данных о структурах
-        if qidb is None:
-            qidb = get_db_connection()
-            dbstructures = db.QUniverseStructures(qidb)
-
         # один раз для первого пилота (его аутентификационного токена) читаем данные
-        # с серверов ССР по публичным структурам
+        # с серверов CCP по публичным структурам
 
         if first_time:
             first_time = False
 
             # Requires: access token
-            universe_structures_data = interface.get_esi_paged_data('universe/structures/')
-            universe_structures_new = dbstructures.get_absent_structure_ids(universe_structures_data)
-            print("{} of {} new public structures found in the universe\n".format(len(universe_structures_new), len(universe_structures_data)))
-            sys.stdout.flush()
-
-            for structure_id in universe_structures_new:
-                actualize_universe_structure(interface, dbstructures, structure_id[0])
+            universe_structures_data, universe_structures_new = eve_db_tools.actualize_universe_structures(
+                interface,
+                dbswagger)
+            print("{} of {} new public structures found in the universe\n".
+                  format(len(universe_structures_new), len(universe_structures_data)))
             sys.stdout.flush()
 
         # приступаем к загрузке корпоративных данных
 
         # Requires role(s): Station_Manager
-        corp_structures_data = interface.get_esi_paged_data(
-            "corporations/{}/structures/".format(corporation_id))
-        corp_structures_ids = [s["structure_id"] for s in corp_structures_data]
-        if not corp_structures_ids:
+        corp_structures_data, corp_structures_new = eve_db_tools.actualize_corporation_structures(
+            interface,
+            dbswagger,
+            corporation_id)
+        if not corp_structures_new:
             print("'{}' corporation has no any structures\n".format(corporation_name))
-            sys.stdout.flush()
         else:
-            corp_structures_newA = dbstructures.get_absent_structure_ids(corp_structures_ids)
-            corp_structures_newA = [id[0] for id in corp_structures_newA]
-            corp_structures_newB = dbstructures.get_absent_corporation_structure_ids(corp_structures_ids)
-            corp_structures_newB = [id[0] for id in corp_structures_newB]
-            corp_structures_new = corp_structures_newA[:]
-            corp_structures_new.extend(corp_structures_newB)
-            corp_structures_new = list(dict.fromkeys(corp_structures_new))
-
-            print("'{}' corporation has {} of {} new structures\n".format(corporation_name, len(corp_structures_new), len(corp_structures_ids)))
-            sys.stdout.flush()
-
-            # выше были найдены идентификаторы тех структур, которых нет либо в universe_structures, либо
-            # нет в corporation_structures, теперь добавляем отсутствующие данные в БД
-            for structure_id in corp_structures_newA:
-                actualize_universe_structure(interface, dbstructures, structure_id)
-            for structure_data in corp_structures_data:
-                if structure_data["structure_id"] in corp_structures_newB:
-                    dbstructures.insert_corporation_structure(structure_data)
-            sys.stdout.flush()
+            print("'{}' corporation has {} of {} new structures\n".
+                  format(corporation_name, len(corp_structures_new), len(corp_structures_data)))
+        sys.stdout.flush()
 
     if not (qidb is None):
         qidb.commit()
-        if not (dbstructures is None):
-            del dbstructures
+        if not (dbswagger is None):
+            del dbswagger
         del qidb
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

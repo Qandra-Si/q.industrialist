@@ -4,6 +4,6 @@
 from .db_interface import QIndustrialistDatabase  # noqa
 from .db_wij import QWorkflowIndustryJobs  # noqa
 from .db_dictionaries import QDictionaries  # noqa
-from .db_universe_structures import QUniverseStructures  # noqa
+from .db_swagger_interface import QSwaggerInterface  # noqa
 
-__version__ = '0.7.8'
+__version__ = '0.8.1'

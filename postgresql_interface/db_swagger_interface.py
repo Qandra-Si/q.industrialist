@@ -1,7 +1,7 @@
 ﻿# -*- encoding: utf-8 -*-
 
 
-class QUniverseStructures:
+class QSwaggerInterface:
     def __init__(self, db):
         """ constructor
 
@@ -28,7 +28,11 @@ class QUniverseStructures:
             return False
         return True
 
-    def get_absent_structure_ids(self, ids):
+    # -------------------------------------------------------------------------
+    # universe/structures/
+    # -------------------------------------------------------------------------
+
+    def get_absent_universe_structure_ids(self, ids):
         """
 
         :param ids: list of unique structure identities
@@ -60,23 +64,32 @@ class QUniverseStructures:
         #  }
         self.db.execute(
             "INSERT INTO esi_universe_structures(eus_structure_id,eus_name,eus_owner_id,eus_solar_system_id,"
-            " eus_type_id,eus_created_at) "
-            "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
+            " eus_type_id,eus_created_at,eus_updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
             "ON CONFLICT ON CONSTRAINT pk_eus DO NOTHING;",
-            # "INSERT INTO esi_universe_structures(eus_structure_id,eus_name,eus_owner_id,eus_solar_system_id,"
-            # " eus_type_id,eus_x,eus_y,eus_z,eus_created_at,eus_updated_at) "
-            # "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-            # " CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
-            # "ON CONFLICT ON CONSTRAINT pk_us DO NOTHING;",
             id,
             data['name'],
             data['owner_id'],
             data['solar_system_id'],
             data.get('type_id', None)
-            # ,data['position']['x'],
-            # data['position']['y'],
-            # data['position']['z']
         )
+
+    def mark_universe_structures_updated(self, ids):
+        """
+
+        :param ids: list of unique structure identities to update
+        """
+
+        self.db.execute(
+            "UPDATE esi_universe_structures"
+            " SET eus_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+            "WHERE eus_structure_id IN (SELECT * FROM UNNEST(%s));",
+            ids
+        )
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/structures/
+    # -------------------------------------------------------------------------
 
     def get_absent_corporation_structure_ids(self, ids):
         """
@@ -114,12 +127,25 @@ class QUniverseStructures:
         # }
         self.db.execute(
             "INSERT INTO esi_corporation_structures(ecs_structure_id,ecs_corporation_id,ecs_type_id,"
-            " ecs_system_id,ecs_profile_id,ecs_created_at) "
-            "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
+            " ecs_system_id,ecs_profile_id,ecs_created_at,ecs_updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
             "ON CONFLICT ON CONSTRAINT pk_ecs DO NOTHING;",
             data['structure_id'],
             data['corporation_id'],
             data['type_id'],
             data['system_id'],
             data['profile_id']
+        )
+
+    def mark_corporation_structures_updated(self, ids):
+        """
+
+        :param ids: list of corporation structure identities to update
+        """
+
+        self.db.execute(
+            "UPDATE esi_corporation_structures"
+            " SET ecs_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+            "WHERE ecs_structure_id IN (SELECT * FROM UNNEST(%s));",
+            ids
         )
