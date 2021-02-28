@@ -20,7 +20,7 @@ def get_argv_prms():
     print_version_only = False
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version", "pilot=", "signup", "offline", "online",
-                                                        "cache_dir=", "pilot1=", "pilot2=", "pilot3=", "pilot4="
+                                                        "cache_dir=", "pilot1=", "pilot2=", "pilot3=", "pilot4=",
                                                         "pilot5="])
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
