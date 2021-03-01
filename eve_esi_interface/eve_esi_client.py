@@ -13,6 +13,8 @@ import base64
 import hashlib
 import secrets
 import time
+#import datetime
+from dateutil.parser import parse as parsedate
 
 from .auth_cache import EveESIAuth
 from .error import EveOnlineClientError
@@ -47,6 +49,9 @@ class EveESIClient:
 
         # для корректной работы с ESI Swagger Interface следует указать User-Agent в заголовках запросов
         self.__user_agent = user_agent
+
+        # данные-состояния, которые были получены во время обработки http-запросов
+        self.__last_modified = None
 
     @property
     def auth_cache(self):
@@ -100,6 +105,13 @@ class EveESIClient:
         :param user_agent: format recomendation - '<project_url> Maintainer: <maintainer_name> <maintainer_email>'
         """
         self.__user_agent = user_agent
+
+    @property
+    def last_modified(self):
+        """ Last-Modified property from http header
+        :returns: :class:`datetime.datetime`
+        """
+        return self.__last_modified
 
     @staticmethod
     def __combine_client_scopes(scopes):
@@ -199,6 +211,7 @@ class EveESIClient:
 
         res = None
         http_connection_times = 0
+        self.__last_modified = None
         while True:
             try:
                 proxy_error_times = 0
@@ -232,7 +245,9 @@ class EveESIClient:
                     if self.__logger:
                         log_line = str(res.status_code) + " " + uri[31:]
                         if 'Last-Modified' in res.headers:
-                            log_line = log_line + " " + str(res.headers['Last-Modified'])[17:-4]
+                            url_time = str(res.headers['Last-Modified'])
+                            self.__last_modified = parsedate(url_time)
+                            log_line = log_line + " " + url_time[17:-4]
                         if 'Etag' in res.headers:
                             log_line = log_line + " " + str(res.headers['Etag'])
                         print(log_line)

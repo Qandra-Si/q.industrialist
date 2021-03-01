@@ -69,7 +69,8 @@ def actualize_universe_structure(interface, dbswagger, structure_id):
         # сохраняем в БД данные о структуре
         dbswagger.insert_universe_structure(
             structure_id,
-            universe_structure_data
+            universe_structure_data,
+            interface.last_modified
         )
         return universe_structure_data
     except requests.exceptions.HTTPError as err:
@@ -101,8 +102,6 @@ def actualize_universe_structures(interface, dbswagger):
 
     for structure_id in universe_structures_new:
         actualize_universe_structure(interface, dbswagger, structure_id)
-    if universe_structures_updated:
-        dbswagger.mark_universe_structures_updated(universe_structures_data)
 
     return universe_structures_data, universe_structures_new
 
@@ -115,6 +114,7 @@ def actualize_corporation_structures(interface, dbswagger, corporation_id):
     corp_structures_updated = interface.is_last_data_updated
     if not corp_structures_updated:
         return corp_structures_data, []
+    corp_structures_updated_at = interface.last_modified
 
     corp_structures_ids = [s["structure_id"] for s in corp_structures_data]
     if not corp_structures_ids:
@@ -139,8 +139,7 @@ def actualize_corporation_structures(interface, dbswagger, corporation_id):
         actualize_universe_structure(interface, dbswagger, structure_id)
     for structure_data in corp_structures_data:
         if structure_data["structure_id"] in corp_structures_newB:
-            dbswagger.insert_corporation_structure(structure_data)
-    if corp_structures_updated:
-        dbswagger.mark_corporation_structures_updated(corp_structures_ids)
+            dbswagger.insert_corporation_structure(structure_data, corp_structures_updated_at)
+    dbswagger.mark_corporation_structures_updated(corp_structures_ids, corp_structures_updated_at)
 
     return corp_structures_data, corp_structures_new
