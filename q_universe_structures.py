@@ -86,7 +86,7 @@ def main():
             interface,
             dbswagger,
             corporation_id)
-        if not corp_structures_new:
+        if not corp_structures_data:
             print("'{}' corporation has no any structures\n".format(corporation_name))
         else:
             print("'{}' corporation has {} of {} new structures\n".

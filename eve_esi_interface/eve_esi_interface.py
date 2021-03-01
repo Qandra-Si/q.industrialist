@@ -25,6 +25,8 @@ class EveOnlineInterface:
             raise EveOnlineClientError("You should use EveESIClient to configure interface")
         self.__client = client
 
+        self.__is_last_data_updated = False
+
     @property
     def client(self):
         """ Eve Online ESI Swagger https client implementation
@@ -69,6 +71,12 @@ class EveOnlineInterface:
         """ flag which says that we are working offline, so eve_esi_interface will download & save data from CCP servers
         """
         return not self.__offline_mode
+
+    @property
+    def is_last_data_updated(self):
+        """ flag which says that we are not fetch data from CCP server because cached data used
+        """
+        return self.__is_last_data_updated
 
     def __get_f_name(self, url):
         """ converts urls to filename to store it in filesystem, for example:
@@ -146,6 +154,7 @@ class EveOnlineInterface:
         :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = True
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # иногда возникает ситуация, когда данные по указанному url не закачались (упали с ошибкой), и так
             # и будут вечно восстанавливаться из кеша, - все ошибки обновляем в online-режиме!
@@ -174,6 +183,7 @@ class EveOnlineInterface:
                     return cached_data["json"] if "json" in cached_data else None
                 else:
                     self.__dump_cache_into_file(url, self.__get_cached_headers(data), data.json())
+                    self.__is_last_data_updated = True
                     return data.json()
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
@@ -193,6 +203,7 @@ class EveOnlineInterface:
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = False
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # аналогично методу get_esi_data, хотя вроде в этом методе HttpError-ы не ожидаются?!
             if not ("Http-Error" in cached_data["headers"][0]):
@@ -291,6 +302,7 @@ class EveOnlineInterface:
                 page = page + 1
             if 0 == match_pages:
                 self.__dump_cache_into_file(url, data_headers, data_json)
+                self.__is_last_data_updated = True
                 return data_json
             elif len(cached_data["headers"]) == match_pages:
                 return cached_data["json"] if "json" in cached_data else None
@@ -305,7 +317,7 @@ class EveOnlineInterface:
         problem_ids = []
         if body:
             try:
-                # Requires role(s): Director
+                # Requires role(s): ???
                 piece_data = self.get_esi_data(
                     url,
                     json.dumps(body, indent=0, sort_keys=False),

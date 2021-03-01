@@ -88,6 +88,11 @@ def actualize_universe_structure(interface, dbswagger, structure_id):
 def actualize_universe_structures(interface, dbswagger):
     # Requires: access token
     universe_structures_data = interface.get_esi_paged_data('universe/structures/')
+
+    universe_structures_updated = interface.is_last_data_updated
+    if not universe_structures_updated:
+        return universe_structures_data, []
+
     universe_structures_new = dbswagger.get_absent_universe_structure_ids(universe_structures_data)
     universe_structures_new = [id[0] for id in universe_structures_new]
 
@@ -96,7 +101,8 @@ def actualize_universe_structures(interface, dbswagger):
 
     for structure_id in universe_structures_new:
         actualize_universe_structure(interface, dbswagger, structure_id)
-    dbswagger.mark_universe_structures_updated(universe_structures_data)
+    if universe_structures_updated:
+        dbswagger.mark_universe_structures_updated(universe_structures_data)
 
     return universe_structures_data, universe_structures_new
 
@@ -105,30 +111,36 @@ def actualize_corporation_structures(interface, dbswagger, corporation_id):
     # Requires role(s): Station_Manager
     corp_structures_data = interface.get_esi_paged_data(
         "corporations/{}/structures/".format(corporation_id))
+
+    corp_structures_updated = interface.is_last_data_updated
+    if not corp_structures_updated:
+        return corp_structures_data, []
+
     corp_structures_ids = [s["structure_id"] for s in corp_structures_data]
     if not corp_structures_ids:
         return corp_structures_data, []
-    else:
-        corp_structures_newA = dbswagger.get_absent_universe_structure_ids(corp_structures_ids)
-        corp_structures_newA = [id[0] for id in corp_structures_newA]
-        corp_structures_newB = dbswagger.get_absent_corporation_structure_ids(corp_structures_ids)
-        corp_structures_newB = [id[0] for id in corp_structures_newB]
-        corp_structures_new = corp_structures_newA[:]
-        corp_structures_new.extend(corp_structures_newB)
-        corp_structures_new = list(dict.fromkeys(corp_structures_new))
 
-        # corp_structures_ids = [1035620655696,1035660997658,1035620697572]
-        # corp_structures_newA = [1035660997658]
-        # corp_structures_newB = [1035620655696,1035660997658]
-        # corp_structures_new = [1035620655696,1035660997658]
+    corp_structures_newA = dbswagger.get_absent_universe_structure_ids(corp_structures_ids)
+    corp_structures_newA = [id[0] for id in corp_structures_newA]
+    corp_structures_newB = dbswagger.get_absent_corporation_structure_ids(corp_structures_ids)
+    corp_structures_newB = [id[0] for id in corp_structures_newB]
+    corp_structures_new = corp_structures_newA[:]
+    corp_structures_new.extend(corp_structures_newB)
+    corp_structures_new = list(dict.fromkeys(corp_structures_new))
 
-        # выше были найдены идентификаторы тех структур, которых нет либо в universe_structures, либо
-        # нет в corporation_structures, теперь добавляем отсутствующие данные в БД
-        for structure_id in corp_structures_newA:
-            actualize_universe_structure(interface, dbswagger, structure_id)
-        for structure_data in corp_structures_data:
-            if structure_data["structure_id"] in corp_structures_newB:
-                dbswagger.insert_corporation_structure(structure_data)
+    # corp_structures_ids = [1035620655696,1035660997658,1035620697572]
+    # corp_structures_newA = [1035660997658]
+    # corp_structures_newB = [1035620655696,1035660997658]
+    # corp_structures_new = [1035620655696,1035660997658]
+
+    # выше были найдены идентификаторы тех структур, которых нет либо в universe_structures, либо
+    # нет в corporation_structures, теперь добавляем отсутствующие данные в БД
+    for structure_id in corp_structures_newA:
+        actualize_universe_structure(interface, dbswagger, structure_id)
+    for structure_data in corp_structures_data:
+        if structure_data["structure_id"] in corp_structures_newB:
+            dbswagger.insert_corporation_structure(structure_data)
+    if corp_structures_updated:
         dbswagger.mark_corporation_structures_updated(corp_structures_ids)
 
-        return corp_structures_data, corp_structures_new
+    return corp_structures_data, corp_structures_new
