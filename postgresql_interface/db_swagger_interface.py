@@ -187,3 +187,34 @@ class QSwaggerInterface:
                 updated_at,
                 ids
             )
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/assets/
+    # -------------------------------------------------------------------------
+
+    def insert_corporation_assets(self, data, updated_at):
+        """ inserts corporation assets data into database
+
+        :param data: corporation assets data
+        """
+        # { "is_singleton": true,
+        #   "item_id": 1035620655696,
+        #   "location_flag": "AutoFit",
+        #   "location_id": 30000153,
+        #   "location_type": "solar_system",
+        #   "quantity": 1,
+        #   "type_id": 35825
+        # }
+        return # недоделано
+        self.db.execute(
+            "INSERT INTO esi_corporation_structures(ecs_structure_id,ecs_corporation_id,ecs_type_id,"
+            " ecs_system_id,ecs_profile_id,ecs_created_at,ecs_updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecs DO NOTHING;",
+            data['structure_id'],
+            data['corporation_id'],
+            data['type_id'],
+            data['system_id'],
+            data['profile_id'],
+            updated_at
+        )

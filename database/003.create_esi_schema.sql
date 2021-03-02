@@ -6,6 +6,16 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+DROP INDEX IF EXISTS qi.idx_eca_location_flag;
+DROP INDEX IF EXISTS qi.idx_eca_location_type;
+DROP INDEX IF EXISTS qi.idx_eca_location_id;
+DROP INDEX IF EXISTS qi.idx_eca_corporation_type_ids;
+DROP INDEX IF EXISTS qi.idx_eca_corporation_id;
+DROP INDEX IF EXISTS qi.idx_eca_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_assets;
+
+DROP TYPE  IF EXISTS qi.esi_location_type;
+
 DROP INDEX IF EXISTS qi.idx_eus_type_id;
 DROP INDEX IF EXISTS qi.idx_eus_solar_system_id;
 DROP INDEX IF EXISTS qi.idx_eus_pk;
@@ -109,6 +119,68 @@ CREATE INDEX idx_ecs_system_id
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+-- esi_corporation_assets
+-- список корпоративных ассетов (по аналогии с БД seat, откуда брались первые
+-- исходные данные)
+--------------------------------------------------------------------------------
+CREATE TYPE qi.esi_location_type AS ENUM ('station','solar_system','other','item');
+
+CREATE TABLE qi.esi_corporation_assets
+(
+    eca_item_id BIGINT NOT NULL,
+    eca_corporation_id BIGINT NOT NULL,
+    eca_type_id INTEGER NOT NULL,
+    eca_quantity INTEGER NOT NULL,
+    eca_location_id BIGINT NOT NULL,
+    eca_location_type qi.esi_location_type NOT NULL,
+    eca_location_flag CHARACTER VARYING(255) NOT NULL,
+    eca_is_singleton BOOLEAN NOT NULL,
+    -- eca_x DOUBLE PRECISION,
+    -- eca_y DOUBLE PRECISION,
+    -- eca_z DOUBLE PRECISION,
+    -- eca_map_id BIGINT,
+    -- eca_map_name CHARACTER VARYING(255),
+    eca_name CHARACTER VARYING(255),
+    eca_created_at TIMESTAMP,
+    eca_updated_at TIMESTAMP,
+    CONSTRAINT pk_eca PRIMARY KEY (eca_item_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_corporation_assets OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_eca_pk
+    ON qi.esi_corporation_assets USING btree
+    (eca_item_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eca_corporation_id
+    ON qi.esi_corporation_assets USING btree
+    (eca_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eca_corporation_type_ids
+    ON qi.esi_corporation_assets USING btree
+    (eca_corporation_id ASC NULLS LAST, eca_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eca_location_id
+    ON qi.esi_corporation_assets USING btree
+    (eca_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eca_location_type
+    ON qi.esi_corporation_assets USING btree
+    (eca_location_type ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eca_location_flag
+    ON qi.esi_corporation_assets USING btree
+    (eca_location_flag ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
 
 -- получаем справку в конце выполнения всех запросов

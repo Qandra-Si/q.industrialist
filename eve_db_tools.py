@@ -143,3 +143,21 @@ def actualize_corporation_structures(interface, dbswagger, corporation_id):
     dbswagger.mark_corporation_structures_updated(corp_structures_ids, corp_structures_updated_at)
 
     return corp_structures_data, corp_structures_new
+
+
+def actualize_corporation_assets(interface, dbswagger, corporation_id):
+    # Requires role(s): Director
+    corp_assets_data = interface.get_esi_paged_data(
+        "corporations/{}/assets/".format(corporation_id))
+
+    corp_assets_updated = interface.is_last_data_updated
+    if not corp_assets_updated:
+        return corp_assets_data, []
+    corp_assets_updated_at = interface.last_modified
+
+    dbswagger.insert_corporation_assets(corp_assets_data, corp_assets_updated_at)
+    #corp_assets_new = dbswagger.get_absent_corp_assets_ids(corp_assets_data)
+    #corp_assets_new = [id[0] for id in corp_assets_new]
+    corp_assets_new = []
+
+    return corp_assets_data, corp_assets_new

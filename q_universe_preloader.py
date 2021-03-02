@@ -17,10 +17,12 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python q_universe_structures.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
+>>> python q_universe_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
+    * esi-corporations.read_structures.v1 - Requires role(s): Station_Manager
+    * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
 """
 import sys
 
@@ -91,6 +93,15 @@ def main():
         else:
             print("'{}' corporation has {} of {} new structures\n".
                   format(corporation_name, len(corp_structures_new), len(corp_structures_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Director
+        corp_assets_data, corp_assets_new = eve_db_tools.actualize_corporation_assets(
+            interface,
+            dbswagger,
+            corporation_id)
+        print("{} of {} new corporation assets items found\n".
+              format(len(corp_assets_new), len(corp_assets_data)))
         sys.stdout.flush()
 
     if not (qidb is None):
