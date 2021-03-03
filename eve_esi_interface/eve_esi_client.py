@@ -249,7 +249,8 @@ class EveESIClient:
                             self.__last_modified = parsedate(url_time)
                             log_line = log_line + " " + url_time[17:-4]
                         if 'Etag' in res.headers:
-                            log_line = log_line + " " + str(res.headers['Etag'])
+                            etag = str(res.headers['Etag'])
+                            log_line = log_line + " " + etag[:17] + '"'
                         print(log_line)
                     if res.status_code == 401:
                         print(res.json())

@@ -17,7 +17,7 @@ DROP TABLE IF EXISTS qi.esi_corporation_assets;
 DROP TYPE  IF EXISTS qi.esi_location_type;
 
 DROP INDEX IF EXISTS qi.idx_eus_type_id;
-DROP INDEX IF EXISTS qi.idx_eus_solar_system_id;
+DROP INDEX IF EXISTS qi.idx_eus_system_id;
 DROP INDEX IF EXISTS qi.idx_eus_pk;
 DROP TABLE IF EXISTS qi.esi_universe_structures;
 
@@ -27,6 +27,55 @@ DROP INDEX IF EXISTS qi.idx_ecs_corporation_id;
 DROP INDEX IF EXISTS qi.idx_ecs_pk;
 DROP TABLE IF EXISTS qi.esi_corporation_structures;
 
+DROP INDEX IF EXISTS qi.idx_ets_system_id;
+DROP INDEX IF EXISTS qi.idx_ets_type_id;
+DROP INDEX IF EXISTS qi.idx_ets_pk;
+DROP TABLE IF EXISTS qi.esi_tranquility_stations;
+
+
+
+--------------------------------------------------------------------------------
+-- esi_tranquility_stations
+-- список станций (по аналогии с БД seat, откуда брались первые исходные данные)
+--------------------------------------------------------------------------------
+CREATE TABLE esi_tranquility_stations
+(
+    ets_station_id BIGINT NOT NULL,
+    ets_type_id BIGINT NOT NULL,
+    ets_name CHARACTER VARYING(255) NOT NULL,
+    ets_owner_id BIGINT,
+    ets_race_id BIGINT,
+    ets_x DOUBLE PRECISION NOT NULL,
+    ets_y DOUBLE PRECISION NOT NULL,
+    ets_z DOUBLE PRECISION NOT NULL,
+    ets_system_id BIGINT NOT NULL,
+    ets_reprocessing_efficiency DOUBLE PRECISION NOT NULL,
+    ets_reprocessing_stations_take DOUBLE PRECISION NOT NULL,
+    ets_max_dockable_ship_volume DOUBLE PRECISION NOT NULL,
+    ets_office_rental_cost DOUBLE PRECISION NOT NULL,
+    ets_created_at TIMESTAMP,
+    ets_updated_at TIMESTAMP,
+    CONSTRAINT pk_ets PRIMARY KEY (ets_station_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_tranquility_stations OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_ets_pk
+    ON qi.esi_tranquility_stations USING btree
+    (ets_station_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ets_type_id
+    ON qi.esi_tranquility_stations USING btree
+    (ets_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ets_system_id
+    ON qi.esi_tranquility_stations USING btree
+    (ets_system_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
 
 --------------------------------------------------------------------------------
@@ -38,11 +87,11 @@ CREATE TABLE qi.esi_universe_structures
     eus_structure_id BIGINT NOT NULL,
     eus_name CHARACTER VARYING(255) NOT NULL,
     eus_owner_id BIGINT DEFAULT NULL,
-    eus_solar_system_id INTEGER NOT NULL,
+    eus_system_id INTEGER NOT NULL,
     eus_type_id INTEGER DEFAULT NULL,
-    -- eus_x DOUBLE PRECISION NOT NULL,
-    -- eus_y DOUBLE PRECISION NOT NULL,
-    -- eus_z DOUBLE PRECISION NOT NULL,
+    eus_x DOUBLE PRECISION NOT NULL,
+    eus_y DOUBLE PRECISION NOT NULL,
+    eus_z DOUBLE PRECISION NOT NULL,
     eus_created_at TIMESTAMP NULL DEFAULT NULL,
     eus_updated_at TIMESTAMP NULL DEFAULT NULL,
     CONSTRAINT pk_eus PRIMARY KEY (eus_structure_id)
@@ -56,9 +105,9 @@ CREATE UNIQUE INDEX idx_eus_pk
     (eus_structure_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
-CREATE INDEX idx_eus_solar_system_id
+CREATE INDEX idx_eus_system_id
     ON qi.esi_universe_structures USING btree
-    (eus_solar_system_id ASC NULLS LAST)
+    (eus_system_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
 CREATE INDEX idx_eus_type_id

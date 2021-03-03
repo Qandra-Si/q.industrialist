@@ -31,8 +31,8 @@ import console_app
 
 
 def main():
-    qidb = None
-    dbswagger = None
+    # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
+    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=False)
     first_time = True
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -41,27 +41,19 @@ def main():
 
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
-        interface, authz = eve_db_tools.auth_pilot_by_name(
+        authz = dbtools.auth_pilot_by_name(
             pilot_name,
             argv_prms["offline_mode"],
             argv_prms["workspace_cache_files_dir"])
         character_id = authz["character_id"]
         character_name = authz["character_name"]
 
-        # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
-        qidb, dbswagger = eve_db_tools.get_db_connection("universe_structures", debug=False)
-
         # Public information about a character
-        character_data = eve_db_tools.actualize_character(
-            interface,
-            dbswagger,
-            character_id)
+        character_data = dbtools.actualize_character(character_id)
+        character_data = dbtools.actualize_character(character_id)
         # Public information about a corporation
         corporation_id = character_data["corporation_id"]
-        corporation_data = eve_db_tools.actualize_corporation(
-            interface,
-            dbswagger,
-            corporation_id)
+        corporation_data = dbtools.actualize_corporation(corporation_id)
 
         corporation_name = corporation_data["name"]
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
@@ -74,9 +66,7 @@ def main():
             first_time = False
 
             # Requires: access token
-            universe_structures_data, universe_structures_new = eve_db_tools.actualize_universe_structures(
-                interface,
-                dbswagger)
+            universe_structures_data, universe_structures_new = dbtools.actualize_universe_structures()
             print("{} of {} new public structures found in the universe\n".
                   format(len(universe_structures_new), len(universe_structures_data)))
             sys.stdout.flush()
@@ -84,10 +74,7 @@ def main():
         # приступаем к загрузке корпоративных данных
 
         # Requires role(s): Station_Manager
-        corp_structures_data, corp_structures_new = eve_db_tools.actualize_corporation_structures(
-            interface,
-            dbswagger,
-            corporation_id)
+        corp_structures_data, corp_structures_new = dbtools.actualize_corporation_structures(corporation_id)
         if not corp_structures_data:
             print("'{}' corporation has no any structures\n".format(corporation_name))
         else:
@@ -96,19 +83,12 @@ def main():
         sys.stdout.flush()
 
         # Requires role(s): Director
-        corp_assets_data, corp_assets_new = eve_db_tools.actualize_corporation_assets(
-            interface,
-            dbswagger,
-            corporation_id)
+        corp_assets_data, corp_assets_new = dbtools.actualize_corporation_assets(corporation_id)
         print("{} of {} new corporation assets items found\n".
               format(len(corp_assets_new), len(corp_assets_data)))
         sys.stdout.flush()
 
-    if not (qidb is None):
-        qidb.commit()
-        if not (dbswagger is None):
-            del dbswagger
-        del qidb
+    del dbtools
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nDone")
