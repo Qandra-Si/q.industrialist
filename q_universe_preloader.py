@@ -49,10 +49,10 @@ def main():
         character_name = authz["character_name"]
 
         # Public information about a character
-        character_data = dbtools.actualize_character(character_id)
+        character_data = dbtools.actualize_character(character_id, True)
         # Public information about a corporation
         corporation_id = character_data["corporation_id"]
-        corporation_data = dbtools.actualize_corporation(corporation_id)
+        corporation_data = dbtools.actualize_corporation(corporation_id, True)
 
         corporation_name = corporation_data["name"]
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))

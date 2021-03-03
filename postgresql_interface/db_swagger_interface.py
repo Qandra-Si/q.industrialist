@@ -19,7 +19,8 @@ class QSwaggerInterface:
 
     def is_exist_something(self, id, table, field):
         """
-        :param id: unique id
+        :param table: table name
+        :param field: field name
         :return: true - exist, false - absent
         """
         sdenid = self.db.select_one_row("SELECT 1 FROM {f} WHERE {t}=%s;".format(t=table, f=field), id)
@@ -27,9 +28,21 @@ class QSwaggerInterface:
             return False
         return True
 
-    def get_absent_anything(self, ids, table, field):
+    def get_exist_ids(self, table, field, updated):
         """
-        :param ids: list of unique identities
+        :param table: table name
+        :param field: field name of identity
+        :param updated: field name of updated_at
+        :return: list of unique identities stored in the database
+        """
+        aids = self.db.select_all_rows("SELECT {f},{u} FROM {t};".format(t=table, f=field, u=updated))
+        return aids
+
+    def get_absent_ids(self, ids, table, field):
+        """
+        :param ids: list of unique identities to compare with ids, stored in the database
+        :param table: table name
+        :param field: field name
         :return: list of ids which are not in the database
         """
         aids = self.db.select_all_rows(
@@ -46,8 +59,11 @@ class QSwaggerInterface:
     def is_exist_character_id(self, id):
         return self.is_exist_something(id, 'esi_characters', 'ech_character_id')
 
+    def get_exist_character_ids(self):
+        return self.get_exist_ids('esi_characters', 'ech_character_id', 'ech_updated_at')
+
     def get_absent_character_ids(self, ids):
-        return self.get_absent_anything(ids, 'esi_characters', 'ech_character_id')
+        return self.get_absent_ids(ids, 'esi_characters', 'ech_character_id')
 
     def insert_character(self, id, data, updated_at):
         """ inserts character data into database
@@ -68,14 +84,27 @@ class QSwaggerInterface:
         #   "security_status": 3.960657443
         #  }
         self.db.execute(
-            "INSERT INTO esi_characters(ech_character_id,ech_name,ech_birthday,ech_created_at,ech_updated_at) "
-            "VALUES (%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
+            "INSERT INTO esi_characters(ech_character_id,ech_name,ech_corporation_id,ech_birthday,"
+            " ech_created_at,ech_updated_at) "
+            "VALUES (%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
             "ON CONFLICT ON CONSTRAINT pk_ech DO NOTHING;",
             id,
             data['name'],
+            data['corporation_id'],
             data['birthday'],
             updated_at
         )
+
+    def select_character(self, id):
+        row = self.db.select_one_row(
+            "SELECT ech_name,ech_corporation_id,ech_birthday,ech_updated_at "
+            "FROM esi_characters "
+            "WHERE ech_character_id=%s;",
+            id
+        )
+        if row is None:
+            return None, None
+        return {'name': row[0], 'corporation_id': row[1], 'birthday': row[2]}, row[3]
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/
@@ -84,8 +113,11 @@ class QSwaggerInterface:
     def is_exist_corporation_id(self, id):
         return self.is_exist_something(id, 'esi_corporations', 'eco_corporation_id')
 
+    def get_exist_corporation_ids(self):
+        return self.get_exist_ids('esi_corporations', 'eco_corporation_id', 'eco_updated_at')
+
     def get_absent_corporation_ids(self, ids):
-        return self.get_absent_anything(ids, 'esi_corporations', 'eco_corporation_id')
+        return self.get_absent_ids(ids, 'esi_corporations', 'eco_corporation_id')
 
     def insert_corporation(self, id, data, updated_at):
         """ inserts corporation data into database
@@ -128,6 +160,31 @@ class QSwaggerInterface:
             updated_at
         )
 
+    def select_corporation(self, id):
+        row = self.db.select_one_row(
+            "SELECT eco_name,eco_ticker,eco_member_count,eco_ceo_id,eco_alliance_id,eco_tax_rate,"
+            " eco_creator_id,eco_home_station_id,eco_shares,eco_updated_at "
+            "FROM esi_corporations "
+            "WHERE eco_corporation_id=%s;",
+            id
+        )
+        if row is None:
+            return None, None
+        data = {
+            'name': row[0],
+            'ticker': row[1],
+            'member_count': row[2],
+            'ceo_id': row[3],
+            'tax_rate': row[5],
+            'creator_id': row[6],
+            'shares': row[8]
+        }
+        if row[4]:
+            data.update({'alliance_id': row[4]})
+        if row[7]:
+            data.update({'home_station_id': row[7]})
+        return data, row[9]
+
     # -------------------------------------------------------------------------
     # universe/stations/
     # -------------------------------------------------------------------------
@@ -135,8 +192,11 @@ class QSwaggerInterface:
     def is_exist_station_id(self, id):
         return self.is_exist_something(id, 'esi_tranquility_stations', 'ets_station_id')
 
+    def get_exist_universe_station_ids(self):
+        return self.get_exist_ids('esi_tranquility_stations', 'ets_station_id', 'ets_updated_at')
+
     def get_absent_universe_station_ids(self, ids):
-        return self.get_absent_anything(ids, 'esi_tranquility_stations', 'ets_station_id')
+        return self.get_absent_ids(ids, 'esi_tranquility_stations', 'ets_station_id')
 
     def insert_universe_station(self, data, updated_at):
         """ inserts universe station data into database
@@ -205,8 +265,11 @@ class QSwaggerInterface:
     def is_exist_structure_id(self, id):
         return self.is_exist_something(id, 'esi_universe_structures', 'eus_structure_id')
 
+    def get_exist_universe_structure_ids(self):
+        return self.get_exist_ids('esi_universe_structures', 'eus_structure_id', 'eus_updated_at')
+
     def get_absent_universe_structure_ids(self, ids):
-        return self.get_absent_anything(ids, 'esi_universe_structures', 'eus_structure_id')
+        return self.get_absent_ids(ids, 'esi_universe_structures', 'eus_structure_id')
 
     def insert_universe_structure(self, id, data, updated_at):
         """ inserts universe structure data into database
@@ -262,8 +325,11 @@ class QSwaggerInterface:
     def is_exist_corporation_structure(self, id):
         return self.is_exist_something(id, 'esi_corporation_structures', 'ecs_structure_id')
 
+    def get_exist_corporation_structure_ids(self):
+        return self.get_exist_ids('esi_corporation_structures', 'ecs_structure_id', 'ecs_updated_at')
+
     def get_absent_corporation_structure_ids(self, ids):
-        return self.get_absent_anything(ids, 'esi_corporation_structures', 'ecs_structure_id')
+        return self.get_absent_ids(ids, 'esi_corporation_structures', 'ecs_structure_id')
 
     def insert_corporation_structure(self, data, updated_at=None):
         """ inserts corporation structure data into database

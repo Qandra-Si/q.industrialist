@@ -7,6 +7,7 @@ actualize_xxx - загружает с серверов CCP xxx-данные, н�
 import sys
 import requests
 import typing
+import datetime
 
 import eve_esi_interface as esi
 import postgresql_interface as db
@@ -14,6 +15,27 @@ import postgresql_interface as db
 import q_industrialist_settings
 
 from __init__ import __version__
+
+
+class QEntity:
+    def __init__(self, db, esi, obj, at):
+        """ данные объекта, хранящеося в индексированном справочнике в памяти
+
+        :param db: признак того, что данные имеются в БД (известно, что объект с таким id есть в БД)
+        :param esi: признак того, что данные получены с серверов CCP
+        :param obj: данные, м.б. None, если не загружены ни с сервера, ни из БД
+        :param at: дата/время последней актуализации кешированных данных (хранящихся в БД)
+        """
+        self.db: bool = db
+        self.esi: bool = esi
+        self.obj: typing.Any = obj
+        self.at: datetime.datetime = at
+
+    def store(self, db, esi, obj, at):
+        self.db: bool = db
+        self.esi: bool = esi
+        self.obj: typing.Any = obj
+        self.at: datetime.datetime = at
 
 
 class QDatabaseTools:
@@ -30,10 +52,11 @@ class QDatabaseTools:
 
         self.esiswagger = None
 
-        self.__cached_characters: typing.Dict[int, typing.Any] = {}
-        self.__cached_corporations: typing.Dict[int, typing.Any] = {}
+        self.__cached_characters: typing.Dict[int, QEntity] = {}
+        self.__cached_corporations: typing.Dict[int, QEntity] = {}
         self.__cached_stations: typing.Dict[int, typing.Any] = {}
         self.__cached_structures: typing.Dict[int, typing.Any] = {}
+        self.prepare_cache()
 
     def __del__(self):
         """ destructor
@@ -68,42 +91,71 @@ class QDatabaseTools:
         return authz
 
     # -------------------------------------------------------------------------
+    # c a c h e
+    # -------------------------------------------------------------------------
+    def prepare_cache(self):
+        rows = self.dbswagger.get_exist_character_ids()
+        for row in rows:
+            self.__cached_characters[row[0]] = QEntity(True, False, None, row[1])
+
+        rows = self.dbswagger.get_exist_corporation_ids()
+        for row in rows:
+            self.__cached_corporations[row[0]] = QEntity(True, False, None, row[1])
+
+    # -------------------------------------------------------------------------
     # characters/{character_id}/
     # -------------------------------------------------------------------------
 
-    def actualize_character(self, character_id):
-        if not (character_id in self.__cached_characters):
+    def actualize_character(self, _character_id, need_data=False):
+        character_id: int = int(_character_id)
+        in_cache = self.__cached_characters.get(character_id)
+        if not in_cache:
             # Public information about a character
             character_data = self.esiswagger.get_esi_data(
                 "characters/{}/".format(character_id),
                 fully_trust_cache=True)
+            character_updated_at = self.esiswagger.last_modified
             # сохраняем данные в БД
             self.dbswagger.insert_character(
                 character_id,
                 character_data,
-                self.esiswagger.last_modified
+                character_updated_at
             )
             # сохраняем данные в кеше
-            self.__cached_characters[character_id] = character_data
+            self.__cached_characters[character_id] = QEntity(
+                True, True, character_data, character_updated_at)
             return character_data
+        elif not need_data:
+            return None
+        elif in_cache.obj:
+            return in_cache.obj
         else:
-            return self.__cached_characters.get(character_id)
+            # есть в кеше, но данных нет (видимо хранится только id)
+            character_data, character_updated_at = self.dbswagger.select_character(character_id)
+            self.__cached_characters[character_id].store(
+                True, True, character_data, character_updated_at)
+            # Внимание! в этой точке надо проверить дату-время последнего обновления информации,
+            # и обновить устаревшие данные
+            return character_data
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/
     # -------------------------------------------------------------------------
 
-    def actualize_corporation(self, corporation_id):
-        if not (corporation_id in self.__cached_corporations):
+    def actualize_corporation(self, _corporation_id, need_data=False):
+        corporation_id: int = int(_corporation_id)
+        in_cache = self.__cached_corporations.get(corporation_id)
+        if not in_cache:
             # Public information about a corporation
             corporation_data = self.esiswagger.get_esi_data(
                 "corporations/{}/".format(corporation_id),
                 fully_trust_cache=True)
+            corporation_updated_at = self.esiswagger.last_modified
             # сохраняем данные в БД
             self.dbswagger.insert_corporation(
                 corporation_id,
                 corporation_data,
-                self.esiswagger.last_modified
+                corporation_updated_at
             )
             # сохраняем сопутствующие данные в БД
             self.actualize_character(corporation_data['ceo_id'])
@@ -112,13 +164,24 @@ class QDatabaseTools:
             if 'home_station_id' in corporation_data:
                 self.actualize_station_or_structure(
                     corporation_data['home_station_id'],
-                    skip_corporation=True
+                    skip_corporation=True  # чтобы программа не зациклилась
                 )
             # сохраняем данные в кеше
-            self.__cached_stations[corporation_id] = corporation_data
+            self.__cached_corporations[corporation_id] = QEntity(
+                True, True, corporation_data, corporation_updated_at)
             return corporation_data
+        elif not need_data:
+            return None
+        elif in_cache.obj:
+            return in_cache.obj
         else:
-            return self.__cached_corporations.get(corporation_id)
+            # есть в кеше, но данных нет (видимо хранится только id)
+            corporation_data, corporation_updated_at = self.dbswagger.select_corporation(corporation_id)
+            self.__cached_corporations[corporation_id].store(
+                True, True, corporation_data, corporation_updated_at)
+            # Внимание! в этой точке надо проверить дату-время последнего обновления информации,
+            # и обновить устаревшие данные
+            return corporation_data
 
     # -------------------------------------------------------------------------
     # universe/stations/{station_id}/

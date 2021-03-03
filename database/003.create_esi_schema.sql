@@ -32,6 +32,7 @@ DROP INDEX IF EXISTS qi.idx_ets_type_id;
 DROP INDEX IF EXISTS qi.idx_ets_pk;
 DROP TABLE IF EXISTS qi.esi_tranquility_stations;
 
+DROP INDEX IF EXISTS qi.idx_ech_corporation_id;
 DROP INDEX IF EXISTS qi.idx_ech_pk;
 DROP TABLE IF EXISTS qi.esi_corporations;
 
@@ -51,6 +52,7 @@ DROP TABLE IF EXISTS qi.esi_characters;
 CREATE TABLE qi.esi_characters (
     ech_character_id BIGINT NOT NULL,
     ech_name CHARACTER VARYING(255) NOT NULL,
+	ech_corporation_id BIGINT NOT NULL,
     -- ech_description TEXT,
     ech_birthday CHARACTER VARYING(255) NOT NULL,
     -- ech_gender CHARACTER VARYING(255) NOT NULL,
@@ -69,6 +71,11 @@ ALTER TABLE qi.esi_characters OWNER TO qi_user;
 CREATE UNIQUE INDEX idx_ech_pk
     ON qi.esi_characters USING btree
     (ech_character_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ech_corporation_id
+    ON qi.esi_characters USING btree
+    (ech_corporation_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
