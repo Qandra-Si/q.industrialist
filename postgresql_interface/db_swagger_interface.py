@@ -14,37 +14,129 @@ class QSwaggerInterface:
         """
 
     # -------------------------------------------------------------------------
-    # universe/stations/
+    # u n i v e r s a l
     # -------------------------------------------------------------------------
 
-    def is_exist_station_id(self, id):
+    def is_exist_something(self, id, table, field):
         """
-
-        :param id: unique station id
+        :param id: unique id
         :return: true - exist, false - absent
         """
-
-        sdenid = self.db.select_one_row(
-            "SELECT 1 FROM esi_tranquility_stations WHERE ets_station_id=%s;",
-            id
-        )
+        sdenid = self.db.select_one_row("SELECT 1 FROM {f} WHERE {t}=%s;".format(t=table, f=field), id)
         if sdenid is None:
             return False
         return True
 
-    def get_absent_universe_station_ids(self, ids):
+    def get_absent_anything(self, ids, table, field):
         """
-
-        :param ids: list of unique station identities
-        :return: list of station ids which are not in the database
+        :param ids: list of unique identities
+        :return: list of ids which are not in the database
         """
-
         aids = self.db.select_all_rows(
             "SELECT id FROM UNNEST(%s) AS a(id) "
-            "WHERE id NOT IN (SELECT ets_station_id FROM esi_tranquility_stations);",
+            "WHERE id NOT IN (SELECT {f} FROM {t});".format(t=table, f=field),
             ids
         )
         return aids
+
+    # -------------------------------------------------------------------------
+    # characters/{character_id}/
+    # -------------------------------------------------------------------------
+
+    def is_exist_character_id(self, id):
+        return self.is_exist_something(id, 'esi_characters', 'ech_character_id')
+
+    def get_absent_character_ids(self, ids):
+        return self.get_absent_anything(ids, 'esi_characters', 'ech_character_id')
+
+    def insert_character(self, id, data, updated_at):
+        """ inserts character data into database
+
+        :param id: unique character id
+        :param data: character data
+        :param updated_at: :class:`datetime.datetime`
+        """
+        # { "alliance_id": 99010134,
+        #   "ancestry_id": 4,
+        #   "birthday": "2009-08-19T19:23:00Z",
+        #   "bloodline_id": 6,
+        #   "corporation_id": 98553333,
+        #   "description": "...",
+        #   "gender": "male",
+        #   "name": "olegez",
+        #   "race_id": 4,
+        #   "security_status": 3.960657443
+        #  }
+        self.db.execute(
+            "INSERT INTO esi_characters(ech_character_id,ech_name,ech_birthday,ech_created_at,ech_updated_at) "
+            "VALUES (%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
+            "ON CONFLICT ON CONSTRAINT pk_ech DO NOTHING;",
+            id,
+            data['name'],
+            data['birthday'],
+            updated_at
+        )
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/
+    # -------------------------------------------------------------------------
+
+    def is_exist_corporation_id(self, id):
+        return self.is_exist_something(id, 'esi_corporations', 'eco_corporation_id')
+
+    def get_absent_corporation_ids(self, ids):
+        return self.get_absent_anything(ids, 'esi_corporations', 'eco_corporation_id')
+
+    def insert_corporation(self, id, data, updated_at):
+        """ inserts corporation data into database
+
+        :param id: unique corporation id
+        :param data: corporation data
+        :param updated_at: :class:`datetime.datetime`
+        """
+        # { "alliance_id": 99007203,
+        #   "ceo_id": 93531267,
+        #   "creator_id": 93362315,
+        #   "date_founded": "2019-09-27T20:27:54Z",
+        #   "description": "...",
+        #   "home_station_id": 60003064,
+        #   "member_count": 215,
+        #   "name": "R Initiative 4",
+        #   "shares": 1000,
+        #   "tax_rate": 0.1,
+        #   "ticker": "RI4",
+        #   "url": "",
+        #   "war_eligible": true
+        #  }
+        self.db.execute(
+            "INSERT INTO esi_corporations(eco_corporation_id,eco_name,eco_ticker,eco_member_count,eco_ceo_id,"
+            " eco_alliance_id,eco_tax_rate,eco_creator_id,eco_home_station_id,eco_shares,eco_created_at,"
+            " eco_updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %s) "
+            "ON CONFLICT ON CONSTRAINT pk_eco DO NOTHING;",
+            id,
+            data['name'],
+            data['ticker'],
+            data['member_count'],
+            data['ceo_id'],
+            data.get('alliance_id', None),
+            data['tax_rate'],
+            data['creator_id'],
+            data.get('home_station_id', None),
+            data.get('shares', None),
+            updated_at
+        )
+
+    # -------------------------------------------------------------------------
+    # universe/stations/
+    # -------------------------------------------------------------------------
+
+    def is_exist_station_id(self, id):
+        return self.is_exist_something(id, 'esi_tranquility_stations', 'ets_station_id')
+
+    def get_absent_universe_station_ids(self, ids):
+        return self.get_absent_anything(ids, 'esi_tranquility_stations', 'ets_station_id')
 
     def insert_universe_station(self, data, updated_at):
         """ inserts universe station data into database
@@ -111,33 +203,10 @@ class QSwaggerInterface:
     # -------------------------------------------------------------------------
 
     def is_exist_structure_id(self, id):
-        """
-
-        :param id: unique structure id
-        :return: true - exist, false - absent
-        """
-
-        sdenid = self.db.select_one_row(
-            "SELECT 1 FROM esi_universe_structures WHERE eus_structure_id=%s;",
-            id
-        )
-        if sdenid is None:
-            return False
-        return True
+        return self.is_exist_something(id, 'esi_universe_structures', 'eus_structure_id')
 
     def get_absent_universe_structure_ids(self, ids):
-        """
-
-        :param ids: list of unique structure identities
-        :return: list of structure ids which are not in the database
-        """
-
-        aids = self.db.select_all_rows(
-            "SELECT id FROM UNNEST(%s) AS a(id) "
-            "WHERE id NOT IN (SELECT eus_structure_id FROM esi_universe_structures);",
-            ids
-        )
-        return aids
+        return self.get_absent_anything(ids, 'esi_universe_structures', 'eus_structure_id')
 
     def insert_universe_structure(self, id, data, updated_at):
         """ inserts universe structure data into database
@@ -190,19 +259,11 @@ class QSwaggerInterface:
     # corporations/{corporation_id}/structures/
     # -------------------------------------------------------------------------
 
+    def is_exist_corporation_structure(self, id):
+        return self.is_exist_something(id, 'esi_corporation_structures', 'ecs_structure_id')
+
     def get_absent_corporation_structure_ids(self, ids):
-        """
-
-        :param ids: list of corporation structure identities
-        :return: list of structure ids which are not in the database
-        """
-
-        aids = self.db.select_all_rows(
-            "SELECT id FROM UNNEST(%s) AS a(id) "
-            "WHERE id NOT IN (SELECT ecs_structure_id FROM esi_corporation_structures);",
-            ids
-        )
-        return aids
+        return self.get_absent_anything(ids, 'esi_corporation_structures', 'ecs_structure_id')
 
     def insert_corporation_structure(self, data, updated_at=None):
         """ inserts corporation structure data into database

@@ -67,16 +67,31 @@ class QDatabaseTools:
         # character_name = authz["character_name"]
         return authz
 
+    # -------------------------------------------------------------------------
+    # characters/{character_id}/
+    # -------------------------------------------------------------------------
+
     def actualize_character(self, character_id):
         if not (character_id in self.__cached_characters):
             # Public information about a character
             character_data = self.esiswagger.get_esi_data(
                 "characters/{}/".format(character_id),
                 fully_trust_cache=True)
+            # сохраняем данные в БД
+            self.dbswagger.insert_character(
+                character_id,
+                character_data,
+                self.esiswagger.last_modified
+            )
+            # сохраняем данные в кеше
             self.__cached_characters[character_id] = character_data
             return character_data
         else:
             return self.__cached_characters.get(character_id)
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/
+    # -------------------------------------------------------------------------
 
     def actualize_corporation(self, corporation_id):
         if not (corporation_id in self.__cached_corporations):
@@ -84,6 +99,13 @@ class QDatabaseTools:
             corporation_data = self.esiswagger.get_esi_data(
                 "corporations/{}/".format(corporation_id),
                 fully_trust_cache=True)
+            # сохраняем данные в БД
+            self.dbswagger.insert_corporation(
+                corporation_id,
+                corporation_data,
+                self.esiswagger.last_modified
+            )
+            # сохраняем сопутствующие данные в БД
             self.actualize_character(corporation_data['ceo_id'])
             if corporation_data['creator_id'] != 1:  # EVE System
                 self.actualize_character(corporation_data['creator_id'])
@@ -92,10 +114,15 @@ class QDatabaseTools:
                     corporation_data['home_station_id'],
                     skip_corporation=True
                 )
+            # сохраняем данные в кеше
             self.__cached_stations[corporation_id] = corporation_data
             return corporation_data
         else:
             return self.__cached_corporations.get(corporation_id)
+
+    # -------------------------------------------------------------------------
+    # universe/stations/{station_id}/
+    # -------------------------------------------------------------------------
 
     def actualize_universe_station(self, station_id):
         try:
@@ -104,11 +131,12 @@ class QDatabaseTools:
                 universe_station_data = self.esiswagger.get_esi_data(
                     "universe/stations/{}/".format(station_id),
                     fully_trust_cache=True)
-                # сохраняем в БД данные о структуре
+                # сохраняем данные в БД
                 self.dbswagger.insert_universe_station(
                     universe_station_data,
                     self.esiswagger.last_modified
                 )
+                # сохраняем данные в кеше
                 self.__cached_stations[station_id] = universe_station_data
                 return universe_station_data
             else:
@@ -125,6 +153,10 @@ class QDatabaseTools:
             print(sys.exc_info())
             raise
 
+    # -------------------------------------------------------------------------
+    # universe/structures/{structure_id}/
+    # -------------------------------------------------------------------------
+
     def actualize_universe_structure(self, structure_id):
         try:
             if not (structure_id in self.__cached_structures):
@@ -132,12 +164,13 @@ class QDatabaseTools:
                 universe_structure_data = self.esiswagger.get_esi_data(
                     "universe/structures/{}/".format(structure_id),
                     fully_trust_cache=True)
-                # сохраняем в БД данные о структуре
+                # сохраняем данные в БД
                 self.dbswagger.insert_universe_structure(
                     structure_id,
                     universe_structure_data,
                     self.esiswagger.last_modified
                 )
+                # сохраняем данные в кеше
                 self.__cached_structures[structure_id] = universe_structure_data
                 return universe_structure_data
             else:
@@ -153,6 +186,10 @@ class QDatabaseTools:
         except:
             print(sys.exc_info())
             raise
+
+    # -------------------------------------------------------------------------
+    # universe/structures/
+    # -------------------------------------------------------------------------
 
     def actualize_universe_structures(self):
         # Requires: access token
@@ -174,6 +211,10 @@ class QDatabaseTools:
             self.actualize_universe_structure(structure_id)
 
         return universe_structures_data, universe_structures_new
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/structures/
+    # -------------------------------------------------------------------------
 
     def actualize_corporation_structures(self, corporation_id):
         # Requires role(s): Station_Manager
@@ -213,6 +254,11 @@ class QDatabaseTools:
 
         return corp_structures_data, corp_structures_new
 
+    # -------------------------------------------------------------------------
+    # universe/stations/{station_id}/
+    # universe/structures/{structure_id}/
+    # -------------------------------------------------------------------------
+
     def actualize_station_or_structure(self, location_id, skip_corporation=False):
         owner_id = None
         if location_id >= 1000000000:
@@ -225,6 +271,10 @@ class QDatabaseTools:
                 owner_id = station_data['owner']
         if not skip_corporation and owner_id:
             self.actualize_corporation(owner_id)
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/assets/
+    # -------------------------------------------------------------------------
 
     def actualize_corporation_assets(self, corporation_id):
         # Requires role(s): Director

@@ -32,13 +32,106 @@ DROP INDEX IF EXISTS qi.idx_ets_type_id;
 DROP INDEX IF EXISTS qi.idx_ets_pk;
 DROP TABLE IF EXISTS qi.esi_tranquility_stations;
 
+DROP INDEX IF EXISTS qi.idx_ech_pk;
+DROP TABLE IF EXISTS qi.esi_corporations;
+
+DROP INDEX IF EXISTS qi.idx_eco_ceo_id;
+DROP INDEX IF EXISTS qi.idx_eco_alliance_id;
+DROP INDEX IF EXISTS qi.idx_eco_creator_id;
+DROP INDEX IF EXISTS qi.idx_eco_home_station_id;
+DROP INDEX IF EXISTS qi.idx_eco_pk;
+DROP TABLE IF EXISTS qi.esi_characters;
+
+
+
+--------------------------------------------------------------------------------
+-- esi_characters
+-- список персонажей (по аналогии с БД seat, откуда брались первые исходные данные)
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_characters (
+    ech_character_id BIGINT NOT NULL,
+    ech_name CHARACTER VARYING(255) NOT NULL,
+    -- ech_description TEXT,
+    ech_birthday CHARACTER VARYING(255) NOT NULL,
+    -- ech_gender CHARACTER VARYING(255) NOT NULL,
+    -- ech_race_id INTEGER NOT NULL,
+    -- ech_bloodline_id INTEGER NOT NULL,
+    -- ech_ancestry_id INTEGER,
+    -- ech_security_status DOUBLE PRECISION,
+    ech_created_at TIMESTAMP,
+    ech_updated_at TIMESTAMP,
+    CONSTRAINT pk_ech PRIMARY KEY (ech_character_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_characters OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_ech_pk
+    ON qi.esi_characters USING btree
+    (ech_character_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- esi_corporations
+-- список корпораций (по аналогии с БД seat, откуда брались первые исходные данные)
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_corporations (
+    eco_corporation_id BIGINT NOT NULL,
+    eco_name CHARACTER VARYING(255) NOT NULL,
+    eco_ticker CHARACTER VARYING(255) NOT NULL,
+    eco_member_count INTEGER NOT NULL,
+    eco_ceo_id BIGINT NOT NULL,
+    eco_alliance_id INTEGER,
+    -- eco_description TEXT,
+    eco_tax_rate DOUBLE PRECISION NOT NULL,
+    -- eco_date_founded TIMESTAMP,
+    eco_creator_id BIGINT NOT NULL,
+    -- eco_url CHARACTER VARYING(510),
+    -- eco_faction_id INTEGER,
+    eco_home_station_id INTEGER,
+    eco_shares BIGINT,
+    eco_created_at TIMESTAMP,
+    eco_updated_at TIMESTAMP,
+    CONSTRAINT pk_eco PRIMARY KEY (eco_corporation_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_corporations OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_eco_pk
+    ON qi.esi_corporations USING btree
+    (eco_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eco_ceo_id
+    ON qi.esi_corporations USING btree
+    (eco_ceo_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eco_alliance_id
+    ON qi.esi_corporations USING btree
+    (eco_alliance_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eco_creator_id
+    ON qi.esi_corporations USING btree
+    (eco_creator_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_eco_home_station_id
+    ON qi.esi_corporations USING btree
+    (eco_home_station_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
 
 --------------------------------------------------------------------------------
 -- esi_tranquility_stations
 -- список станций (по аналогии с БД seat, откуда брались первые исходные данные)
 --------------------------------------------------------------------------------
-CREATE TABLE esi_tranquility_stations
+CREATE TABLE qi.esi_tranquility_stations
 (
     ets_station_id BIGINT NOT NULL,
     ets_type_id BIGINT NOT NULL,
