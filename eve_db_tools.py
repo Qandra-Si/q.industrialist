@@ -197,7 +197,7 @@ class QDatabaseTools:
 
         universe_structures_updated = self.esiswagger.is_last_data_updated
         if not universe_structures_updated:
-            return universe_structures_data, []
+            return universe_structures_data, 0
 
         universe_structures_new = self.dbswagger.get_absent_universe_structure_ids(
             universe_structures_data
@@ -209,8 +209,9 @@ class QDatabaseTools:
 
         for structure_id in universe_structures_new:
             self.actualize_universe_structure(structure_id)
+        self.qidb.commit()
 
-        return universe_structures_data, universe_structures_new
+        return universe_structures_data, len(universe_structures_new)
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/structures/
@@ -223,12 +224,12 @@ class QDatabaseTools:
 
         corp_structures_updated = self.esiswagger.is_last_data_updated
         if not corp_structures_updated:
-            return corp_structures_data, []
+            return corp_structures_data, 0
         corp_structures_updated_at = self.esiswagger.last_modified
 
         corp_structures_ids = [s["structure_id"] for s in corp_structures_data]
         if not corp_structures_ids:
-            return corp_structures_data, []
+            return corp_structures_data, 0
 
         corp_structures_newA = self.dbswagger.get_absent_universe_structure_ids(corp_structures_ids)
         corp_structures_newA = [id[0] for id in corp_structures_newA]
@@ -251,8 +252,9 @@ class QDatabaseTools:
             if structure_data["structure_id"] in corp_structures_newB:
                 self.dbswagger.insert_corporation_structure(structure_data, corp_structures_updated_at)
         self.dbswagger.mark_corporation_structures_updated(corp_structures_ids, corp_structures_updated_at)
+        self.qidb.commit()
 
-        return corp_structures_data, corp_structures_new
+        return corp_structures_data, len(corp_structures_new)
 
     # -------------------------------------------------------------------------
     # universe/stations/{station_id}/
@@ -281,20 +283,24 @@ class QDatabaseTools:
         corp_assets_data = self.esiswagger.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
 
-        #corp_assets_updated = interface.is_last_data_updated
-        #if not corp_assets_updated:
-        #    return corp_assets_data, []
+        corp_assets_updated = self.esiswagger.is_last_data_updated
+        if not corp_assets_updated:
+            return corp_assets_data
         corp_assets_updated_at = self.esiswagger.last_modified
 
         self.dbswagger.clear_corporation_assets(corporation_id)
         for assets_data in corp_assets_data:
-            self.dbswagger.insert_corporation_assets(assets_data, corporation_id, corp_assets_updated_at)
             type_id = assets_data['type_id']
+
+            # пропускаем все ассеты, которые не являются офисами (экономим время на работу с БД,
+            # пока такая работа не сделана по-нормальному)
+            if type_id != 27:
+                continue
+
+            self.dbswagger.insert_corporation_assets(assets_data, corporation_id, corp_assets_updated_at)
             location_id = assets_data['location_id']
             if type_id == 27:  # Office
                 self.actualize_station_or_structure(location_id)
-        #corp_assets_new = dbswagger.get_absent_corp_assets_ids(corp_assets_data)
-        #corp_assets_new = [id[0] for id in corp_assets_new]
-        corp_assets_new = []
+        self.qidb.commit()
 
-        return corp_assets_data, corp_assets_new
+        return corp_assets_data

@@ -50,7 +50,6 @@ def main():
 
         # Public information about a character
         character_data = dbtools.actualize_character(character_id)
-        character_data = dbtools.actualize_character(character_id)
         # Public information about a corporation
         corporation_id = character_data["corporation_id"]
         corporation_data = dbtools.actualize_corporation(corporation_id)
@@ -68,7 +67,7 @@ def main():
             # Requires: access token
             universe_structures_data, universe_structures_new = dbtools.actualize_universe_structures()
             print("{} of {} new public structures found in the universe\n".
-                  format(len(universe_structures_new), len(universe_structures_data)))
+                  format(universe_structures_new, len(universe_structures_data)))
             sys.stdout.flush()
 
         # приступаем к загрузке корпоративных данных
@@ -79,13 +78,13 @@ def main():
             print("'{}' corporation has no any structures\n".format(corporation_name))
         else:
             print("'{}' corporation has {} of {} new structures\n".
-                  format(corporation_name, len(corp_structures_new), len(corp_structures_data)))
+                  format(corporation_name, corp_structures_new, len(corp_structures_data)))
         sys.stdout.flush()
 
         # Requires role(s): Director
-        corp_assets_data, corp_assets_new = dbtools.actualize_corporation_assets(corporation_id)
-        print("{} of {} new corporation assets items found\n".
-              format(len(corp_assets_new), len(corp_assets_data)))
+        corp_assets_data = dbtools.actualize_corporation_assets(corporation_id)
+        print("'{}' corporation has {} asset items\n".
+              format(corporation_name, len(corp_assets_data)))
         sys.stdout.flush()
 
     del dbtools
