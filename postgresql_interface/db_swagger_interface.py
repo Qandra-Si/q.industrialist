@@ -1,4 +1,5 @@
 ﻿# -*- encoding: utf-8 -*-
+import pytz
 
 
 class QSwaggerInterface:
@@ -65,7 +66,7 @@ class QSwaggerInterface:
     def get_absent_character_ids(self, ids):
         return self.get_absent_ids(ids, 'esi_characters', 'ech_character_id')
 
-    def insert_character(self, id, data, updated_at):
+    def insert_or_update_character(self, id, data, updated_at):
         """ inserts character data into database
 
         :param id: unique character id
@@ -84,15 +85,30 @@ class QSwaggerInterface:
         #   "security_status": 3.960657443
         #  }
         self.db.execute(
-            "INSERT INTO esi_characters(ech_character_id,ech_name,ech_corporation_id,ech_birthday,"
-            " ech_created_at,ech_updated_at) "
-            "VALUES (%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
-            "ON CONFLICT ON CONSTRAINT pk_ech DO NOTHING;",
-            id,
-            data['name'],
-            data['corporation_id'],
-            data['birthday'],
-            updated_at
+            "INSERT INTO esi_characters("
+            " ech_character_id,"
+            " ech_name,"
+            " ech_corporation_id,"
+            " ech_birthday,"
+            " ech_created_at,"
+            " ech_updated_at) "
+            "VALUES("
+            " %(id)s,"
+            " %(nm)s,"
+            " %(co)s,"
+            " %(bth)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ech DO "
+            "UPDATE SET"
+            " ech_corporation_id=%(co)s,"
+            " ech_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'id': id,
+             'nm': data['name'],
+             'co': data['corporation_id'],
+             'bth': data['birthday'],
+             'at': updated_at,
+             }
         )
 
     def select_character(self, id):
@@ -119,7 +135,7 @@ class QSwaggerInterface:
     def get_absent_corporation_ids(self, ids):
         return self.get_absent_ids(ids, 'esi_corporations', 'eco_corporation_id')
 
-    def insert_corporation(self, id, data, updated_at):
+    def insert_or_update_corporation(self, id, data, updated_at):
         """ inserts corporation data into database
 
         :param id: unique corporation id
@@ -141,23 +157,55 @@ class QSwaggerInterface:
         #   "war_eligible": true
         #  }
         self.db.execute(
-            "INSERT INTO esi_corporations(eco_corporation_id,eco_name,eco_ticker,eco_member_count,eco_ceo_id,"
-            " eco_alliance_id,eco_tax_rate,eco_creator_id,eco_home_station_id,eco_shares,eco_created_at,"
+            "INSERT INTO esi_corporations("
+            " eco_corporation_id,"
+            " eco_name,"
+            " eco_ticker,"
+            " eco_member_count,"
+            " eco_ceo_id,"
+            " eco_alliance_id,"
+            " eco_tax_rate,"
+            " eco_creator_id,"
+            " eco_home_station_id,"
+            " eco_shares,"
+            " eco_created_at,"
             " eco_updated_at) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-            " TIMESTAMP WITHOUT TIME ZONE %s) "
-            "ON CONFLICT ON CONSTRAINT pk_eco DO NOTHING;",
-            id,
-            data['name'],
-            data['ticker'],
-            data['member_count'],
-            data['ceo_id'],
-            data.get('alliance_id', None),
-            data['tax_rate'],
-            data['creator_id'],
-            data.get('home_station_id', None),
-            data.get('shares', None),
-            updated_at
+            "VALUES ("
+            " %(id)s,"
+            " %(nm)s,"
+            " %(ti)s,"
+            " %(mem)s,"
+            " %(ceo)s,"
+            " %(ali)s,"
+            " %(tax)s,"
+            " %(own)s,"
+            " %(hm)s,"
+            " %(sh)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_eco DO "
+            "UPDATE SET"
+            " eco_name=%(nm)s,"
+            " eco_ticker=%(ti)s,"
+            " eco_member_count=%(mem)s,"
+            " eco_ceo_id=%(ceo)s,"
+            " eco_alliance_id=%(ali)s,"
+            " eco_tax_rate=%(tax)s,"
+            " eco_home_station_id=%(hm)s,"
+            " eco_shares=%(sh)s,"
+            " eco_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'id': id,
+             'nm': data['name'],
+             'ti': data['ticker'],
+             'mem': data['member_count'],
+             'ceo': data['ceo_id'],
+             'ali': data.get('alliance_id', None),
+             'tax': data['tax_rate'],
+             'own': data['creator_id'],
+             'hm': data.get('home_station_id', None),
+             'sh': data.get('shares', None),
+             'at': updated_at,
+             }
         )
 
     def select_corporation(self, id):
