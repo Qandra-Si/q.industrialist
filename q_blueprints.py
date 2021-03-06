@@ -63,7 +63,6 @@ def __push_location_into_blueprints_locations(
 
 
 def __build_blueprints(
-        blueprint_copies,  # true - copy, false - original
         corp_blueprints_data,
         corp_industry_jobs_data,
         eve_market_prices_data,
@@ -84,11 +83,9 @@ def __build_blueprints(
         # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
         # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
         # activities performed on them yet).
-        __quantity = __blueprint_dict["quantity"]
-        __is_blueprint_copy = __quantity == -2
-        if __is_blueprint_copy != blueprint_copies:
-            continue
-        __type_id = __blueprint_dict["type_id"]
+        __quantity: int = __blueprint_dict["quantity"]
+        __is_blueprint_copy: bool = bool(__quantity == -2)
+        __type_id: int = int(__blueprint_dict["type_id"])
         __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
         # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
         # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
@@ -101,6 +98,7 @@ def __build_blueprints(
             "item_id": __blueprint_id,
             "type_id": __type_id,
             "name": __type_desc["name"]["en"],
+            "copy": __is_blueprint_copy,
             "me": __blueprint_dict["material_efficiency"],
             "te": __blueprint_dict["time_efficiency"],
             "q": 1 if __quantity < 0 else __quantity,
@@ -199,12 +197,11 @@ def __build_blueprints(
                 if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
                     # raw_qauntity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
                     # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
+                    __is_blueprint_copy: bool = False
                     if "raw_qauntity" in __items_dict:
                         __raw_qauntity = __items_dict["raw_qauntity"]
-                        if (__raw_qauntity == -2) != blueprint_copies:
-                            continue
-                        elif (__raw_qauntity == -1) == blueprint_copies:
-                            continue
+                        if __raw_qauntity == -2:
+                            __is_blueprint_copy = True
                     # получение данных по чертежу, находящемуся в продаже
                     __quantity = __items_dict["quantity"]
                     __type_desc = sde_type_ids[str(__type_id)]
@@ -217,6 +214,7 @@ def __build_blueprints(
                         "item_id": __items_dict["record_id"],
                         "type_id": __type_id,
                         "name": __type_desc["name"]["en"],
+                        "copy": __is_blueprint_copy,
                         # "me": None,
                         # "te": None,
                         "q": __quantity,
@@ -253,7 +251,7 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
 
-    corps_blueprints = {"bpo": {}, "bpc": {}}
+    corps_blueprints = {}
     eve_market_prices_data = None
     various_characters_data = []
     for pilot_name in argv_prms["character_names"]:
@@ -425,23 +423,7 @@ def main():
         # Построение дерева имущества (сводная информация, учитывающая объёмы и ориентировочную стоимость asset-ов)
         print("\nBuilding {} blueprints stat...".format(corporation_name))
         sys.stdout.flush()
-        corp_orig_blueprints, blueprints_orig_locations = __build_blueprints(
-            False,
-            corp_blueprints_data,
-            corp_industry_jobs_data,
-            eve_market_prices_data,
-            corp_contracts_data,
-            corp_contract_items_data,
-            various_characters_data,
-            sde_type_ids,
-            sde_inv_names,
-            sde_inv_items,
-            sde_market_groups,
-            corp_assets_tree,
-            corp_ass_names_data,
-            foreign_structures_data)
-        corp_copy_blueprints, blueprints_copy_locations = __build_blueprints(
-            True,
+        corp_blueprints, blueprints_locations = __build_blueprints(
             corp_blueprints_data,
             corp_industry_jobs_data,
             eve_market_prices_data,
@@ -456,18 +438,12 @@ def main():
             corp_ass_names_data,
             foreign_structures_data)
 
-        corp_orig_blueprints.sort(key=lambda bp: bp["name"])
-        corp_copy_blueprints.sort(key=lambda bp: bp["name"])
+        corp_blueprints.sort(key=lambda bp: bp["name"])
 
-        corps_blueprints["bpo"].update({str(corporation_id): {
+        corps_blueprints.update({str(corporation_id): {
             "corporation": corporation_name,
-            "blueprints": corp_orig_blueprints,
-            "locations": blueprints_orig_locations
-        }})
-        corps_blueprints["bpc"].update({str(corporation_id): {
-            "corporation": corporation_name,
-            "blueprints": corp_copy_blueprints,
-            "locations": blueprints_copy_locations
+            "blueprints": corp_blueprints,
+            "locations": blueprints_locations
         }})
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_blueprints", corps_blueprints)
