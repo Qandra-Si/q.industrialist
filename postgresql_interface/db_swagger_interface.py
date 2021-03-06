@@ -544,7 +544,7 @@ class QSwaggerInterface:
              }
         )
 
-    def get_exist_corporation_structures(self,):
+    def get_exist_corporation_structures(self):
         rows = self.db.select_all_rows(
             "SELECT ecs_structure_id,ecs_corporation_id,ecs_type_id,ecs_system_id,ecs_profile_id,ecs_updated_at "
             "FROM esi_corporation_structures;"
@@ -598,7 +598,7 @@ class QSwaggerInterface:
             corporation_id
         )
 
-    def insert_corporation_assets(self, data, corporation_id, updated_at):
+    def insert_or_update_corporation_assets(self, data, corporation_id, updated_at):
         """ inserts corporation assets data into database
 
         :param data: corporation assets data
@@ -612,20 +612,104 @@ class QSwaggerInterface:
         #   "type_id": 35825
         # }
         self.db.execute(
-            "INSERT INTO esi_corporation_assets(eca_item_id,eca_corporation_id,eca_type_id,eca_quantity,"
-            " eca_location_id,eca_location_type,eca_location_flag,eca_is_singleton,eca_name,eca_created_at,"
+            "INSERT INTO esi_corporation_assets("
+            " eca_item_id,"
+            " eca_corporation_id,"
+            " eca_type_id,"
+            " eca_quantity,"
+            " eca_location_id,"
+            " eca_location_type,"
+            " eca_location_flag,"
+            " eca_is_singleton,"
+            " eca_name,"
+            " eca_created_at,"
             " eca_updated_at) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-            " TIMESTAMP WITHOUT TIME ZONE %s) "
-            "ON CONFLICT ON CONSTRAINT pk_eca DO NOTHING;",
-            data['item_id'],
-            corporation_id,
-            data['type_id'],
-            data['quantity'],
-            data['location_id'],
-            data['location_type'],
-            data['location_flag'],
-            data['is_singleton'],
-            None,
-            updated_at
+            "VALUES ("
+            " %(id)s,"
+            " %(co)s,"
+            " %(ty)s,"
+            " %(q)s,"
+            " %(loc)s,"
+            " %(lty)s,"
+            " %(lfl)s,"
+            " %(sn)s,"
+            " %(nm)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_eca DO UPDATE SET"
+            " eca_quantity=%(q)s,"
+            " eca_location_id=%(loc)s,"
+            " eca_location_type=%(lty)s,"
+            " eca_location_flag=%(lfl)s,"
+            " eca_is_singleton=%(sn)s,"
+            " eca_name=%(nm)s,"
+            " eca_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'id': data['item_id'],
+             'co': corporation_id,
+             'ty': data['type_id'],
+             'q': data['quantity'],
+             'loc': data['location_id'],
+             'lty': data['location_type'],
+             'lfl': data['location_flag'],
+             'sn': data['is_singleton'],
+             'nm': data.get('name', None),
+             'at': updated_at,
+             }
         )
+
+    def get_exist_corporation_assets(self):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " eca_item_id,"
+            " eca_corporation_id,"
+            " eca_type_id,"
+            " eca_quantity,"
+            " eca_location_id,"
+            " eca_location_type,"
+            " eca_location_flag,"
+            " eca_is_singleton,"
+            " eca_name,"
+            " eca_updated_at "
+            "FROM esi_corporation_assets;"
+        )
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[9], 'corporation_id': row[1]}
+            if row[8]:
+                ext.update({'name': row[8]})
+            data.append({
+                'item_id': row[0],
+                'type_id': row[2],
+                'quantity': row[3],
+                'location_id': row[4],
+                'location_type': row[5],
+                'location_flag': row[6],
+                'is_singleton': row[7],
+                'ext': ext,
+            })
+        return data
+
+    def delete_obsolete_corporation_assets(self, deleted_ids):
+        """ обновляет updated_at у существующих корп-ассетов и удаляет устаревшие (исчезнувшие) ассеты
+
+        :param deleted_ids: obsolete corporation asset items ids to remove from database
+        :param corporation_id: corporation id to update its assets
+        :param updated_at: :class:`datetime.datetime`
+        """
+        if deleted_ids:
+            self.db.execute(
+                "DELETE FROM esi_corporation_assets "
+                "WHERE eca_item_id IN (SELECT * FROM UNNEST(%s));",
+                deleted_ids,
+            )
+        # if updated_at:
+        #    self.db.execute(
+        #        "UPDATE esi_corporation_assets SET"
+        #        " eca_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s "
+        #        "WHERE eca_corporation_id=%(id)s;",
+        #        {'id': corporation_id,
+        #         'at': updated_at,
+        #         }
+        #    )
