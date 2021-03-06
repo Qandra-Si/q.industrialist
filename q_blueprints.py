@@ -199,8 +199,6 @@ def __build_blueprints(
                    continue
                 __type_id = __items_dict["type_id"]
                 __type_desc = sde_type_ids[str(__type_id)]
-                if __type_desc.get("metaGroupID") == 2:
-                    print(__type_id, __type_desc["name"]["en"])
                 # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
                 # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
                 # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
