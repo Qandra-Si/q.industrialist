@@ -86,13 +86,18 @@ def __build_blueprints(
         __quantity: int = __blueprint_dict["quantity"]
         __is_blueprint_copy: bool = bool(__quantity == -2)
         __type_id: int = int(__blueprint_dict["type_id"])
+        __type_desc = sde_type_ids[str(__type_id)]
         __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
         # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
         # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+        # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
+        # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
         if __group_id != 2:  # Blueprints & Reactions
-            continue
+            if __type_desc.get("metaGroupID") == 2:
+                pass
+            else:
+                continue
         __blueprint_id = __blueprint_dict["item_id"]
-        __type_desc = sde_type_ids[str(__type_id)]
         __location_id = __blueprint_dict["location_id"]
         __blueprint = {
             "item_id": __blueprint_id,
@@ -193,18 +198,25 @@ def __build_blueprints(
                 elif not bool(__items_dict["is_included"]):
                    continue
                 __type_id = __items_dict["type_id"]
+                __type_desc = sde_type_ids[str(__type_id)]
+                if __type_desc.get("metaGroupID") == 2:
+                    print(__type_id, __type_desc["name"]["en"])
+                # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
+                # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+                # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
+                # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
                 __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-                if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
-                    # raw_qauntity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
+                # Blueprints and Reactions (добавляем только этот тип), а также T2-чертежи
+                if not (__group_id is None) and (__group_id == 2) or (__type_desc.get("metaGroupID") == 2):
+                    # raw_quantity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
                     # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
                     __is_blueprint_copy: bool = False
-                    if "raw_qauntity" in __items_dict:
-                        __raw_qauntity = __items_dict["raw_qauntity"]
+                    if "raw_quantity" in __items_dict:
+                        __raw_qauntity = __items_dict["raw_quantity"]
                         if __raw_qauntity == -2:
                             __is_blueprint_copy = True
                     # получение данных по чертежу, находящемуся в продаже
                     __quantity = __items_dict["quantity"]
-                    __type_desc = sde_type_ids[str(__type_id)]
                     # получение общих данных данных по контракту
                     __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
                     __location_id = __contract_dict["start_location_id"]
