@@ -485,19 +485,6 @@ class QSwaggerInterface:
         forbidden: bool = False if row[7] is None else bool(row[7])
         return data, forbidden, row[8]
 
-    # def mark_universe_structures_updated(self, ids):
-    #    """
-    #
-    #    :param ids: list of unique structure identities to update
-    #    """
-    #
-    #    self.db.execute(
-    #        "UPDATE esi_universe_structures"
-    #        " SET eus_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
-    #        "WHERE eus_structure_id IN (SELECT * FROM UNNEST(%s));",
-    #        ids
-    #    )
-
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/structures/
     # -------------------------------------------------------------------------
@@ -505,13 +492,10 @@ class QSwaggerInterface:
     def is_exist_corporation_structure(self, id):
         return self.is_exist_something(id, 'esi_corporation_structures', 'ecs_structure_id')
 
-    def get_exist_corporation_structure_ids(self):
-        return self.get_exist_ids('esi_corporation_structures', 'ecs_structure_id', 'ecs_updated_at')
-
     def get_absent_corporation_structure_ids(self, ids):
         return self.get_absent_ids(ids, 'esi_corporation_structures', 'ecs_structure_id')
 
-    def insert_corporation_structure(self, data, updated_at=None):
+    def insert_or_update_corporation_structure(self, data, updated_at):
         """ inserts corporation structure data into database
 
         :param data: corporation structure data
@@ -531,52 +515,75 @@ class QSwaggerInterface:
         #   "system_id": 30000153,
         #   "type_id": 35825
         # }
-        if updated_at is None:
-            self.db.execute(
-                "INSERT INTO esi_corporation_structures(ecs_structure_id,ecs_corporation_id,ecs_type_id,"
-                " ecs_system_id,ecs_profile_id,ecs_created_at,ecs_updated_at) "
-                "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
-                "ON CONFLICT ON CONSTRAINT pk_ecs DO NOTHING;",
-                data['structure_id'],
-                data['corporation_id'],
-                data['type_id'],
-                data['system_id'],
-                data['profile_id']
-            )
-        else:
-            self.db.execute(
-                "INSERT INTO esi_corporation_structures(ecs_structure_id,ecs_corporation_id,ecs_type_id,"
-                " ecs_system_id,ecs_profile_id,ecs_created_at,ecs_updated_at) "
-                "VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP AT TIME ZONE 'GMT',TIMESTAMP WITHOUT TIME ZONE %s) "
-                "ON CONFLICT ON CONSTRAINT pk_ecs DO NOTHING;",
-                data['structure_id'],
-                data['corporation_id'],
-                data['type_id'],
-                data['system_id'],
-                data['profile_id'],
-                updated_at
-            )
+        self.db.execute(
+            "INSERT INTO esi_corporation_structures("
+            " ecs_structure_id,"
+            " ecs_corporation_id,"
+            " ecs_type_id,"
+            " ecs_system_id,"
+            " ecs_profile_id,"
+            " ecs_created_at,"
+            " ecs_updated_at) "
+            "VALUES ("
+            " %(id)s,"
+            " %(co)s,"
+            " %(ty)s,"
+            " %(ss)s,"
+            " %(pr)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecs DO UPDATE SET"
+            " ecs_profile_id=%(pr)s,"
+            " ecs_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'id': data['structure_id'],
+             'co': data['corporation_id'],
+             'ty': data['type_id'],
+             'ss': data['system_id'],
+             'pr': data['profile_id'],
+             'at': updated_at,
+             }
+        )
 
-    def mark_corporation_structures_updated(self, ids, updated_at=None):
+    def get_exist_corporation_structures(self,):
+        rows = self.db.select_all_rows(
+            "SELECT ecs_structure_id,ecs_corporation_id,ecs_type_id,ecs_system_id,ecs_profile_id,ecs_updated_at "
+            "FROM esi_corporation_structures;"
+        )
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            data.append({
+                'structure_id': row[0],
+                'corporation_id': row[1],
+                'type_id': row[2],
+                'system_id': row[3],
+                'profile_id': row[4],
+                'ext': {'updated_at': row[5]},
+            })
+        return data
+
+    def mark_corporation_structures_updated(self, corporation_id, deleted_ids, updated_at):
+        """ обновляет updated_at у существующих корп-структур и удаляет устаревшие (исчезнувшие) структуры
+
+        :param corporation_id: corporation id to update its structure
+        :param deleted_ids: obsolete corporation structure ids to remove from database
+        :param updated_at: :class:`datetime.datetime`
         """
-
-        :param ids: list of corporation structure identities to update
-        """
-
-        if updated_at is None:
+        if deleted_ids:
             self.db.execute(
-                "UPDATE esi_corporation_structures"
-                " SET ecs_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+                "DELETE FROM esi_corporation_structures "
                 "WHERE ecs_structure_id IN (SELECT * FROM UNNEST(%s));",
-                ids
+                deleted_ids,
             )
-        else:
+        if updated_at:
             self.db.execute(
-                "UPDATE esi_corporation_structures"
-                " SET ecs_updated_at=TIMESTAMP WITHOUT TIME ZONE %s "
-                "WHERE ecs_structure_id IN (SELECT * FROM UNNEST(%s));",
-                updated_at,
-                ids
+                "UPDATE esi_corporation_structures SET"
+                " ecs_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s "
+                "WHERE ecs_corporation_id=%(id)s;",
+                {'id': corporation_id,
+                 'at': updated_at,
+                 }
             )
 
     # -------------------------------------------------------------------------
