@@ -101,6 +101,170 @@ def __dump_materials_list(
 """)  # qind-materials-used, media, media-body
 
 
+def __dump_not_available_materials_list(
+        glf,
+        # esi данные, загруженные с серверов CCP
+        corp_bp_loc_data,
+        corp_industry_jobs_data,
+        corp_assets_tree,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_bp_materials,
+        sde_market_groups,
+        # списки контейнеров и станок из экземпляра контейнера
+        stock_all_loc_ids,
+        exclude_loc_ids,
+        blueprint_station_ids,
+        # списком материалов, которых не хватает в производстве
+        stock_not_enough_materials,
+        # список ресурсов, которые используются в производстве
+        stock_resources,
+        materials_summary,
+        # настройки
+        with_copy_to_clipboard):
+    # отображение в отчёте summary-информации по недостающим материалам
+    if len(materials_summary) > 0:
+        # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+        # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
+        material_groups = {}
+        for __summary_dict in materials_summary:
+            __quantity = __summary_dict["q"]
+            __type_id = __summary_dict["id"]
+            __item_name = __summary_dict["nm"]
+            __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+            __material_dict = {"id": __type_id, "q": __quantity, "nm": __item_name}
+            if str(__market_group) in material_groups:
+                material_groups[str(__market_group)].append(__material_dict)
+            else:
+                material_groups.update({str(__market_group): [__material_dict]})
+        # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
+        not_available_row_num = 1
+        ms_groups = material_groups.keys()
+        for ms_group_id in ms_groups:
+            material_groups[ms_group_id].sort(key=lambda m: m["nm"])
+            group_diplayed = False
+            for __material_dict in material_groups[ms_group_id]:
+                # получение данных по материалу
+                ms_type_id = __material_dict["id"]
+                not_available = __material_dict["q"]
+                ms_item_name = __material_dict["nm"]
+                if ms_type_id in stock_resources:
+                    not_available = 0 if stock_resources[ms_type_id] >= not_available else \
+                        not_available - stock_resources[ms_type_id]
+                if not_available > 0:
+                    # формирование выходного списка недостающих материалов
+                    __stock_ne = next((ne for ne in stock_not_enough_materials if ne['id'] == ms_type_id), None)
+                    if __stock_ne is None:
+                        stock_not_enough_materials.append({"id": ms_type_id, "q": not_available})
+                    else:
+                        __stock_ne["q"] += not_available
+                    # вывод сведений в отчёт
+                    if not_available_row_num == 1:
+                        glf.write("""
+    <div class="media">
+     <div class="media-left">
+      <span class="glyphicon glyphicon-remove-sign" aria-hidden="false" style="font-size: 64px;"></span>
+     </div>
+     <div class="media-body">
+      <h4 class="media-heading">Not available materials</h4>
+      <div class="table-responsive">
+       <table class="table table-condensed table-hover">
+       <thead>
+        <tr>
+         <th style="width:40px;">#</th>
+         <th>Materials</th>
+         <th>Not available</th>
+         <th>In progress</th>
+        </tr>
+       </thead>
+       <tbody>
+    """)
+                    # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
+                    if not group_diplayed:
+                        __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
+                        __icon_id = sde_market_groups[ms_group_id]["iconID"] if "iconID" in sde_market_groups[
+                            ms_group_id] else 0
+                        # подготовка элементов управления копирования данных в clipboard
+                        __copy2clpbrd = '' if not with_copy_to_clipboard else \
+                            '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
+                            '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
+                            '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
+                        glf.write(
+                            '<tr>\n'
+                            # ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                            ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                            '</tr>'.
+                                format(nm=__grp_name,
+                                       # icn=__get_icon_src(__icon_id, sde_icon_ids),
+                                       id=ms_group_id,
+                                       clbrd=__copy2clpbrd))
+                        group_diplayed = True
+                    # получаем список работ, которые выдутся с этим материалом, а результаты сбрабываются в stock-ALL
+                    jobs = [j for j in corp_industry_jobs_data if
+                            (j["product_type_id"] == ms_type_id) and
+                            (j['output_location_id'] in stock_all_loc_ids)]
+                    in_progress = 0
+                    for j in jobs:
+                        in_progress = in_progress + j["runs"]
+                    # умножаем на кол-во производимых материалов на один run
+                    __stub01, __bp_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(ms_type_id,
+                                                                                            sde_bp_materials)
+                    if not (__bp_dict is None):
+                        in_progress *= __bp_dict["activities"]["manufacturing"]["products"][0]["quantity"]
+                    # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
+                    vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
+                        ms_type_id,
+                        corp_bp_loc_data,
+                        sde_bp_materials,
+                        exclude_loc_ids,
+                        blueprint_station_ids,
+                        corp_assets_tree)
+                    # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
+                    vacant_originals_tag = ""
+                    vacant_copies_tag = ""
+                    absent_blueprints_tag = ""
+                    if not_available > in_progress:
+                        if not not_a_product and vacant_originals:
+                            vacant_originals_tag = ' <span class="label label-info">original</span>'
+                        if not not_a_product and vacant_copies:
+                            vacant_copies_tag = ' <span class="label label-default">copy</span>'
+                        if not not_a_product and not vacant_originals and not vacant_copies:
+                            absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
+                    # подготовка элементов управления копирования данных в clipboard
+                    __copy2clpbrd = '' if not with_copy_to_clipboard else \
+                        '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                        '  aria-hidden="true"></span></a>'. \
+                            format(nm=ms_item_name)
+                    # вывод сведений в отчёт
+                    glf.write(
+                        '<tr>\n'
+                        ' <th scope="row">{num}</th>\n'
+                        ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
+                        ' <td quantity="{q}">{q:,d}{original}{copy}{absent}</td>\n'
+                        ' <td>{inp}</td>\n'
+                        '</tr>'.
+                            format(num=not_available_row_num,
+                                   src=render_html.__get_img_src(ms_type_id, 32),
+                                   q=not_available,
+                                   inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
+                                   nm=ms_item_name,
+                                   clbrd=__copy2clpbrd,
+                                   original=vacant_originals_tag,
+                                   copy=vacant_copies_tag,
+                                   absent=absent_blueprints_tag)
+                    )
+                    not_available_row_num = not_available_row_num + 1
+        if not_available_row_num != 1:
+            glf.write("""
+       </tbody>
+       </table>
+      </div> <!--table-responsive-->
+     </div> <!--media-body-->
+    </div> <!--media-->
+    """)
+
+
 def __dump_blueprints_list_with_materials(
         glf,
         conveyor_entity,
@@ -112,6 +276,8 @@ def __dump_blueprints_list_with_materials(
         sde_bp_materials,
         sde_market_groups,
         sde_icon_ids,
+        global_materials_summary,
+        global_materials_used,
         enable_copy_to_clipboard=False):
     # получение списков контейнеров и станок из экземпляра контейнера
     stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
@@ -266,13 +432,19 @@ def __dump_blueprints_list_with_materials(
                                 quantity_or_runs,
                                 m["quantity"],  # сведения из чертежа
                                 material_efficiency)
-                            # сохраняем материалы для производства в список их суммарного кол-ва
+                            # получаем сведения о материале
                             bpmm_tid = int(m["typeID"])
                             bpmm_tnm = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm_tid)
+                            # сохраняем материалы для производства в список их суммарного кол-ва
                             __used_dict = next((ms for ms in materials_used if ms['id'] == bpmm_tid), None)
                             if __used_dict is None:
-                                __used_dict = {"id": bpmm_tid, "q": __need, "nm": bpmm_tnm}
-                                materials_used.append(__used_dict)
+                                materials_used.append({"id": bpmm_tid, "q": __need, "nm": bpmm_tnm})
+                            else:
+                                __used_dict["q"] += __need
+                            # сохраняем материалы для производства в список их суммарного кол-ва
+                            __used_dict = next((ms for ms in global_materials_used if ms['id'] == bpmm_tid), None)
+                            if __used_dict is None:
+                                global_materials_used.append({"id": bpmm_tid, "q": __need, "nm": bpmm_tnm})
                             else:
                                 __used_dict["q"] += __need
                     # ---
@@ -329,8 +501,21 @@ def __dump_blueprints_list_with_materials(
                         # сохраняем материалы для производства в список их суммарного кол-ва
                         __summary_dict = next((ms for ms in materials_summary if ms['id'] == int(m["typeID"])), None)
                         if __summary_dict is None:
-                            __summary_dict = {"id": int(m["typeID"]), "q": bp_manuf_need_all, "nm": bpmm_tnm}
-                            materials_summary.append(__summary_dict)
+                            materials_summary.append({
+                                "id": int(m["typeID"]),
+                                "q": bp_manuf_need_all,
+                                "nm": bpmm_tnm
+                            })
+                        else:
+                            __summary_dict["q"] += bp_manuf_need_all
+                        # сохраняем материалы для производства в ГЛОБАЛЬНЫЙ список их суммарного кол-ва
+                        __summary_dict = next((ms for ms in global_materials_summary if ms['id'] == int(m["typeID"])), None)
+                        if __summary_dict is None:
+                            global_materials_summary.append({
+                                "id": int(m["typeID"]),
+                                "q": bp_manuf_need_all,
+                                "nm": bpmm_tnm
+                            })
                         else:
                             __summary_dict["q"] += bp_manuf_need_all
                     glf.write('</div>\n')  # div(materials)
@@ -361,148 +546,30 @@ def __dump_blueprints_list_with_materials(
 </div> <!--table-responsive-->
 """)
 
+        # отображение в отчёте summary-информации по недостающим материалам
         __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', materials_used, True, True)
         __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', materials_summary, False, True)
-
-        # отображение в отчёте summary-информации по недостающим материалам
-        if len(materials_summary) > 0:
-            # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
-            # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
-            material_groups = {}
-            for __summary_dict in materials_summary:
-                __quantity = __summary_dict["q"]
-                __type_id = __summary_dict["id"]
-                __item_name = __summary_dict["nm"]
-                __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-                __material_dict = {"id": __type_id, "q": __quantity, "nm": __item_name}
-                if str(__market_group) in material_groups:
-                    material_groups[str(__market_group)].append(__material_dict)
-                else:
-                    material_groups.update({str(__market_group): [__material_dict]})
-            # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
-            not_available_row_num = 1
-            ms_groups = material_groups.keys()
-            for ms_group_id in ms_groups:
-                material_groups[ms_group_id].sort(key=lambda m: m["nm"])
-                group_diplayed = False
-                for __material_dict in material_groups[ms_group_id]:
-                    # получение данных по материалу
-                    ms_type_id = __material_dict["id"]
-                    not_available = __material_dict["q"]
-                    ms_item_name = __material_dict["nm"]
-                    if ms_type_id in stock_resources:
-                        not_available = 0 if stock_resources[ms_type_id] >= not_available else \
-                            not_available - stock_resources[ms_type_id]
-                    if not_available > 0:
-                        # формирование выходного списка недостающих материалов
-                        __stock_ne = next((ne for ne in stock_not_enough_materials if ne['id'] == ms_type_id), None)
-                        if __stock_ne is None:
-                            stock_not_enough_materials.append({"id": ms_type_id, "q": not_available})
-                        else:
-                            __stock_ne["q"] += not_available
-                        # вывод сведений в отчёт
-                        if not_available_row_num == 1:
-                            glf.write("""
-<div class="media">
- <div class="media-left">
-  <span class="glyphicon glyphicon-remove-sign" aria-hidden="false" style="font-size: 64px;"></span>
- </div>
- <div class="media-body">
-  <h4 class="media-heading">Not available materials</h4>
-  <div class="table-responsive">
-   <table class="table table-condensed table-hover">
-   <thead>
-    <tr>
-     <th style="width:40px;">#</th>
-     <th>Materials</th>
-     <th>Not available</th>
-     <th>In progress</th>
-    </tr>
-   </thead>
-   <tbody>
-""")
-                        # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
-                        if not group_diplayed:
-                            __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
-                            __icon_id = sde_market_groups[ms_group_id]["iconID"] if "iconID" in sde_market_groups[ms_group_id] else 0
-                            # подготовка элементов управления копирования данных в clipboard
-                            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
-                                '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
-                                '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
-                                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
-                            glf.write(
-                                '<tr>\n'
-                                # ' <td class="active" colspan="4"><img class="icn24" src="{icn}" style="display:inline;">&nbsp;<strong class="text-primary">{nm}</strong><!--{id}-->{clbrd}</td>\n'
-                                ' <td class="active" colspan="4"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
-                                '</tr>'.
-                                format(nm=__grp_name,
-                                       # icn=__get_icon_src(__icon_id, sde_icon_ids),
-                                       id=ms_group_id,
-                                       clbrd=__copy2clpbrd))
-                            group_diplayed = True
-                        # получаем список работ, которые выдутся с этим материалом, а результаты сбрабываются в stock-ALL
-                        jobs = [j for j in corp_industry_jobs_data if
-                                    (j["product_type_id"] == ms_type_id) and
-                                    (j['output_location_id'] in stock_all_loc_ids)]
-                        in_progress = 0
-                        for j in jobs:
-                            in_progress = in_progress + j["runs"]
-                        # умножаем на кол-во производимых материалов на один run
-                        __stub01, __bp_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(ms_type_id, sde_bp_materials)
-                        if not (__bp_dict is None):
-                            in_progress *= __bp_dict["activities"]["manufacturing"]["products"][0]["quantity"]
-                        # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
-                        vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
-                            ms_type_id,
-                            corp_bp_loc_data,
-                            sde_bp_materials,
-                            exclude_loc_ids,
-                            blueprint_station_ids,
-                            corp_assets_tree)
-                        # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
-                        vacant_originals_tag = ""
-                        vacant_copies_tag = ""
-                        absent_blueprints_tag = ""
-                        if not_available > in_progress:
-                            if not not_a_product and vacant_originals:
-                                vacant_originals_tag = ' <span class="label label-info">original</span>'
-                            if not not_a_product and vacant_copies:
-                                vacant_copies_tag = ' <span class="label label-default">copy</span>'
-                            if not not_a_product and not vacant_originals and not vacant_copies:
-                                absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
-                        # подготовка элементов управления копирования данных в clipboard
-                        __copy2clpbrd = '' if not enable_copy_to_clipboard else \
-                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
-                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'\
-                            '  aria-hidden="true"></span></a>'. \
-                            format(nm=ms_item_name)
-                        # вывод сведений в отчёт
-                        glf.write(
-                            '<tr>\n'
-                            ' <th scope="row">{num}</th>\n'
-                            ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                            ' <td quantity="{q}">{q:,d}{original}{copy}{absent}</td>\n'
-                            ' <td>{inp}</td>\n'
-                            '</tr>'.
-                            format(num=not_available_row_num,
-                                   src=render_html.__get_img_src(ms_type_id, 32),
-                                   q=not_available,
-                                   inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
-                                   nm=ms_item_name,
-                                   clbrd=__copy2clpbrd,
-                                   original=vacant_originals_tag,
-                                   copy=vacant_copies_tag,
-                                   absent=absent_blueprints_tag)
-                        )
-                        not_available_row_num = not_available_row_num + 1
-            if not_available_row_num != 1:
-                glf.write("""
-   </tbody>
-   </table>
-  </div> <!--table-responsive-->
- </div> <!--media-body-->
-</div> <!--media-->
-""")
+        __dump_not_available_materials_list(
+            glf,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_assets_tree,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            # списки контейнеров и станок из экземпляра контейнера
+            stock_all_loc_ids,
+            exclude_loc_ids,
+            blueprint_station_ids,
+            # списком материалов, которых не хватает в производстве
+            stock_not_enough_materials,
+            # список ресурсов, которые используются в производстве
+            stock_resources,
+            materials_summary,
+            # настройки
+            enable_copy_to_clipboard)
 
         glf.write("""
    </div> <!--panel-body-->
@@ -704,6 +771,7 @@ def __dump_corp_conveyor(
        <li><a id="btnToggleImpossible" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowImpossible"></span> Show impossible to produce</a></li>
        <li><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
        <li><a id="btnToggleMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMaterials"></span> Show used materials</a></li>
+       <li><a id="btnToggleSummary" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowSummary"></span> Show summary</a></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -727,6 +795,11 @@ def __dump_corp_conveyor(
 """)
 
     stock_not_enough_materials = None
+
+    # инициализация списка материалов, требуемых (и уже используемых) в производстве
+    global_materials_summary = []
+    global_materials_used = []
+
     for __conveyor_entity in conveyour_entities:
         __stock_not_enough_materials = __dump_blueprints_list_with_materials(
             glf,
@@ -739,6 +812,8 @@ def __dump_corp_conveyor(
             sde_bp_materials,
             sde_market_groups,
             sde_icon_ids,
+            global_materials_summary,
+            global_materials_used,
             enable_copy_to_clipboard=True)
         if stock_not_enough_materials is None:
             stock_not_enough_materials = __stock_not_enough_materials
@@ -746,9 +821,70 @@ def __dump_corp_conveyor(
     glf.write("""
  </div>
  <!-- END: collapsable group (locations) -->
+
+<div id="summary-block">
+ <h3>Summary</h3>
 """)
 
     if conveyour_entities:
+
+        # Внимание! нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
+        __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', global_materials_used, True, True)
+        __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', global_materials_summary, False, True)
+
+        # получение списков контейнеров и станок из экземпляра контейнера
+        global_stock_all_loc_ids = []
+        global_exclude_loc_ids = []
+        # global_blueprint_loc_ids = []
+        global_blueprint_station_ids = []
+        for conveyor_entity in conveyour_entities:
+            for id in [int(ces["id"]) for ces in conveyor_entity["stock"]]:
+                if not (id in global_stock_all_loc_ids):
+                    global_stock_all_loc_ids.append(id)
+            for id in [int(cee["id"]) for cee in conveyor_entity["exclude"]]:
+                if not (id in global_exclude_loc_ids):
+                    global_exclude_loc_ids.append(id)
+            # for id in conveyor_entity["containers"]:
+            #     if not (id in global_blueprint_loc_ids):
+            #         global_blueprint_loc_ids.append(id)
+            if not (conveyor_entity["station_id"] in global_blueprint_station_ids):
+                global_blueprint_station_ids.append(conveyor_entity["station_id"])
+        # формирование списка ресурсов, которые используются в производстве
+        global_stock_resources = {}
+        if not (global_stock_all_loc_ids is None):
+            for loc_id in global_stock_all_loc_ids:
+                loc_flags = corp_ass_loc_data.keys()
+                for loc_flag in loc_flags:
+                    __a1 = corp_ass_loc_data[loc_flag]
+                    if str(loc_id) in __a1:
+                        __a2 = __a1[str(loc_id)]
+                        for itm in __a2:
+                            if str(itm) in global_stock_resources:
+                                global_stock_resources[itm] = global_stock_resources[itm] + __a2[itm]
+                            else:
+                                global_stock_resources.update({itm: __a2[itm]})
+        __dump_not_available_materials_list(
+            glf,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_assets_tree,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            # списки контейнеров и станок из экземпляра контейнера
+            global_stock_all_loc_ids,
+            global_exclude_loc_ids,
+            global_blueprint_station_ids,
+            # списком материалов, которых не хватает в производстве
+            stock_not_enough_materials,
+            # список ресурсов, которые используются в производстве
+            global_stock_resources,
+            global_materials_summary,
+            # настройки
+            True)
+
         # получение списков контейнеров и станок из экземпляра контейнера
         conveyor_entity = conveyour_entities[0]
         stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
@@ -772,6 +908,8 @@ def __dump_corp_conveyor(
         render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
+</div>
+    
 <div id="legend-block">
  <hr>
  <h4>Legend</h4>
@@ -818,6 +956,9 @@ def __dump_corp_conveyor(
     if (!ls.getItem('Show Legend')) {
       ls.setItem('Show Legend', 1);
     }
+    if (!ls.getItem('Show Summary')) {
+      ls.setItem('Show Summary', 0);
+    }
     if (!ls.getItem('Show Impossible')) {
       ls.setItem('Show Impossible', 1);
     }
@@ -835,6 +976,11 @@ def __dump_corp_conveyor(
       $('#imgShowLegend').removeClass('hidden');
     else
       $('#imgShowLegend').addClass('hidden');
+    show = ls.getItem('Show Summary');
+    if (show == 1)
+      $('#imgShowSummary').removeClass('hidden');
+    else
+      $('#imgShowSummary').addClass('hidden');
     show = ls.getItem('Show Impossible');
     if (show == 1)
       $('#imgShowImpossible').removeClass('hidden');
@@ -933,6 +1079,11 @@ def __dump_corp_conveyor(
       $('#legend-block').removeClass('hidden');
     else
       $('#legend-block').addClass('hidden');
+    show = ls.getItem('Show Summary');
+    if (show == 1)
+      $('#summary-block').removeClass('hidden');
+    else
+      $('#summary-block').addClass('hidden');
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
@@ -963,6 +1114,7 @@ def __dump_corp_conveyor(
   }
   $(document).ready(function(){
     $('#btnToggleLegend').on('click', function () { toggleMenuOption('Show Legend'); });
+    $('#btnToggleSummary').on('click', function () { toggleMenuOption('Show Summary'); });
     $('#btnToggleImpossible').on('click', function () { toggleMenuOption('Show Impossible'); });
     $('#btnToggleActive').on('click', function () { toggleMenuOption('Show Active'); });
     $('#btnToggleMaterials').on('click', function () { toggleMenuOption('Show Materials'); });
