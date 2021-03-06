@@ -1077,8 +1077,20 @@ def dump_blueprints_into_report(
         corps_blueprints):
     glf = open('{dir}/blueprints.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        render_html.__dump_header(glf, "Blueprints")
-        __dump_corp_blueprints_tbl(glf, corps_blueprints)
+        render_html.__dump_header(glf, "Blueprint Originals")
+        __dump_corp_blueprints_tbl(
+            glf,
+            corps_blueprints["bpo"])
+        render_html.__dump_footer(glf)
+    finally:
+        glf.close()
+
+    glf = open('{dir}/blueprints-copies.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    try:
+        render_html.__dump_header(glf, "Blueprint Copies")
+        __dump_corp_blueprints_tbl(
+            glf,
+            corps_blueprints["bpc"])
         render_html.__dump_footer(glf)
     finally:
         glf.close()
