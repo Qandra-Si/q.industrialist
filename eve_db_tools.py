@@ -25,11 +25,13 @@ class QEntity:
         :param db: признак того, что данные имеются в БД (известно, что объект с таким id есть в БД)
         :param esi: признак того, что данные получены с серверов CCP
         :param obj: данные, м.б. None, если не загружены ни с сервера, ни из БД
+        :param ext: данные, которые опосредовано связаны с объектом (не загружены с сервера CCP)
         :param at: дата/время последней актуализации кешированных данных (хранящихся в БД)
         """
         self.db: bool = db
         self.esi: bool = esi
         self.obj: typing.Any = obj
+        self.ext = None
         self.at: datetime.datetime = at
 
     def store(self, db, esi, obj, at):
@@ -38,10 +40,18 @@ class QEntity:
         self.obj: typing.Any = obj
         self.at: datetime.datetime = at
 
+    def store_ext(self, ext: dict):
+        if self.ext:
+            self.ext.update(ext)
+        else:
+            self.ext = ext
+
 
 class QDatabaseTools:
     character_timedelta = datetime.timedelta(days=3)
     corporation_timedelta = datetime.timedelta(days=5)
+    universe_station_timedelta = datetime.timedelta(days=7)
+    universe_structure_timedelta = datetime.timedelta(days=3)
 
     def __init__(self, module_name, debug):
         """ constructor
@@ -59,8 +69,8 @@ class QDatabaseTools:
 
         self.__cached_characters: typing.Dict[int, QEntity] = {}
         self.__cached_corporations: typing.Dict[int, QEntity] = {}
-        self.__cached_stations: typing.Dict[int, typing.Any] = {}
-        self.__cached_structures: typing.Dict[int, typing.Any] = {}
+        self.__cached_stations: typing.Dict[int, QEntity] = {}
+        self.__cached_structures: typing.Dict[int, QEntity] = {}
         self.prepare_cache()
 
     def __del__(self):
@@ -106,6 +116,14 @@ class QDatabaseTools:
         rows = self.dbswagger.get_exist_corporation_ids()
         for row in rows:
             self.__cached_corporations[row[0]] = QEntity(True, False, None, row[1].replace(tzinfo=pytz.UTC))
+
+        rows = self.dbswagger.get_exist_universe_station_ids()
+        for row in rows:
+            self.__cached_stations[row[0]] = QEntity(True, False, None, row[1].replace(tzinfo=pytz.UTC))
+
+        rows = self.dbswagger.get_exist_universe_structure_ids()
+        for row in rows:
+            self.__cached_structures[row[0]] = QEntity(True, False, None, row[1].replace(tzinfo=pytz.UTC))
 
     # -------------------------------------------------------------------------
     # characters/{character_id}/
@@ -168,6 +186,18 @@ class QDatabaseTools:
         updated_at = self.esiswagger.last_modified
         return data, updated_at
 
+    def actualize_corporation_details(self, corporation_data, need_data=False):
+        # сохраняем сопутствующие данные в БД
+        self.actualize_character(corporation_data['ceo_id'], need_data=need_data)
+        if corporation_data['creator_id'] != 1:  # EVE System
+            self.actualize_character(corporation_data['creator_id'], need_data=need_data)
+        if 'home_station_id' in corporation_data:
+            self.actualize_station_or_structure(
+                corporation_data['home_station_id'],
+                need_data=need_data,
+                skip_corporation=True  # чтобы программа не зациклилась
+            )
+
     def actualize_corporation(self, _corporation_id, need_data=False):
         corporation_id: int = int(_corporation_id)
         in_cache = self.__cached_corporations.get(corporation_id)
@@ -182,6 +212,7 @@ class QDatabaseTools:
         elif not need_data:
             return None
         elif in_cache.obj:
+            self.actualize_corporation_details(in_cache.obj, need_data=True)
             return in_cache.obj
         elif (in_cache.at + self.corporation_timedelta) < self.eve_now:
             reload_esi = True
@@ -203,117 +234,131 @@ class QDatabaseTools:
             self.__cached_corporations[corporation_id] = QEntity(True, True, data, updated_at)
         else:
             in_cache.store(True, reload_esi, data, updated_at)
-
-        #   # сохраняем сопутствующие данные в БД
-        #   self.actualize_character(corporation_data['ceo_id'])
-        #   if corporation_data['creator_id'] != 1:  # EVE System
-        #       self.actualize_character(corporation_data['creator_id'])
-        #   if 'home_station_id' in corporation_data:
-        #       self.actualize_station_or_structure(
-        #           corporation_data['home_station_id'],
-        #           skip_corporation=True  # чтобы программа не зациклилась
-        #       )
-
+        self.actualize_corporation_details(data, need_data=need_data)
         return data
-
-    def actualize_corporation2(self, _corporation_id, need_data=False):
-        corporation_id: int = int(_corporation_id)
-        in_cache = self.__cached_corporations.get(corporation_id)
-        if not in_cache:
-            # Public information about a corporation
-            corporation_data = self.esiswagger.get_esi_data(
-                "corporations/{}/".format(corporation_id),
-                fully_trust_cache=True)
-            corporation_updated_at = self.esiswagger.last_modified
-            # сохраняем данные в БД
-            self.dbswagger.insert_corporation(
-                corporation_id,
-                corporation_data,
-                corporation_updated_at
-            )
-            # сохраняем данные в кеше
-            self.__cached_corporations[corporation_id] = QEntity(
-                True, True, corporation_data, corporation_updated_at)
-            return corporation_data
-        elif not need_data:
-            return None
-        elif in_cache.obj:
-            return in_cache.obj
-        else:
-            # есть в кеше, но данных нет (видимо хранится только id)
-            corporation_data, corporation_updated_at = self.dbswagger.select_corporation(corporation_id)
-            self.__cached_corporations[corporation_id].store(
-                True, True, corporation_data, corporation_updated_at)
-            # Внимание! в этой точке надо проверить дату-время последнего обновления информации,
-            # и обновить устаревшие данные
-            return corporation_data
 
     # -------------------------------------------------------------------------
     # universe/stations/{station_id}/
     # -------------------------------------------------------------------------
 
-    def actualize_universe_station(self, station_id):
-        try:
-            if not (station_id in self.__cached_stations):
-                # Requires: access token
-                universe_station_data = self.esiswagger.get_esi_data(
-                    "universe/stations/{}/".format(station_id),
-                    fully_trust_cache=True)
-                # сохраняем данные в БД
-                self.dbswagger.insert_universe_station(
-                    universe_station_data,
-                    self.esiswagger.last_modified
-                )
-                # сохраняем данные в кеше
-                self.__cached_stations[station_id] = universe_station_data
-                return universe_station_data
-            else:
-                return self.__cached_stations.get(station_id)
-        except requests.exceptions.HTTPError as err:
-            status_code = err.response.status_code
-            if status_code == 403:  # это нормально, что часть станций со временем могут оказаться Forbidden
-                pass
-                return None
-            else:
-                # print(sys.exc_info())
-                raise
-        except:
-            print(sys.exc_info())
-            raise
+    def load_universe_station_from_esi(self, station_id, fully_trust_cache=True):
+        # Public information about a universe_station
+        data = self.esiswagger.get_esi_data(
+            "universe/stations/{}/".format(station_id),
+            fully_trust_cache=fully_trust_cache)
+        updated_at = self.esiswagger.last_modified
+        return data, updated_at
+
+    def actualize_universe_station(self, _station_id, need_data=False):
+        station_id: int = int(_station_id)
+        in_cache = self.__cached_stations.get(station_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, но внешнему коду не интересны сами данные, то выход выход
+        # 3. либо данные в текущую сессию работы программы уже загружались
+        # 4. данные с таким id существуют, но самих данных нет (видимо хранится только id вместе с at)
+        #    проверяем дату-время последнего обновления информации, и обновляем устаревшие данные
+        reload_esi: bool = False
+        if not in_cache:
+            reload_esi = True
+        elif not need_data:
+            return None
+        elif in_cache.obj:
+            return in_cache.obj
+        elif (in_cache.at + self.universe_station_timedelta) < self.eve_now:
+            reload_esi = True
+        # ---
+        # загружаем данные с серверов CCP или загружаем данные из БД
+        if reload_esi:
+            data, updated_at = self.load_universe_station_from_esi(
+                station_id,
+                fully_trust_cache=in_cache is None
+            )
+            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+            if updated_at < self.eve_now:
+                updated_at = self.eve_now
+            self.dbswagger.insert_or_update_universe_station(data, updated_at)
+        else:
+            data, updated_at = self.dbswagger.select_universe_station(station_id)
+        # сохраняем данные в кеше
+        if not in_cache:
+            self.__cached_stations[station_id] = QEntity(True, True, data, updated_at)
+        else:
+            in_cache.store(True, reload_esi, data, updated_at)
+        return data
 
     # -------------------------------------------------------------------------
     # universe/structures/{structure_id}/
     # -------------------------------------------------------------------------
 
-    def actualize_universe_structure(self, structure_id):
+    def load_universe_structure_from_esi(self, structure_id, fully_trust_cache=True):
         try:
-            if not (structure_id in self.__cached_structures):
-                # Requires: access token
-                universe_structure_data = self.esiswagger.get_esi_data(
-                    "universe/structures/{}/".format(structure_id),
-                    fully_trust_cache=True)
-                # сохраняем данные в БД
-                self.dbswagger.insert_universe_structure(
-                    structure_id,
-                    universe_structure_data,
-                    self.esiswagger.last_modified
-                )
-                # сохраняем данные в кеше
-                self.__cached_structures[structure_id] = universe_structure_data
-                return universe_structure_data
-            else:
-                return self.__cached_structures.get(structure_id)
+            # Requires: access token
+            data = self.esiswagger.get_esi_data(
+                "universe/structures/{}/".format(structure_id),
+                fully_trust_cache=fully_trust_cache)
+            updated_at = self.esiswagger.last_modified
+            return data, False, updated_at
         except requests.exceptions.HTTPError as err:
             status_code = err.response.status_code
-            if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                pass
-                return None
+            if status_code == 403:
+                # это нормально, что часть структур со временем могут оказаться Forbidden
+                return None, True, self.eve_now
             else:
                 # print(sys.exc_info())
                 raise
         except:
             print(sys.exc_info())
             raise
+
+    def actualize_universe_structure_details(self, structure_data, need_data=False):
+        # сохраняем сопутствующие данные в БД
+        self.actualize_corporation(structure_data['owner_id'], need_data=need_data)
+
+    def actualize_universe_structure(self, _structure_id, need_data=False):
+        structure_id: int = int(_structure_id)
+        in_cache = self.__cached_structures.get(structure_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, но внешнему коду не интересны сами данные, то выход выход
+        # 3. либо данные в текущую сессию работы программы уже загружались
+        # 4. данные с таким id существуют, но самих данных нет (видимо хранится только id вместе с at)
+        #    проверяем дату-время последнего обновления информации, и обновляем устаревшие данные
+        reload_esi: bool = False
+        if not in_cache:
+            reload_esi = True
+        elif not need_data:
+            return None
+        elif in_cache.obj:
+            self.actualize_universe_structure_details(in_cache.obj, need_data=True)
+            return in_cache.obj
+        elif in_cache.ext and in_cache.ext.get('forbidden'):
+            return None
+        elif (in_cache.at + self.universe_structure_timedelta) < self.eve_now:
+            reload_esi = True
+        # ---
+        # загружаем данные с серверов CCP или загружаем данные из БД
+        if reload_esi:
+            data, forbidden, updated_at = self.load_universe_structure_from_esi(
+                structure_id,
+                fully_trust_cache=in_cache is None
+            )
+            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+            if updated_at < self.eve_now:
+                updated_at = self.eve_now
+            self.dbswagger.insert_or_update_universe_structure(structure_id, data, forbidden, updated_at)
+        else:
+            data, forbidden, updated_at = self.dbswagger.select_universe_structure(structure_id)
+        # сохраняем данные в кеше
+        if not in_cache:
+            self.__cached_structures[structure_id] = QEntity(True, True, data, updated_at)
+            if forbidden:
+                self.__cached_structures[structure_id].store_ext({'forbidden': True})
+        else:
+            in_cache.store(True, reload_esi, data, updated_at)
+            if forbidden:
+                in_cache.store_ext({'forbidden': True})
+        if data:
+            self.actualize_universe_structure_details(data, need_data=need_data)
+        return data
 
     # -------------------------------------------------------------------------
     # universe/structures/
@@ -321,25 +366,23 @@ class QDatabaseTools:
 
     def actualize_universe_structures(self):
         # Requires: access token
-        universe_structures_data = self.esiswagger.get_esi_paged_data('universe/structures/')
+        data = self.esiswagger.get_esi_paged_data('universe/structures/')
 
-        universe_structures_updated = self.esiswagger.is_last_data_updated
-        if not universe_structures_updated:
-            return universe_structures_data, 0
+        updated_at = self.esiswagger.is_last_data_updated
+        if not updated_at:
+            return data, 0
 
-        universe_structures_new = self.dbswagger.get_absent_universe_structure_ids(
-            universe_structures_data
-        )
-        universe_structures_new = [id[0] for id in universe_structures_new]
+        data_new = self.dbswagger.get_absent_universe_structure_ids(data)
+        data_new = [id[0] for id in data_new]
 
-        # universe_structures_data = [1035620655696, 1035660997658, 1035620697572, ... ]
-        # universe_structures_new = [1035620655696]
+        # data = [1035620655696, 1035660997658, 1035620697572, ... ]
+        # data_new = [1035620655696]
 
-        for structure_id in universe_structures_new:
-            self.actualize_universe_structure(structure_id)
+        for structure_id in data_new:
+            self.actualize_universe_structure(structure_id, need_data=False)
         self.qidb.commit()
 
-        return universe_structures_data, len(universe_structures_new)
+        return data, len(data_new)
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/structures/
@@ -389,18 +432,16 @@ class QDatabaseTools:
     # universe/structures/{structure_id}/
     # -------------------------------------------------------------------------
 
-    def actualize_station_or_structure(self, location_id, skip_corporation=False):
+    def actualize_station_or_structure(self, location_id, need_data=False, skip_corporation=False):
         owner_id = None
         if location_id >= 1000000000:
-            structure_data = self.actualize_universe_structure(location_id)
-            if structure_data:
-                owner_id = structure_data['owner_id']
+            self.actualize_universe_structure(location_id)
         else:
             station_data = self.actualize_universe_station(location_id)
             if station_data:
                 owner_id = station_data['owner']
-        if not skip_corporation and owner_id:
-            self.actualize_corporation(owner_id)
+            if not skip_corporation and owner_id:
+                self.actualize_corporation(owner_id, need_data=need_data)
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/assets/

@@ -4,13 +4,15 @@ select
  s.system_id as solar_system_id,
  s.type_id as station_type_id,
  sol.sden_name as solar_system_name,
- strct.sden_name as station_type_name
+ strct.sden_name as station_type_name,
+ coalesce(s.forbidden,false) as forbidden
 from (
  select
   a.eca_location_id as locatoin_id,
   s.ets_name as name,
   s.ets_system_id as system_id,
-  s.ets_type_id as type_id
+  s.ets_type_id as type_id,
+  false as forbidden
  from
   qi.esi_corporation_assets a
     left outer join qi.esi_tranquility_stations s on (a.eca_location_id = s.ets_station_id)
@@ -23,7 +25,8 @@ from (
   a.eca_location_id,
   s.eus_name,
   s.eus_system_id,
-  s.eus_type_id
+  s.eus_type_id,
+  s.eus_forbidden
  from
   qi.esi_corporation_assets a
     left outer join qi.esi_universe_structures s on (a.eca_location_id = s.eus_structure_id)

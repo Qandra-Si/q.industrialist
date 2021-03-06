@@ -186,14 +186,15 @@ CREATE TABLE qi.esi_universe_structures
 (
     eus_structure_id BIGINT NOT NULL,
     eus_name CHARACTER VARYING(255) NOT NULL,
-    eus_owner_id BIGINT DEFAULT NULL,
+    eus_owner_id BIGINT,
     eus_system_id INTEGER NOT NULL,
-    eus_type_id INTEGER DEFAULT NULL,
+    eus_type_id INTEGER,
     eus_x DOUBLE PRECISION NOT NULL,
     eus_y DOUBLE PRECISION NOT NULL,
     eus_z DOUBLE PRECISION NOT NULL,
-    eus_created_at TIMESTAMP NULL DEFAULT NULL,
-    eus_updated_at TIMESTAMP NULL DEFAULT NULL,
+    eus_forbidden BOOLEAN,
+    eus_created_at TIMESTAMP,
+    eus_updated_at TIMESTAMP,
     CONSTRAINT pk_eus PRIMARY KEY (eus_structure_id)
 )
 TABLESPACE pg_default;
@@ -229,18 +230,18 @@ CREATE TABLE qi.esi_corporation_structures
     ecs_type_id INTEGER NOT NULL,
     ecs_system_id INTEGER NOT NULL,
     ecs_profile_id INTEGER NOT NULL,
-    -- ecs_fuel_expires TIMESTAMP DEFAULT NULL,
-    -- ecs_state_timer_start TIMESTAMP DEFAULT NULL,
-    -- ecs_state_timer_end TIMESTAMP DEFAULT NULL,
-    -- ecs_unanchors_at TIMESTAMP DEFAULT NULL,
+    -- ecs_fuel_expires TIMESTAMP,
+    -- ecs_state_timer_start TIMESTAMP,
+    -- ecs_state_timer_end TIMESTAMP,
+    -- ecs_unanchors_at TIMESTAMP,
     -- ecs_state enum('anchor_vulnerable','anchoring','armor_reinforce','armor_vulnerable','fitting_invulnerable','hull_reinforce','hull_vulnerable','online_deprecated','onlining_vulnerable','shield_vulnerable','unanchored','unknown') NOT NULL,
-    -- ecs_reinforce_weekday INTEGER DEFAULT NULL,
+    -- ecs_reinforce_weekday INTEGER,
     -- ecs_reinforce_hour INTEGER NOT NULL,
-    -- ecs_next_reinforce_weekday INTEGER DEFAULT NULL,
-    -- ecs_next_reinforce_hour INTEGER DEFAULT NULL,
-    -- ecs_next_reinforce_apply TIMESTAMP DEFAULT NULL,
-    ecs_created_at TIMESTAMP NULL DEFAULT NULL,
-    ecs_updated_at TIMESTAMP NULL DEFAULT NULL,
+    -- ecs_next_reinforce_weekday INTEGER,
+    -- ecs_next_reinforce_hour INTEGER,
+    -- ecs_next_reinforce_apply TIMESTAMP,
+    ecs_created_at TIMESTAMP,
+    ecs_updated_at TIMESTAMP,
     CONSTRAINT pk_ecs PRIMARY KEY (ecs_structure_id)
 )
 TABLESPACE pg_default;
