@@ -162,7 +162,7 @@ def __dump_corp_blueprints_sales(
                 glf.write(
                     '<tr>'
                     '<th scope="row">{num}</th>'
-                    '<td>{nm} <span class="label label-{lbclr}">{me} {te}{cp}</span></td>'
+                    '<td>{nm} <span class="label label-{lbclr}">{me} {te}</span>{cp}</td>'
                     '<td class="hidden">{loc}</td>'
                     '<td class="hidden">{pl}</td>'
                     '<td align="right">{prc}</td>'
