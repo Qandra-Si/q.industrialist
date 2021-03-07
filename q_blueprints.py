@@ -87,15 +87,14 @@ def __build_blueprints(
         __is_blueprint_copy: bool = bool(__quantity == -2)
         __type_id: int = int(__blueprint_dict["type_id"])
         __type_desc = sde_type_ids[str(__type_id)]
-        __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+        __is_t2_blueprint = __type_desc.get("metaGroupID") == 2
         # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
         # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
         # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
         # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
-        if __group_id != 2:  # Blueprints & Reactions
-            if __type_desc.get("metaGroupID") == 2:
-                pass
-            else:
+        if not __is_t2_blueprint:
+            __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+            if __group_id != 2:  # Blueprints & Reactions
                 continue
         __blueprint_id = __blueprint_dict["item_id"]
         __location_id = __blueprint_dict["location_id"]
@@ -158,16 +157,19 @@ def __build_blueprints(
                 same_blueprint_found = b
                 break
         if not same_blueprint_found:
-            # выясняем стоимость чертежа
-            if "basePrice" in __type_desc:
-                __blueprint.update({"base_price": __type_desc["basePrice"]})
-            else:
-                __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
-                if not (__price_dict is None):
-                    if "average_price" in __price_dict:
-                        __blueprint.update({"average_price": __price_dict["average_price"]})
-                    elif "adjusted_price" in __price_dict:
-                        __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
+            # T2 чертежи не имеют какую-то точную маркет-цену, т.к. либо не продаются, либо продаются через
+            # контракты, поэтому base_price и/или average_price, или adjusted_price невалидны
+            if not __is_t2_blueprint:
+                # выясняем стоимость чертежа
+                if "basePrice" in __type_desc:
+                    __blueprint.update({"base_price": __type_desc["basePrice"]})
+                else:
+                    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+                    if not (__price_dict is None):
+                        if "average_price" in __price_dict:
+                            __blueprint.update({"average_price": __price_dict["average_price"]})
+                        elif "adjusted_price" in __price_dict:
+                            __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
             # осуществляем поиск местоположения чертежа
             __push_location_into_blueprints_locations(
                 __location_id,
@@ -199,54 +201,57 @@ def __build_blueprints(
                    continue
                 __type_id = __items_dict["type_id"]
                 __type_desc = sde_type_ids[str(__type_id)]
+                __is_t2_blueprint = __type_desc.get("metaGroupID") == 2
                 # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
                 # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
                 # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
                 # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
-                __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-                # Blueprints and Reactions (добавляем только этот тип), а также T2-чертежи
-                if not (__group_id is None) and (__group_id == 2) or (__type_desc.get("metaGroupID") == 2):
-                    # raw_quantity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
-                    # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
-                    __is_blueprint_copy: bool = False
-                    if "raw_quantity" in __items_dict:
-                        __raw_qauntity = __items_dict["raw_quantity"]
-                        if __raw_qauntity == -2:
-                            __is_blueprint_copy = True
-                    # получение данных по чертежу, находящемуся в продаже
-                    __quantity = __items_dict["quantity"]
-                    # получение общих данных данных по контракту
-                    __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
-                    __location_id = __contract_dict["start_location_id"]
-                    __issuer_id = __contract_dict["issuer_id"]
-                    __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
-                    __blueprint = {
-                        "item_id": __items_dict["record_id"],
-                        "type_id": __type_id,
-                        "name": __type_desc["name"]["en"],
-                        "copy": __is_blueprint_copy,
-                        # "me": None,
-                        # "te": None,
-                        "q": __quantity,
-                        "loc": __location_id,
-                        "flag": __contract_dict["title"],
-                        "price": __contract_dict["price"],
-                        "cntrct_sta": __contract_dict["status"],
-                        "cntrct_typ": __contract_dict["type"],
-                        "cntrct_issuer": __issuer_id,
-                        "cntrct_issuer_name": __issuer_name
-                    }
-                    # осуществляем поиск местоположения чертежа
-                    __push_location_into_blueprints_locations(
-                        __location_id,
-                        blueprints_locations,
-                        sde_inv_names,
-                        sde_inv_items,
-                        corp_assets_tree,
-                        corp_ass_names_data,
-                        foreign_structures_data)
-                    # добавляем собранную информацию в список чертежей
-                    blueprints.append(__blueprint)
+                if not __is_t2_blueprint:
+                    # Blueprints and Reactions (добавляем только этот тип), а также T2-чертежи
+                    __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                    if __group_id != 2:
+                        continue
+                # raw_quantity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
+                # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
+                __is_blueprint_copy: bool = False
+                if "raw_quantity" in __items_dict:
+                    __raw_qauntity = __items_dict["raw_quantity"]
+                    if __raw_qauntity == -2:
+                        __is_blueprint_copy = True
+                # получение данных по чертежу, находящемуся в продаже
+                __quantity = __items_dict["quantity"]
+                # получение общих данных данных по контракту
+                __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
+                __location_id = __contract_dict["start_location_id"]
+                __issuer_id = __contract_dict["issuer_id"]
+                __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
+                __blueprint = {
+                    "item_id": __items_dict["record_id"],
+                    "type_id": __type_id,
+                    "name": __type_desc["name"]["en"],
+                    "copy": __is_blueprint_copy,
+                    # "me": None,
+                    # "te": None,
+                    "q": __quantity,
+                    "loc": __location_id,
+                    "flag": __contract_dict["title"],
+                    "price": __contract_dict["price"],
+                    "cntrct_sta": __contract_dict["status"],
+                    "cntrct_typ": __contract_dict["type"],
+                    "cntrct_issuer": __issuer_id,
+                    "cntrct_issuer_name": __issuer_name
+                }
+                # осуществляем поиск местоположения чертежа
+                __push_location_into_blueprints_locations(
+                    __location_id,
+                    blueprints_locations,
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_assets_tree,
+                    corp_ass_names_data,
+                    foreign_structures_data)
+                # добавляем собранную информацию в список чертежей
+                blueprints.append(__blueprint)
 
     return blueprints, blueprints_locations
 

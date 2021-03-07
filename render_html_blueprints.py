@@ -510,7 +510,7 @@ tr.qind-bp-row {
                              te=__blueprint_dict["te"] if "te" in __blueprint_dict else "",
                              q=__blueprint_dict["q"],
                              price=__price,
-                             iprice=__fprice,
+                             iprice='0' if not __fprice else __fprice,
                              loc=__location_name,
                              plc=__place,
                              box=__location_box,
