@@ -821,12 +821,13 @@ def __dump_corp_conveyor(
     glf.write("""
  </div>
  <!-- END: collapsable group (locations) -->
-
-<div id="summary-block">
- <h3>Summary</h3>
 """)
 
     if conveyour_entities:
+        glf.write("""
+<div id="summary-block">
+ <h3>Summary</h3>
+""")
 
         # Внимание! нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
         __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', global_materials_used, True, True)
@@ -884,6 +885,9 @@ def __dump_corp_conveyor(
             global_materials_summary,
             # настройки
             True)
+        glf.write("""
+</div>
+""")
 
         # получение списков контейнеров и станок из экземпляра контейнера
         conveyor_entity = conveyour_entities[0]
@@ -908,8 +912,6 @@ def __dump_corp_conveyor(
         render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
-</div>
-    
 <div id="legend-block">
  <hr>
  <h4>Legend</h4>
