@@ -109,13 +109,12 @@ def main():
     print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
     sys.stdout.flush()
 
-    corp_ass_names_data = []
+    # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
-        # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
-            "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    # Requires role(s): Director
+    corp_ass_names_data = interface.get_esi_piece_data(
+        "corporations/{}/assets/names/".format(corporation_id),
+        corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
@@ -172,6 +171,7 @@ def main():
         # кешируем признак того, что контейнеры являются стоком материалов
         same_stock_container = ("same_stock_container" in __manuf_dict[1]) and bool(__manuf_dict[1]["same_stock_container"])
         fixed_number_of_runs = __manuf_dict[1]["fixed_number_of_runs"] if "fixed_number_of_runs" in __manuf_dict[1] else None
+        manufacturing_activity = __manuf_dict[1]["manufacturing_activity"] if "manufacturing_activity" in __manuf_dict[1] else "manufacturing"
         # находим станцию, где расположены найденные контейнеры
         for id in blueprint_loc_ids:
             __loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -226,7 +226,9 @@ def main():
             __conveyor_entity["containers"].append({
                 "id": id,
                 "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None),
-                "fixed_number_of_runs": fixed_number_of_runs})
+                "fixed_number_of_runs": fixed_number_of_runs,
+                "manufacturing_activity": manufacturing_activity,
+            })
 
     # перечисляем станции и контейнеры, которые были найдены
     print('\nFound conveyor containters and station ids...')

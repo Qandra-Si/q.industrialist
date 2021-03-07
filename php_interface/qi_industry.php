@@ -92,6 +92,6 @@ EOD;
     pg_close($conn);
 ?>
 <div class="container-fluid">
-<?php __dump_industrial_jobs($jobs, $quantities); ?>
+<?php __dump_industrial_jobs($jobs); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>

@@ -155,13 +155,11 @@ def main():
     sys.stdout.flush()
 
     # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_names_data = []
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
-        # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
-            "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    # Requires role(s): Director
+    corp_ass_names_data = interface.get_esi_piece_data(
+        "corporations/{}/assets/names/".format(corporation_id),
+        corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 
@@ -224,7 +222,10 @@ def main():
                             if str(loc_id) in sde_inv_items:
                                 root_item = sde_inv_items[str(loc_id)]
                                 # print("root_item", root_item)
-                                if root_item["typeID"] != 5:  # not Solar System (may be Station?)
+                                if root_item["typeID"] == 5:  # Solar System
+                                    system_id = loc_id
+                                    # print(" >>> >>> ", loc_name)
+                                else:  # not Solar System (may be Station?)
                                     loc_id = root_item["locationID"]
                                     root_item = sde_inv_items[str(loc_id)]
                                     # print(" >>> ", loc_id, root_item)
@@ -232,10 +233,21 @@ def main():
                                         system_id = loc_id
                                         loc_name = sde_inv_names[str(loc_id)]  # Solar System (name)
                                         # print(" >>> >>> ", loc_name)
-                    data = {"error": "no data",
+                    data = {"error": "no data" if system_id is None else "no solar system",
                             "system_id": system_id,
                             "solar_system": loc_name,
-                            "signalling_level": 3}
+                            "signalling_level": 3,
+                            # -- используется, если 'error'='no solar system'
+                            "badger": 0,
+                            "venture": 0,
+                            "liquid_ozone": 0,
+                            "indus_cyno_gen": 0,
+                            "exp_cargohold": 0,
+                            "cargohold_rigs": 0,
+                            "nitrogen_isotope": 0,
+                            "hydrogen_isotope": 0,
+                            "oxygen_isotope": 0,
+                            "helium_isotope": 0}
                 else:
                     system_id = data["solar_system"]
                     badger_ids = data["badger"]

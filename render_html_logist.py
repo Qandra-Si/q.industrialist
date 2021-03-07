@@ -302,7 +302,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            cnn=cynonetwork_num,
@@ -410,7 +410,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name))
@@ -529,6 +529,13 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                                  hy=hydrogen_isotope_num,
                                  ox=oxygen_isotope_num,
                                  he=helium_isotope_num,
+                                 ly=lightyears))
+            else:
+                glf.write("      [{rn},'{nm}','{signal}',{ly},0,0,0,0]{comma}\n".
+                          format(comma=',' if not last_route else ']',
+                                 rn=route_num,
+                                 nm=system_name,
+                                 signal=__get_route_signalling_type(3),
                                  ly=lightyears))
             route_num = route_num + 1
         glf.write('    ]{comma}\n'.format(comma=',' if cynonetwork_num != len(q_logist_settings.g_cynonetworks) else ''))

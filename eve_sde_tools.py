@@ -295,50 +295,45 @@ def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sd
     return bool(set(groups_chain) & set(market_groups))
 
 
-def get_blueprint_manufacturing_activity(blueprints, type_id):
-    if not (str(type_id) in blueprints):
-        return None
-    else:
-        bp = blueprints[str(type_id)]
-        if not ("activities" in bp):
-            return None
-        elif not ("manufacturing" in bp["activities"]):
-            return None
-        elif not ("materials" in bp["activities"]["manufacturing"]):
-            return None
-        else:
-            manufacturing = bp["activities"]["manufacturing"]
-            return manufacturing
-
-
-def get_blueprint_manufacturing_materials(blueprints, type_id):
-    manufacturing = get_blueprint_manufacturing_activity(blueprints, type_id)
-    if manufacturing is None:
-        return None
-    return manufacturing["materials"]
-
-
-def get_blueprint_reaction_activity(blueprints, type_id):
-    if not (str(type_id) in blueprints):
-        return None
-    else:
-        bp = blueprints[str(type_id)]
-        if not ("activities" in bp):
-            return None
-        elif not ("reaction" in bp["activities"]):
-            return None
-        elif not ("materials" in bp["activities"]["reaction"]):
+def get_blueprint_any_activity(blueprints, activity: str, type_id: int):
+    #  manufacturing - производство
+    #  invention - запуск инвентов
+    #  copying - копирка
+    #  research_material - запуск ME
+    #  research_time - запуск TE
+    #  reaction - реакции
+    if activity in ['manufacturing', 'invention', 'copying', 'research_material', 'research_time', 'reaction']:
+        if not (str(type_id) in blueprints):
             return None
         else:
-            reaction = bp["activities"]["reaction"]
-            return reaction
-
-
-def get_blueprint_reaction_materials(blueprints, type_id):
-    reaction = get_blueprint_reaction_activity(blueprints, type_id)
-    if reaction is None:
+            bp = blueprints[str(type_id)]
+            bp1 = bp.get('activities')
+            if bp1 is None:
+                return None
+            bp2 = bp1.get(activity)
+            if bp2 is None:
+                return None
+            bp3 = bp2.get('materials')
+            if bp3 is None:
+                return None
+            return bp2
+    else:
         return None
-    return reaction["materials"]
+
+
+def get_blueprint_any_materials(blueprints, activity: str, type_id: int):
+    a = get_blueprint_any_activity(blueprints, activity, type_id)
+    if a is None:
+        return None
+    return a['materials']
+
+
+def get_blueprint_manufacturing_activity(blueprints, type_id: int):
+    return get_blueprint_any_activity(blueprints, 'manufacturing', type_id)
+
+
+def get_blueprint_manufacturing_materials(blueprints, type_id: int):
+    return get_blueprint_any_materials(blueprints, 'manufacturing', type_id)
 
 
 def get_materials_for_blueprints(sde_bp_materials):
@@ -454,44 +449,51 @@ def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_mat
 
 
 def get_industry_material_efficiency(
-        # признак - это чертёж или формула?
-        __is_reaction_formula,
+        # тип производства - это чертёж или формула, или реакция?
+        manufacturing_activity: str,
         # кол-во run-ов
-        runs_quantity,
+        runs_quantity: int,
         # кол-во из исходного чертежа (до учёта всех бонусов)
-        __bpo_materials_quantity,
+        __bpo_materials_quantity: int,
         # me-параметр чертежа
-        material_efficiency):
-    if __is_reaction_formula:
-        # TODO: хардкодим -2.2% structure role bonus
-        __stage1 = runs_quantity * __bpo_materials_quantity
-        # учитываем бонус профиля сооружения
-        __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
-        # округляем вещественное число до старшего целого
-        __stage3 = int(float(__stage2 + 0.99))
-        # ---
-        __need = __stage3
-    elif __bpo_materials_quantity == 1:
+        material_efficiency: int):
+    if __bpo_materials_quantity == 1:
         # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
         # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
         __need = runs_quantity
     else:
-        # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-        # см. 1 x run: http://prntscr.com/u0g07w
-        # см. 4 x run: http://prntscr.com/u0g0cd
-        # см.11 x run: https://prnt.sc/v3mk1m
-        # см. экономия материалов: http://prntscr.com/u0g11u
-        # ---
-        # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
-        __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
-        # учитываем бонус профиля сооружения
-        __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
-        # учитываем бонус установленного модификатора
-        __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
-        # округляем вещественное число до старшего целого
-        __stage4 = int(float(__stage3 + 0.99))
-        # ---
-        __need = __stage4
+        if manufacturing_activity == 'reaction':
+            # TODO: хардкодим -2.2% structure role bonus
+            __stage1 = runs_quantity * __bpo_materials_quantity
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage3 = int(float(__stage2 + 0.99))
+            # ---
+            __need = __stage3
+        elif manufacturing_activity == 'manufacturing':
+            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+            # см. 1 x run: http://prntscr.com/u0g07w
+            # см. 4 x run: http://prntscr.com/u0g0cd
+            # см.11 x run: https://prnt.sc/v3mk1m
+            # см. экономия материалов: http://prntscr.com/u0g11u
+            # ---
+            # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
+            __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
+            # учитываем бонус установленного модификатора
+            __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage4 = int(float(__stage3 + 0.99))
+            # ---
+            __need = __stage4
+        elif manufacturing_activity == 'invention':
+            # TODO: не используется structure role bonus
+            __need = runs_quantity * __bpo_materials_quantity
+        else:
+            # TODO: не поддерживается расчёт... доделать
+            __need = runs_quantity * __bpo_materials_quantity
     return __need
 
 

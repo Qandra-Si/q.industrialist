@@ -252,6 +252,7 @@ class EveOnlineInterface:
                             # сохраняем информацию в кеше и выходим с тем же кодом ошибки
                             self.__dump_cache_into_file(url, [{"Http-Error": 404}], None)
                         raise
+                    raise
                 except:
                     raise
                 if page_data.status_code == 304:
@@ -303,6 +304,67 @@ class EveOnlineInterface:
                 print("ERROR! : ", match_pages)
                 print("ERROR! : ", cached_data["headers"])
                 raise
+
+    def get_esi_piece_data(self, url, body: list, fully_trust_cache=False):
+        # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        piece_data = []
+        problem_ids = []
+        if body:
+            try:
+                # Requires role(s): Director
+                piece_data = self.get_esi_data(
+                    url,
+                    json.dumps(body, indent=0, sort_keys=False),
+                    fully_trust_cache)
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if not self.__offline_mode and (status_code == 404):
+                    # изредка бывает так, что corp_assets_data включает в себя id, которые уже удалены, т.е. в ассетах
+                    # контейнер ещё есть, а в names уже нет (вот такая печальная ситуация по синхронизации данных у ССР)
+                    # какой именно id из сотни возможных оказался "битым" неизвестно, поэтому разбиваем список id по частям
+                    # пытаемся их скачать по отдельности
+                    # а во время активных мувопсов и перетаскивании ассетов, ситуация усугубляется - множество названий
+                    # разом исчезает из списков и подолгу мешает грузить данные (значит будем грузить частями)
+                    parted_body = body[:]
+                    while parted_body:
+                        parted_ids = parted_body[:10]
+                        parted_body = parted_body[10:]
+                        try:
+                            parted_names = self.get_esi_data(
+                                url,
+                                json.dumps(parted_ids, indent=0, sort_keys=False),
+                                False)
+                            piece_data.extend(parted_names)
+                        except requests.exceptions.HTTPError as err:
+                            status_code = err.response.status_code
+                            if status_code == 404:
+                                for single_id in parted_ids:
+                                    try:
+                                        single_name = self.get_esi_data(
+                                            url,
+                                            json.dumps([single_id], indent=0, sort_keys=False),
+                                            False)
+                                        piece_data.append(single_name[0])
+                                    except requests.exceptions.HTTPError as err:
+                                        status_code = err.response.status_code
+                                        if status_code == 404:
+                                            problem_ids.append(single_id)
+                                        else:
+                                            raise
+                            else:
+                                raise
+                    # после того как все данные успешно загрузились... повторяем!!! операцию чтения, чтобы
+                    # кеш с данными был корректно сформирован
+                    body = [b for b in body if b not in problem_ids]
+                    piece_data = self.get_esi_data(
+                        url,
+                        json.dumps(body, indent=0, sort_keys=False),
+                        fully_trust_cache)
+                else:
+                    raise
+            except:
+                raise
+        return piece_data
 
     def authenticate(self, character_name=None):
         """ Main authenticate method to login character into system

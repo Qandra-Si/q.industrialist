@@ -7,10 +7,10 @@ g_month_names = [
 
 
 def __get_progress_element(current_num, max_num):
-    if current_num >= max_num:
-        __progress_factor = 100
+    if max_num == 0:
+        __progress_factor: float = 100.0
     else:
-        __progress_factor = float(100 * current_num / max_num)
+        __progress_factor: float = float(100 * current_num / max_num)
     prgrs = \
         '<strong><span class="text-warning">{q:,d}</span></strong> / {sc:,d}<br>' \
         '<div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"' \
@@ -18,8 +18,8 @@ def __get_progress_element(current_num, max_num):
         format(
             q=current_num,
             sc=max_num,
-            prcnt100=" progress-bar-success" if __progress_factor >= 99.999 else "",
-            prcnt=int(__progress_factor),
+            prcnt100=" progress-bar-success" if (__progress_factor > 95.999) and (__progress_factor < 104.999) else (" progress-bar-warning" if __progress_factor > 104.999 else ""),
+            prcnt=int(__progress_factor) if __progress_factor < 100.001 else 100,
             fprcnt=__progress_factor
         )
     return prgrs
@@ -47,7 +47,7 @@ def __dump_industry_product(
     __td_cost = ""
     __td_volume = ""
     for month in range(3):
-        __wij_month = (current_month - 2) + month
+        __wij_month = (current_month - 1 - (2-month) + 12) % 12 + 1
         # получение информации о производстве этого продукта
         __wij_dict = next((wij for wij in workflow_industry_jobs if
                            (wij["ptid"] == __product_type_id) and (wij["month"] == __wij_month)), None)
@@ -159,7 +159,9 @@ def __dump_industry(
         '<th style="text-align: center;">{}</th>'
         '<th style="text-align: center;">{}</th>'
         '<th style="text-align: center;">Last 30 days</th>'.
-        format(g_month_names[(current_month+9)%12+1], g_month_names[(current_month+10)%12+1], g_month_names[current_month]))
+        format(g_month_names[(current_month+9)%12+1],
+               g_month_names[(current_month+10)%12+1],
+               g_month_names[current_month]))
     glf.write("""
  </tr>
 </thead>

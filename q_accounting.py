@@ -741,11 +741,21 @@ def main():
                 print(sys.exc_info())
                 raise
 
-        # Requires role(s): Director
-        corp_wallets_data = interface.get_esi_paged_data(
-            "corporations/{}/wallets/".format(corporation_id))
-        print("\n'{}' corporation has {} wallet divisions".format(corporation_name, len(corp_wallets_data)))
-        sys.stdout.flush()
+        try:
+            # Requires role(s): Accountant, Junior_Accountant
+            corp_wallets_data = interface.get_esi_paged_data(
+                "corporations/{}/wallets/".format(corporation_id))
+            print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
+            sys.stdout.flush()
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                corp_wallets_data = []
+            else:
+                raise
+        except:
+            print(sys.exc_info())
+            raise
 
         # Requires role(s): Accountant, Junior_Accountant
         corp_wallet_journal_data = [None, None, None, None, None, None, None]
@@ -760,6 +770,8 @@ def main():
                 status_code = err.response.status_code
                 if status_code == 404:  # 2020.11.26 поломался доступ к журналу кошелька (ССР-шники "внесли правки")
                     corp_wallet_journal_data[division-1] = None
+                elif status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                    corp_wallets_data = []
                 else:
                     raise
             except:
@@ -780,13 +792,11 @@ def main():
         sys.stdout.flush()
 
         # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-        corp_ass_names_data = []
         corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-        if len(corp_ass_named_ids) > 0:
-            # Requires role(s): Director
-            corp_ass_names_data = interface.get_esi_data(
-                "corporations/{}/assets/names/".format(corporation_id),
-                json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+        # Requires role(s): Director
+        corp_ass_names_data = interface.get_esi_piece_data(
+            "corporations/{}/assets/names/".format(corporation_id),
+            corp_ass_named_ids)
         print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
         sys.stdout.flush()
 
@@ -826,6 +836,7 @@ def main():
         corp_contract_items_data = []
         corp_contract_items_len = 0
         corp_contract_items_not_found = []
+        corp_contract_individual = []
         if len(corp_contracts_data) > 0:
             # Requires: access token
             for c in corp_contracts_data:
@@ -843,6 +854,11 @@ def main():
                 if c['issuer_corporation_id'] != corporation_id:
                     continue
                 contract_id = c["contract_id"]
+                # пропускаем контракты на продажу, которые выставлены не от имени корпорации, и доход от продажи
+                # которых упадёт в кошелёк пилота, а не корпорации
+                if not c['for_corporation']:
+                    corp_contract_individual.append(contract_id)
+                    continue
                 try:
                     __contract_items = interface.get_esi_data(
                         "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
@@ -874,6 +890,8 @@ def main():
         print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
         if len(corp_contract_items_not_found) > 0:
             print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+        if corp_contract_individual:
+            print("'{}' corporation has {} individual contracts : {}\n".format(corporation_name, len(corp_contract_individual), corp_contract_individual))
         sys.stdout.flush()
 
         # Построение дерева ассетов, с узлами в роли станций и систем, и листьями в роли хранящихся

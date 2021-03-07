@@ -47,13 +47,25 @@ g_module_default_settings = {
     # hangar, which stores blueprint copies to build T2 modules
     "factory:blueprints_hangars": [1],
 
-    "factory:station_id2": 60003760,
-    "factory:station_name2": "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-    # hangar, which stores blueprint copies to build T2 modules
-    "factory:blueprints_hangars2": [1],
-
     # номера контейнеров, в которых располагаются чертежи для конвейера
     "industry:conveyor_boxes": [],
+}
+g_module_default_types = {
+    "factory:station_id2": int,
+    "factory:station_name2": str,
+    "factory:blueprints_hangars2": list,
+
+    "factory:station_id3": int,
+    "factory:station_name3": str,
+    "factory:blueprints_hangars3": list,
+
+    "factory:station_id4": int,
+    "factory:station_name4": str,
+    "factory:blueprints_hangars4": list,
+
+    "factory:station_id5": int,
+    "factory:station_name5": str,
+    "factory:blueprints_hangars5": list,
 }
 
 
@@ -605,12 +617,15 @@ def __build_industry(
             "  wij_product_tid=ANY(%s) AND"
             "  wij_end_date > (current_date - interval '93' day)"
             ") AS a "
-            "WHERE mnth>=(%s-2) "
+            "WHERE mnth=%s OR mnth=%s OR mnth=%s "
             "GROUP BY 1,4 "
             "ORDER BY 1;",
             module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids,
-            db_current_month[0])
+            int(db_current_month[0]),  # january=1, december=12
+            int((db_current_month[0]-2+12)%12+1),
+            int((db_current_month[0]-3+12)%12+1)
+        )
         corp_industry_stat["workflow_industry_jobs"] = [{
             "ptid": wij[0],
             "cost": wij[1],
@@ -643,7 +658,7 @@ def __build_industry(
 def main():
     qidb = __get_db_connection()
     try:
-        module_settings = qidb.load_module_settings(g_module_default_settings)
+        module_settings = qidb.load_module_settings(g_module_default_settings, g_module_default_types)
         db_monthly_jobs = qidb.select_all_rows(
             "SELECT wmj_quantity,wmj_eft,wmj_conveyor "
             "FROM workflow_monthly_jobs "
@@ -736,13 +751,11 @@ def main():
     sys.stdout.flush()
 
     # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_names_data = []
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
-        # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
-            "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    # Requires role(s): Director
+    corp_ass_names_data = interface.get_esi_piece_data(
+        "corporations/{}/assets/names/".format(corporation_id),
+        corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
 

@@ -32,6 +32,20 @@ def __dump_index(glf):
       <li><a href="qi_workflow.php">Settings</a></li>
     </ul>
   </div>
+  <div class="btn-group btn-block">
+    <a href="shareholders_r_initiative4.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Shareholders</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left:201px;">
+      <li><a href="shareholders_r_initiative4.html">R Initiative 4</a></li>
+      <li><a href="shareholders_r_initiative5.html">R Initiative 5</a></li>
+      <li><a href="shareholders_r_strike.html">R Strike</a></li>
+      <li><a href="shareholders_night_trade_team.html">Night Trade Team</a></li>
+      <li><a href="shareholders_just_a_trade_corp.html">Just A Trade Corp</a></li>
+    </ul>
+  </div>
 """)
     for ro in q_capital_settings.g_report_options:
         glf.write('<a href="{fnm}.html" class="btn btn-primary btn-lg btn-block" role="button">{nm}</a>\n'.
