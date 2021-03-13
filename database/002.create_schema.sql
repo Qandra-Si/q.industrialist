@@ -4,6 +4,10 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+DROP INDEX IF EXISTS qi.idx_rs_pk;
+DROP TABLE IF EXISTS qi.regroup_stock;
+DROP SEQUENCE IF EXISTS qi.seq_rs;
+
 DROP INDEX IF EXISTS qi.idx_wij_bp_tid;
 DROP INDEX IF EXISTS qi.idx_wij_bp_id;
 DROP INDEX IF EXISTS qi.idx_wij_pk;
@@ -189,6 +193,41 @@ TABLESPACE pg_default;
 CREATE INDEX idx_wij_bp_tid
     ON qi.workflow_industry_jobs USING btree
     (wij_bp_tid ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- regroup_stock
+-- список фитов, запланированных в наличии в регруп-контейнерах
+--------------------------------------------------------------------------------
+CREATE SEQUENCE qi.seq_rs
+    INCREMENT 1
+    START 1000
+    MINVALUE 1
+    MAXVALUE 2147483647
+    CACHE 1;
+
+ALTER SEQUENCE qi.seq_rs OWNER TO qi_user;
+
+CREATE TABLE qi.regroup_stock
+(
+    rs_id INTEGER NOT NULL DEFAULT NEXTVAL('qi.seq_rs'::regclass),
+    rs_active BOOLEAN NOT NULL DEFAULT TRUE, -- фит запланирован в регруп (запись активна), иначе по ней план не составляется
+    rs_quantity INTEGER NOT NULL, -- кол-во кораблей (фитов) запланированных для наличия в регруп-контейнере
+    rs_eft CHARACTER VARYING(16383), -- 16 Кб для текстового представления фита (очень много всего в карго?)
+    rs_station CHARACTER VARYING(127), -- название станции/структуры в которой должен контролироваться регруп
+    rs_container CHARACTER VARYING(127), -- название контейнера на станции/структуре, в котором должен контролироваться регруп
+    rs_remarks CHARACTER VARYING(127), -- дополнительная информация
+    CONSTRAINT pk_rs PRIMARY KEY (rs_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.regroup_stock OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_rs_pk
+    ON qi.regroup_stock USING btree
+    (rs_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
