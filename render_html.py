@@ -187,7 +187,24 @@ def __dump_any_into_modal_footer(glf):
 """)
 
 
-def __dump_fit_items(
+def __get_converted_fit_status(fit, available_attr: str):
+    if not available_attr:
+        return "default"
+    __ship = fit["ship"]
+    __ship_name = __ship["name"] if not (__ship is None) else None
+    __ship_type_id = __ship["type_id"] if not (__ship is None) and ("type_id" in __ship) else None
+    __total_quantity = fit["quantity"]
+    if (__ship_name is None) or (__ship_type_id is None):
+        if __ship[available_attr] < __total_quantity:
+            return "warning"
+    for __item_dict in fit["items"]:
+        __quantity = __item_dict["quantity"]
+        if __item_dict[available_attr] < (__total_quantity*__quantity):
+            return "warning"
+    return "success"
+
+
+def __dump_converted_fits_items(
         glf,
         fit,
         num_id: int,
@@ -392,9 +409,10 @@ def __dump_converted_fits(
         else:
             __pn_flag_type = None
         __warnings = len([i for i in __items if "renamed" in i])
+        __fit_status = __get_converted_fit_status(fit, available_attr)
         # создаём сворачиваемую панель для работы с содержимым фита
         glf.write(
-            '<div class="panel panel-default {pnclass}">\n'
+            '<div class="panel panel-{status} {pnclass}">\n'
             ' <div class="panel-heading" role="tab" id="{prfxcllps}_hd{num}">\n'
             '  <h4 class="panel-title">\n'
             '   <a role="button" data-toggle="collapse"'  # отключение автосворачивания: data-parent="#monthly_jobs"
@@ -408,6 +426,7 @@ def __dump_converted_fits(
             '  role="tabpanel" aria-labelledby="{prfxcllps}_hd{num}">\n'
             '  <div class="panel-body">\n'.
             format(
+                status=__fit_status,
                 num=row_num,
                 prfxcllps=collapse_pn_name,
                 nm=__ship_name if not (__ship_name is None) and __ship_name else 'Fit #{}'.format(row_num),
@@ -420,7 +439,7 @@ def __dump_converted_fits(
             )
         )
         # выводим элементы управления фитом и его содержимое
-        __dump_fit_items(glf, fit, row_num, fit_keyword, available_attr)
+        __dump_converted_fits_items(glf, fit, row_num, fit_keyword, available_attr)
         # закрываем сворачиваемую панель
         glf.write(
             '  </div>\n'  # panel-body

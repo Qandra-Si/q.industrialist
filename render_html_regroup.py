@@ -130,7 +130,7 @@ def __dump_regroup_stations(
             regroup_container_dict = regroup_station_dict.get(int(container_id)) if not (regroup_station_dict is None) else None
             container_name = container_dict["name"]
 
-            glf.write('<div class="panel panel-danger" id="id{id}">\n'  # panel (container)
+            glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (container)
                       ' <div class="panel-heading">\n'
                       '  <h3 class="panel-title">{nm}</h3>\n'
                       ' </div>\n'
@@ -197,7 +197,6 @@ def __dump_regroup_stations(
     ls.setItem(ls_name, toggle);
     return toggle;
   }
-
   // Workflow Options storage (init)
   function resetOptionsMenuToDefault() {
     setupOptionDefaultValue('Show T2 Only', 0);
@@ -205,22 +204,6 @@ def __dump_regroup_stations(
 """)
     render_html.__dump_converted_fits_script(glf, "regroup")
     glf.write("""
-  // Missing Blueprints Row Color
-  function toggleRowColor(tr,clr) { // 1-danger;2-muted;3-warning
-    if (clr==1) {
-      tr.addClass('danger');
-      tr.removeClass('text-muted');
-      tr.removeClass('warning');
-    } else if (clr==2) {
-      tr.removeClass('danger');
-      tr.addClass('text-muted');
-      tr.removeClass('warning');
-    } else {
-      tr.removeClass('danger');
-      tr.removeClass('text-muted');
-      tr.addClass('warning');
-    }
-  }
   // Workflow Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
     makeVisibleByOption('Show T2 Only', '#imgShowT2Only');
