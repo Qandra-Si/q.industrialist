@@ -33,6 +33,16 @@ def __dump_index(glf):
     </ul>
   </div>
   <div class="btn-group btn-block">
+    <a href="regroup.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Regroup</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left:201px;">
+      <li><a href="qi_regroup.php">Settings</a></li>
+    </ul>
+  </div>
+  <div class="btn-group btn-block">
     <a href="shareholders_r_initiative4.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Shareholders</a>
     <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
       <span class="caret"></span>

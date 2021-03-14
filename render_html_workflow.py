@@ -25,216 +25,6 @@ function getSdeItemName(id) {
 """)
 
 
-def __dump_fit_items(glf, job, job_id):
-    __ship = job["ship"]
-    __ship_name = __ship["name"] if not (__ship is None) else None
-    __ship_type_id = __ship["type_id"] if not (__ship is None) and ("type_id" in __ship) else None
-    __fit_comment = job["comment"]
-    __eft = job["eft"]
-    __total_quantity = job["quantity"]
-    __fit_items = job["items"]
-    __problems = job["problems"]
-    # вывод информации о корабле, а также формирование элементов пользовательского интерфейса
-    if (__ship_name is None) or (__ship_type_id is None):
-        glf.write(
-            '<div class="media">\n'
-            ' <div class="media-left"></div>\n'
-            ' <div class="media-body">\n'
-            '  <div class="row">\n'
-            '   <div class="col-md-6">\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" job="{job}"><span'
-            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
-            '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
-            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
-            '   </div>\n'
-            '  </div>\n'
-            ' </div>\n'
-            '</div>\n'.
-            format(job=job_id)
-        )
-    else:
-        glf.write(
-            '<div class="media">\n'
-            ' <div class="media-left"><img class="media-object icn32" src="{src}"></div>\n'
-            ' <div class="media-body">\n'
-            '  <h4 class="media-heading">{q}x {nm}</h4>\n'
-            '  <div class="row">\n'
-            '   <div class="col-md-6">\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" job="{job}"><span'
-            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
-            '     data-target="#modalEFT{job}"><span class="glyphicon glyphicon-th-list"'
-            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
-            '   </div>\n'
-            '  </div>\n'
-            ' </div>\n'
-            '</div>\n'.
-            format(
-                job=job_id,
-                nm=__ship_name,
-                src=render_html.__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
-                q=__total_quantity
-            )
-        )
-    # добавление окна, в котором можно просматривать и копировать EFT
-    render_html.__dump_any_into_modal_header_wo_button(
-        glf,
-        '<strong>{q}x {nm}</strong>{cmnt}'.format(
-            q=__total_quantity,
-            nm=__ship_name,
-            cmnt=', &nbsp<small>{}</small>'.format(__fit_comment) if not (__fit_comment is None) and __fit_comment else ""
-        ),
-        'EFT{job}'.format(job=job_id),  # modal добавляется автоматически
-        None)  # 'modal-sm')
-    # формируем содержимое модального диалога
-    glf.write(
-        '<textarea onclick="this.select();" class="fitting col-md-12" rows="15" style="resize:none"'
-        ' readonly="readonly">{eft}</textarea>'.
-        format(eft=__eft)
-    )
-    # закрываем footer модального диалога
-    render_html.__dump_any_into_modal_footer(glf)
-    # вывод таблицы  item-ов фита
-    glf.write(
-        '<div class="table-responsive">\n'
-        ' <table id="qind-job{num}" class="table table-condensed qind-fit-table">\n'.
-        format(num=job_id)
-    )
-    # сначала показываем список проблем, он всегда будет наверху
-    for __problem_dict in __problems:
-        __name = __problem_dict["name"]
-        __quantity = __problem_dict["quantity"]
-        __problem = __problem_dict["problem"]
-        __is_blueprint_copy = __problem_dict["is_blueprint_copy"] if "is_blueprint_copy" in __problem_dict else None
-        glf.write(
-            '<tr class="qind-prblm-job{job} danger">'
-            '<td></td>'
-            '<td><strong>{q}x</strong> {nm}{copy} <span class="label label-danger">{prblm}</span></td>'
-            '<td align="right">{tq:,d}</td>'
-            '</tr>\n'.
-            format(
-                job=job_id,
-                q=__quantity,
-                nm=__name,
-                copy='&nbsp;(Copy)' if not (__is_blueprint_copy is None) and bool(__is_blueprint_copy) else "",
-                prblm=__problem,
-                tq=__total_quantity * __quantity
-            )
-        )
-    # следом за проблемами показываем список модулей фита
-    for __item_dict in __fit_items:
-        __name = __item_dict["name"]
-        __type_id = __item_dict["type_id"]
-        __quantity = __item_dict["quantity"]
-        __details = __item_dict["details"]
-        __is_blueprint_copy = __item_dict["is_blueprint_copy"] if "is_blueprint_copy" in __item_dict else None
-        __renamed = __item_dict["renamed"] if "renamed" in __item_dict else None
-        glf.write(
-            '<tr{nont2}>'
-            '<td><img class="media-object icn16" src="{img}"></td>'
-            '<td><strong>{q}x</strong> {nm}{copy}{renamed}</td>'
-            '<td align="right">{tq:,d}</td>'
-            '</tr>\n'.
-            format(
-                nm=__name,
-                copy='&nbsp;(Copy)' if not (__is_blueprint_copy is None) and bool(__is_blueprint_copy) else "",
-                renamed=' <span class="label label-warning">renamed</span>' if not (__renamed is None) and bool(__renamed) else "",
-                img=render_html.__get_img_src(__type_id, 32),
-                q=__quantity,
-                tq=__total_quantity*__quantity,
-                nont2="" if ("metaGroupID" in __details) and (__details["metaGroupID"] == 2) else
-                      ' class="qind-nont2-job{} hidden"'.format(job_id)
-            )
-        )
-    glf.write("""
-</table>
-</div>
-""")
-
-
-def __dump_monthly_jobs(glf, corp_manufacturing_scheduler):
-    monthly_jobs = corp_manufacturing_scheduler["monthly_jobs"]
-
-    glf.write("""
-<!--start monthly_jobs-->
-<div class="panel-group" id="monthly_jobs" role="tablist" aria-multiselectable="true">
-""")
-
-    row_num = 0
-    for job in monthly_jobs:
-        row_num += 1
-        __ship = job["ship"]
-        __ship_name = job["ship"]["name"] if not (job["ship"] is None) else None
-        __fit_comment = job["comment"]
-        __eft = job["eft"]
-        __total_quantity = job["quantity"]
-        __items = job["items"]
-        __problems = job["problems"]
-        __conveyor_flag = job["conveyor"]
-        __warnings = len([i for i in __items if "renamed" in i])
-        # создаём сворачиваемую панель для работы с содержимым фита
-        glf.write(
-            '<div class="panel panel-default qind-job-{cflg}">\n'
-            ' <div class="panel-heading" role="tab" id="monthjob_hd{num}">\n'
-            '  <h4 class="panel-title">\n'
-            '   <a role="button" data-toggle="collapse"'  # отключение автосворачивания: data-parent="#monthly_jobs"
-            '    href="#monthjob_collapse{num}" aria-expanded="true"'
-            '    aria-controls="monthjob_collapse{num}"><strong>{nm}</strong>&nbsp;<span'
-            '    class="badge">{q}</span>{wrngs}{prblms}</a>\n'
-            '  </h4>\n'
-            '  {cmnt}\n'
-            ' </div>\n'
-            ' <div id="monthjob_collapse{num}" class="panel-collapse collapse{vsbl}"'
-            '  role="tabpanel" aria-labelledby="monthjob_hd{num}">\n'
-            '  <div class="panel-body">\n'.
-            format(
-                num=row_num,
-                nm=__ship_name if not (__ship_name is None) and __ship_name else 'Fit #{}'.format(row_num),
-                cmnt='<small>{}</small>'.format(__fit_comment) if not (__fit_comment is None) and __fit_comment else "",
-                q=__total_quantity,
-                vsbl="",  # свёрнуты все по умолчанию: " in" if row_num == 1 else "",
-                wrngs="" if __warnings == 0 else '&nbsp;<span class="label label-warning">warnings</span>',
-                prblms="" if len(__problems) == 0 else '&nbsp;<span class="label label-danger">problems</span>',
-                cflg='cnveyr' if __conveyor_flag else 'schdld'
-            )
-        )
-        # выводим элементы управления фитом и его содержимое
-        __dump_fit_items(glf, job, row_num)
-        # закрываем сворачиваемую панель
-        glf.write(
-            '  </div>\n'  # panel-body
-            ' </div>\n'  # panel-collapse
-            '</div>\n'  # panel
-        )
-
-    # только для отладки !!!!!
-    # scheduled_blueprints = corp_manufacturing_scheduler["scheduled_blueprints"]
-    # glf.write('<table class="table table-condensed" style="padding:1px;font-size:smaller;">')
-    # scheduled_blueprints.sort(key=lambda sb: sb["product"]["name"])
-    # for bpc in scheduled_blueprints:
-    #     glf.write(
-    #         '<tr>'
-    #         '<td><img class="media-object icn32" src="{img}"></td>'
-    #         '<td>{nm} <span class="label label-default">{id}</span></td>'
-    #         '<td align="right">{q}</td>'
-    #         '</tr>\n'.
-    #         format(
-    #             img=render_html.__get_img_src(bpc["type_id"], 32),
-    #             nm=bpc["product"]["name"],
-    #             id=bpc["type_id"],
-    #             q=bpc["product"]["scheduled_quantity"]
-    #         )
-    #     )
-    # glf.write('</table>')
-    # только для отладки !!!!!
-
-    glf.write("""
-</div>
-<!--end monthly_jobs-->
-""")
-
-
 def __group_blueprints_by_category(blueprints, sde_type_ids, sde_market_groups):
     blueprint_categories = []
     for bp in enumerate(blueprints):
@@ -402,9 +192,16 @@ def __dump_workflow_tools(
    <h3>Monthly Scheduled Jobs</h3>
 """)
 
-    __dump_monthly_jobs(
+    render_html.__dump_converted_fits(
         glf,
-        corp_manufacturing_scheduler)
+        corp_manufacturing_scheduler["monthly_jobs"],
+        "monthly_jobs",  # наименование группы сворачиваемых панелей
+        "monthjob",  # профикс названий сворачиваемых панелей
+        collapse_pn_types=("conveyor", {"False": "qind-job-schdld", "True": "qind-job-cnveyr"}),
+        row_num_multiplexer=0,
+        fit_keyword="job",
+        available_attr=None
+    )
 
     glf.write("""
   </div>
@@ -494,37 +291,9 @@ def __dump_workflow_tools(
     setupOptionDefaultValue('Show Scheduled', 1);
     setupOptionDefaultValue('Show Legend', 1);
   }
-  // T2 -> All -> T2...
-  function setupT2ButtonAndTable(t2_only, job, img, txt) {
-    if (t2_only == 1) {
-      img.removeClass('glyphicon-eye-open');
-      img.addClass('glyphicon-eye-close');
-      txt.html('T2');
-      $('tr.qind-nont2-job'+job).each(function() { $(this).addClass('hidden'); })    
-    } else {
-      img.addClass('glyphicon-eye-open');
-      img.removeClass('glyphicon-eye-close');
-      txt.html('All');
-      $('tr.qind-nont2-job'+job).each(function() { $(this).removeClass('hidden'); })    
-    }
-  }
-  function refreshT2ButtonsAndTables() {
-    $('button.qind-btn-t2').each(function() {
-      var img = $(this).find('span').eq(0);
-      var txt = $(this).find('span').eq(1);
-      var t2_only = (txt.html() == 'T2') ? 1 : 0;
-      var job = $(this).attr('job');
-      setupT2ButtonAndTable(t2_only, job, img, txt);
-    })
-  }
-  function resetT2ButtonsAndTables(t2_only) {
-    $('button.qind-btn-t2').each(function() {
-      var img = $(this).find('span').eq(0);
-      var txt = $(this).find('span').eq(1);
-      var job = $(this).attr('job');
-      setupT2ButtonAndTable(t2_only, job, img, txt);
-    })
-  }
+""")
+    render_html.__dump_converted_fits_script(glf, "job")
+    glf.write("""
   // Missing Blueprints Row Color
   function toggleRowColor(tr,clr) { // 1-danger;2-muted;3-warning
     if (clr==1) {
@@ -618,15 +387,6 @@ def __dump_workflow_tools(
   }
   // Workflow Options menu and submenu setup
   $(document).ready(function(){
-    $('button.qind-btn-t2').each(function() {
-        $(this).on('click', function () {
-          var img = $(this).find('span').eq(0);
-          var txt = $(this).find('span').eq(1);
-          var t2_toggle = (txt.html() == 'T2') ? 0 : 1;
-          var job = $(this).attr('job');
-          setupT2ButtonAndTable(t2_toggle, job, img, txt);
-      })
-    })
     $('#btnToggleShowT2Only').on('click', function () {
       t2_toggle = toggleOptionValue('Show T2 Only');
       resetT2ButtonsAndTables(t2_toggle);

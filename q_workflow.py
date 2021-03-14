@@ -74,93 +74,36 @@ def __get_blueprints_containers(
         module_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        corp_assets_data,
         # esi данные, загруженные с серверов CCP
+        corp_assets_data,
         foreign_structures_data,
         corp_ass_names_data):
-    factories_containers = []
+    search_settings = []
     for station_num in range(1, 6):
         station_num_str = '' if station_num == 1 else str(station_num)
         # input setings
         hangars_filter = module_settings.get("factory:blueprints_hangars"+station_num_str, None)
+        if hangars_filter is None:
+            continue
         # output factory containers
         factory_containers = {
             "station_id": module_settings.get("factory:station_id"+station_num_str, None),
             "station_name": module_settings.get("factory:station_name"+station_num_str, None),
-            "station_num": station_num,
+            "user_data": {"station_num": station_num},
             "station_foreign": None,
             "hangars_filter": hangars_filter,
             "containers": None
         }
-        if (hangars_filter is None) or (factory_containers['station_id'] is None) and (factory_containers['station_name'] is None):
+        if (factory_containers['station_id'] is None) and (factory_containers['station_name'] is None):
             continue
-
-        # пытаемся определить недостающее звено, либо station_id, либо station_name (если неизвестны)
-        if not (factory_containers["station_id"] is None):
-            station_id = factory_containers["station_id"]
-            station_name = None
-            factory_containers["station_foreign"] = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None) is None
-
-            # поиск контейнеров на станции station_id в ангарах hangars_filter
-            factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
-                station_id,
-                hangars_filter,
-                sde_type_ids,
-                corp_assets_data)
-
-            if not factory_containers["station_foreign"]:
-                station_name = next((an['name'] for an in corp_ass_names_data if an["item_id"] == station_id), None)
-
-            if factory_containers["station_foreign"]:
-                # поиск одной единственной станции, которая не принадлежат корпорации (на них имеется офис,
-                # но самой станции в ассетах нет)
-                if str(station_id) in foreign_structures_data:
-                    station_name = foreign_structures_data[str(station_id)]["name"]
-
-            # вывод на экран найденных station_id и station_name
-            if station_name is None:
-                raise Exception('Not found station name for factory {}!!!'.format(station_id))
-
-        elif not (factory_containers["station_name"] is None):
-            station_name = factory_containers["station_name"]
-            station_id = next((an for an in corp_ass_names_data if an["name"] == station_name), None)
-            factory_containers["station_foreign"] = station_id is None
-
-            if factory_containers["station_foreign"]:
-                # поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-                __foreign_keys = foreign_structures_data.keys()
-                for __foreign_id in __foreign_keys:
-                    __foreign_dict = foreign_structures_data[str(__foreign_id)]
-                    if __foreign_dict["name"] == station_name:
-                        station_id = int(__foreign_id)
-                        break
-
-            # вывод на экран найденных station_id и station_name
-            if station_id is None:
-                raise Exception('Not found station identity for factory {}!!!'.format(station_name))
-
-            # поиск контейнеров на станции station_id в ангарах hangars_filter
-            factory_containers["containers"] = eve_esi_tools.find_containers_in_hangars(
-                station_id,
-                hangars_filter,
-                sde_type_ids,
-                corp_assets_data)
-
-        else:
-            raise Exception('Not found station identity and name!!!')
-
-        factory_containers["station_id"] = station_id
-        factory_containers["station_name"] = station_name
-
-        # получение названий контейнеров и сохранение из в списке контейнеров
-        for __cont_dict in factory_containers["containers"]:
-            __item_id = __cont_dict["id"]
-            __item_name = next((an for an in corp_ass_names_data if an["item_id"] == __item_id), None)
-            if not (__item_name is None):
-                __cont_dict["name"] = __item_name["name"]
-
-        factories_containers.append(factory_containers)
-
+        search_settings.append(factory_containers)
+    factories_containers = eve_esi_tools.get_containers_on_stations(
+        search_settings,
+        sde_type_ids,
+        corp_assets_data,
+        foreign_structures_data,
+        corp_ass_names_data
+    )
     return factories_containers
 
 
