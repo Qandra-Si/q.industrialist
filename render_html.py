@@ -221,11 +221,19 @@ def __dump_fit_items(
             format(fitk=fit_keyword, num=num_id)
         )
     else:
+        __available_txt = ""
+        if available_attr:
+            __available_txt = \
+                '<strong><span class="text-{cls}">{q:,d}</span></strong>&nbsp;/&nbsp;'.\
+                format(
+                    q=__ship[available_attr],
+                    cls="success" if (__ship[available_attr] >= __total_quantity) else "warning"
+                )
         glf.write(
             '<div class="media">\n'
             ' <div class="media-left"><img class="media-object icn32" src="{src}"></div>\n'
             ' <div class="media-body">\n'
-            '  <h4 class="media-heading">{q}x {nm}</h4>\n'
+            '  <h4 class="media-heading">{aq}{q}x {nm}</h4>\n'
             '  <div class="row">\n'
             '   <div class="col-md-6">\n'
             '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" {fitk}="{num}"><span'
@@ -242,6 +250,7 @@ def __dump_fit_items(
                 num=num_id,
                 nm=__ship_name,
                 src=__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
+                aq=__available_txt,
                 q=__total_quantity
             )
         )
@@ -278,7 +287,8 @@ def __dump_fit_items(
         __available_txt = ""
         if available_attr:
             __available_txt = \
-                '<strong><span class="text-{cls}">{q:,d}</span></strong>&nbsp;/&nbsp;'.format(
+                '<strong><span class="text-{cls}">{q:,d}</span></strong>&nbsp;/&nbsp;'.\
+                format(
                     q=__problem_dict[available_attr],
                     cls="success" if (__problem_dict[available_attr] >= (__total_quantity*__quantity)) else "warning"
                 )
@@ -310,7 +320,8 @@ def __dump_fit_items(
         __available_txt = ""
         if available_attr:
             __available_txt = \
-                '<strong><span class="text-{cls}">{q:,d}</span></strong>&nbsp;/&nbsp;'.format(
+                '<strong><span class="text-{cls}">{q:,d}</span></strong>&nbsp;/&nbsp;'.\
+                format(
                     q=__item_dict[available_attr],
                     cls="success" if (__item_dict[available_attr] >= (__total_quantity*__quantity)) else "warning"
                 )
