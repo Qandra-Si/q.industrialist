@@ -45,137 +45,115 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
-    # настройка Eve Online ESI Swagger interface
-    auth = esi.EveESIAuth(
-        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        debug=True)
-    client = esi.EveESIClient(
-        auth,
-        debug=False,
-        logger=True,
-        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
-    interface = esi.EveOnlineInterface(
-        client,
-        q_industrialist_settings.g_client_scope,
-        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        offline_mode=argv_prms["offline_mode"])
-
-    authz = interface.authenticate(argv_prms["character_names"][0])
-    character_id = authz["character_id"]
-    character_name = authz["character_name"]
-
-    # Public information about a character
-    character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id),
-        fully_trust_cache=True)
-    # Public information about a corporation
-    corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]),
-        fully_trust_cache=True)
-
-    corporation_id = character_data["corporation_id"]
-    corporation_name = corporation_data["name"]
-    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
-    sys.stdout.flush()
-
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
 
-    # Public information about market prices
-    try:
-        # Public information about market prices
-        eve_market_prices_data = interface.get_esi_data("markets/prices/")
-        print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+    # настройка Eve Online ESI Swagger interface
+    eve_market_prices_data = None
+    total_assets_data = []
+    total_blueprints_data = []
+    total_industry_jobs_data = []
+    total_ass_names_data = []
+    for pilot_name in argv_prms["character_names"]:
+        auth = esi.EveESIAuth(
+            '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            debug=True)
+        client = esi.EveESIClient(
+            auth,
+            debug=False,
+            logger=True,
+            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+        interface = esi.EveOnlineInterface(
+            client,
+            q_industrialist_settings.g_client_scope,
+            cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            offline_mode=argv_prms["offline_mode"])
+
+        authz = interface.authenticate(pilot_name)
+        character_id = authz["character_id"]
+        character_name = authz["character_name"]
+
+        # Public information about a character
+        character_data = interface.get_esi_data(
+            "characters/{}/".format(character_id),
+            fully_trust_cache=True)
+        # Public information about a corporation
+        corporation_data = interface.get_esi_data(
+            "corporations/{}/".format(character_data["corporation_id"]),
+            fully_trust_cache=True)
+
+        corporation_id = character_data["corporation_id"]
+        corporation_name = corporation_data["name"]
+        print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
-    except requests.exceptions.HTTPError as err:
-        status_code = err.response.status_code
-        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
-            eve_market_prices_data = []
-        else:
-            raise
-    except:
-        print(sys.exc_info())
-        raise
 
-    # Requires role(s): Director
-    corp_assets_data = interface.get_esi_paged_data(
-        "corporations/{}/assets/".format(corporation_id))
-    print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
-    sys.stdout.flush()
-
-    # Requires role(s): Director
-    corp_blueprints_data = interface.get_esi_paged_data(
-        "corporations/{}/blueprints/".format(corporation_id))
-    print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
-    sys.stdout.flush()
-
-    # Requires role(s): Factory_Manager
-    corp_industry_jobs_data = interface.get_esi_paged_data(
-        "corporations/{}/industry/jobs/".format(corporation_id))
-    print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
-    sys.stdout.flush()
-
-    # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    # Requires role(s): Director
-    corp_ass_names_data = interface.get_esi_piece_data(
-        "corporations/{}/assets/names/".format(corporation_id),
-        corp_ass_named_ids)
-    print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
-    sys.stdout.flush()
-
-    # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-    foreign_structures_data = {}
-    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
-    foreign_structures_forbidden_ids = []
-    if len(foreign_structures_ids) > 0:
-        # Requires: access token
-        for structure_id in foreign_structures_ids:
+        if eve_market_prices_data is None:
             try:
-                universe_structure_data = interface.get_esi_data(
-                    "universe/structures/{}/".format(structure_id),
-                    fully_trust_cache=True)
-                foreign_structures_data.update({str(structure_id): universe_structure_data})
+                # Public information about market prices
+                eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                sys.stdout.flush()
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
-                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                    foreign_structures_forbidden_ids.append(structure_id)
+                if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                    eve_market_prices_data = []
                 else:
                     raise
             except:
                 print(sys.exc_info())
                 raise
-    print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
-    if len(foreign_structures_forbidden_ids) > 0:
-        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
-    sys.stdout.flush()
 
-    # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
-    # элементов, в виде:
-    # { location1: {items:[item1,item2,...],type_id,location_id},
-    #   location2: {items:[item3],type_id} }
-    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+        # Requires role(s): Director
+        corp_assets_data = interface.get_esi_paged_data(
+            "corporations/{}/assets/".format(corporation_id))
+        print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Director
+        corp_blueprints_data = interface.get_esi_paged_data(
+            "corporations/{}/blueprints/".format(corporation_id))
+        print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Factory_Manager
+        corp_industry_jobs_data = interface.get_esi_paged_data(
+            "corporations/{}/industry/jobs/".format(corporation_id))
+        print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
+        sys.stdout.flush()
+
+        # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+        # Requires role(s): Director
+        corp_ass_names_data = interface.get_esi_piece_data(
+            "corporations/{}/assets/names/".format(corporation_id),
+            corp_ass_named_ids)
+        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+        sys.stdout.flush()
+
+        total_assets_data.extend(corp_assets_data)
+        total_blueprints_data.extend(corp_blueprints_data)
+        total_industry_jobs_data.extend(corp_industry_jobs_data)
+        total_ass_names_data.extend(corp_ass_names_data)
 
     # находим контейнеры по заданным названиям
     for ro in q_capital_settings.g_report_options:
         containers = []
         if "bp_cont_templates" in ro:
             for tmplt in ro["bp_cont_templates"]:
-                containers.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
+                containers.extend([n["item_id"] for n in total_ass_names_data if re.search(tmplt, n['name'])])
                 for id in containers:
                     ro["blueprints"].append(
-                        {"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
+                        {"id": id, "name": next((n["name"] for n in total_ass_names_data if n['item_id'] == id), None)})
 
         # перечисляем станции и контейнеры, которые были найдены
         print('\nFound report containters and station ids for {}...'.format(ro["product"]))
         for bpl in ro["blueprints"]:
             print('  {} = {}'.format(bpl["id"], bpl["name"]))
-        for bpl in ro["stock"]:
-            print('  {} = {}'.format(bpl["id"], bpl.get("name", bpl.get("flag"))))
+        for stk in ro["stock"]:
+            print('  {} = {}'.format(stk["id"], stk.get("name", stk.get("flag"))))
 
         print("\nBuilding report...")
         sys.stdout.flush()
@@ -191,9 +169,9 @@ def main():
             sde_market_groups,
             sde_icon_ids,
             # esi данные, загруженные с серверов CCP
-            corp_assets_data,
-            corp_industry_jobs_data,
-            corp_blueprints_data,
+            total_assets_data,
+            total_industry_jobs_data,
+            total_blueprints_data,
             eve_market_prices_data)
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)

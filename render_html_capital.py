@@ -124,12 +124,16 @@ def __dump_corp_capital(
  <div class="media">
   <div class="media-left">
 """)
-    glf.write('  <img class="media-object icn64" src="{src}" alt="Capital Ship Components">\n'.
-              format(src=render_html.__get_icon_src(2863, sde_icon_ids)))  # Standard Capital Ship Components
+    glf.write('<img class="media-object icn64" src="{src}" alt="{nm} Components">\n'.
+              format(src=render_html.__get_icon_src(2863, sde_icon_ids), nm=product_name))  # Standard Capital Ship Components
     glf.write("""
   </div>
   <div class="media-body">
-   <h4 class="media-heading">Capital Ship Components</h4>
+""")
+    glf.write('<h4 class="media-heading">{nm} Components</h4>\n'.
+              format(nm=product_name))  # Standard Capital Ship Components
+   
+    glf.write("""
 <p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,<br/>
 where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.</p>
 <div class="table-responsive">
@@ -350,6 +354,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     # stock_resources = []
 
     # подсчёт кол-ва имеющихся в наличии материалов
+    # составляем список тех материалов, у которых нет поля 'a', что говорит о том, что ассеты по
+    # этим материалам не проверялись (в список они попали в результате анализа БП второго уровня)
     materials_summary_without_a = [int(ms["id"]) for ms in materials_summary if not ("a" in ms)]
     for a in corp_assets_data:
         __location_id = int(a["location_id"])
@@ -360,7 +366,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             if not (__stock_flag_dict['flag'] == a['location_flag']):
                 continue
         __type_id = int(a["type_id"])
-        if __type_id in materials_summary_without_a:
+        if int(__type_id) in materials_summary_without_a:
             __summary_dict = next((ms for ms in materials_summary if ms['id'] == __type_id), None)
             if __summary_dict is None:
                 continue
