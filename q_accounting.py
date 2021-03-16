@@ -393,8 +393,9 @@ def __build_accounting(
         foreign_structures_forbidden_ids,
         corp_assets_tree,
         corp_assets_data):
+    # проверяем, может быть у корпы нет ассетов?
     if not ("roots" in corp_assets_tree):
-        return None
+        return {}, {}
     corp_accounting_stat = {}
     corp_accounting_tree = {}
     __roots = corp_assets_tree["roots"]
