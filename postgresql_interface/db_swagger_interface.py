@@ -704,12 +704,123 @@ class QSwaggerInterface:
                 "WHERE eca_item_id IN (SELECT * FROM UNNEST(%s));",
                 deleted_ids,
             )
-        # if updated_at:
-        #    self.db.execute(
-        #        "UPDATE esi_corporation_assets SET"
-        #        " eca_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s "
-        #        "WHERE eca_corporation_id=%(id)s;",
-        #        {'id': corporation_id,
-        #         'at': updated_at,
-        #         }
-        #    )
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/blueprints/
+    # -------------------------------------------------------------------------
+
+    def clear_corporation_blueprints(self, corporation_id):
+        """ delete corporation blueprints data from database
+        """
+        self.db.execute(
+            "DELETE FROM esi_corporation_blueprints WHERE ecb_corporation_id=%s;",
+            corporation_id
+        )
+
+    def insert_or_update_corporation_blueprints(self, data, corporation_id, updated_at):
+        """ inserts corporation blueprints data into database
+
+        :param data: corporation blueprints data
+        """
+        # { "item_id": 162478388,
+        #   "location_flag": "CorpSAG4",
+        #   "location_id": 1035318107573,
+        #   "material_efficiency": 10,
+        #   "quantity": -1,
+        #   "runs": -1,
+        #   "time_efficiency": 20,
+        #   "type_id": 17860
+        # }
+        self.db.execute(
+            "INSERT INTO esi_corporation_blueprints("
+            " ecb_corporation_id,"
+            " ecb_item_id,"
+            " ecb_type_id,"
+            " ecb_location_id,"
+            " ecb_location_flag,"
+            " ecb_quantity,"
+            " ecb_time_efficiency,"
+            " ecb_material_efficiency,"
+            " ecb_runs,"
+            " ecb_created_at,"
+            " ecb_updated_at) "
+            "VALUES ("
+            " %(co)s,"
+            " %(id)s,"
+            " %(ty)s,"
+            " %(loc)s,"
+            " %(lfl)s,"
+            " %(q)s,"
+            " %(te)s,"
+            " %(me)s,"
+            " %(r)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecb DO UPDATE SET"
+            " ecb_type_id=%(ty)s,"
+            " ecb_location_id=%(loc)s,"
+            " ecb_location_flag=%(lfl)s,"
+            " ecb_quantity=%(q)s,"
+            " ecb_time_efficiency=%(me)s,"
+            " ecb_material_efficiency=%(te)s,"
+            " ecb_runs=%(r)s,"
+            " ecb_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'co': corporation_id,
+             'id': data['item_id'],
+             'ty': data['type_id'],
+             'loc': data['location_id'],
+             'lfl': data['location_flag'],
+             'q': data['quantity'],
+             'me': data['material_efficiency'],
+             'te': data['time_efficiency'],
+             'r': data['runs'],
+             'at': updated_at,
+             }
+        )
+
+    def get_exist_corporation_blueprints(self):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " ecb_corporation_id,"
+            " ecb_item_id,"
+            " ecb_type_id,"
+            " ecb_location_id,"
+            " ecb_location_flag,"
+            " ecb_quantity,"
+            " ecb_time_efficiency,"
+            " ecb_material_efficiency,"
+            " ecb_runs,"
+            " ecb_updated_at "
+            "FROM esi_corporation_blueprints;"
+        )
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[9], 'corporation_id': row[0]}
+            data.append({
+                'item_id': row[1],
+                'type_id': row[2],
+                'location_id': row[3],
+                'location_flag': row[4],
+                'quantity': row[5],
+                'time_efficiency': row[6],
+                'material_efficiency': row[7],
+                'runs': row[8],
+                'ext': ext,
+            })
+        return data
+
+    def delete_obsolete_corporation_blueprints(self, deleted_ids):
+        """ обновляет updated_at у существующих корп-чертежей и удаляет устаревшие (исчезнувшие) БП
+
+        :param deleted_ids: obsolete corporation blueprint items ids to remove from database
+        :param corporation_id: corporation id to update its blueprints
+        :param updated_at: :class:`datetime.datetime`
+        """
+        if deleted_ids:
+            self.db.execute(
+                "DELETE FROM esi_corporation_blueprints "
+                "WHERE ecb_item_id IN (SELECT * FROM UNNEST(%s));",
+                deleted_ids,
+            )

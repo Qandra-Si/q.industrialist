@@ -6,6 +6,14 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+
+DROP INDEX IF EXISTS qi.idx_ecb_location_id;
+DROP INDEX IF EXISTS qi.idx_ecb_type_id;
+DROP INDEX IF EXISTS qi.idx_ecb_item_id;
+DROP INDEX IF EXISTS qi.idx_ecb_corporation_id;
+DROP INDEX IF EXISTS qi.idx_ecb_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_blueprints;
+
 DROP INDEX IF EXISTS qi.idx_eca_location_flag;
 DROP INDEX IF EXISTS qi.idx_eca_location_type;
 DROP INDEX IF EXISTS qi.idx_eca_location_id;
@@ -329,6 +337,60 @@ TABLESPACE pg_default;
 CREATE INDEX idx_eca_location_flag
     ON qi.esi_corporation_assets USING btree
     (eca_location_flag ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- esi_corporation_blueprints
+-- список корпоративных чертежей
+--------------------------------------------------------------------------------
+CREATE TABLE esi_corporation_blueprints
+(
+    ecb_corporation_id BIGINT NOT NULL,
+    ecb_item_id BIGINT NOT NULL,
+    ecb_type_id INTEGER NOT NULL,
+    ecb_location_id BIGINT NOT NULL,
+    ecb_location_flag CHARACTER VARYING(255) NOT NULL,
+    ecb_quantity INTEGER NOT NULL,
+    ecb_time_efficiency INTEGER NOT NULL,
+    ecb_material_efficiency INTEGER NOT NULL,
+    ecb_runs INTEGER NOT NULL,
+    ecb_created_at TIMESTAMP,
+    ecb_updated_at TIMESTAMP,
+    CONSTRAINT pk_ecb PRIMARY KEY (ecb_corporation_id,ecb_item_id),
+    CONSTRAINT fk_ecb_corporation_id FOREIGN KEY (ecb_corporation_id)
+        REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_corporation_blueprints OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_ecb_pk
+    ON qi.esi_corporation_blueprints USING btree
+    (ecb_corporation_id ASC NULLS LAST, ecb_item_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecb_corporation_id
+    ON qi.esi_corporation_blueprints USING btree
+    (ecb_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecb_item_id
+    ON qi.esi_corporation_blueprints USING btree
+    (ecb_item_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecb_type_id
+    ON qi.esi_corporation_blueprints USING btree
+    (ecb_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecb_location_id
+    ON qi.esi_corporation_blueprints USING btree
+    (ecb_location_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

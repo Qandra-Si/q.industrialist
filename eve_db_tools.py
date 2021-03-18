@@ -91,6 +91,7 @@ class QDatabaseTools:
         self.__cached_structures: typing.Dict[int, QEntity] = {}
         self.__cached_corporation_structures: typing.Dict[int, QEntity] = {}
         self.__cached_corporation_assets: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.prepare_cache()
 
         self.depth = QEntityDepth()
@@ -100,6 +101,7 @@ class QDatabaseTools:
         """
         del self.depth
 
+        del self.__cached_corporation_blueprints
         del self.__cached_corporation_assets
         del self.__cached_corporation_structures
         del self.__cached_structures
@@ -164,7 +166,24 @@ class QDatabaseTools:
             del row['ext']
             self.__cached_corporation_structures[structure_id] = QEntity(True, False, row, updated_at)
 
-        rows = self.dbswagger.get_exist_corporation_assets()
+        self.prepare_corp_cache(
+            self.dbswagger.get_exist_corporation_assets(),
+            self.__cached_corporation_assets
+        )
+
+        self.prepare_corp_cache(
+            self.dbswagger.get_exist_corporation_blueprints(),
+            self.__cached_corporation_blueprints
+        )
+
+    def get_corp_cache(self, cache, corporation_id):
+        corp_cache = cache.get(corporation_id)
+        if not corp_cache:
+            cache[corporation_id] = {}
+            corp_cache = cache.get(corporation_id)
+        return corp_cache
+
+    def prepare_corp_cache(self, rows, cache):
         for row in rows:
             item_id: int = int(row['item_id'])
             ext = row['ext']
@@ -173,10 +192,7 @@ class QDatabaseTools:
             del ext['updated_at']
             del ext['corporation_id']
             del row['ext']
-            corp_cache = self.__cached_corporation_assets.get(corporation_id)
-            if not corp_cache:
-                self.__cached_corporation_assets[corporation_id] = {}
-                corp_cache = self.__cached_corporation_assets.get(corporation_id)
+            corp_cache = self.get_corp_cache(cache, corporation_id)
             corp_cache[item_id] = QEntity(True, False, row, updated_at)
             if ext == {}:
                 del ext
@@ -188,15 +204,20 @@ class QDatabaseTools:
         ids_from_esi: typing.List[int] = [int(s[data_key]) for s in data]
         if not ids_from_esi:
             return None, None, None, None
-        # кешированный, м.б. устаревший список корпоративных структур
-        if filter_key and filter_val:
-            ids_in_cache: typing.List[int] = [id for id in cache.keys() if cache[id].obj[filter_key] == filter_val]
+        # кешированный, м.б. устаревший список корпоративных элементов
+        if not cache:
+            ids_in_cache: typing.List[int] = []
+            new_ids: typing.List[int] = [id for id in ids_from_esi]
+            deleted_ids: typing.List[int] = []
         else:
-            ids_in_cache: typing.List[int] = [id for id in cache.keys()]
-        # список структур, появившихся у корпорации и отсутствующих в кеше (в базе данных)
-        new_ids: typing.List[int] = [id for id in ids_from_esi if not cache.get(id)]
-        # список корпоративных структур, которых больше нет у корпорации (кеш устарел и база данных устарела)
-        deleted_ids: typing.List[int] = [id for id in ids_in_cache if not (id in ids_from_esi)]
+            if filter_key and filter_val:
+                ids_in_cache: typing.List[int] = [id for id in cache.keys() if cache[id].obj[filter_key] == filter_val]
+            else:
+                ids_in_cache: typing.List[int] = [id for id in cache.keys()]
+            # список элементов, появившихся у корпорации и отсутствующих в кеше (в базе данных)
+            new_ids: typing.List[int] = [id for id in ids_from_esi if not cache.get(id)]
+            # список корпоративных элементов, которых больше нет у корпорации (кеш устарел и база данных устарела)
+            deleted_ids: typing.List[int] = [id for id in ids_in_cache if not (id in ids_from_esi)]
         if debug:
             print(' == ids_from_esi', ids_from_esi)
             print(' == ids_in_cache', ids_in_cache)
@@ -606,9 +627,7 @@ class QDatabaseTools:
 
     def actualize_corporation_asset_item(self, corporation_id: int, item_data, updated_at):
         item_id: int = int(item_data['item_id'])
-        corp_cache = self.__cached_corporation_assets.get(corporation_id)
-        if not corp_cache:
-            corp_cache = self.__cached_corporation_assets[corporation_id]
+        corp_cache = self.get_corp_cache(self.__cached_corporation_assets, corporation_id)
         in_cache = corp_cache.get(item_id)
         # 1. либо данных нет в кеше
         # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
@@ -664,6 +683,82 @@ class QDatabaseTools:
         # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
         # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
         self.dbswagger.delete_obsolete_corporation_assets(deleted_ids)
+        self.qidb.commit()
+
+        return data
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/blueprints/
+    # -------------------------------------------------------------------------
+
+    def get_corporation_blueprints_url(self, corporation_id: int):
+        # Requires role(s): Director
+        return "corporations/{corporation_id}/blueprints/".format(corporation_id=corporation_id)
+
+    def actualize_corporation_blueprint_item_details(self, item_data, need_data=False):
+        location_flag: str = item_data.get('location_flag')
+        if location_flag == 'CorpDeliveries':  # Station or Structure
+            location_id: int = int(item_data['location_id'])
+            self.actualize_station_or_structure(location_id, need_data=need_data)
+
+    def actualize_corporation_blueprint_item(self, corporation_id: int, item_data, updated_at):
+        item_id: int = int(item_data['item_id'])
+        corp_cache = self.get_corp_cache(self.__cached_corporation_blueprints, corporation_id)
+        in_cache = corp_cache.get(item_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
+        #    если данные изменились, то надо также обновить их в БД
+        data_equal: bool = False
+        if not in_cache:
+            data_equal = False
+        elif in_cache.obj:
+            data_equal = True
+            for key in in_cache.obj:
+                if (key in item_data) and (item_data[key] != in_cache.obj[key]):
+                    data_equal = False
+                    break
+        # ---
+        # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
+        # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
+        # необходимости подгружаем данные из БД
+        self.actualize_corporation_blueprint_item_details(item_data, need_data=True)
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
+        self.dbswagger.insert_or_update_corporation_blueprints(item_data, corporation_id, updated_at)
+        # сохраняем данные в кеше
+        if not in_cache:
+            corp_cache[item_id] = QEntity(True, True, item_data, updated_at)
+        else:
+            in_cache.store(True, True, item_data, updated_at)
+
+    def actualize_corporation_blueprints(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+
+        # Requires role(s): Director
+        url: str = self.get_corporation_blueprints_url(corporation_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if not is_updated:
+            return data
+
+        # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
+        corp_cache = self.__cached_corporation_blueprints.get(corporation_id)
+        ids_from_esi, ids_in_cache, new_ids, deleted_ids = self.get_cache_status(
+            corp_cache,
+            data, 'item_id',
+            debug=False  # corporation_id == 98150545
+        )
+        if not ids_from_esi:
+            return data
+
+        if self.depth.push(url):
+            for item_data in data:
+                self.actualize_corporation_blueprint_item(corporation_id, item_data, updated_at)
+            self.depth.pop()
+
+        # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
+        # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
+        self.dbswagger.delete_obsolete_corporation_blueprints(deleted_ids)
         self.qidb.commit()
 
         return data

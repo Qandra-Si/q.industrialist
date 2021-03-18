@@ -23,6 +23,7 @@ Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
     * esi-corporations.read_structures.v1 - Requires role(s): Station_Manager
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
+    * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
 
@@ -85,6 +86,12 @@ def main():
         corp_assets_data = dbtools.actualize_corporation_assets(corporation_id)
         print("'{}' corporation has {} asset items\n".
               format(corporation_name, len(corp_assets_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Director
+        corp_blueprints_data = dbtools.actualize_corporation_blueprints(corporation_id)
+        print("'{}' corporation has {} blueprints\n".
+              format(corporation_name, len(corp_blueprints_data)))
         sys.stdout.flush()
 
     del dbtools
