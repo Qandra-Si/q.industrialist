@@ -46,6 +46,33 @@ if (isset($_GET['module'])) {
             }
         }
     }
+    elseif ($method == 'regroup') {
+        if (isset($_GET['action']) && isset($_GET['fit'])) {
+            $action = htmlentities($_GET['action']);
+            $rs_id = htmlentities($_GET['fit']);
+            if (is_numeric($rs_id) && (get_numeric($rs_id) >= 1)) {
+                $query = NULL;
+                $params = NULL;
+                if ($action == 'del') {
+                    $query = 'DELETE FROM regroup_stock WHERE rs_id=$1;';
+                    $params = array($rs_id);
+                }
+                elseif ($action == 'act' || $action == 'deact') {
+                    $query = 'UPDATE regroup_stock SET rs_active=$2 WHERE rs_id=$1;';
+                    $params = array($rs_id, ($action == 'act') ? 1 : 0);
+                }
+                if (!is_null($query)) {
+                    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+                            or die('pg_connect err: '.pg_last_error());
+                    pg_exec($conn, "SET search_path TO qi");
+                    pg_query_params($conn, $query, $params)
+                            or die('pg_query_params err: '.pg_last_error());
+                    pg_exec($conn, 'COMMIT;');
+                    pg_close($conn);
+                }
+            }
+        }
+    }
 }
 
 elseif (isset($_POST['module'])) {
@@ -186,6 +213,76 @@ EOD;
                     or die('pg_query_params err: '.pg_last_error());
             pg_query($conn, 'COMMIT;');
             pg_close($conn);
+        }
+    }
+    elseif ($method == 'regroup') {
+        if (isset($_POST['action'])) {
+            $conn = NULL;
+            $query = NULL;
+            $params = NULL;
+            //---
+            $action = htmlentities($_POST['action']);
+            if (($action == 'edit') &&
+                isset($_POST['fit']) &&
+                isset($_POST['quantity']) &&
+                isset($_POST['eft']) &&
+                isset($_POST['station']) &&
+                isset($_POST['container']))
+            {
+                $rs_id = htmlentities($_POST['fit']);
+                $rs_quantity = htmlentities($_POST['quantity']);
+                $rs_eft = $_POST['eft'];
+                $rs_station = $_POST['station'];
+                $rs_container = $_POST['container'];
+                if (is_numeric($rs_id) && is_numeric($rs_quantity) &&
+                    (get_numeric($rs_id) >= 1) && (get_numeric($rs_quantity) >= 1) &&
+                    !empty($rs_eft) &&
+                    !empty($rs_station) && !empty($rs_container))
+                {
+                    $query = 'UPDATE regroup_stock SET rs_quantity=$2,rs_eft=$3,rs_station=$4,rs_container=$5,rs_remarks=NULL WHERE rs_id=$1;';
+                    $params = array($rs_id, $rs_quantity, $rs_eft, $rs_station, $rs_container);
+                    if (isset($_POST['remarks'])) {
+                        $rs_remarks = $_POST['remarks'];
+                        if (!empty($rs_remarks)) {
+                            $query = 'UPDATE regroup_stock SET rs_quantity=$2,rs_eft=$3,rs_station=$4,rs_container=$5,rs_remarks=$6 WHERE rs_id=$1;';
+                            array_push($params, $rs_remarks);
+                        }
+                    }
+                }
+            }
+            //---
+            elseif (($action == 'add') &&
+                    isset($_POST['quantity']) &&
+                    isset($_POST['eft']) &&
+                    isset($_POST['station']) &&
+                    isset($_POST['container']))
+            {
+                $rs_quantity = htmlentities($_POST['quantity']);
+                if (is_numeric($rs_quantity) && (get_numeric($rs_quantity) >= 1)) {
+                    $rs_eft = $_POST['eft'];
+                    $rs_station = $_POST['station'];
+                    $rs_container = $_POST['container'];
+                    if (!empty($rs_eft)) {
+                        $query = 'INSERT INTO regroup_stock(rs_quantity,rs_eft,rs_station,rs_container) VALUES($1,$2,$3,$4);';
+                        $params = array($rs_quantity, $rs_eft, $rs_station, $rs_container);
+                        if (isset($_POST['remarks'])) {
+                            $rs_remarks = $_POST['remarks'];
+                            if (!empty($rs_remarks)) {
+                                $query = 'INSERT INTO regroup_stock(rs_quantity,rs_eft,rs_station,rs_container,rs_remarks) VALUES($1,$2,$3,$4,$5);';
+                                array_push($params, $rs_remarks);
+                            }
+                        }
+                    }
+                }
+            }
+            //---
+            if (!is_null($query)) {
+                $conn = get_conn();
+                pg_query_params($conn, $query, $params)
+                        or die('pg_query_params err: '.pg_last_error());
+                pg_query($conn, 'COMMIT;');
+                pg_close($conn);
+            }
         }
     }
 }
