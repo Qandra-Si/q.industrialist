@@ -7,6 +7,18 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+DROP INDEX IF EXISTS qi.idx_ecj_corp_status_activity_id;
+DROP INDEX IF EXISTS qi.idx_ecj_corp_activity_id;
+DROP INDEX IF EXISTS qi.idx_ecj_corp_status;
+DROP INDEX IF EXISTS qi.idx_ecj_blueprint_id;
+DROP INDEX IF EXISTS qi.idx_ecj_location_id;
+DROP INDEX IF EXISTS qi.idx_ecj_installer_id;
+DROP INDEX IF EXISTS qi.idx_ecj_corporation_id;
+DROP INDEX IF EXISTS qi.idx_ecj_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_industry_jobs;
+
+DROP TYPE  IF EXISTS qi.esi_job_status;
+
 DROP INDEX IF EXISTS qi.idx_ecb_location_id;
 DROP INDEX IF EXISTS qi.idx_ecb_type_id;
 DROP INDEX IF EXISTS qi.idx_ecb_item_id;
@@ -345,7 +357,7 @@ TABLESPACE pg_default;
 -- esi_corporation_blueprints
 -- список корпоративных чертежей
 --------------------------------------------------------------------------------
-CREATE TABLE esi_corporation_blueprints
+CREATE TABLE qi.esi_corporation_blueprints
 (
     ecb_corporation_id BIGINT NOT NULL,
     ecb_item_id BIGINT NOT NULL,
@@ -391,6 +403,91 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecb_location_id
     ON qi.esi_corporation_blueprints USING btree
     (ecb_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- corporation_industry_jobs
+-- список корпоративных производственных работ
+--------------------------------------------------------------------------------
+CREATE TYPE qi.esi_job_status AS ENUM ('active','cancelled','delivered','paused','ready','reverted');
+
+CREATE TABLE qi.esi_corporation_industry_jobs
+(
+    ecj_corporation_id BIGINT NOT NULL,
+    ecj_job_id BIGINT NOT NULL,
+    ecj_installer_id BIGINT NOT NULL,
+    ecj_facility_id BIGINT NOT NULL,
+    ecj_location_id BIGINT NOT NULL,
+    ecj_activity_id INTEGER NOT NULL,
+    ecj_blueprint_id BIGINT NOT NULL,
+    ecj_blueprint_type_id INTEGER NOT NULL,
+    ecj_blueprint_location_id BIGINT NOT NULL,
+    ecj_output_location_id BIGINT NOT NULL,
+    ecj_runs INTEGER NOT NULL,
+    ecj_cost DOUBLE PRECISION,
+    ecj_licensed_runs INTEGER,
+    ecj_probability DOUBLE PRECISION,
+    ecj_product_type_id INTEGER,
+    ecj_status qi.esi_job_status NOT NULL,
+    ecj_duration INTEGER NOT NULL,
+    ecj_start_date TIMESTAMP NOT NULL,
+    ecj_end_date TIMESTAMP NOT NULL,
+    ecj_pause_date TIMESTAMP,
+    ecj_completed_date TIMESTAMP,
+    ecj_completed_character_id INTEGER,
+    ecj_successful_runs INTEGER,
+    ecj_created_at TIMESTAMP,
+    ecj_updated_at TIMESTAMP,
+    CONSTRAINT pk_ecj PRIMARY KEY (ecj_job_id),
+    CONSTRAINT fk_ecj_corporation_id FOREIGN KEY (ecj_corporation_id)
+        REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.esi_corporation_industry_jobs OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_ecj_pk
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_job_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_corporation_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_installer_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_installer_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_location_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_blueprint_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_blueprint_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_corp_status
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_corporation_id ASC NULLS LAST, ecj_status ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_corp_activity_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_corporation_id ASC NULLS LAST, ecj_activity_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecj_corp_status_activity_id
+    ON qi.esi_corporation_industry_jobs USING btree
+    (ecj_corporation_id ASC NULLS LAST, ecj_status ASC NULLS LAST, ecj_activity_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

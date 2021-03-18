@@ -824,3 +824,189 @@ class QSwaggerInterface:
                 "WHERE ecb_item_id IN (SELECT * FROM UNNEST(%s));",
                 deleted_ids,
             )
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
+    def insert_or_update_corporation_industry_jobs(self, data, corporation_id, updated_at):
+        """ inserts corporation industry job data into database
+
+        :param data: corporation industry job data
+        """
+        # { "activity_id": 3,
+        #   "blueprint_id": 1035690963115,
+        #   "blueprint_location_id": 1035704750584,
+        #   "blueprint_type_id": 12055,
+        #   "cost": 319478.0,
+        #   "duration": 617929,
+        #   "end_date": "2021-03-24T21:42:07Z",
+        #   "facility_id": 1035620697572,
+        #   "installer_id": 2116252240,
+        #   "job_id": 453460908,
+        #   "licensed_runs": 60,
+        #   "location_id": 1035620697572,
+        #   "output_location_id": 1035704750584,
+        #   "probability": 1.0,
+        #   "product_type_id": 12055,
+        #   "runs": 9,
+        #   "start_date": "2021-03-17T18:03:18Z",
+        #   "status": "active"
+        # }
+        self.db.execute(
+            "INSERT INTO esi_corporation_industry_jobs("
+            " ecj_corporation_id,"
+            " ecj_job_id,"
+            " ecj_installer_id,"
+            " ecj_facility_id,"
+            " ecj_location_id,"
+            " ecj_activity_id,"
+            " ecj_blueprint_id,"
+            " ecj_blueprint_type_id,"
+            " ecj_blueprint_location_id,"
+            " ecj_output_location_id,"
+            " ecj_runs,"
+            " ecj_cost,"
+            " ecj_licensed_runs,"
+            " ecj_probability,"
+            " ecj_product_type_id,"
+            " ecj_status,"
+            " ecj_duration,"
+            " ecj_start_date,"
+            " ecj_end_date,"
+            " ecj_pause_date,"
+            " ecj_completed_date,"
+            " ecj_completed_character_id,"
+            " ecj_successful_runs,"
+            " ecj_created_at,"
+            " ecj_updated_at) "
+            "VALUES ("
+            " %(co)s,"
+            " %(id)s,"
+            " %(who)s,"
+            " %(fac)s,"
+            " %(loc)s,"
+            " %(a)s,"
+            " %(bp)s,"
+            " %(bty)s,"
+            " %(bpl)s,"
+            " %(out)s,"
+            " %(r)s,"
+            " %(c)s,"
+            " %(lr)s,"
+            " %(p)s,"
+            " %(pty)s,"
+            " %(s)s,"
+            " %(d)s,"
+            " %(sdt)s,"
+            " %(edt)s,"
+            " %(pdt)s,"
+            " %(cdt)s,"
+            " %(cwho)s,"
+            " %(sr)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecj DO UPDATE SET"
+            " ecj_status=%(s)s,"
+            " ecj_pause_date=%(pdt)s,"
+            " ecj_completed_date=%(cdt)s,"
+            " ecj_completed_character_id=%(cwho)s,"
+            " ecj_successful_runs=%(sr)s,"
+            " ecj_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'co': corporation_id,
+             'id': data['job_id'],
+             'who': data['installer_id'],
+             'fac': data['facility_id'],
+             'loc': data['location_id'],
+             'a': data['activity_id'],
+             'bp': data['blueprint_id'],
+             'bty': data['blueprint_type_id'],
+             'bpl': data['blueprint_location_id'],
+             'out': data['output_location_id'],
+             'r': data['runs'],
+             'c': data.get('cost', None),
+             'lr': data.get('licensed_runs', None),
+             'p': data.get('probability', None),
+             'pty': data.get('product_type_id', None),
+             's': data['status'],
+             'd': data['duration'],
+             'sdt': data['start_date'],
+             'edt': data['end_date'],
+             'pdt': data.get('pause_date', None),
+             'cdt': data.get('completed_date', None),
+             'cwho': data.get('completed_character_id', None),
+             'sr': data.get('successful_runs', None),
+             'at': updated_at,
+             }
+        )
+
+    def get_exist_corporation_industry_jobs(self, oldest_delivered_job=None):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " ecj_corporation_id,"
+            " ecj_job_id,"
+            " ecj_installer_id,"
+            " ecj_facility_id,"
+            " ecj_location_id,"
+            " ecj_activity_id,"
+            " ecj_blueprint_id,"
+            " ecj_blueprint_type_id,"
+            " ecj_blueprint_location_id,"
+            " ecj_output_location_id,"
+            " ecj_runs,"
+            " ecj_cost,"
+            " ecj_licensed_runs,"
+            " ecj_probability,"
+            " ecj_product_type_id,"
+            " ecj_status,"
+            " ecj_duration,"
+            " ecj_start_date,"
+            " ecj_end_date,"
+            " ecj_pause_date,"
+            " ecj_completed_date,"
+            " ecj_completed_character_id,"
+            " ecj_successful_runs,"
+            " ecj_updated_at "
+            "FROM esi_corporation_industry_jobs "
+            "WHERE ecj_completed_date IS NULL{};".
+            format(" OR ecj_status='delivered' AND ecj_job_id>={job}".format(job=oldest_delivered_job))
+        )
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[23], 'corporation_id': row[0]}
+            data_item = {
+                'job_id': row[1],
+                'installer_id': row[2],
+                'facility_id': row[3],
+                'location_id': row[4],
+                'activity_id': row[5],
+                'blueprint_id': row[6],
+                'blueprint_type_id': row[7],
+                'blueprint_location_id': row[8],
+                'output_location_id': row[9],
+                'runs': row[10],
+                'cost': row[11],
+                'status': row[15],
+                'duration': row[16],
+                'start_date': row[17],
+                'end_date': row[18],
+                'ext': ext,
+            }
+            if row[12]:
+                data_item.update({'licensed_runs': row[12]})
+            if row[13]:
+                data_item.update({'probability': row[13]})
+            if row[14]:
+                data_item.update({'product_type_id': row[14]})
+            if row[19]:
+                data_item.update({'pause_date': row[19]})
+            if row[20]:
+                data_item.update({'completed_date': row[20]})
+            if row[21]:
+                data_item.update({'completed_character_id': row[21]})
+            if row[22]:
+                data_item.update({'successful_runs': row[22]})
+            data.append(data_item)
+        return data

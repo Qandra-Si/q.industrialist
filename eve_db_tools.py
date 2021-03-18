@@ -46,6 +46,26 @@ class QEntity:
         else:
             self.ext = ext
 
+    def is_obj_equal(self, data):
+        for key in self.obj:
+            if (key in data) and (data[key] != self.obj[key]):
+                return False
+        return True
+
+    def is_obj_equal_by_keys(self, data, keys):
+        for key in keys:
+            if key in data:
+                if not (key in self.obj):
+                    return False
+                elif data[key] != self.obj[key]:
+                    return False
+            else:
+                if not (key in self.obj):
+                    pass
+                elif data[key] != self.obj[key]:
+                    return False
+        return True
+
 
 class QEntityDepth:
     def __init__(self):
@@ -70,6 +90,11 @@ class QDatabaseTools:
     corporation_timedelta = datetime.timedelta(days=5)
     universe_station_timedelta = datetime.timedelta(days=7)
     universe_structure_timedelta = datetime.timedelta(days=3)
+    corporation_structure_diff = ['profile_id']
+    corporation_asset_diff = ['quantity', 'location_id', 'location_type', 'location_flag', 'is_singleton']
+    corporation_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
+                                  'material_efficiency', 'runs']
+    corporation_industry_job_diff = ['status']
 
     def __init__(self, module_name, debug):
         """ constructor
@@ -92,6 +117,7 @@ class QDatabaseTools:
         self.__cached_corporation_structures: typing.Dict[int, QEntity] = {}
         self.__cached_corporation_assets: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.prepare_cache()
 
         self.depth = QEntityDepth()
@@ -101,6 +127,7 @@ class QDatabaseTools:
         """
         del self.depth
 
+        del self.__cached_corporation_industry_jobs
         del self.__cached_corporation_blueprints
         del self.__cached_corporation_assets
         del self.__cached_corporation_structures
@@ -168,12 +195,16 @@ class QDatabaseTools:
 
         self.prepare_corp_cache(
             self.dbswagger.get_exist_corporation_assets(),
-            self.__cached_corporation_assets
+            self.__cached_corporation_assets,
+            'item_id',
+            None
         )
 
         self.prepare_corp_cache(
             self.dbswagger.get_exist_corporation_blueprints(),
-            self.__cached_corporation_blueprints
+            self.__cached_corporation_blueprints,
+            'item_id',
+            None
         )
 
     def get_corp_cache(self, cache, corporation_id):
@@ -183,21 +214,25 @@ class QDatabaseTools:
             corp_cache = cache.get(corporation_id)
         return corp_cache
 
-    def prepare_corp_cache(self, rows, cache):
+    def prepare_corp_cache(self, rows, cache, row_key, datetime_keys):
         for row in rows:
-            item_id: int = int(row['item_id'])
+            row_id: int = int(row[row_key])
             ext = row['ext']
             updated_at = ext['updated_at'].replace(tzinfo=pytz.UTC)
             corporation_id: int = int(ext['corporation_id'])
             del ext['updated_at']
             del ext['corporation_id']
             del row['ext']
+            if datetime_keys:
+                for dtkey in datetime_keys:
+                    if dtkey in row:
+                        row[dtkey].replace(tzinfo=pytz.UTC)
             corp_cache = self.get_corp_cache(cache, corporation_id)
-            corp_cache[item_id] = QEntity(True, False, row, updated_at)
+            corp_cache[row_id] = QEntity(True, False, row, updated_at)
             if ext == {}:
                 del ext
             else:
-                corp_cache[item_id].store_ext(ext)
+                corp_cache[row_id].store_ext(ext)
 
     def get_cache_status(self, cache, data, data_key, filter_val=None, filter_key=None, debug=False):
         # список элементов (ассетов или структур) имеющихся у корпорации
@@ -229,14 +264,14 @@ class QDatabaseTools:
     # e v e   s w a g g e r   i n t e r f a c e
     # -------------------------------------------------------------------------
 
-    def load_from_esi(self, url: str, fully_trust_cache=True):
+    def load_from_esi(self, url: str, fully_trust_cache=False):
         data = self.esiswagger.get_esi_data(
             url,
             fully_trust_cache=fully_trust_cache)
         updated_at = self.esiswagger.last_modified
         return data, updated_at
 
-    def load_from_esi_paged_data(self, url: str, fully_trust_cache=True):
+    def load_from_esi_paged_data(self, url: str, fully_trust_cache=False):
         data = self.esiswagger.get_esi_paged_data(
             url,
             fully_trust_cache=fully_trust_cache)
@@ -547,13 +582,9 @@ class QDatabaseTools:
         #    если данные изменились, то надо также обновить их в БД
         data_equal: bool = False
         if not in_cache:
-            data_equal = False
+            pass
         elif in_cache.obj:
-            data_equal = True
-            for key in in_cache.obj:
-                if (key in structure_data) and (structure_data[key] != in_cache.obj[key]):
-                    data_equal = False
-                    break
+            data_equal = in_cache.is_obj_equal_by_keys(structure_data, self.corporation_structure_diff)
         # ---
         # из соображений о том, что корпоративные структуры может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о universe_structure, так и о корпорации (либо актуализируем, либо
@@ -574,7 +605,7 @@ class QDatabaseTools:
 
         # Requires role(s): Station_Manager
         url: str = self.get_corporation_structures_url(corporation_id)
-        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url, fully_trust_cache=True)
         if not is_updated:
             return data, 0
 
@@ -634,13 +665,9 @@ class QDatabaseTools:
         #    если данные изменились, то надо также обновить их в БД
         data_equal: bool = False
         if not in_cache:
-            data_equal = False
+            pass
         elif in_cache.obj:
-            data_equal = True
-            for key in in_cache.obj:
-                if (key in item_data) and (item_data[key] != in_cache.obj[key]):
-                    data_equal = False
-                    break
+            data_equal = in_cache.is_obj_equal_by_keys(item_data, self.corporation_asset_diff)
         # ---
         # из соображений о том, что корпоративные ассеты может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
@@ -696,7 +723,7 @@ class QDatabaseTools:
         return "corporations/{corporation_id}/blueprints/".format(corporation_id=corporation_id)
 
     def actualize_corporation_blueprint_item_details(self, item_data, need_data=False):
-        location_flag: str = item_data.get('location_flag')
+        location_flag: str = item_data['location_flag']
         if location_flag == 'CorpDeliveries':  # Station or Structure
             location_id: int = int(item_data['location_id'])
             self.actualize_station_or_structure(location_id, need_data=need_data)
@@ -710,13 +737,9 @@ class QDatabaseTools:
         #    если данные изменились, то надо также обновить их в БД
         data_equal: bool = False
         if not in_cache:
-            data_equal = False
+            pass
         elif in_cache.obj:
-            data_equal = True
-            for key in in_cache.obj:
-                if (key in item_data) and (item_data[key] != in_cache.obj[key]):
-                    data_equal = False
-                    break
+            data_equal = in_cache.is_obj_equal_by_keys(item_data, self.corporation_blueprint_diff)
         # ---
         # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
@@ -759,6 +782,97 @@ class QDatabaseTools:
         # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
         # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
         self.dbswagger.delete_obsolete_corporation_blueprints(deleted_ids)
+        self.qidb.commit()
+
+        return data
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
+    def get_corporation_industry_jobs_url(self, corporation_id: int):
+        # Requires role(s): Director
+        return "corporations/{corporation_id}/industry/jobs/?include_completed=true".format(corporation_id=corporation_id)
+
+    def actualize_corporation_industry_job_item_details(self, job_data, need_data=False):
+        self.actualize_station_or_structure(job_data['facility_id'], need_data=need_data)
+        self.actualize_character(job_data['installer_id'], need_data=need_data)
+        completed_character_id = job_data.get('completed_character_id')
+        if completed_character_id:
+            self.actualize_character(job_data['completed_character_id'], need_data=need_data)
+
+    def actualize_corporation_industry_job_item(self, corporation_id: int, job_data, updated_at):
+        job_id: int = int(job_data['job_id'])
+        corp_cache = self.get_corp_cache(self.__cached_corporation_industry_jobs, corporation_id)
+        in_cache = corp_cache.get(job_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
+        #    если данные изменились, то надо также обновить их в БД
+        data_equal: bool = False
+        if not in_cache:
+            pass
+        elif in_cache.obj:
+            data_equal = in_cache.is_obj_equal_by_keys(job_data, self.corporation_industry_job_diff)
+        # ---
+        # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
+        # выполняем обновление сведений как о структурах и станциях, так и у частниках производства, а в случае
+        # необходимости подгружаем данные из БД
+        self.actualize_corporation_industry_job_item_details(job_data, need_data=False)
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
+        self.dbswagger.insert_or_update_corporation_industry_jobs(job_data, corporation_id, updated_at)
+        # сохраняем данные в кеше
+        if not in_cache:
+            corp_cache[job_id] = QEntity(True, True, job_data, updated_at)
+        else:
+            in_cache.store(True, True, job_data, updated_at)
+
+    def actualize_corporation_industry_jobs(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+
+        # Requires role(s): Director
+        url: str = self.get_corporation_industry_jobs_url(corporation_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if not is_updated:
+            return data
+
+        oldest_delivered_job = None
+        for job_data in data:
+            job_id:  int = int(job_data['job_id'])
+            if not oldest_delivered_job:
+                oldest_delivered_job = job_id
+            elif oldest_delivered_job > job_id:
+                oldest_delivered_job = job_id
+
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+        self.prepare_corp_cache(
+            self.dbswagger.get_exist_corporation_industry_jobs(oldest_delivered_job),
+            self.__cached_corporation_industry_jobs,
+            'job_id',
+            ['start_date', 'end_date', 'completed_date', 'pause_date']
+        )
+
+        # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
+        corp_cache = self.__cached_corporation_industry_jobs.get(corporation_id)
+        ids_from_esi, ids_in_cache, new_ids, deleted_ids = self.get_cache_status(
+            corp_cache,
+            data, 'job_id',
+            debug=False  # corporation_id == 98150545
+        )
+        if not ids_from_esi:
+            return data
+
+        if self.depth.push(url):
+            for job_data in data:
+                self.actualize_corporation_industry_job_item(corporation_id, job_data, updated_at)
+            self.depth.pop()
+
+        # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
+        # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
+        """
+        self.dbswagger.delete_obsolete_corporation_industry_jobs(deleted_ids)
+        """
         self.qidb.commit()
 
         return data

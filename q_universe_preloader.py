@@ -24,6 +24,7 @@ Required application scopes:
     * esi-corporations.read_structures.v1 - Requires role(s): Station_Manager
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
+    * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
 """
 import sys
 
@@ -92,6 +93,12 @@ def main():
         corp_blueprints_data = dbtools.actualize_corporation_blueprints(corporation_id)
         print("'{}' corporation has {} blueprints\n".
               format(corporation_name, len(corp_blueprints_data)))
+        sys.stdout.flush()
+
+        # Requires role(s): Factory_Manager
+        corp_industry_jobs_data = dbtools.actualize_corporation_industry_jobs(corporation_id)
+        print("'{}' corporation has {} active industry jobs\n".
+              format(corporation_name, len([j for j in corp_industry_jobs_data if j['status'] == 'active'])))
         sys.stdout.flush()
 
     del dbtools
