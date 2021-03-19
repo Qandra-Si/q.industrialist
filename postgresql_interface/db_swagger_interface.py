@@ -940,7 +940,14 @@ class QSwaggerInterface:
              }
         )
 
-    def get_exist_corporation_industry_jobs(self, oldest_delivered_job=None):
+    def get_exist_corporation_industry_jobs(self, corporation_id: int, oldest_delivered_job=None):
+        if oldest_delivered_job:
+            where = "ecj_corporation_id={co} AND " \
+                    "(ecj_completed_date IS NULL OR ecj_status='delivered' AND ecj_job_id>={job})".\
+                    format(co=corporation_id, job=oldest_delivered_job)
+        else:
+            where = "ecj_corporation_id={co} AND ecj_completed_date IS NULL".\
+                    format(co=corporation_id)
         rows = self.db.select_all_rows(
             "SELECT"
             " ecj_corporation_id,"
@@ -968,8 +975,8 @@ class QSwaggerInterface:
             " ecj_successful_runs,"
             " ecj_updated_at "
             "FROM esi_corporation_industry_jobs "
-            "WHERE ecj_completed_date IS NULL{};".
-            format(" OR ecj_status='delivered' AND ecj_job_id>={job}".format(job=oldest_delivered_job))
+            "WHERE {};".
+            format(where)
         )
         if rows is None:
             return []

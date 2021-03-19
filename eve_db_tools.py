@@ -837,6 +837,7 @@ class QDatabaseTools:
         if not is_updated:
             return data
 
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         oldest_delivered_job = None
         for job_data in data:
             job_id:  int = int(job_data['job_id'])
@@ -845,9 +846,8 @@ class QDatabaseTools:
             elif oldest_delivered_job > job_id:
                 oldest_delivered_job = job_id
 
-        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         self.prepare_corp_cache(
-            self.dbswagger.get_exist_corporation_industry_jobs(oldest_delivered_job),
+            self.dbswagger.get_exist_corporation_industry_jobs(corporation_id, oldest_delivered_job),
             self.__cached_corporation_industry_jobs,
             'job_id',
             ['start_date', 'end_date', 'completed_date', 'pause_date']
