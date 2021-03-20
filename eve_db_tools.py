@@ -90,7 +90,7 @@ class QDatabaseTools:
     corporation_timedelta = datetime.timedelta(days=5)
     universe_station_timedelta = datetime.timedelta(days=7)
     universe_structure_timedelta = datetime.timedelta(days=3)
-    corporation_structure_diff = ['profile_id']
+    corporation_structure_diff = ['corporation_id', 'profile_id']
     corporation_asset_diff = ['quantity', 'location_id', 'location_type', 'location_flag', 'is_singleton']
     corporation_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
                                   'material_efficiency', 'runs']
@@ -196,13 +196,6 @@ class QDatabaseTools:
         self.prepare_corp_cache(
             self.dbswagger.get_exist_corporation_assets(),
             self.__cached_corporation_assets,
-            'item_id',
-            None
-        )
-
-        self.prepare_corp_cache(
-            self.dbswagger.get_exist_corporation_blueprints(),
-            self.__cached_corporation_blueprints,
             'item_id',
             None
         )
@@ -319,10 +312,17 @@ class QDatabaseTools:
             # Public information about a character
             url: str = self.get_character_url(character_id)
             data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
-            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
-            if updated_at < self.eve_now:
-                updated_at = self.eve_now
-            self.dbswagger.insert_or_update_character(character_id, data, updated_at)
+            if data:
+                # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+                if updated_at < self.eve_now:
+                    updated_at = self.eve_now
+                self.dbswagger.insert_or_update_character(character_id, data, updated_at)
+            else:
+                # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
+                data, updated_at = self.dbswagger.select_character(character_id)
+                if not data:
+                    return None
+                reload_esi = False
         else:
             data, updated_at = self.dbswagger.select_character(character_id)
         # сохраняем данные в кеше
@@ -381,10 +381,17 @@ class QDatabaseTools:
             # Public information about a corporation
             url: str = self.get_corporation_url(corporation_id)
             data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
-            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
-            if updated_at < self.eve_now:
-                updated_at = self.eve_now
-            self.dbswagger.insert_or_update_corporation(corporation_id, data, updated_at)
+            if data:
+                # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+                if updated_at < self.eve_now:
+                    updated_at = self.eve_now
+                self.dbswagger.insert_or_update_corporation(corporation_id, data, updated_at)
+            else:
+                # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
+                data, updated_at = self.dbswagger.select_corporation(corporation_id)
+                if not data:
+                    return None
+                reload_esi = False
         else:
             data, updated_at = self.dbswagger.select_corporation(corporation_id)
         # сохраняем данные в кеше
@@ -439,10 +446,17 @@ class QDatabaseTools:
             # Public information about a universe_station
             url: str = self.get_universe_station_url(station_id)
             data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
-            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
-            if updated_at < self.eve_now:
-                updated_at = self.eve_now
-            self.dbswagger.insert_or_update_universe_station(data, updated_at)
+            if data:
+                # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+                if updated_at < self.eve_now:
+                    updated_at = self.eve_now
+                self.dbswagger.insert_or_update_universe_station(data, updated_at)
+            else:
+                # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
+                data, updated_at = self.dbswagger.select_universe_station(station_id)
+                if not data:
+                    return None
+                reload_esi = False
         else:
             data, updated_at = self.dbswagger.select_universe_station(station_id)
         # сохраняем данные в кеше
@@ -514,10 +528,17 @@ class QDatabaseTools:
                 structure_id,
                 fully_trust_cache=in_cache is None
             )
-            # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
-            if updated_at < self.eve_now:
-                updated_at = self.eve_now
-            self.dbswagger.insert_or_update_universe_structure(structure_id, data, forbidden, updated_at)
+            if data:
+                # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+                if updated_at < self.eve_now:
+                    updated_at = self.eve_now
+                self.dbswagger.insert_or_update_universe_structure(structure_id, data, forbidden, updated_at)
+            else:
+                # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
+                data, forbidden, updated_at = self.dbswagger.select_universe_structure(structure_id)
+                if not data:
+                    return None
+                reload_esi = False
         else:
             data, forbidden, updated_at = self.dbswagger.select_universe_structure(structure_id)
         # сохраняем данные в кеше
@@ -642,6 +663,26 @@ class QDatabaseTools:
         else:
             self.actualize_universe_station(location_id, need_data=need_data)
 
+    def get_system_id_of_station_or_structure(self, location_id):
+        system_id = None
+        if location_id >= 1000000000:
+            structure = self.__cached_structures.get(location_id)
+            if not structure or not structure.obj or not ('solar_system_id' in structure.obj):
+                self.actualize_universe_structure(location_id, False)
+                structure = self.__cached_structures.get(location_id)
+            if structure and structure.obj:
+                system_id = structure.obj.get('solar_system_id', None)
+                del structure
+        else:
+            station = self.__cached_stations.get(location_id)
+            if not station or not station.obj or not ('system_id' in station.obj):
+                self.actualize_universe_station(location_id, False)
+                station = self.__cached_stations.get(location_id)
+            if station and station.obj:
+                system_id = station.obj.get('system_id', None)
+                del station
+        return system_id
+
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/assets/
     # -------------------------------------------------------------------------
@@ -689,7 +730,9 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_assets_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
-        if not is_updated:
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
             return data
 
         # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
@@ -713,6 +756,40 @@ class QDatabaseTools:
         self.qidb.commit()
 
         return data
+
+    def get_system_id_of_item(self, _corporation_id: int, _item_id: int):
+        corporation_id: int = int(_corporation_id)
+        item_id: int = int(_item_id)
+        system_id = None
+
+        corp_cache = self.__cached_corporation_assets.get(corporation_id)
+        if corp_cache:
+            # получение информации о регионе, солнечной системе и т.п. (поиск исходного root-а)
+            location_id: int = -1
+            while True:
+                in_cache = corp_cache.get(item_id)
+                if not in_cache or not in_cache.obj:
+                    break
+                location_id = int(in_cache.obj['location_id'])
+                location_type: str = in_cache.obj['location_type']
+                if location_type == 'station':
+                    system_id = self.get_system_id_of_station_or_structure(location_id)
+                    break
+                elif location_type == 'solar_system':
+                    system_id = location_id
+                    break
+                else:
+                    location_flag: str = in_cache.obj['location_flag']
+                    if location_flag == 'OfficeFolder' or location_flag == 'CorpDeliveries':
+                        system_id = self.get_system_id_of_station_or_structure(location_id)
+                        break
+                item_id = location_id
+            if location_id > 0:
+                # сюда можем попасть случайно: возможно, что location_id не станция!
+                system_id = self.get_system_id_of_station_or_structure(location_id)
+            del corp_cache
+
+        return system_id
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/blueprints/
@@ -744,7 +821,7 @@ class QDatabaseTools:
         # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
         # необходимости подгружаем данные из БД
-        self.actualize_corporation_blueprint_item_details(item_data, need_data=True)
+        self.actualize_corporation_blueprint_item_details(item_data, need_data=not data_equal)
         # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
         if data_equal:
             return
@@ -752,8 +829,11 @@ class QDatabaseTools:
         # сохраняем данные в кеше
         if not in_cache:
             corp_cache[item_id] = QEntity(True, True, item_data, updated_at)
+            in_cache = corp_cache.get(item_id)
+            in_cache.store_ext({'just_added': True})  # добавлен в кеш и в БД (ранее отсутствовал)
         else:
             in_cache.store(True, True, item_data, updated_at)
+            in_cache.store_ext({'changed': True})  # был в кеше, а значит и в БД (обновлён и там и тут)
 
     def actualize_corporation_blueprints(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
@@ -761,8 +841,18 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_blueprints_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
-        if not is_updated:
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
             return data
+
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+        self.prepare_corp_cache(
+            self.dbswagger.get_exist_corporation_blueprints(corporation_id),
+            self.__cached_corporation_blueprints,
+            'item_id',
+            None
+        )
 
         # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
         corp_cache = self.__cached_corporation_blueprints.get(corporation_id)
@@ -783,6 +873,15 @@ class QDatabaseTools:
         # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
         self.dbswagger.delete_obsolete_corporation_blueprints(deleted_ids)
         self.qidb.commit()
+
+        # отмечаем, что часть данных в кеше осталась, но из БД уже удалена (т.е. ранее информация была
+        # считана из БД, но с серверов ССР чертежи исчезли) - их могут удалить, могут переложить в
+        # личный ангар, могут использовать или передать в имущество другой корпорации и т.п. (т.е. быть
+        # может в будущем эти чертежи снова появятся в корпангарах)
+        for item_id in deleted_ids:
+            in_cache = corp_cache.get(int(item_id))
+            if in_cache:
+                in_cache.store_ext({'deleted': True})
 
         return data
 
@@ -812,12 +911,15 @@ class QDatabaseTools:
         if not in_cache:
             pass
         elif in_cache.obj:
-            data_equal = in_cache.is_obj_equal_by_keys(job_data, self.corporation_industry_job_diff)
+            if in_cache.obj['status'] == 'delivered':
+                data_equal = True  # в БД уже хранятся актуальные данные!
+            else:
+                data_equal = in_cache.is_obj_equal_by_keys(job_data, self.corporation_industry_job_diff)
         # ---
         # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, так и у частниках производства, а в случае
         # необходимости подгружаем данные из БД
-        self.actualize_corporation_industry_job_item_details(job_data, need_data=False)
+        self.actualize_corporation_industry_job_item_details(job_data, need_data=not data_equal)
         # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
         if data_equal:
             return
@@ -825,8 +927,11 @@ class QDatabaseTools:
         # сохраняем данные в кеше
         if not in_cache:
             corp_cache[job_id] = QEntity(True, True, job_data, updated_at)
+            in_cache = corp_cache.get(job_id)
+            in_cache.store_ext({'just_added': True})  # добавлен в кеш и в БД (ранее отсутствовал)
         else:
             in_cache.store(True, True, job_data, updated_at)
+            in_cache.store_ext({'changed': True})  # был в кеше, а значит и в БД (обновлён и там и тут)
 
     def actualize_corporation_industry_jobs(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
@@ -834,13 +939,17 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_industry_jobs_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
-        if not is_updated:
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
             return data
 
         # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         oldest_delivered_job = None
         for job_data in data:
-            job_id:  int = int(job_data['job_id'])
+            if job_data['status'] != 'delivered':
+                continue
+            job_id: int = int(job_data['job_id'])
             if not oldest_delivered_job:
                 oldest_delivered_job = job_id
             elif oldest_delivered_job > job_id:
@@ -853,26 +962,167 @@ class QDatabaseTools:
             ['start_date', 'end_date', 'completed_date', 'pause_date']
         )
 
-        # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
-        corp_cache = self.__cached_corporation_industry_jobs.get(corporation_id)
-        ids_from_esi, ids_in_cache, new_ids, deleted_ids = self.get_cache_status(
-            corp_cache,
-            data, 'job_id',
-            debug=False  # corporation_id == 98150545
-        )
-        if not ids_from_esi:
-            return data
-
+        # актуализация (добавление и обновление) производственных работ
         if self.depth.push(url):
             for job_data in data:
                 self.actualize_corporation_industry_job_item(corporation_id, job_data, updated_at)
             self.depth.pop()
-
-        # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
-        # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
-        """
-        self.dbswagger.delete_obsolete_corporation_industry_jobs(deleted_ids)
-        """
         self.qidb.commit()
 
         return data
+
+    def link_blueprints_and_jobs(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+
+        actualized_jobs = []
+        actualized_bpcs = []
+
+        corp_cache_j = self.get_corp_cache(self.__cached_corporation_industry_jobs, corporation_id)
+        if corp_cache_j:
+            for job_id in corp_cache_j:
+                in_cache = corp_cache_j.get(job_id)
+                if not in_cache.ext:  # признак того, что данные считаны из БД в кеш и не менялись
+                    continue
+                if not (in_cache.obj['activity_id'] in (5,8)):  # copy & invent
+                    continue
+                if in_cache.obj['status'] != 'delivered':  # добавляем в таблицу только законченные работы
+                    continue
+                # just_added: (в БД job-а нет), но это предположительно!
+                # changed: изменился status у job-а
+                if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
+                    facility_id: int = int(in_cache.obj['facility_id'])
+                    system_id = self.get_system_id_of_station_or_structure(facility_id)
+                    in_cache.store_ext({
+                        'bty': in_cache.obj['blueprint_type_id'],
+                        'lr': in_cache.obj['licensed_runs'],
+                        'jid': in_cache.obj['job_id'],
+                        'co': corporation_id,
+                        'a': in_cache.obj['activity_id'],
+                        'r': in_cache.obj['runs'],
+                        'pty': in_cache.obj.get('product_type_id', None),
+                        'sr': in_cache.obj.get('successful_runs', None),
+                        'c': in_cache.obj.get('cost', None),
+                        'ss': system_id,
+                    })
+                    actualized_jobs.append(in_cache.ext)
+                    print('JOB JOB JOB', in_cache.ext)
+
+        corp_cache_b = self.get_corp_cache(self.__cached_corporation_blueprints, corporation_id)
+        if corp_cache_b:
+            for item_id in corp_cache_b:
+                in_cache = corp_cache_b.get(item_id)
+                if not in_cache.ext:  # признак того, что данные считаны из БД в кеш и не менялись
+                    continue
+                if in_cache.obj['quantity'] != -2:  # ищем только копии, как продукты copy & invent
+                    continue
+                # just_added: (в БД чертежа нет), но это предположительно!
+                # changed: изменился status у чертежа
+                # deleted: чертёж исчез из портассетов (использован, удалён, перемещён, передан)
+                if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
+                    system_id = self.get_system_id_of_item(corporation_id, in_cache.obj['location_id'])
+                    in_cache.store_ext({
+                        'bid': in_cache.obj['item_id'],
+                        'bty': in_cache.obj['type_id'],
+                        'r': in_cache.obj['runs'],
+                        'te': in_cache.obj['time_efficiency'],
+                        'me': in_cache.obj['material_efficiency'],
+                        'ss': system_id,
+                    })
+                    actualized_bpcs.append(in_cache.ext)
+                    print('BPC BPC BPC', in_cache.ext)
+
+        undefined_links = self.qidb.select_all_rows(
+            "SELECT"
+            " ebc_id,"                   # 0
+            " ebc_blueprint_id,"         # 1
+            " ebc_blueprint_type_id,"    # 2
+            " ebc_blueprint_runs,"       # 3
+            " ebc_time_efficiency,"      # 4
+            " ebc_material_efficiency,"  # 5
+            " ebc_job_id,"               # 6
+            " ebc_job_corporation_id,"   # 7
+            " ebc_job_activity,"         # 8
+            " ebc_job_runs,"             # 9
+            " ebc_job_product_type_id,"  # 10
+            " ebc_job_successful_runs,"  # 11
+            " ebc_job_cost,"             # 12
+            " ebc_industry_payment,"     # 13
+            " ebc_tax,"                  # 14
+            " ebc_created_at "           # 15
+            "FROM esi_blueprint_costs "
+            "WHERE"  # поиск тех линков, которые не были "соединены" за последние 12 часов
+            " (ebc_blueprint_id IS NULL OR ebc_job_id IS NULL);",
+            # " AND (ebc_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '12 hours'));",
+        )
+        undefined_job_ids = [int(lnk[6]) for lnk in undefined_links if not (lnk[6] is None)]
+        undefined_bpc_ids = [int(lnk[1]) for lnk in undefined_links if not (lnk[1] is None)]
+
+        # перебираем список тех работ, которые поменялись
+        for job in actualized_jobs:
+            if not ('ss' in job):  # пропускаем jobs, по которым нет данных о расположении фабрики
+                continue
+            job_id: int = int(job['jid'])
+            if not (job_id in undefined_job_ids):
+                self.qidb.execute(
+                    "INSERT INTO esi_blueprint_costs("
+                    " ebc_system_id,"
+                    " ebc_blueprint_type_id,"
+                    " ebc_blueprint_runs,"
+                    " ebc_job_id,"
+                    " ebc_job_corporation_id,"
+                    " ebc_job_activity,"
+                    " ebc_job_runs,"
+                    " ebc_job_product_type_id,"
+                    " ebc_job_successful_runs,"
+                    " ebc_job_cost,"
+                    " ebc_created_at,"
+                    " ebc_updated_at)"
+                    "VALUES("
+                    " %(ss)s,"
+                    " %(bty)s,"
+                    " %(lr)s,"
+                    " %(jid)s,"
+                    " %(co)s,"
+                    " %(a)s,"
+                    " %(r)s,"
+                    " %(pty)s,"
+                    " %(sr)s,"
+                    " %(c)s,"
+                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT');",
+                    job
+                )
+
+        # перебираем список тех чертежей, которые поменялись
+        for bpc in actualized_bpcs:
+            if not ('ss' in bpc):  # пропускаем БП, по которым нет данных о расположении
+                continue
+            item_id: int = int(bpc['bid'])
+            if not (item_id in undefined_bpc_ids):
+                self.qidb.execute(
+                    "INSERT INTO esi_blueprint_costs("
+                    " ebc_system_id,"
+                    " ebc_blueprint_id,"
+                    " ebc_blueprint_type_id,"
+                    " ebc_blueprint_runs,"
+                    " ebc_time_efficiency,"
+                    " ebc_material_efficiency,"
+                    " ebc_created_at,"
+                    " ebc_updated_at)"
+                    "VALUES("
+                    " %(ss)s,"
+                    " %(bid)s,"
+                    " %(bty)s,"
+                    " %(r)s,"
+                    " %(te)s,"
+                    " %(me)s,"
+                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT');",
+                    bpc
+                )
+
+        del actualized_jobs
+        del actualized_bpcs
+
+        del corp_cache_j
+        del corp_cache_b

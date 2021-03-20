@@ -533,6 +533,7 @@ class QSwaggerInterface:
             " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
             "ON CONFLICT ON CONSTRAINT pk_ecs DO UPDATE SET"
+            " ecs_corporation_id=%(co)s,"  # могут ли структуры передаваться другим корпорациям?
             " ecs_profile_id=%(pr)s,"
             " ecs_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'id': data['structure_id'],
@@ -637,6 +638,7 @@ class QSwaggerInterface:
             " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
             "ON CONFLICT ON CONSTRAINT pk_eca DO UPDATE SET"
+            " eca_corporation_id=%(co)s,"  # ассеты могут перемещаться до того, как будет выяснено куда?
             " eca_quantity=%(q)s,"
             " eca_location_id=%(loc)s,"
             " eca_location_type=%(lty)s,"
@@ -757,12 +759,13 @@ class QSwaggerInterface:
             " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
             "ON CONFLICT ON CONSTRAINT pk_ecb DO UPDATE SET"
+            " ecb_corporation_id=%(co)s,"  # чертежи могут перемещаться до того, как будет выяснено куда?
             " ecb_type_id=%(ty)s,"
             " ecb_location_id=%(loc)s,"
             " ecb_location_flag=%(lfl)s,"
             " ecb_quantity=%(q)s,"
-            " ecb_time_efficiency=%(me)s,"
-            " ecb_material_efficiency=%(te)s,"
+            " ecb_time_efficiency=%(te)s,"
+            " ecb_material_efficiency=%(me)s,"
             " ecb_runs=%(r)s,"
             " ecb_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'co': corporation_id,
@@ -778,10 +781,9 @@ class QSwaggerInterface:
              }
         )
 
-    def get_exist_corporation_blueprints(self):
+    def get_exist_corporation_blueprints(self, corporation_id):
         rows = self.db.select_all_rows(
             "SELECT"
-            " ecb_corporation_id,"
             " ecb_item_id,"
             " ecb_type_id,"
             " ecb_location_id,"
@@ -791,22 +793,24 @@ class QSwaggerInterface:
             " ecb_material_efficiency,"
             " ecb_runs,"
             " ecb_updated_at "
-            "FROM esi_corporation_blueprints;"
+            "FROM esi_corporation_blueprints "
+            "WHERE ecb_corporation_id=%s;",
+            int(corporation_id),
         )
         if rows is None:
             return []
         data = []
         for row in rows:
-            ext = {'updated_at': row[9], 'corporation_id': row[0]}
+            ext = {'updated_at': row[8], 'corporation_id': corporation_id}
             data.append({
-                'item_id': row[1],
-                'type_id': row[2],
-                'location_id': row[3],
-                'location_flag': row[4],
-                'quantity': row[5],
-                'time_efficiency': row[6],
-                'material_efficiency': row[7],
-                'runs': row[8],
+                'item_id': row[0],
+                'type_id': row[1],
+                'location_id': row[2],
+                'location_flag': row[3],
+                'quantity': row[4],
+                'time_efficiency': row[5],
+                'material_efficiency': row[6],
+                'runs': row[7],
                 'ext': ext,
             })
         return data
@@ -834,6 +838,8 @@ class QSwaggerInterface:
 
         :param data: corporation industry job data
         """
+        # print("INSERT {} {} {}".format(data['job_id'], data['activity_id'], data['status']))
+        # return
         # { "activity_id": 3,
         #   "blueprint_id": 1035690963115,
         #   "blueprint_location_id": 1035704750584,
@@ -943,7 +949,7 @@ class QSwaggerInterface:
     def get_exist_corporation_industry_jobs(self, corporation_id: int, oldest_delivered_job=None):
         if oldest_delivered_job:
             where = "ecj_corporation_id={co} AND " \
-                    "(ecj_completed_date IS NULL OR ecj_status='delivered' AND ecj_job_id>={job})".\
+                    "(ecj_completed_date IS NULL OR (ecj_status='delivered' AND ecj_job_id>={job}))".\
                     format(co=corporation_id, job=oldest_delivered_job)
         else:
             where = "ecj_corporation_id={co} AND ecj_completed_date IS NULL".\

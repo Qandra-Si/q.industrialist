@@ -7,6 +7,14 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+---
+DROP INDEX IF EXISTS qi.idx_ebc_blueprint_job_ids;
+DROP INDEX IF EXISTS qi.idx_ebc_job_id;
+DROP INDEX IF EXISTS qi.idx_ebc_blueprint_id;
+DROP INDEX IF EXISTS qi.idx_ebc_pk;
+DROP TABLE IF EXISTS qi.esi_blueprint_costs;
+DROP SEQUENCE IF EXISTS qi.seq_ebc;
+
 DROP INDEX IF EXISTS qi.idx_ecj_corp_status_activity_id;
 DROP INDEX IF EXISTS qi.idx_ecj_corp_activity_id;
 DROP INDEX IF EXISTS qi.idx_ecj_corp_status;
@@ -488,6 +496,75 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecj_corp_status_activity_id
     ON qi.esi_corporation_industry_jobs USING btree
     (ecj_corporation_id ASC NULLS LAST, ecj_status ASC NULLS LAST, ecj_activity_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- corporation_blueprint_costs
+-- список идентификаторов чертежей и идентификаторов job-ов с получения сведений
+-- о том, в результате какой работы был получен чертёж? (попытка дедуктивным
+-- способом восстановить связь blueprint_id и job_id)
+-- внимание! всякий job_id имеет валидное значение только в рамках corporation_id,
+-- но это не означает, что чертёж принадлежит указанной корпорации, т.к. может
+-- быть передан
+--------------------------------------------------------------------------------
+CREATE SEQUENCE qi.seq_ebc
+    INCREMENT 1
+    START 1000
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+ALTER SEQUENCE qi.seq_ebc OWNER TO qi_user;
+
+CREATE TABLE qi.esi_blueprint_costs
+(
+    ebc_id BIGINT NOT NULL DEFAULT NEXTVAL('qi.seq_ebc'::regclass),
+    ebc_system_id BIGINT NOT NULL,          -- солнечная система, где была обнаружена либо работа, либо чертёж
+    -- базовые сведения о чертеже, который был получен в результате копирки или инвента
+    ebc_blueprint_id BIGINT,
+    ebc_blueprint_type_id INTEGER NOT NULL,
+    ebc_blueprint_runs INTEGER NOT NULL,    -- кол-во прогонов БП (свойство чертежа, который будет сгенерирован)
+    ebc_time_efficiency INTEGER,
+    ebc_material_efficiency INTEGER,
+    -- сведения о выполненной работе, в результате которой получен чертёж
+    ebc_job_id BIGINT,
+    ebc_job_corporation_id BIGINT,          -- идентификатор нужен для получения уникального номера работы в рамках каждой из корпораций
+    ebc_job_activity INTEGER,               -- 5: copy, 8: invent
+    ebc_job_runs INTEGER,                   -- кол-во job-ов (сколько штук новых чертежей будет сгенерировано)
+    ebc_job_product_type_id INTEGER,        -- что именно будет получено в результате job-а
+    ebc_job_successful_runs INTEGER,        -- кол-во job-ов, которые завершились успешно (от 0 до job_runs)
+    -- стоимость выполненной работы (из сведений о работе)
+    ebc_job_cost INTEGER,
+    -- слагаемые стоимости выполенной работы (из журнала транзакций корпкошелька)
+    ebc_industry_payment INTEGER,
+    ebc_tax INTEGER,
+    -- когда создана и актуализирована запись
+    ebc_created_at TIMESTAMP,
+    ebc_updated_at TIMESTAMP,
+    CONSTRAINT pk_ebc PRIMARY KEY (ebc_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ebc_pk
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_blueprint_id
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_blueprint_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_job_id
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_job_id ASC NULLS LAST, ebc_job_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_blueprint_job_ids
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_blueprint_id ASC NULLS LAST, ebc_job_id ASC NULLS LAST, ebc_job_corporation_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

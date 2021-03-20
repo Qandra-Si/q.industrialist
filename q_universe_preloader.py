@@ -101,6 +101,8 @@ def main():
               format(corporation_name, len([j for j in corp_industry_jobs_data if j['status'] == 'active'])))
         sys.stdout.flush()
 
+        dbtools.link_blueprints_and_jobs(corporation_id)
+
     del dbtools
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
