@@ -1023,3 +1023,132 @@ class QSwaggerInterface:
                 data_item.update({'successful_runs': row[22]})
             data.append(data_item)
         return data
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/blueprints/
+    # corporations/{corporation_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
+    def insert_into_blueprint_costs(
+            self,
+            corporation_id,
+            industry_jobs, industry_jobs_updated_at,
+            blueprints, blueprints_updated_at):
+        undefined_links = self.db.select_all_rows(
+            "SELECT"
+            " ebc_id,"                   # 0
+            " ebc_blueprint_id,"         # 1
+            " ebc_blueprint_type_id,"    # 2
+            " ebc_blueprint_runs,"       # 3
+            " ebc_time_efficiency,"      # 4
+            " ebc_material_efficiency,"  # 5
+            " ebc_job_id,"               # 6
+            " ebc_job_corporation_id,"   # 7
+            " ebc_job_activity,"         # 8
+            " ebc_job_runs,"             # 9
+            " ebc_job_product_type_id,"  # 10
+            " ebc_job_successful_runs,"  # 11
+            " ebc_job_cost,"             # 12
+            " ebc_industry_payment,"     # 13
+            " ebc_tax,"                  # 14
+            " ebc_created_at "           # 15
+            "FROM esi_blueprint_costs "
+            "WHERE"  # поиск тех линков, которые не были "соединены" за последние 12 часов
+            " (ebc_blueprint_id IS NULL OR ebc_job_id IS NULL);",
+            # " AND (ebc_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '12 hours'));",
+        )
+        undefined_job_ids = [int(lnk[6]) for lnk in undefined_links if not (lnk[6] is None)]
+        undefined_bpc_ids = [int(lnk[1]) for lnk in undefined_links if not (lnk[1] is None)]
+
+        # перебираем список тех работ, которые поменялись
+        for job in industry_jobs:
+            # пропускаем jobs, по которым нет данных о расположении фабрики
+            if not job.get('ext') and not job['ext'].get('system_id'):
+                continue
+            # пропускаем jobs, которые уже добавлены в БД
+            job_id: int = int(job['job_id'])
+            if job_id in undefined_job_ids:
+                continue
+            # добавляем запись в БД
+            self.db.execute(
+                "INSERT INTO esi_blueprint_costs("
+                " ebc_system_id,"
+                " ebc_blueprint_type_id,"
+                " ebc_blueprint_runs,"
+                " ebc_job_id,"
+                " ebc_job_corporation_id,"
+                " ebc_job_activity,"
+                " ebc_job_runs,"
+                " ebc_job_product_type_id,"
+                " ebc_job_successful_runs,"
+                " ebc_job_cost,"
+                " ebc_created_at,"
+                " ebc_updated_at)"
+                "VALUES("
+                " %(ss)s,"
+                " %(bty)s,"
+                " %(lr)s,"
+                " %(jid)s,"
+                " %(co)s,"
+                " %(a)s,"
+                " %(r)s,"
+                " %(pty)s,"
+                " %(sr)s,"
+                " %(c)s,"
+                " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+                " TIMESTAMP WITHOUT TIME ZONE %(at)s);",
+                {'bty': job['blueprint_type_id'],
+                 'lr': job['licensed_runs'],
+                 'jid': job['job_id'],
+                 'co': corporation_id,
+                 'a': job['activity_id'],
+                 'r': job['runs'],
+                 'pty': job.get('product_type_id', None),
+                 'sr': job.get('successful_runs', None),
+                 'c': job.get('cost', None),
+                 'ss': job['ext']['system_id'],
+                 'at': industry_jobs_updated_at,
+                 }
+            )
+
+        # перебираем список тех чертежей, которые поменялись
+        for bpc in blueprints:
+            # пропускаем БП, по которым нет данных о расположении
+            if not bpc.get('ext') and not bpc['ext'].get('system_id'):
+                continue
+            # пропускаем БД, которые уже добавлены в БД
+            item_id: int = int(bpc['item_id'])
+            if item_id in undefined_bpc_ids:
+                continue
+            self.db.execute(
+                "INSERT INTO esi_blueprint_costs("
+                " ebc_system_id,"
+                " ebc_blueprint_id,"
+                " ebc_blueprint_type_id,"
+                " ebc_blueprint_runs,"
+                " ebc_time_efficiency,"
+                " ebc_material_efficiency,"
+                " ebc_created_at,"
+                " ebc_updated_at)"
+                "VALUES("
+                " %(ss)s,"
+                " %(bid)s,"
+                " %(bty)s,"
+                " %(r)s,"
+                " %(te)s,"
+                " %(me)s,"
+                " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+                " TIMESTAMP WITHOUT TIME ZONE %(at)s);",
+                {'bid': bpc['item_id'],
+                 'bty': bpc['type_id'],
+                 'r': bpc['runs'],
+                 'te': bpc['time_efficiency'],
+                 'me': bpc['material_efficiency'],
+                 'ss': bpc['ext']['system_id'],
+                 'at': blueprints_updated_at,
+                 }
+            )
+
+        del undefined_bpc_ids
+        del undefined_job_ids
+        del undefined_links

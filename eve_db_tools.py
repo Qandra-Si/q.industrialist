@@ -990,22 +990,15 @@ class QDatabaseTools:
                 # just_added: (в БД job-а нет), но это предположительно!
                 # changed: изменился status у job-а
                 if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
+                    # пропускаем jobs, по которым нет данных о расположении фабрики
                     facility_id: int = int(in_cache.obj['facility_id'])
                     system_id = self.get_system_id_of_station_or_structure(facility_id)
-                    in_cache.store_ext({
-                        'bty': in_cache.obj['blueprint_type_id'],
-                        'lr': in_cache.obj['licensed_runs'],
-                        'jid': in_cache.obj['job_id'],
-                        'co': corporation_id,
-                        'a': in_cache.obj['activity_id'],
-                        'r': in_cache.obj['runs'],
-                        'pty': in_cache.obj.get('product_type_id', None),
-                        'sr': in_cache.obj.get('successful_runs', None),
-                        'c': in_cache.obj.get('cost', None),
-                        'ss': system_id,
-                    })
-                    actualized_jobs.append(in_cache.ext)
-                    print('JOB JOB JOB', in_cache.ext)
+                    if not system_id:
+                        continue
+                    actualized_jobs.append(in_cache.obj)
+                    actualized_jobs[-1].update({'ext': {'system_id': system_id}})
+                    # debug: print('JOB JOB JOB', actualized_jobs[-1])
+        del corp_cache_j
 
         corp_cache_b = self.get_corp_cache(self.__cached_corporation_blueprints, corporation_id)
         if corp_cache_b:
@@ -1019,110 +1012,19 @@ class QDatabaseTools:
                 # changed: изменился status у чертежа
                 # deleted: чертёж исчез из портассетов (использован, удалён, перемещён, передан)
                 if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
+                    # пропускаем БП, по которым нет данных о расположении
                     system_id = self.get_system_id_of_item(corporation_id, in_cache.obj['location_id'])
-                    in_cache.store_ext({
-                        'bid': in_cache.obj['item_id'],
-                        'bty': in_cache.obj['type_id'],
-                        'r': in_cache.obj['runs'],
-                        'te': in_cache.obj['time_efficiency'],
-                        'me': in_cache.obj['material_efficiency'],
-                        'ss': system_id,
-                    })
-                    actualized_bpcs.append(in_cache.ext)
-                    print('BPC BPC BPC', in_cache.ext)
+                    if not system_id:
+                        continue
+                    actualized_bpcs.append(in_cache.obj)
+                    actualized_bpcs[-1].update({'ext': {'system_id': system_id}})
+                    # debug: print('BPC BPC BPC', actualized_bpcs[-1])
+        del corp_cache_b
 
-        undefined_links = self.qidb.select_all_rows(
-            "SELECT"
-            " ebc_id,"                   # 0
-            " ebc_blueprint_id,"         # 1
-            " ebc_blueprint_type_id,"    # 2
-            " ebc_blueprint_runs,"       # 3
-            " ebc_time_efficiency,"      # 4
-            " ebc_material_efficiency,"  # 5
-            " ebc_job_id,"               # 6
-            " ebc_job_corporation_id,"   # 7
-            " ebc_job_activity,"         # 8
-            " ebc_job_runs,"             # 9
-            " ebc_job_product_type_id,"  # 10
-            " ebc_job_successful_runs,"  # 11
-            " ebc_job_cost,"             # 12
-            " ebc_industry_payment,"     # 13
-            " ebc_tax,"                  # 14
-            " ebc_created_at "           # 15
-            "FROM esi_blueprint_costs "
-            "WHERE"  # поиск тех линков, которые не были "соединены" за последние 12 часов
-            " (ebc_blueprint_id IS NULL OR ebc_job_id IS NULL);",
-            # " AND (ebc_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '12 hours'));",
-        )
-        undefined_job_ids = [int(lnk[6]) for lnk in undefined_links if not (lnk[6] is None)]
-        undefined_bpc_ids = [int(lnk[1]) for lnk in undefined_links if not (lnk[1] is None)]
-
-        # перебираем список тех работ, которые поменялись
-        for job in actualized_jobs:
-            if not ('ss' in job):  # пропускаем jobs, по которым нет данных о расположении фабрики
-                continue
-            job_id: int = int(job['jid'])
-            if not (job_id in undefined_job_ids):
-                self.qidb.execute(
-                    "INSERT INTO esi_blueprint_costs("
-                    " ebc_system_id,"
-                    " ebc_blueprint_type_id,"
-                    " ebc_blueprint_runs,"
-                    " ebc_job_id,"
-                    " ebc_job_corporation_id,"
-                    " ebc_job_activity,"
-                    " ebc_job_runs,"
-                    " ebc_job_product_type_id,"
-                    " ebc_job_successful_runs,"
-                    " ebc_job_cost,"
-                    " ebc_created_at,"
-                    " ebc_updated_at)"
-                    "VALUES("
-                    " %(ss)s,"
-                    " %(bty)s,"
-                    " %(lr)s,"
-                    " %(jid)s,"
-                    " %(co)s,"
-                    " %(a)s,"
-                    " %(r)s,"
-                    " %(pty)s,"
-                    " %(sr)s,"
-                    " %(c)s,"
-                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT');",
-                    job
-                )
-
-        # перебираем список тех чертежей, которые поменялись
-        for bpc in actualized_bpcs:
-            if not ('ss' in bpc):  # пропускаем БП, по которым нет данных о расположении
-                continue
-            item_id: int = int(bpc['bid'])
-            if not (item_id in undefined_bpc_ids):
-                self.qidb.execute(
-                    "INSERT INTO esi_blueprint_costs("
-                    " ebc_system_id,"
-                    " ebc_blueprint_id,"
-                    " ebc_blueprint_type_id,"
-                    " ebc_blueprint_runs,"
-                    " ebc_time_efficiency,"
-                    " ebc_material_efficiency,"
-                    " ebc_created_at,"
-                    " ebc_updated_at)"
-                    "VALUES("
-                    " %(ss)s,"
-                    " %(bid)s,"
-                    " %(bty)s,"
-                    " %(r)s,"
-                    " %(te)s,"
-                    " %(me)s,"
-                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-                    " CURRENT_TIMESTAMP AT TIME ZONE 'GMT');",
-                    bpc
-                )
+        self.dbswagger.insert_into_blueprint_costs(
+            corporation_id,
+            actualized_jobs, self.eve_now,
+            actualized_bpcs, self.eve_now)
 
         del actualized_jobs
         del actualized_bpcs
-
-        del corp_cache_j
-        del corp_cache_b
