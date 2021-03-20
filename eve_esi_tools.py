@@ -555,7 +555,9 @@ def get_containers_on_stations(
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
-        corp_ass_names_data):
+        corp_ass_names_data,
+        # настройки
+        throw_when_not_found=True):
     found_containers = []
     for station_dict in search_settings:
         # input setings
@@ -566,7 +568,7 @@ def get_containers_on_stations(
             "station_name": station_dict.get("station_name", None),
             "station_foreign": None,
             "hangars_filter": hangars_filter,
-            "containers": None
+            "containers": []
         }
         if "user_data" in station_dict:
             station_containers.update(station_dict.get("user_data"))
@@ -597,7 +599,10 @@ def get_containers_on_stations(
 
             # вывод на экран найденных station_id и station_name
             if station_name is None:
-                raise Exception('Not found station name for factory {}!!!'.format(station_id))
+                if throw_when_not_found:
+                    raise Exception('Not found station name for factory {}!!!'.format(station_id))
+                else:
+                    print("ERROR: not found station name for factory {}!!!".format(station_id))
 
         elif not (station_containers["station_name"] is None):
             station_name = station_containers["station_name"]
@@ -615,17 +620,26 @@ def get_containers_on_stations(
 
             # вывод на экран найденных station_id и station_name
             if station_id is None:
-                raise Exception('Not found station identity for factory {}!!!'.format(station_name))
+                if throw_when_not_found:
+                    raise Exception('Not found station identity for factory {}!!!'.format(station_name))
+                else:
+                    print("ERROR: not found station identity for factory {}!!!".format(station_name))
 
-            # поиск контейнеров на станции station_id в ангарах hangars_filter
-            station_containers["containers"] = find_containers_in_hangars(
-                station_id,
-                hangars_filter,
-                sde_type_ids,
-                corp_assets_data)
+            else:
+                # поиск контейнеров на станции station_id в ангарах hangars_filter
+                station_containers["containers"] = find_containers_in_hangars(
+                    station_id,
+                    hangars_filter,
+                    sde_type_ids,
+                    corp_assets_data)
+
+        elif throw_when_not_found:
+            raise Exception('Not found station identity and name!!!')
 
         else:
-            raise Exception('Not found station identity and name!!!')
+            print("ERROR: not found station identity and name!!!")
+            station_id = None
+            station_name = None
 
         station_containers["station_id"] = station_id
         station_containers["station_name"] = station_name

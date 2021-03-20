@@ -111,9 +111,12 @@ def __dump_regroup_stations(
     fit_multiplexer = 0
     for station_dict in corp_regroup_stat["regroup_containers"]:
         station_id = station_dict["station_id"]
-        regroup_station_dict = corp_regroup_stat["regroup_stocks"].get(int(station_id))
+        if not (station_id is None):
+            regroup_station_dict = corp_regroup_stat["regroup_stocks"].get(int(station_id))
+        else:
+            regroup_station_dict = None
         station_name = station_dict["station_name"]
-        foreign = station_dict["station_foreign"]
+        foreign = station_dict.get("station_foreign", False)
         containers = station_dict["containers"]
 
         glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (station)
