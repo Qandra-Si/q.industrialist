@@ -190,18 +190,56 @@ def __dump_any_into_modal_footer(glf):
 def __get_converted_fit_status(fit, available_attr: str):
     if not available_attr:
         return "default"
-    __ship = fit["ship"]
-    __ship_name = __ship["name"] if not (__ship is None) else None
-    __ship_type_id = __ship["type_id"] if not (__ship is None) and ("type_id" in __ship) else None
-    __total_quantity = fit["quantity"]
-    if (__ship_name is None) or (__ship_type_id is None):
-        if __ship[available_attr] < __total_quantity:
-            return "warning"
-    for __item_dict in fit["items"]:
-        __quantity = __item_dict["quantity"]
-        if __item_dict[available_attr] < (__total_quantity*__quantity):
-            return "warning"
-    return "success"
+    ship_dict = fit["ship"]
+    ship_name = ship_dict["name"] if not (ship_dict is None) else None
+    ship_type_id = ship_dict["type_id"] if not (ship_dict is None) and ("type_id" in ship_dict) else None
+    total_quantity: int = int(fit["quantity"])
+    # ---
+    if ship_type_id and ship_name:
+        available: int = int(ship_dict[available_attr])
+        if available < total_quantity:
+            return "warning" if available > 0 else "danger"
+    # ---
+    something_not_available: bool = False
+    for item_dict in fit["items"]:
+        available: int = int(item_dict[available_attr])
+        if available == 0:
+            return "danger"
+        elif something_not_available:
+            continue
+        quantity: int = int(item_dict["quantity"])
+        if available < (total_quantity * quantity):
+            something_not_available = True
+    return "warning" if something_not_available else "success"
+
+
+def __get_possible_fit_assembles(fit, available_attr: str):
+    if not available_attr:
+        return None
+    possible_assembles = None  # min, max
+    ship_dict = fit["ship"]
+    # ---
+    ship_name = ship_dict["name"] if not (ship_dict is None) else None
+    ship_type_id = ship_dict["type_id"] if not (ship_dict is None) and ("type_id" in ship_dict) else None
+    # total_quantity: int = int(fit["quantity"])
+    # ---
+    if ship_type_id and ship_name:
+        available: int = int(ship_dict[available_attr])
+        if available == 0:
+            return 0
+        possible_assembles = available
+    # ---
+    for item_dict in fit["items"]:
+        available: int = int(item_dict[available_attr])
+        if available == 0:
+            return 0
+        quantity: int = int(item_dict["quantity"])
+        possible = divmod(available, quantity)
+        if possible_assembles is None:
+            possible_assembles = possible[0]
+        elif possible[0] < possible_assembles:
+            possible_assembles = possible[0]
+    return possible_assembles
 
 
 def __dump_converted_fits_items(
@@ -410,6 +448,7 @@ def __dump_converted_fits(
             __pn_flag_type = None
         __warnings = len([i for i in __items if "renamed" in i])
         __fit_status = __get_converted_fit_status(fit, available_attr)
+        __fit_possible_assembles = __get_possible_fit_assembles(fit, available_attr)
         # создаём сворачиваемую панель для работы с содержимым фита
         glf.write(
             '<div class="panel panel-{status} {pnclass}">\n'
@@ -418,7 +457,7 @@ def __dump_converted_fits(
             '   <a role="button" data-toggle="collapse"'  # отключение автосворачивания: data-parent="#monthly_jobs"
             '    href="#{prfxcllps}_collapse{num}" aria-expanded="true"'
             '    aria-controls="{prfxcllps}_collapse{num}"><strong>{nm}</strong>&nbsp;<span'
-            '    class="badge">{q}</span>{wrngs}{prblms}</a>\n'
+            '    class="badge">{fpass}{q}</span>{wrngs}{prblms}</a>\n'
             '  </h4>\n'
             '  {cmnt}\n'
             ' </div>\n'
@@ -435,7 +474,8 @@ def __dump_converted_fits(
                 vsbl="",  # свёрнуты все по умолчанию: " in" if row_num == 1 else "",
                 wrngs="" if __warnings == 0 else '&nbsp;<span class="label label-warning">warnings</span>',
                 prblms="" if len(__problems) == 0 else '&nbsp;<span class="label label-danger">problems</span>',
-                pnclass=__pn_flag_type if __pn_flag_type else ''
+                pnclass=__pn_flag_type if __pn_flag_type else '',
+                fpass="" if __fit_possible_assembles is None else '{} of '.format(__fit_possible_assembles),
             )
         )
         # выводим элементы управления фитом и его содержимое
