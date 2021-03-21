@@ -971,6 +971,11 @@ class QDatabaseTools:
 
         return data
 
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/blueprints/
+    # corporations/{corporation_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
     def link_blueprints_and_jobs(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
 
@@ -978,6 +983,8 @@ class QDatabaseTools:
         actualized_bpcs = []
 
         corp_cache_j = self.get_corp_cache(self.__cached_corporation_industry_jobs, corporation_id)
+        corp_cache_b = self.get_corp_cache(self.__cached_corporation_blueprints, corporation_id)
+
         if corp_cache_j:
             for job_id in corp_cache_j:
                 in_cache = corp_cache_j.get(job_id)
@@ -997,10 +1004,18 @@ class QDatabaseTools:
                         continue
                     actualized_jobs.append(in_cache.obj)
                     actualized_jobs[-1].update({'ext': {'system_id': system_id}})
+                    # пытаемся получить информацию по me и te чертежа, который используется в работе
+                    # (такой подход имеет смысл только при отслеживании параметров БПО, которые
+                    # "не кончаются" и как правило лежат в одном и том же контейнере, т.ч. долгое
+                    # время известны в ассетах корпорации)
+                    bp_in_cache = corp_cache_b.get(int(in_cache.obj['blueprint_id']))
+                    if not (bp_in_cache is None):
+                        actualized_jobs[-1]['ext'].update({
+                            'bp_te': bp_in_cache.obj['time_efficiency'],
+                            'bp_me': bp_in_cache.obj['material_efficiency'],
+                        })
                     # debug: print('JOB JOB JOB', actualized_jobs[-1])
-        del corp_cache_j
 
-        corp_cache_b = self.get_corp_cache(self.__cached_corporation_blueprints, corporation_id)
         if corp_cache_b:
             for item_id in corp_cache_b:
                 in_cache = corp_cache_b.get(item_id)
@@ -1019,12 +1034,21 @@ class QDatabaseTools:
                     actualized_bpcs.append(in_cache.obj)
                     actualized_bpcs[-1].update({'ext': {'system_id': system_id}})
                     # debug: print('BPC BPC BPC', actualized_bpcs[-1])
-        del corp_cache_b
 
+        del corp_cache_b
+        del corp_cache_j
+
+        # сохраняем в БД только что найденные чертежи и работы, оставляем их там "мариноваться"
+        # до тех пор, пока у ним не подгрузятся стоимость выполненных работ и все прочие данные
         self.dbswagger.insert_into_blueprint_costs(
             corporation_id,
             actualized_jobs, self.eve_now,
             actualized_bpcs, self.eve_now)
+        self.qidb.commit()
 
         del actualized_jobs
         del actualized_bpcs
+
+        # вычитываем необъединённые чертежи и ищем им парные работы по копирке, объединяем их
+        self.dbswagger.link_blueprint_copies_with_jobs()
+        self.qidb.commit()

@@ -34,7 +34,7 @@ import console_app
 
 def main():
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
-    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=False)
+    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=True)
     first_time = True
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -101,6 +101,7 @@ def main():
               format(corporation_name, len([j for j in corp_industry_jobs_data if j['status'] == 'active'])))
         sys.stdout.flush()
 
+        # Пытаемся отследить и сохраняем связи между чертежами и работами
         dbtools.link_blueprints_and_jobs(corporation_id)
 
     del dbtools

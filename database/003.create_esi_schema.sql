@@ -7,7 +7,6 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
----
 DROP INDEX IF EXISTS qi.idx_ebc_blueprint_job_ids;
 DROP INDEX IF EXISTS qi.idx_ebc_job_id;
 DROP INDEX IF EXISTS qi.idx_ebc_blueprint_id;
@@ -373,8 +372,8 @@ CREATE TABLE qi.esi_corporation_blueprints
     ecb_location_id BIGINT NOT NULL,
     ecb_location_flag CHARACTER VARYING(255) NOT NULL,
     ecb_quantity INTEGER NOT NULL,
-    ecb_time_efficiency INTEGER NOT NULL,
-    ecb_material_efficiency INTEGER NOT NULL,
+    ecb_time_efficiency SMALLINT NOT NULL,
+    ecb_material_efficiency SMALLINT NOT NULL,
     ecb_runs INTEGER NOT NULL,
     ecb_created_at TIMESTAMP,
     ecb_updated_at TIMESTAMP,
@@ -526,8 +525,8 @@ CREATE TABLE qi.esi_blueprint_costs
     ebc_blueprint_id BIGINT,
     ebc_blueprint_type_id INTEGER NOT NULL,
     ebc_blueprint_runs INTEGER NOT NULL,    -- кол-во прогонов БП (свойство чертежа, который будет сгенерирован)
-    ebc_time_efficiency INTEGER,
-    ebc_material_efficiency INTEGER,
+    ebc_time_efficiency SMALLINT,
+    ebc_material_efficiency SMALLINT,
     -- сведения о выполненной работе, в результате которой получен чертёж
     ebc_job_id BIGINT,
     ebc_job_corporation_id BIGINT,          -- идентификатор нужен для получения уникального номера работы в рамках каждой из корпораций
@@ -535,6 +534,8 @@ CREATE TABLE qi.esi_blueprint_costs
     ebc_job_runs INTEGER,                   -- кол-во job-ов (сколько штук новых чертежей будет сгенерировано)
     ebc_job_product_type_id INTEGER,        -- что именно будет получено в результате job-а
     ebc_job_successful_runs INTEGER,        -- кол-во job-ов, которые завершились успешно (от 0 до job_runs)
+    ebc_job_time_efficiency SMALLINT,       -- me параметр чертежа, использованного в работе job_id (невполне точный параметр, т.к. меняется несинхронно получению данных)
+    ebc_job_material_efficiency SMALLINT,   -- te параметр чертежа, использованного в работе job_id (невполне точный параметр, т.к. меняется несинхронно получению данных)
     -- стоимость выполненной работы (из сведений о работе)
     ebc_job_cost INTEGER,
     -- слагаемые стоимости выполенной работы (из журнала транзакций корпкошелька)
