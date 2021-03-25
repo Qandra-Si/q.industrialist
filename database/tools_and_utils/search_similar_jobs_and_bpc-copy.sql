@@ -21,4 +21,4 @@ where
  ( ebc_blueprint_id is not null and ebc_job_id is null and ebc_blueprint_type_id = 35772 or
    ebc_job_id is not null and ebc_blueprint_id is null and ebc_job_activity = 5 and ebc_job_product_type_id = 35772
  )
-order by ebc_created_at desc
+order by 2 desc

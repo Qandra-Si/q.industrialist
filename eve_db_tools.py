@@ -992,8 +992,8 @@ class QDatabaseTools:
                     continue
                 if not (in_cache.obj['activity_id'] in (5,8)):  # copy & invent
                     continue
-                if in_cache.obj['status'] != 'delivered':  # добавляем в таблицу только законченные работы
-                    continue
+                #if in_cache.obj['status'] != 'delivered':  # добавляем в таблицу только законченные работы
+                #    continue
                 # just_added: (в БД job-а нет), но это предположительно!
                 # changed: изменился status у job-а
                 if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
@@ -1014,7 +1014,8 @@ class QDatabaseTools:
                             'bp_te': bp_in_cache.obj['time_efficiency'],
                             'bp_me': bp_in_cache.obj['material_efficiency'],
                         })
-                    # debug: print('JOB JOB JOB', actualized_jobs[-1])
+                    # debug:
+                    print('JOB JOB JOB', actualized_jobs[-1])
 
         if corp_cache_b:
             for item_id in corp_cache_b:
@@ -1026,17 +1027,19 @@ class QDatabaseTools:
                 # just_added: (в БД чертежа нет), но это предположительно!
                 # changed: изменился status у чертежа
                 # deleted: чертёж исчез из портассетов (использован, удалён, перемещён, передан)
-                if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False):
+                if in_cache.ext.get('just_added', False) or in_cache.ext.get('changed', False) or in_cache.ext.get('deleted', False):
                     # пропускаем БП, по которым нет данных о расположении
                     system_id = self.get_system_id_of_item(corporation_id, in_cache.obj['location_id'])
                     if not system_id:
                         continue
                     actualized_bpcs.append(in_cache.obj)
                     actualized_bpcs[-1].update({'ext': {'system_id': system_id}})
-                    # debug: print('BPC BPC BPC', actualized_bpcs[-1])
+                    # debug:
+                    print('BPC BPC BPC', actualized_bpcs[-1])
 
         del corp_cache_b
         del corp_cache_j
+        return
 
         # сохраняем в БД только что найденные чертежи и работы, оставляем их там "мариноваться"
         # до тех пор, пока у ним не подгрузятся стоимость выполненных работ и все прочие данные
@@ -1052,3 +1055,5 @@ class QDatabaseTools:
         # вычитываем необъединённые чертежи и ищем им парные работы по копирке, объединяем их
         self.dbswagger.link_blueprint_copies_with_jobs()
         self.qidb.commit()
+
+        self.dbswagger.link_blueprint_invents_with_jobs()

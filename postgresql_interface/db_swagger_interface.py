@@ -1104,7 +1104,8 @@ class QSwaggerInterface:
                 " %(c)s,"
                 " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
                 " TIMESTAMP WITHOUT TIME ZONE %(at)s);",
-                {'bty': job['blueprint_type_id'],
+                {'ss': job['ext']['system_id'],
+                 'bty': job['blueprint_type_id'],
                  'lr': job['licensed_runs'],
                  'jid': job['job_id'],
                  'co': corporation_id,
@@ -1115,7 +1116,6 @@ class QSwaggerInterface:
                  'pty': job.get('product_type_id', None),
                  'sr': job.get('successful_runs', None),
                  'c': job.get('cost', None),
-                 'ss': job['ext']['system_id'],
                  'at': industry_jobs_updated_at,
                  }
             )
@@ -1162,11 +1162,10 @@ class QSwaggerInterface:
         del undefined_job_ids
         del undefined_links
 
-    def link_blueprint_copies_with_jobs(
-            self):
+    def link_blueprint_copies_with_jobs(self):
         # настройки работы метода
         #  * deffered: время, после которого история не анализируется
-        #  * missed:
+        #  * missed: ждём кол-во часом не менее чем, чтобы дождаться когда будут добыты все недостающие данные
         missed_hours: int = 2
         deffered_hours: int = 24
         # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
@@ -1184,9 +1183,7 @@ class QSwaggerInterface:
             "WHERE"
             " ebc_job_activity=5 AND"
             " ebc_blueprint_id IS NULL AND"
-            " {wh};".format(wh=where_hours),
-            {'dh': deffered_hours,
-             }
+            " {wh};".format(wh=where_hours)
         )
 
         for ubtype in unlinked_blueprint_types:
@@ -1209,7 +1206,7 @@ class QSwaggerInterface:
                 # " ebc_job_product_type_id as bpc_type,"
                 " ecj_runs as job_runs,"                   # 8 *
                 " ebc_job_time_efficiency as job_te,"      # 9 *
-                " ebc_job_material_efficiency as job_me"   # 10 *
+                " ebc_job_material_efficiency as job_me "  # 10 *
                 "FROM"
                 " esi_blueprint_costs"
                 "  LEFT OUTER JOIN esi_corporation_industry_jobs ON (ebc_job_id = ecj_job_id) "
@@ -1223,7 +1220,7 @@ class QSwaggerInterface:
                 "   ebc_job_product_type_id=%(bty)s"
                 "  )"
                 " )"
-                "ORDER BY ebc_created_at DESC;".format(wh=where_hours),
+                "ORDER BY 2 DESC;".format(wh=where_hours),
                 {'bty': type_id,
                  'dh': deffered_hours,
                  }
@@ -1263,47 +1260,77 @@ class QSwaggerInterface:
                     if job_runs == 0:
                         break
                 # изменение связей в БД
-                self.db.execute(
-                    "UPDATE esi_blueprint_costs SET("
-                    " ebc_job_id,"
-                    " ebc_job_corporation_id,"
-                    " ebc_job_activity,"
-                    " ebc_job_runs,"
-                    " ebc_job_product_type_id,"
-                    " ebc_job_successful_runs,"
-                    " ebc_job_time_efficiency,"
-                    " ebc_job_material_efficiency,"
-                    " ebc_job_cost,"
-                    " ebc_industry_payment,"
-                    " ebc_tax,"
-                    " ebc_created_at,"
-                    " ebc_updated_at)="
-                    "(SELECT"
-                    "  %(jid)s,"
-                    "  ebc_job_corporation_id,"
-                    "  ebc_job_activity,"
-                    "  ebc_job_runs,"
-                    "  ebc_job_product_type_id,"
-                    "  ebc_job_successful_runs,"
-                    "  ebc_job_time_efficiency,"
-                    "  ebc_job_material_efficiency,"
-                    "  ebc_job_cost,"
-                    "  ebc_industry_payment,"
-                    "  ebc_tax,"
-                    "  ebc_created_at,"
-                    "  CURRENT_TIMESTAMP AT TIME ZONE 'GMT'"
-                    " FROM"
-                    "  esi_blueprint_costs"
-                    " WHERE"
-                    "  ebc_job_id=%(jid)s AND ebc_blueprint_id IS NULL"
-                    ")"
-                    "WHERE"
-                    " ebc_id IN (SELECT * FROM UNNEST(%(ids)s));\n"
-                    "DELETE FROM esi_blueprint_costs WHERE ebc_id=%(del)s;",
-                    {'jid': job_id,
-                     'ids': found_ebc_ids,
-                     'del': job[1]
-                     }
-                )
+                if found_ebc_ids:
+                    self.db.execute(
+                        "UPDATE esi_blueprint_costs SET("
+                        " ebc_job_id,"
+                        " ebc_job_corporation_id,"
+                        " ebc_job_activity,"
+                        " ebc_job_runs,"
+                        " ebc_job_product_type_id,"
+                        " ebc_job_successful_runs,"
+                        " ebc_job_time_efficiency,"
+                        " ebc_job_material_efficiency,"
+                        " ebc_job_cost,"
+                        " ebc_industry_payment,"
+                        " ebc_tax,"
+                        " ebc_created_at,"
+                        " ebc_updated_at)="
+                        "(SELECT"
+                        "  %(jid)s,"
+                        "  ebc_job_corporation_id,"
+                        "  ebc_job_activity,"
+                        "  ebc_job_runs,"
+                        "  ebc_job_product_type_id,"
+                        "  ebc_job_successful_runs,"
+                        "  ebc_job_time_efficiency,"
+                        "  ebc_job_material_efficiency,"
+                        "  ebc_job_cost,"
+                        "  ebc_industry_payment,"
+                        "  ebc_tax,"
+                        "  ebc_created_at,"
+                        "  CURRENT_TIMESTAMP AT TIME ZONE 'GMT'"
+                        " FROM"
+                        "  esi_blueprint_costs"
+                        " WHERE"
+                        "  ebc_job_id=%(jid)s AND ebc_blueprint_id IS NULL"
+                        ")"
+                        "WHERE"
+                        " ebc_id IN (SELECT * FROM UNNEST(%(ids)s));\n"
+                        "DELETE FROM esi_blueprint_costs WHERE ebc_id=%(del)s;",
+                        {'jid': job_id,
+                         'ids': found_ebc_ids,
+                         'del': job[1]
+                         }
+                    )
 
         del unlinked_blueprint_types
+
+    def link_blueprint_invents_with_jobs(self):
+        # настройки работы метода
+        #  * deffered: время, после которого история не анализируется
+        #  * missed: ждём кол-во часом не менее чем, чтобы дождаться когда будут добыты все недостающие данные
+        missed_hours: int = 2
+        deffered_hours: int = 24
+        # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
+        where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_created_at and " \
+                           "ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '{dh} hours'))".\
+                           format(mh=missed_hours, dh=deffered_hours)
+
+        # список продуктов, которые пока что являются не связанными в базе данных
+        unlinked_blueprint_types = self.db.select_all_rows(
+            "SELECT"
+            " DISTINCT ebc_job_product_type_id "
+            " ,(select sden_name from eve_sde_names"
+            "  where sden_category=1 and sden_id=ebc_job_product_type_id) as type_name "
+            "FROM esi_blueprint_costs "
+            "WHERE"
+            " ebc_job_activity=8 AND"
+            " ebc_blueprint_id IS NULL AND"
+            " ebc_job_product_type_id IS NOT NULL AND"
+            " {wh};".format(wh=where_hours)
+        )
+
+        for ubtype in unlinked_blueprint_types:
+            type_id: int = int(ubtype[0])
+            print(type_id, ubtype[1])
