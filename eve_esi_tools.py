@@ -552,6 +552,7 @@ def get_containers_on_stations(
         search_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
@@ -607,7 +608,12 @@ def get_containers_on_stations(
         elif not (station_containers["station_name"] is None):
             station_name = station_containers["station_name"]
             station_id = next((an for an in corp_ass_names_data if an["name"] == station_name), None)
-            station_containers["station_foreign"] = station_id is None
+            if station_id is None:
+                station_id = next((int(n) for n in sde_inv_names if sde_inv_names[str(n)] == station_name), None)
+                if not (station_id is None):
+                    station_containers["station_npc"] = True
+                else:
+                    station_containers["station_foreign"] = station_id is None
 
             if station_containers["station_foreign"]:
                 # поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)

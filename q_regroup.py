@@ -32,7 +32,6 @@ import eve_esi_tools
 import eve_sde_tools
 import console_app
 import render_html_regroup
-import render_html_industry
 
 from __init__ import __version__
 
@@ -42,6 +41,7 @@ def __get_containers(
         db_regroup_stock,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
@@ -51,15 +51,19 @@ def __get_containers(
     # построение списка станций для которых необходимо получить списки контейнеров
     search_settings = []
     tmp_sc: str = "search_containers"
+    tmp_sh: str = "stock_hangars"
     for station_name in stations:
         stock_containers = [r["container"] for r in db_regroup_stock if r["station"] == station_name]
+        stock_hangars = [c for c in stock_containers if c[:-1] == "CorpSAG"]
+        stock_containers = [c for c in stock_containers if c[:-1] != "CorpSAG"]
         search_settings.append({
             "station_name": station_name,
-            "user_data": {tmp_sc: stock_containers}
+            "user_data": {tmp_sc: stock_containers, tmp_sh: stock_hangars},
         })
     regroup_containers = eve_esi_tools.get_containers_on_stations(
         search_settings,
         sde_type_ids,
+        sde_inv_names,
         corp_assets_data,
         foreign_structures_data,
         corp_ass_names_data,
@@ -77,6 +81,7 @@ def __build_regroup(
         db_regroup_stock,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         sde_market_groups,
         sde_named_type_ids,
         # esi данные, загруженные с серверов CCP
@@ -88,6 +93,7 @@ def __build_regroup(
         db_regroup_stock,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
@@ -104,6 +110,11 @@ def __build_regroup(
     #     'station_name': 'W6V-VM - Delta After Dark - RIP Remdick',
     #     'station_foreign': True,
     #     'containers': [{'id': 1035776350534, 'type_id': 17366, 'name': '!▒▒▒▒▒▒▒▒▒!CTA Stock'}]
+    # },
+    # {   'station_id': ?,
+    #     'station_name': 'YZ-LQL VI - Moon 19 - Guardian Angels Logistic Support',
+    #     'containers': [],
+    #     'stock_hangars': ['CorpSAG3']
     # } ]
 
     corp_regroup_stat = {
@@ -118,9 +129,14 @@ def __build_regroup(
                 int(__market_group_id): eve_sde_tools.get_market_group_name_by_id(sde_market_groups, __market_group_id)
             })
 
-    def get_new_product_dict(container_id: int, hangar_dict, type_id: int, item_name: str, quantity: int):
-        __available121 = sum([a["quantity"] for a in corp_assets_data
-                              if (a["type_id"] == type_id) and (a["location_id"] == container_id)])
+    def get_new_product_dict(container_id, hangar_dict, type_id: int, item_name: str, quantity: int):
+        if isinstance(container_id, str):  # ангар
+            __available121 = 0
+        elif isinstance(container_id, int):  # контейнер
+            __available121 = sum([a["quantity"] for a in corp_assets_data
+                                  if (a["type_id"] == type_id) and (a["location_id"] == container_id)])
+        else:
+            __available121 = 0
         __market123 = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
         if not (hangar_dict is None):
             hangar_loc_id: int = int(hangar_dict["location_id"])  # это может быть, например, номер офиса на станции
@@ -136,12 +152,12 @@ def __build_regroup(
             "market": __market123,
         }
 
-    def push_into_regroup_stock(station_id: int, container_id: int, hangar_dict, type_id: int, item_name: str,
+    def push_into_regroup_stock(station_id: int, container_id, hangar_dict, type_id: int, item_name: str,
                                 quantity: int):
         __station135 = corp_regroup_stat["regroup_stocks"].get(int(station_id), None)
         if __station135 is None:
             corp_regroup_stat["regroup_stocks"][int(station_id)] = {
-                int(container_id): {
+                container_id: {
                     "stock": {
                         int(type_id): get_new_product_dict(container_id, hangar_dict, type_id, item_name, quantity)
                     },
@@ -149,9 +165,9 @@ def __build_regroup(
                 }
             }
         else:
-            __container141 = __station135.get(int(container_id), None)
+            __container141 = __station135.get(container_id, None)
             if __container141 is None:
-                __station135[int(container_id)] = {
+                __station135[container_id] = {
                     "stock": {
                         int(type_id): get_new_product_dict(container_id, hangar_dict, type_id, item_name, quantity)
                     },
@@ -168,7 +184,7 @@ def __build_regroup(
         __station152 = corp_regroup_stat["regroup_stocks"].get(int(station_id), None)
         if __station152 is None:
             return
-        __container155 = __station152.get(int(container_id), None)
+        __container155 = __station152.get(container_id, None)
         if __container155 is None:
             return
         __container155["fits"].append(converted_fit)
@@ -185,16 +201,24 @@ def __build_regroup(
             continue
         station_id = station_dict.get("station_id")
         # ---
-        container_id = next((c["id"] for c in station_dict["containers"] if c["name"] == __container_name), None)
-        if container_id is None:
-            continue
-        # ---
-        hangar_dict = None  # попытаемся найти номер ангара, в котором лежит контейнер (будет там искать ships)
-        container_dict = next((a for a in corp_assets_data if a["item_id"] == container_id), None)
-        if not (container_dict is None):
-            container_loc_flag: str = container_dict["location_flag"]
-            if container_loc_flag[:-1] == "CorpSAG":  # контейнер находится в ангаре
-                hangar_dict = {"location_id": int(container_dict["location_id"]), "location_flag": container_loc_flag}
+        if __container_name[:-1] == "CorpSAG":
+            office_id = next((a["item_id"] for a in corp_assets_data if a["location_flag"] == "OfficeFolder" and a["location_id"] == station_id), None)
+            if office_id is None:
+                continue
+            container_id = "{}_{}".format(station_id, __container_name)  # в контейнерах не искать, только в ангаре
+            # ---
+            hangar_dict = {"location_id": int(office_id), "location_flag": __container_name}
+        else:
+            container_id = next((c["id"] for c in station_dict["containers"] if c["name"] == __container_name), None)
+            if container_id is None:
+                continue
+            # ---
+            hangar_dict = None  # попытаемся найти номер ангара, в котором лежит контейнер (будет там искать ships)
+            container_dict = next((a for a in corp_assets_data if a["item_id"] == container_id), None)
+            if not (container_dict is None):
+                container_loc_flag: str = container_dict["location_flag"]
+                if container_loc_flag[:-1] == "CorpSAG":  # контейнер находится в ангаре
+                    hangar_dict = {"location_id": int(container_dict["location_id"]), "location_flag": container_loc_flag}
         # ---
         __converted = eve_sde_tools.get_items_list_from_eft(__eft, sde_named_type_ids)
         __converted.update({"quantity": __total_quantity})
@@ -202,23 +226,23 @@ def __build_regroup(
             push_into_regroup_stock(
                 station_id,
                 container_id,
-                hangar_dict, # это может быть номер офиса и название ангара, в котором лежит контейнер
+                hangar_dict,  # это может быть номер офиса и название ангара, в котором лежит контейнер
                 __converted["ship"]["type_id"],
                 __converted["ship"]["name"],
                 __total_quantity)
             # пересчитываем общее кол-во, необходимое для регрупа и кол-во доступных компонентов
-            __converted["ship"]["available"]  = corp_regroup_stat["regroup_stocks"][int(station_id)][int(container_id)]["stock"][int(__converted["ship"]["type_id"])]["available"]
+            __converted["ship"]["available"] = corp_regroup_stat["regroup_stocks"][int(station_id)][container_id]["stock"][int(__converted["ship"]["type_id"])]["available"]
         __converted["items"].sort(key=lambda i: i["name"])
         for __item_dict in __converted["items"]:
             push_into_regroup_stock(
                 station_id,
                 container_id,
-                None,  # обычные items в ангаре не ищем (только корабли)
+                hangar_dict,
                 __item_dict["type_id"],
                 __item_dict["name"],
                 __total_quantity * __item_dict["quantity"])
             # пересчитываем общее кол-во, необходимое для регрупа и кол-во доступных компонентов
-            __item_dict["available"] = corp_regroup_stat["regroup_stocks"][int(station_id)][int(container_id)]["stock"][int(__item_dict["type_id"])]["available"]
+            __item_dict["available"] = corp_regroup_stat["regroup_stocks"][int(station_id)][container_id]["stock"][int(__item_dict["type_id"])]["available"]
         for __problem_dict in __converted["problems"]:
             # у проблемных item-ов неизвестен type_id
             __problem_dict["available"] = 0
@@ -272,7 +296,7 @@ def main():
     character_name = authz["character_name"]
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    # sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
@@ -343,12 +367,17 @@ def main():
         db_regroup_stock,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         sde_market_groups,
         sde_named_type_ids,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
         corp_ass_names_data)
+
+    # освобождаем память от ненужных более списков
+    del sde_inv_names
+    del sde_named_type_ids
 
     # обновление данных в БД (названия контейнеров, и первичное автозаполнение)
     for stock_containers in corp_regroup_stat["regroup_containers"]:
