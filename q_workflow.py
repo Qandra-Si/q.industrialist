@@ -74,6 +74,7 @@ def __get_blueprints_containers(
         module_settings,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
+        sde_inv_names,
         # esi данные, загруженные с серверов CCP
         corp_assets_data,
         foreign_structures_data,
@@ -100,6 +101,7 @@ def __get_blueprints_containers(
     factories_containers = eve_esi_tools.get_containers_on_stations(
         search_settings,
         sde_type_ids,
+        sde_inv_names,
         corp_assets_data,
         foreign_structures_data,
         corp_ass_names_data
@@ -637,6 +639,7 @@ def main():
         character_name = authz["character_name"]
 
         sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+        sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
         sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
         sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
         sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
@@ -733,6 +736,7 @@ def main():
     factories_containers = __get_blueprints_containers(
         module_settings,
         sde_type_ids,
+        sde_inv_names,
         corp_assets_data,
         foreign_structures_data,
         corp_ass_names_data
