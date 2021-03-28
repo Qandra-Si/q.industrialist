@@ -1029,139 +1029,6 @@ class QSwaggerInterface:
     # corporations/{corporation_id}/industry/jobs/
     # -------------------------------------------------------------------------
 
-    def insert_into_blueprint_costs(
-            self,
-            corporation_id,
-            industry_jobs, industry_jobs_updated_at,
-            blueprints, blueprints_updated_at):
-        if len(industry_jobs) == 0 and len(blueprints) == 0:
-            return
-
-        undefined_links = self.db.select_all_rows(
-            "SELECT"
-            # " ebc_id,"                   # 0
-            " ebc_blueprint_id,"           # 1 (0)
-            # " ebc_blueprint_type_id,"    # 2
-            # " ebc_blueprint_runs,"       # 3
-            # " ebc_time_efficiency,"      # 4
-            # " ebc_material_efficiency,"  # 5
-            " ebc_job_id "                 # 6 (1)
-            # " ebc_job_corporation_id,"   # 7
-            # " ebc_job_activity,"         # 8
-            # " ebc_job_runs,"             # 9
-            # " ebc_job_product_type_id,"  # 10
-            # " ebc_job_successful_runs,"  # 11
-            # " ebc_job_cost,"             # 12
-            # " ebc_industry_payment,"     # 13
-            # " ebc_tax,"                  # 14
-            # " ebc_created_at "           # 15
-            "FROM esi_blueprint_costs "
-            "WHERE"  # поиск тех линков, которые не были "соединены" за последние 12 часов
-            " ebc_blueprint_id IS NULL OR ebc_job_id IS NULL;",
-            # " AND (ebc_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '12 hours'));",
-        )
-        undefined_job_ids = [int(lnk[1]) for lnk in undefined_links if not (lnk[1] is None)]  # ebc_job_id
-        undefined_bpc_ids = [int(lnk[0]) for lnk in undefined_links if not (lnk[0] is None)]  # ebc_blueprint_id
-
-        # перебираем список тех работ, которые поменялись
-        for job in industry_jobs:
-            # пропускаем jobs, по которым нет данных о расположении фабрики
-            if not job.get('ext') and not job['ext'].get('system_id'):
-                continue
-            # пропускаем jobs, которые уже добавлены в БД
-            job_id: int = int(job['job_id'])
-            if job_id in undefined_job_ids:
-                continue
-            # добавляем запись в БД
-            self.db.execute(
-                "INSERT INTO esi_blueprint_costs("
-                " ebc_system_id,"
-                " ebc_blueprint_type_id,"
-                " ebc_blueprint_runs,"
-                " ebc_job_id,"
-                " ebc_job_corporation_id,"
-                " ebc_job_activity,"
-                " ebc_job_runs,"
-                " ebc_job_product_type_id,"
-                " ebc_job_successful_runs,"
-                " ebc_job_time_efficiency,"
-                " ebc_job_material_efficiency,"
-                " ebc_job_cost,"
-                " ebc_created_at,"
-                " ebc_updated_at)"
-                "VALUES("
-                " %(ss)s,"
-                " %(bty)s,"
-                " %(lr)s,"
-                " %(jid)s,"
-                " %(co)s,"
-                " %(a)s,"
-                " %(r)s,"
-                " %(pty)s,"
-                " %(sr)s,"
-                " %(te)s,"
-                " %(me)s,"
-                " %(c)s,"
-                " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-                " TIMESTAMP WITHOUT TIME ZONE %(at)s);",
-                {'ss': job['ext']['system_id'],
-                 'bty': job['blueprint_type_id'],
-                 'lr': job['licensed_runs'],
-                 'jid': job['job_id'],
-                 'co': corporation_id,
-                 'a': job['activity_id'],
-                 'r': job['runs'],
-                 'te': job['ext']['bp_te'] if 'ext' in job and 'bp_te' in job['ext'] else None,
-                 'me': job['ext']['bp_me'] if 'ext' in job and 'bp_me' in job['ext'] else None,
-                 'pty': job.get('product_type_id', None),
-                 'sr': job.get('successful_runs', None),
-                 'c': job.get('cost', None),
-                 'at': industry_jobs_updated_at,
-                 }
-            )
-
-        # перебираем список тех чертежей, которые поменялись
-        for bpc in blueprints:
-            # пропускаем БП, по которым нет данных о расположении
-            if not bpc.get('ext') and not bpc['ext'].get('system_id'):
-                continue
-            # пропускаем БД, которые уже добавлены в БД
-            item_id: int = int(bpc['item_id'])
-            if item_id in undefined_bpc_ids:
-                continue
-            self.db.execute(
-                "INSERT INTO esi_blueprint_costs("
-                " ebc_system_id,"
-                " ebc_blueprint_id,"
-                " ebc_blueprint_type_id,"
-                " ebc_blueprint_runs,"
-                " ebc_time_efficiency,"
-                " ebc_material_efficiency,"
-                " ebc_created_at,"
-                " ebc_updated_at)"
-                "VALUES("
-                " %(ss)s,"
-                " %(bid)s,"
-                " %(bty)s,"
-                " %(r)s,"
-                " %(te)s,"
-                " %(me)s,"
-                " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
-                " TIMESTAMP WITHOUT TIME ZONE %(at)s);",
-                {'bid': bpc['item_id'],
-                 'bty': bpc['type_id'],
-                 'r': bpc['runs'],
-                 'te': bpc['time_efficiency'],
-                 'me': bpc['material_efficiency'],
-                 'ss': bpc['ext']['system_id'],
-                 'at': blueprints_updated_at,
-                 }
-            )
-
-        del undefined_bpc_ids
-        del undefined_job_ids
-        del undefined_links
-
     def link_blueprint_copies_with_jobs(self):
         # настройки работы метода
         #  * deffered: время, после которого история не анализируется
@@ -1177,18 +1044,19 @@ class QSwaggerInterface:
         unlinked_blueprint_types = self.db.select_all_rows(
             "SELECT"
             " DISTINCT ebc_job_product_type_id "
-            # " ,(select sden_name from eve_sde_names"
-            # "  where sden_category=1 and sden_id=ebc_job_product_type_id) as type_name "
+            # debug: " ,(select sden_name from eve_sde_names"
+            # debug: "  where sden_category=1 and sden_id=ebc_job_product_type_id) as type_name "
             "FROM esi_blueprint_costs "
             "WHERE"
-            " ebc_job_activity=5 AND"
+            " ebc_job_activity=5 AND"  # copies
             " ebc_blueprint_id IS NULL AND"
+            " ebc_transaction_type='f' AND"
             " {wh};".format(wh=where_hours)
         )
 
         for ubtype in unlinked_blueprint_types:
             type_id: int = int(ubtype[0])
-            # debug: print(type_id, ubtype[1])
+            # debug: print(type_id, ubtype[1] if len(ubtype) == 2 else '')
 
             unlinked_bpcs_and_jobs = self.db.select_all_rows(
                 "SELECT"
@@ -1201,43 +1069,36 @@ class QSwaggerInterface:
                 " ebc_blueprint_runs as bp_runs,"          # 3 *
                 " ebc_time_efficiency as te,"              # 4 *
                 " ebc_material_efficiency as me,"          # 5 *
-                " ebc_job_id as job_id,"                   # 6 *
-                " ecj_blueprint_id as job_bp,"             # 7 *
+                # " ebc_job_id as job_id,"
+                " ecj_blueprint_id as job_bp,"             # 6 *
                 # " ebc_job_product_type_id as bpc_type,"
-                " ecj_runs as job_runs,"                   # 8 *
-                " ebc_job_time_efficiency as job_te,"      # 9 *
-                " ebc_job_material_efficiency as job_me "  # 10 *
+                " ecj_runs as job_runs,"                   # 7 *
+                " ebc_job_time_efficiency as job_te,"      # 8 *
+                " ebc_job_material_efficiency as job_me "  # 9 *
                 "FROM"
                 " esi_blueprint_costs"
-                "  LEFT OUTER JOIN esi_corporation_industry_jobs ON (ebc_job_id = ecj_job_id) "
+                "  LEFT OUTER JOIN esi_corporation_industry_jobs ON (ebc_job_id=ecj_job_id) "
                 "WHERE"
                 " {wh} AND"
-                " ((ebc_blueprint_id IS NOT NULL AND ebc_job_id IS NULL AND"
-                "   ebc_blueprint_type_id=%(bty)s"
-                "  ) or"
-                "  (ebc_job_id IS NOT NULL AND ebc_blueprint_id IS NULL AND"
-                "   ebc_job_activity=5 AND"
-                "   ebc_job_product_type_id=%(bty)s"
-                "  )"
+                " ((ebc_job_product_type_id=%(bty)s AND ebc_transaction_type='f' AND ebc_job_activity=5) OR"
+                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A')"
                 " )"
                 "ORDER BY 2 DESC;".format(wh=where_hours),
                 {'bty': type_id,
-                 'dh': deffered_hours,
                  }
             )
-            for unlinked in unlinked_bpcs_and_jobs:
-                print(unlinked)
+            # debug: for unlinked in unlinked_bpcs_and_jobs:
+            # debug:     print(unlinked)
             unlinked_jobs = [j for j in unlinked_bpcs_and_jobs if j[2] is None]
 
-            print('unlinked_jobs', unlinked_jobs)
+            # debug: print('unlinked_jobs', unlinked_jobs)
             for job in unlinked_jobs:
                 solar_system = job[0]
                 licensed_runs: int = job[3]
-                job_id: int = job[6]
-                blueprint_id: int = job[7]
-                job_runs: int = job[8]
-                te: int = job[9]
-                me: int = job[10]
+                blueprint_id: int = job[6]
+                job_runs: int = job[7]
+                te: int = job[8]
+                me: int = job[9]
                 found_ebc_ids = []
                 for bpc in unlinked_bpcs_and_jobs:
                     blueprint_copy_id: int = bpc[2]
@@ -1253,7 +1114,7 @@ class QSwaggerInterface:
                     # пропускаем те чертежи, параметры которых отличаются от параметров работы
                     if (bpc[3] != licensed_runs) or (bpc[4] != te) or (bpc[5] != me):
                         continue
-                    # debug: print("!!!!!!!! (", job_runs, ") : ", job_id, " -> ", blueprint_copy_id)
+                    # debug: print("!!!!!!!! (", job_runs, ") : ", job[1], " -> ", blueprint_copy_id)
                     found_ebc_ids.append(bpc[1])
                     # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
                     job_runs -= 1
@@ -1277,7 +1138,7 @@ class QSwaggerInterface:
                         " ebc_created_at,"
                         " ebc_updated_at)="
                         "(SELECT"
-                        "  %(jid)s,"
+                        "  ebc_job_id,"
                         "  ebc_job_corporation_id,"
                         "  ebc_job_activity,"
                         "  ebc_job_runs,"
@@ -1293,16 +1154,19 @@ class QSwaggerInterface:
                         " FROM"
                         "  esi_blueprint_costs"
                         " WHERE"
-                        "  ebc_job_id=%(jid)s AND ebc_blueprint_id IS NULL"
+                        "  ebc_id=%(jid)s"
                         ")"
                         "WHERE"
-                        " ebc_id IN (SELECT * FROM UNNEST(%(ids)s));\n"
-                        "DELETE FROM esi_blueprint_costs WHERE ebc_id=%(del)s;",
-                        {'jid': job_id,
+                        " ebc_id IN (SELECT * FROM UNNEST(%(ids)s));",
+                        {'jid': job[1],
                          'ids': found_ebc_ids,
-                         'del': job[1]
                          }
                     )
+                self.db.execute(
+                    "UPDATE esi_blueprint_costs SET ebc_transaction_type='p' WHERE ebc_id=%(jid)s;",
+                    {'jid': job[1],
+                     }
+                )
 
         del unlinked_blueprint_types
 
@@ -1321,16 +1185,106 @@ class QSwaggerInterface:
         unlinked_blueprint_types = self.db.select_all_rows(
             "SELECT"
             " DISTINCT ebc_job_product_type_id "
-            " ,(select sden_name from eve_sde_names"
-            "  where sden_category=1 and sden_id=ebc_job_product_type_id) as type_name "
+            # debug: " ,(select sden_name from eve_sde_names"
+            # debug: "  where sden_category=1 and sden_id=ebc_job_product_type_id) as type_name "
             "FROM esi_blueprint_costs "
             "WHERE"
-            " ebc_job_activity=8 AND"
+            " ebc_job_activity=8 AND"  # invent
             " ebc_blueprint_id IS NULL AND"
-            " ebc_job_product_type_id IS NOT NULL AND"
+            " ebc_transaction_type='f' AND"
             " {wh};".format(wh=where_hours)
         )
 
         for ubtype in unlinked_blueprint_types:
             type_id: int = int(ubtype[0])
-            print(type_id, ubtype[1])
+            # debug: print(type_id, ubtype[1] if len(ubtype) == 2 else '')
+
+            unlinked_bp2s_and_jobs = self.db.select_all_rows(
+                "SELECT"
+                " ebc_system_id,"                                                        # 0 *
+                # " (select sden_name from eve_sde_names"
+                # "  where sden_category=3 and sden_id=ebc_system_id) as solar_system,"  # 0 (debug only)
+                " ebc_id,"                                 # 1 *
+                " ebc_blueprint_id,"                       # 2 *
+                " ebc_job_successful_runs "                # 3 *
+                "FROM"
+                " esi_blueprint_costs "
+                "WHERE"
+                " {wh} AND"
+                " ((ebc_job_product_type_id=%(bty)s AND ebc_transaction_type='f' AND ebc_job_activity=8) OR"
+                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A')"
+                " )"
+                "ORDER BY 2 DESC;".format(wh=where_hours),
+                {'bty': type_id,
+                 }
+            )
+            # debug: for unlinked in unlinked_bp2s_and_jobs:
+            # debug:     print(unlinked)
+            unlinked_jobs = [j for j in unlinked_bp2s_and_jobs if j[2] is None]
+
+            # debug: print('unlinked_jobs', unlinked_jobs)
+            for job in unlinked_jobs:
+                solar_system = job[0]
+                successful_runs: int = job[3]
+                found_ebc_ids = []
+                if successful_runs > 0:
+                    for bpc in unlinked_bp2s_and_jobs:
+                        blueprint_t2_id: int = bpc[2]
+                        # в списке имеются и работы и чертежи, пропускаем работы (ищем только чертежи)
+                        if job is None:
+                            continue
+                        # пропускаем те чертежи, которые сделаны в других солнечных системах
+                        if bpc[0] != solar_system:
+                            continue
+                        # debug: print("!!!!!!!! (", successful_runs, ") : ", job[1], " -> ", job)
+                        found_ebc_ids.append(bpc[1])
+                        # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
+                        successful_runs -= 1
+                        if successful_runs == 0:
+                            break
+                    # изменение связей в БД
+                    # debug: print('job_ebc_id', job[1], 'found_ebc_ids', found_ebc_ids)
+                    if found_ebc_ids:
+                        self.db.execute(
+                            "UPDATE esi_blueprint_costs SET("
+                            " ebc_job_id,"
+                            " ebc_job_corporation_id,"
+                            " ebc_job_activity,"
+                            " ebc_job_runs,"
+                            " ebc_job_product_type_id,"
+                            " ebc_job_successful_runs,"
+                            " ebc_job_cost,"
+                            " ebc_industry_payment,"
+                            " ebc_tax,"
+                            " ebc_created_at,"
+                            " ebc_updated_at)="
+                            "(SELECT"
+                            "  ebc_job_id,"
+                            "  ebc_job_corporation_id,"
+                            "  ebc_job_activity,"
+                            "  ebc_job_runs,"
+                            "  ebc_job_product_type_id,"
+                            "  ebc_job_successful_runs,"
+                            "  ebc_job_cost,"
+                            "  ebc_industry_payment,"
+                            "  ebc_tax,"
+                            "  ebc_created_at,"
+                            "  CURRENT_TIMESTAMP AT TIME ZONE 'GMT'"
+                            " FROM"
+                            "  esi_blueprint_costs"
+                            " WHERE"
+                            "  ebc_id=%(jid)s"
+                            ")"
+                            "WHERE"
+                            " ebc_id IN (SELECT * FROM UNNEST(%(ids)s));",
+                            {'jid': job[1],
+                             'ids': found_ebc_ids,
+                             }
+                        )
+                self.db.execute(
+                    "UPDATE esi_blueprint_costs SET ebc_transaction_type='p' WHERE ebc_id=%(jid)s;",
+                    {'jid': job[1],
+                     }
+                )
+
+        del unlinked_blueprint_types

@@ -977,22 +977,13 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     def link_blueprints_and_jobs(self, _corporation_id):
-        corporation_id: int = int(_corporation_id)
-        return
-
-        # сохраняем в БД только что найденные чертежи и работы, оставляем их там "мариноваться"
-        # до тех пор, пока у ним не подгрузятся стоимость выполненных работ и все прочие данные
-        self.dbswagger.insert_into_blueprint_costs(
-            corporation_id,
-            actualized_jobs, self.eve_now,
-            actualized_bpcs, self.eve_now)
-        self.qidb.commit()
-
-        del actualized_jobs
-        del actualized_bpcs
+        # сохранённые в БД только что найденные чертежи и работы остаются там "мариноваться"
+        # до тех пор, пока у ним не подгрузятся стоимость выполненных работ и все прочие
+        # данные (солнечная система, me/te чертежей и т.п.)
 
         # вычитываем необъединённые чертежи и ищем им парные работы по копирке, объединяем их
         self.dbswagger.link_blueprint_copies_with_jobs()
         self.qidb.commit()
 
         self.dbswagger.link_blueprint_invents_with_jobs()
+        self.qidb.commit()

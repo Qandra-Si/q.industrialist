@@ -521,7 +521,7 @@ CREATE TABLE qi.esi_blueprint_costs
 (
     ebc_id BIGINT NOT NULL DEFAULT NEXTVAL('qi.seq_ebc'::regclass),
     ebc_system_id BIGINT,                   -- солнечная система, где была обнаружена либо работа, либо чертёж
-    ebc_transaction_type CHAR(1) NOT NULL,  -- тип операции: A - just added БП, C - changed БП, D - deleted БП; f - delivered job, j - active job, d - cancelled job
+    ebc_transaction_type CHAR(1) NOT NULL,  -- тип операции: A - just added БП, C - changed БП, D - deleted БП; f - delivered job, j - active job, d - cancelled job, p - processed job
     -- базовые сведения о чертеже, который был получен в результате копирки или инвента
     ebc_blueprint_id BIGINT,
     ebc_blueprint_type_id INTEGER NOT NULL,
