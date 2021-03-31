@@ -54,8 +54,8 @@ def __get_containers(
     tmp_sh: str = "stock_hangars"
     for station_name in stations:
         stock_containers = [r["container"] for r in db_regroup_stock if r["station"] == station_name]
-        stock_hangars = [c for c in stock_containers if c[:-1] == "CorpSAG"]
-        stock_containers = [c for c in stock_containers if c[:-1] != "CorpSAG"]
+        stock_hangars = list(dict.fromkeys([c for c in stock_containers if c[:-1] == "CorpSAG"]))
+        stock_containers = list(dict.fromkeys([c for c in stock_containers if c[:-1] != "CorpSAG"]))
         search_settings.append({
             "station_name": station_name,
             "user_data": {tmp_sc: stock_containers, tmp_sh: stock_hangars},

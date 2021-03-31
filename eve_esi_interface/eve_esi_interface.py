@@ -131,6 +131,9 @@ class EveOnlineInterface:
                 f.write(s)
             finally:
                 f.close()
+        del s
+        del cache
+        del f_name
         return
 
     def __take_cache_from_file(self, url):
@@ -145,6 +148,15 @@ class EveOnlineInterface:
                     return cache_data
                 finally:
                     f.close()
+        return None
+
+    @staticmethod
+    def __get_merged_pages(cached_data):
+        if "json" in cached_data:
+            merged = []
+            for p in cached_data["json"]:
+                merged += p
+            return merged
         return None
 
     @staticmethod
@@ -229,7 +241,7 @@ class EveOnlineInterface:
                 url_time = cached_data["headers"][0].get("last-modified", None)
                 if not (url_time is None):
                     self.__last_modified = parsedate(url_time)
-                return cached_data.get("json", None)
+                return self.__get_merged_pages(cached_data)
         if self.__offline_mode:
             if cached_data is None:
                 return None
@@ -240,19 +252,27 @@ class EveOnlineInterface:
                     code,
                     '{} Client Error: Offline-cache for url: {}'.format(code, url))
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
-            return cached_data.get("json", None)
+            return self.__get_merged_pages(cached_data)
         else:
             # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
             restart = True
             restart_cache = False
-            first_start = True
+            diff_pages = 0
+            match_pages = 0
+            data_headers = []
+            data_pages = []
             while True:
                 if restart:
                     page = 1
+                    diff_pages = 0
                     match_pages = 0
                     all_pages = None
+                    if data_headers:
+                        del data_headers
                     data_headers = []
-                    data_json = []
+                    if data_pages:
+                        del data_pages
+                    data_pages = []
                     if restart_cache:
                         cached_data = None
                     restart = False
@@ -268,9 +288,13 @@ class EveOnlineInterface:
                         page=page))  # noqa
                 # см. рекомендации по программированию тут
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
-                etag = cached_data["headers"][page-1]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
-                        len(cached_data["headers"]) >= page) and ("etag" in cached_data["headers"][page-1]) and (
-                        len(data_headers) == 0) else None
+                if not (cached_data is None) and \
+                   ("headers" in cached_data) and \
+                   (len(cached_data["headers"]) >= page) and \
+                   ("etag" in cached_data["headers"][page-1]):
+                    etag = cached_data["headers"][page-1]["etag"]
+                else:
+                    etag = None
                 # возможна ситуация, когда page=1 считался с кодом 200, причём в кеше имеется
                 # page=2, при этом X-Pages=2:
                 #   200 corporations/98615601/contracts/?page=1 14:10:23 "3f60dac1..."
@@ -289,36 +313,37 @@ class EveOnlineInterface:
                 except:
                     raise
                 if page_data.status_code == 304:
-                    # ускоренный вывод данных из этого метода - если находимся в цикле загрузке данных с сервера
-                    # и при первом же обращении к первой же странице совпал etag, следовательно весь набор актуален
-                    # и заниматься загрузкой остальных страниц (дожидаясь, а может быть на этот раз именно во время
-                    # загрузки данные обновятся) - нет никакого смысла! (О) - оптимизация! :)
-                    if first_start and 3 == page:
-                        url_time = cached_data["headers"][0].get("last-modified", None)
-                        if not (url_time is None):
-                            self.__last_modified = parsedate(url_time)
-                        return cached_data.get("json", None)
+                    url_time = cached_data["headers"][0].get("last-modified", None)
+                    if not (url_time is None):
+                        self.__last_modified = parsedate(url_time)
+
+                    # возможна ситуация, когда etag у первых 3х страниц не меняется несколько суток подряд, тогда
+                    # как страницы с 4й по ...20ю (например) меняются часто; такое поведение нередко наблюдается
+                    # у corporation/blueprints отчёта, где первые страницы хранят младшие идентификаторы и долгое
+                    # время не будут обновлятся потому, что чертежи не используются, лежат к хранилищах
+                    # нет никакого смысла проверять только первых 3и страницы, - их надо проверять все, т.к.
+                    # изменениям могут быть подвержены часть данных (в середине отчёта)
+                    match_pages += 1
                     # если известны etag-параметры, то все страницы должны совпасть, тогда набор данных
                     # считаем полностью валидным
-                    match_pages = match_pages + 1  # noqa
+                    if len(data_pages) < page:
+                        data_headers.append(cached_data["headers"][page-1])
+                        data_pages.append(cached_data["json"][page-1])
+                    else:
+                        data_headers[page-1] = cached_data["headers"][page-1]
+                        data_pages[page-1] = cached_data["json"][page-1]
                     if 1 == page:
                         all_pages = len(cached_data["headers"])
                 else:
-                    if match_pages > 0:  # noqa
-                        # если какая-либо страница посреди набора данных не совпала с ранее известным etag, то весь набор
-                        # данных будем считать невалидным, а ранее загруженные данные устаревшими полностью
-                        page = 1
-                        match_pages = 0
-                        all_pages = None
-                        data_headers = []
-                        data_json = []
-                        cached_data = None
-                        restart = True
-                        restart_cache = True
-                        first_start = False
-                        continue
-                    data_headers.append(self.__get_cached_headers(page_data))  # noqa
-                    data_json.extend(page_data.json())  # noqa
+                    diff_pages += 1
+                    # если какая-либо страница посреди набора данных не совпала с ранее известным etag,
+                    # то обновляем только её, причём данные по другим страницам продолжаем считать валидными
+                    if len(data_pages) < page:
+                        data_headers.append(self.__get_cached_headers(page_data))
+                        data_pages.append(page_data.json())
+                    else:
+                        data_headers[page-1] = self.__get_cached_headers(page_data)
+                        data_pages[page-1] = page_data.json()
                     if 1 == page:
                         all_pages = int(page_data.headers["X-Pages"]) if "X-Pages" in page_data.headers else 1
                     elif (int(all_pages) != int(page_data.headers["X-Pages"])):  # noqa
@@ -326,23 +351,25 @@ class EveOnlineInterface:
                         # элемента этого набора, то весь набор признаётся невалидным
                         restart = True
                         restart_cache = True
-                        first_start = False
                         continue
                 if page == all_pages:
                     break
                 page = page + 1
-            if 0 == match_pages:
-                self.__dump_cache_into_file(url, data_headers, data_json)
+            if (diff_pages > 0) or (match_pages == 0):
+                self.__dump_cache_into_file(url, data_headers, data_pages)
                 self.__is_last_data_updated = True
                 self.__last_modified = self.__client.last_modified
-                return data_json
+                merged = []
+                for p in data_pages:
+                    merged += p
+                return merged
             elif len(cached_data["headers"]) == match_pages:
                 url_time = cached_data["headers"][0].get("last-modified", None)
                 if not (url_time is None):
                     self.__last_modified = parsedate(url_time)
-                return cached_data.get("json", None)
+                return self.__get_merged_pages(cached_data)
             else:
-                print("ERROR! : ", match_pages)
+                print("ERROR! : ", match_pages, diff_pages)
                 print("ERROR! : ", cached_data["headers"])
                 raise
 

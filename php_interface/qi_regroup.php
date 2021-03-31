@@ -233,7 +233,7 @@ $(document).ready(function(){
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     //---
-    $query = 'SELECT rs_id,rs_active,rs_quantity,rs_eft,rs_station,rs_container,rs_remarks FROM regroup_stock ORDER BY 4;';
+    $query = 'SELECT rs_id,rs_active,rs_quantity,rs_eft,rs_station,rs_container,rs_remarks FROM regroup_stock ORDER BY 5,6,4;';
     $regroup_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $regroup = pg_fetch_all($regroup_cursor);
