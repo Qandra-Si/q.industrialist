@@ -199,13 +199,27 @@ class EveESIClient:
 
         res = None
         http_connection_times = 0
+        requests_get_times = 0
+        timeout_connect = 3
+        timeout_read = 7
         while True:
             try:
                 proxy_error_times = 0
                 throttle_error_times = 0
                 while True:
                     if body is None:
-                        res = requests.get(uri, headers=headers)
+                        requests_get_finished = False
+                        while not requests_get_finished:
+                            try:
+                                # при попытке загружать рыночные данные (их и только их) начинает зависать
+                                # метод get, и висит бесконечно - добавил таймауты на переподключения, которые
+                                # подобрал экспериментально, см. также https://ru.stackoverflow.com/a/1189363
+                                requests_get_times += 1
+                                res = requests.get(uri, headers=headers, timeout=(timeout_connect, timeout_read))
+                            except (requests.ConnectionError, requests.Timeout):
+                                continue
+                            else:
+                                requests_get_finished = True
                         if self.__debug:
                             print("\nMade GET request to {} with headers: "
                                   "{}\nAnd the answer {} was received with "
@@ -232,9 +246,13 @@ class EveESIClient:
                     if self.__logger:
                         log_line = str(res.status_code) + " " + uri[31:]
                         if 'Last-Modified' in res.headers:
-                            log_line = log_line + " " + str(res.headers['Last-Modified'])[17:-4]
+                            url_time = str(res.headers['Last-Modified'])
+                            log_line += " " + url_time[17:-4]
                         if 'Etag' in res.headers:
-                            log_line = log_line + " " + str(res.headers['Etag'])
+                            etag = str(res.headers['Etag'])
+                            log_line += " " + etag[:17] + '"'
+                        if requests_get_times > 1:
+                            log_line += " (" + str(requests_get_times) + ")"
                         print(log_line)
                     if res.status_code == 401:
                         print(res.json())
