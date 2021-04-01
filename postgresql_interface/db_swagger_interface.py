@@ -1072,7 +1072,7 @@ class QSwaggerInterface:
                 # " ebc_job_id as job_id,"
                 " ecj_blueprint_id as job_bp,"             # 6 *
                 # " ebc_job_product_type_id as bpc_type,"
-                " ecj_runs as job_runs,"                   # 7 *
+                " ebc_job_runs as rest_runs,"              # 7 * (меняется в процессе поиска чертежей)
                 " ebc_job_time_efficiency as job_te,"      # 8 *
                 " ebc_job_material_efficiency as job_me "  # 9 *
                 "FROM"
@@ -1081,7 +1081,7 @@ class QSwaggerInterface:
                 "WHERE"
                 " {wh} AND"
                 " ((ebc_job_product_type_id=%(bty)s AND ebc_transaction_type='f' AND ebc_job_activity=5) OR"
-                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A')"
+                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A' AND ebc_job_id IS NULL)"
                 " )"
                 "ORDER BY 2 DESC;".format(wh=where_hours),
                 {'bty': type_id,
@@ -1127,11 +1127,7 @@ class QSwaggerInterface:
                         " ebc_job_id,"
                         " ebc_job_corporation_id,"
                         " ebc_job_activity,"
-                        " ebc_job_runs,"
                         " ebc_job_product_type_id,"
-                        " ebc_job_successful_runs,"
-                        " ebc_job_time_efficiency,"
-                        " ebc_job_material_efficiency,"
                         " ebc_job_cost,"
                         " ebc_industry_payment,"
                         " ebc_tax,"
@@ -1141,11 +1137,7 @@ class QSwaggerInterface:
                         "  ebc_job_id,"
                         "  ebc_job_corporation_id,"
                         "  ebc_job_activity,"
-                        "  ebc_job_runs,"
                         "  ebc_job_product_type_id,"
-                        "  ebc_job_successful_runs,"
-                        "  ebc_job_time_efficiency,"
-                        "  ebc_job_material_efficiency,"
                         "  ebc_job_cost,"
                         "  ebc_industry_payment,"
                         "  ebc_tax,"
@@ -1162,11 +1154,20 @@ class QSwaggerInterface:
                          'ids': found_ebc_ids,
                          }
                     )
-                self.db.execute(
-                    "UPDATE esi_blueprint_costs SET ebc_transaction_type='p' WHERE ebc_id=%(jid)s;",
-                    {'jid': job[1],
-                     }
-                )
+                    if job_runs == 0:
+                        self.db.execute(
+                            "UPDATE esi_blueprint_costs SET ebc_job_runs=0, ebc_transaction_type='p' "
+                            "WHERE ebc_id=%(jid)s;",
+                            {'jid': job[1],
+                             }
+                        )
+                    else:
+                        self.db.execute(
+                            "UPDATE esi_blueprint_costs SET ebc_job_runs=%(r)s WHERE ebc_id=%(jid)s;",
+                            {'jid': job[1],
+                             'r': job_runs,
+                             }
+                        )
 
         del unlinked_blueprint_types
 
@@ -1192,6 +1193,7 @@ class QSwaggerInterface:
             " ebc_job_activity=8 AND"  # invent
             " ebc_blueprint_id IS NULL AND"
             " ebc_transaction_type='f' AND"
+            " ebc_job_successful_runs>0 AND"
             " {wh};".format(wh=where_hours)
         )
 
@@ -1206,13 +1208,13 @@ class QSwaggerInterface:
                 # "  where sden_category=3 and sden_id=ebc_system_id) as solar_system,"  # 0 (debug only)
                 " ebc_id,"                                 # 1 *
                 " ebc_blueprint_id,"                       # 2 *
-                " ebc_job_successful_runs "                # 3 *
+                " ebc_job_successful_runs "                # 3 * (меняется в процессе поиска чертежей)
                 "FROM"
                 " esi_blueprint_costs "
                 "WHERE"
                 " {wh} AND"
                 " ((ebc_job_product_type_id=%(bty)s AND ebc_transaction_type='f' AND ebc_job_activity=8) OR"
-                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A')"
+                "  (ebc_blueprint_type_id=%(bty)s AND ebc_transaction_type='A' AND ebc_job_id IS NULL)"
                 " )"
                 "ORDER BY 2 DESC;".format(wh=where_hours),
                 {'bty': type_id,
@@ -1250,9 +1252,7 @@ class QSwaggerInterface:
                             " ebc_job_id,"
                             " ebc_job_corporation_id,"
                             " ebc_job_activity,"
-                            " ebc_job_runs,"
                             " ebc_job_product_type_id,"
-                            " ebc_job_successful_runs,"
                             " ebc_job_cost,"
                             " ebc_industry_payment,"
                             " ebc_tax,"
@@ -1262,9 +1262,7 @@ class QSwaggerInterface:
                             "  ebc_job_id,"
                             "  ebc_job_corporation_id,"
                             "  ebc_job_activity,"
-                            "  ebc_job_runs,"
                             "  ebc_job_product_type_id,"
-                            "  ebc_job_successful_runs,"
                             "  ebc_job_cost,"
                             "  ebc_industry_payment,"
                             "  ebc_tax,"
@@ -1281,10 +1279,19 @@ class QSwaggerInterface:
                              'ids': found_ebc_ids,
                              }
                         )
-                self.db.execute(
-                    "UPDATE esi_blueprint_costs SET ebc_transaction_type='p' WHERE ebc_id=%(jid)s;",
-                    {'jid': job[1],
-                     }
-                )
+                if successful_runs == 0:
+                    self.db.execute(
+                        "UPDATE esi_blueprint_costs SET ebc_job_successful_runs=0, ebc_transaction_type='p' "
+                        "WHERE ebc_id=%(jid)s;",
+                        {'jid': job[1],
+                         }
+                    )
+                else:
+                    self.db.execute(
+                        "UPDATE esi_blueprint_costs SET ebc_job_successful_runs=%(sr)s WHERE ebc_id=%(jid)s;",
+                        {'jid': job[1],
+                         'sr': successful_runs,
+                         }
+                    )
 
         del unlinked_blueprint_types

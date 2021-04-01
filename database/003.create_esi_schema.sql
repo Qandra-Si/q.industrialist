@@ -532,9 +532,9 @@ CREATE TABLE qi.esi_blueprint_costs
     ebc_job_id BIGINT,
     ebc_job_corporation_id BIGINT,          -- идентификатор нужен для получения уникального номера работы в рамках каждой из корпораций
     ebc_job_activity INTEGER,               -- 5: copy, 8: invent
-    ebc_job_runs INTEGER,                   -- кол-во job-ов (сколько штук новых чертежей будет сгенерировано)
+    ebc_job_runs INTEGER,                   -- кол-во job-ов (сколько штук новых чертежей будет сгенерировано) - меняется в процессе поиска чертежей
     ebc_job_product_type_id INTEGER,        -- что именно будет получено в результате job-а
-    ebc_job_successful_runs INTEGER,        -- кол-во job-ов, которые завершились успешно (от 0 до job_runs)
+    ebc_job_successful_runs INTEGER,        -- кол-во job-ов, которые завершились успешно (от 0 до job_runs) - меняется в процессе поиска чертежей
     ebc_job_time_efficiency SMALLINT,       -- me параметр чертежа, использованного в работе job_id (невполне точный параметр, т.к. меняется несинхронно получению данных)
     ebc_job_material_efficiency SMALLINT,   -- te параметр чертежа, использованного в работе job_id (невполне точный параметр, т.к. меняется несинхронно получению данных)
     -- стоимость выполненной работы (из сведений о работе)

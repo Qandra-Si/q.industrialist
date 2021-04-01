@@ -12,13 +12,14 @@ select
  ecj_runs as job_runs,
  ebc_job_time_efficiency as job_te,
  ebc_job_material_efficiency as job_me,
- ebc_created_at as dt
+ ebc_created_at as dt,
+ ebc_transaction_type as t
 from
  qi.esi_blueprint_costs
    left outer join qi.esi_corporation_industry_jobs on (ebc_job_id = ecj_job_id)
 where
- -- ebc_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '40 hours') and
- ( ebc_blueprint_id is not null and ebc_job_id is null and ebc_blueprint_type_id = 35772 or
-   ebc_job_id is not null and ebc_blueprint_id is null and ebc_job_activity = 5 and ebc_job_product_type_id = 35772
+ -- ((current_timestamp at time zone 'GMT' - interval '2 hours') >= ebc_created_at and ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '24 hours')) and
+ ( ebc_transaction_type in ('f','p') AND ebc_job_activity=5 and ebc_job_product_type_id = 35772 or
+   ebc_transaction_type='A' and ebc_job_id is null and ebc_blueprint_type_id=1072
  )
 order by 2 desc
