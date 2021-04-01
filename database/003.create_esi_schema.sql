@@ -7,6 +7,13 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+---
+
+DROP INDEX IF EXISTS qi.idx_ebc_created_at;
+DROP INDEX IF EXISTS qi.idx_ebc_transaction_type;
+DROP INDEX IF EXISTS qi.idx_ebc_job_activity;
+DROP INDEX IF EXISTS qi.idx_ebc_job_product_type_id;
+DROP INDEX IF EXISTS qi.idx_ebc_blueprint_type_id;
 DROP INDEX IF EXISTS qi.idx_ebc_blueprint_job_ids;
 DROP INDEX IF EXISTS qi.idx_ebc_job_id;
 DROP INDEX IF EXISTS qi.idx_ebc_blueprint_id;
@@ -567,6 +574,31 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ebc_blueprint_job_ids
     ON qi.esi_blueprint_costs USING btree
     (ebc_blueprint_id ASC NULLS LAST, ebc_job_id ASC NULLS LAST, ebc_job_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_blueprint_type_id
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_blueprint_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_job_product_type_id
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_job_product_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_job_activity
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_job_activity ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_transaction_type
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_transaction_type ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ebc_created_at
+    ON qi.esi_blueprint_costs USING btree
+    (ebc_created_at ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
