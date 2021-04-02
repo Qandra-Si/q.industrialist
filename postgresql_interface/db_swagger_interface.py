@@ -1094,6 +1094,7 @@ class QSwaggerInterface:
             unlinked_jobs = [j for j in unlinked_bpcs_and_jobs if j[2] is None]
 
             # debug: print('unlinked_jobs', unlinked_jobs)
+            used_ebc_ids = []
             for job in unlinked_jobs:
                 solar_system = job[0]
                 licensed_runs: int = job[3]
@@ -1103,6 +1104,8 @@ class QSwaggerInterface:
                 me: int = job[9]
                 found_ebc_ids = []
                 for bpc in unlinked_bpcs_and_jobs:
+                    if bpc[1] in used_ebc_ids:
+                        continue
                     blueprint_copy_id: int = bpc[2]
                     # в списке имеются и работы и чертежи, пропускаем работы (ищем только чертежи)
                     if blueprint_copy_id is None:
@@ -1174,7 +1177,9 @@ class QSwaggerInterface:
                              'r': job_runs,
                              }
                         )
+                    used_ebc_ids += found_ebc_ids
 
+        del used_ebc_ids
         del unlinked_blueprint_types
 
     def link_blueprint_invents_with_jobs(self):
@@ -1231,13 +1236,16 @@ class QSwaggerInterface:
             unlinked_jobs = [j for j in unlinked_bp2s_and_jobs if j[2] is None]
 
             # debug: print('unlinked_jobs', unlinked_jobs)
+            used_ebc_ids = []
             for job in unlinked_jobs:
                 solar_system = job[0]
                 successful_runs: int = job[3]
                 found_ebc_ids = []
                 if successful_runs > 0:
                     for bpc in unlinked_bp2s_and_jobs:
-                        blueprint_t2_id: int = bpc[2]
+                        if bpc[1] in used_ebc_ids:
+                            continue
+                        # blueprint_t2_id: int = bpc[2]
                         # в списке имеются и работы и чертежи, пропускаем работы (ищем только чертежи)
                         if job is None:
                             continue
@@ -1283,6 +1291,7 @@ class QSwaggerInterface:
                              'ids': found_ebc_ids,
                              }
                         )
+                        used_ebc_ids += found_ebc_ids
                 if successful_runs == 0:
                     self.db.execute(
                         "UPDATE esi_blueprint_costs SET"
@@ -1304,4 +1313,5 @@ class QSwaggerInterface:
                          }
                     )
 
+        del used_ebc_ids
         del unlinked_blueprint_types
