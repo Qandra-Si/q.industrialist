@@ -949,7 +949,9 @@ class QSwaggerInterface:
     def get_exist_corporation_industry_jobs(self, corporation_id: int, oldest_delivered_job=None):
         if oldest_delivered_job:
             where = "ecj_corporation_id={co} AND " \
-                    "(ecj_completed_date IS NULL OR (ecj_status='delivered' AND ecj_job_id>={job}))".\
+                    "(ecj_completed_date IS NULL OR (" \
+                    " ecj_status in ('delivered','cancelled') AND ecj_job_id>={job})" \
+                    ")".\
                     format(co=corporation_id, job=oldest_delivered_job)
         else:
             where = "ecj_corporation_id={co} AND ecj_completed_date IS NULL".\
@@ -1131,7 +1133,6 @@ class QSwaggerInterface:
                         " ebc_job_cost,"
                         " ebc_industry_payment,"
                         " ebc_tax,"
-                        " ebc_created_at,"
                         " ebc_updated_at)="
                         "(SELECT"
                         "  ebc_job_id,"
@@ -1141,7 +1142,6 @@ class QSwaggerInterface:
                         "  ebc_job_cost,"
                         "  ebc_industry_payment,"
                         "  ebc_tax,"
-                        "  ebc_created_at,"
                         "  CURRENT_TIMESTAMP AT TIME ZONE 'GMT'"
                         " FROM"
                         "  esi_blueprint_costs"
@@ -1156,14 +1156,20 @@ class QSwaggerInterface:
                     )
                     if job_runs == 0:
                         self.db.execute(
-                            "UPDATE esi_blueprint_costs SET ebc_job_runs=0, ebc_transaction_type='p' "
+                            "UPDATE esi_blueprint_costs SET"
+                            " ebc_job_runs=0,"
+                            " ebc_transaction_type='p',"
+                            " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
                             "WHERE ebc_id=%(jid)s;",
                             {'jid': job[1],
                              }
                         )
                     else:
                         self.db.execute(
-                            "UPDATE esi_blueprint_costs SET ebc_job_runs=%(r)s WHERE ebc_id=%(jid)s;",
+                            "UPDATE esi_blueprint_costs SET"
+                            " ebc_job_runs=%(r)s,"
+                            " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+                            "WHERE ebc_id=%(jid)s;",
                             {'jid': job[1],
                              'r': job_runs,
                              }
@@ -1256,7 +1262,6 @@ class QSwaggerInterface:
                             " ebc_job_cost,"
                             " ebc_industry_payment,"
                             " ebc_tax,"
-                            " ebc_created_at,"
                             " ebc_updated_at)="
                             "(SELECT"
                             "  ebc_job_id,"
@@ -1266,7 +1271,6 @@ class QSwaggerInterface:
                             "  ebc_job_cost,"
                             "  ebc_industry_payment,"
                             "  ebc_tax,"
-                            "  ebc_created_at,"
                             "  CURRENT_TIMESTAMP AT TIME ZONE 'GMT'"
                             " FROM"
                             "  esi_blueprint_costs"
@@ -1281,14 +1285,20 @@ class QSwaggerInterface:
                         )
                 if successful_runs == 0:
                     self.db.execute(
-                        "UPDATE esi_blueprint_costs SET ebc_job_successful_runs=0, ebc_transaction_type='p' "
+                        "UPDATE esi_blueprint_costs SET"
+                        " ebc_job_successful_runs=0,"
+                        " ebc_transaction_type='p',"
+                        " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
                         "WHERE ebc_id=%(jid)s;",
                         {'jid': job[1],
                          }
                     )
                 else:
                     self.db.execute(
-                        "UPDATE esi_blueprint_costs SET ebc_job_successful_runs=%(sr)s WHERE ebc_id=%(jid)s;",
+                        "UPDATE esi_blueprint_costs SET"
+                        " ebc_job_successful_runs=%(sr)s,"
+                        " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+                        "WHERE ebc_id=%(jid)s;",
                         {'jid': job[1],
                          'sr': successful_runs,
                          }
