@@ -30,7 +30,7 @@ begin
       when 'station' then (select ets_system_id from qi.esi_tranquility_stations where ets_station_id = root.loc)
       else
         case root.flag
-          when 'OfficeFolder' then (select solar_system_id from qi.esi_corporation_offices where location_id = root.loc)
+          when 'OfficeFolder' then (select distinct solar_system_id from qi.esi_corporation_offices where location_id = root.loc)
           else null
         end
     end -- as solar_system_id
@@ -96,7 +96,7 @@ begin
   	  ebc_updated_at
     )
     select
-      o.solar_system_id,
+      (select distinct o.solar_system_id from qi.esi_corporation_offices o where new.ecj_facility_id = o.location_id),
       case new.ecj_status when 'delivered' then 'f'
                           when 'cancelled' then 'd'
                           else 'j'
@@ -116,9 +116,7 @@ begin
       current_timestamp at time zone 'GMT'
     from
       (select new.ecj_blueprint_id) as bp
-        left outer join qi.esi_corporation_blueprints b on (bp.ecj_blueprint_id = b.ecb_item_id),
-      (select new.ecj_facility_id) as loc
-        left outer join qi.esi_corporation_offices o on (loc.ecj_facility_id = o.location_id);
+        left outer join qi.esi_corporation_blueprints b on (bp.ecj_blueprint_id = b.ecb_item_id);
   end if;
   return new;
 end;
@@ -171,7 +169,7 @@ begin
     -- ebc_system_id
     if system_id is null then
       update qi.esi_blueprint_costs set(ebc_system_id)=(
-        select o.solar_system_id
+        select distinct o.solar_system_id
         from qi.esi_corporation_offices o
         where new.ecj_facility_id = o.location_id
       )
