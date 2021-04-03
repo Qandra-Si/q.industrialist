@@ -822,7 +822,7 @@ def __dump_corp_conveyors(
 
         if corp_conveyors["corp_conveyour_entities"]:
             glf.write("""
-<div id="summary-block">
+<div class="qind-summary-block">
  <h3>Summary</h3>
 """)
 
@@ -1079,10 +1079,12 @@ def __dump_corp_conveyors(
     else
       $('#legend-block').addClass('hidden');
     show = ls.getItem('Show Summary');
-    if (show == 1)
-      $('#summary-block').removeClass('hidden');
-    else
-      $('#summary-block').addClass('hidden');
+    $('div.qind-summary-block').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
