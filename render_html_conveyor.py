@@ -787,8 +787,6 @@ def __dump_corp_conveyors(
  </div>
 </nav>
 <div class="container-fluid">
- <!-- BEGIN: collapsable group (locations) -->
- <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
 """)
 
     stock_not_enough_materials = None
@@ -798,6 +796,11 @@ def __dump_corp_conveyors(
     global_materials_used = []
 
     for corp_conveyors in conveyor_data:
+        glf.write("""
+<!-- BEGIN: collapsable group (locations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+""")
+
         for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
             __stock_not_enough_materials = __dump_blueprints_list_with_materials(
                 glf,
