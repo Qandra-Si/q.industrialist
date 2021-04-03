@@ -911,7 +911,7 @@ class QDatabaseTools:
         if not in_cache:
             pass
         elif in_cache.obj:
-            if in_cache.obj['status'] == 'delivered':
+            if in_cache.obj['status'] in ('delivered', 'cancelled'):
                 data_equal = True  # в БД уже хранятся актуальные данные!
             else:
                 data_equal = in_cache.is_obj_equal_by_keys(job_data, self.corporation_industry_job_diff)
@@ -947,13 +947,12 @@ class QDatabaseTools:
         # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         oldest_delivered_job = None
         for job_data in data:
-            if job_data['status'] != 'delivered':
-                continue
-            job_id: int = int(job_data['job_id'])
-            if not oldest_delivered_job:
-                oldest_delivered_job = job_id
-            elif oldest_delivered_job > job_id:
-                oldest_delivered_job = job_id
+            if job_data['status'] in ('delivered', 'cancelled'):
+                job_id: int = int(job_data['job_id'])
+                if not oldest_delivered_job:
+                    oldest_delivered_job = job_id
+                elif oldest_delivered_job > job_id:
+                    oldest_delivered_job = job_id
 
         self.prepare_corp_cache(
             self.dbswagger.get_exist_corporation_industry_jobs(corporation_id, oldest_delivered_job),

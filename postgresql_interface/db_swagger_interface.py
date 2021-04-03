@@ -1114,17 +1114,16 @@ class QSwaggerInterface:
                     if blueprint_id == blueprint_copy_id:
                         continue
                     # пропускаем те чертежи, которые сделаны в других солнечных системах
-                    if bpc[0] != solar_system:
-                        continue
-                    # пропускаем те чертежи, параметры которых отличаются от параметров работы
-                    if (bpc[3] != licensed_runs) or (bpc[4] != te) or (bpc[5] != me):
-                        continue
-                    # debug: print("!!!!!!!! (", job_runs, ") : ", job[1], " -> ", blueprint_copy_id)
-                    found_ebc_ids.append(bpc[1])
-                    # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
-                    job_runs -= 1
-                    if job_runs == 0:
-                        break
+                    if bpc[0] == solar_system:
+                        # пропускаем те чертежи, параметры которых отличаются от параметров работы
+                        if (bpc[3] != licensed_runs) or (bpc[4] != te) or (bpc[5] != me):
+                            continue
+                        # debug: print("!!!!!!!! (", job_runs, ") : ", job[1], " -> ", blueprint_copy_id)
+                        found_ebc_ids.append(bpc[1])
+                        # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
+                        job_runs -= 1
+                        if job_runs == 0:
+                            break
                 # изменение связей в БД
                 if found_ebc_ids:
                     self.db.execute(
@@ -1178,8 +1177,8 @@ class QSwaggerInterface:
                              }
                         )
                     used_ebc_ids += found_ebc_ids
+            del used_ebc_ids
 
-        del used_ebc_ids
         del unlinked_blueprint_types
 
     def link_blueprint_invents_with_jobs(self):
@@ -1245,19 +1244,18 @@ class QSwaggerInterface:
                     for bpc in unlinked_bp2s_and_jobs:
                         if bpc[1] in used_ebc_ids:
                             continue
-                        # blueprint_t2_id: int = bpc[2]
+                        blueprint_t2_id: int = bpc[2]
                         # в списке имеются и работы и чертежи, пропускаем работы (ищем только чертежи)
-                        if job is None:
+                        if blueprint_t2_id is None:
                             continue
                         # пропускаем те чертежи, которые сделаны в других солнечных системах
-                        if bpc[0] != solar_system:
-                            continue
-                        # debug: print("!!!!!!!! (", successful_runs, ") : ", job[1], " -> ", job)
-                        found_ebc_ids.append(bpc[1])
-                        # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
-                        successful_runs -= 1
-                        if successful_runs == 0:
-                            break
+                        if bpc[0] == solar_system:
+                            # debug: print("!!!!!!!! (", successful_runs, ") : ", job[1], " -> ", job)
+                            found_ebc_ids.append(bpc[1])
+                            # как только найдено достаточное кол-во чертежей по этой работе, то прекращаем их поиск
+                            successful_runs -= 1
+                            if successful_runs == 0:
+                                break
                     # изменение связей в БД
                     # debug: print('job_ebc_id', job[1], 'found_ebc_ids', found_ebc_ids)
                     if found_ebc_ids:
@@ -1312,6 +1310,6 @@ class QSwaggerInterface:
                          'sr': successful_runs,
                          }
                     )
+            del used_ebc_ids
 
-        del used_ebc_ids
         del unlinked_blueprint_types
