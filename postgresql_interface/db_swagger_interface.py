@@ -1289,27 +1289,27 @@ class QSwaggerInterface:
                              'ids': found_ebc_ids,
                              }
                         )
+                        if successful_runs == 0:
+                            self.db.execute(
+                                "UPDATE esi_blueprint_costs SET"
+                                " ebc_job_successful_runs=0,"
+                                " ebc_transaction_type='p',"
+                                " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+                                "WHERE ebc_id=%(jid)s;",
+                                {'jid': job[1],
+                                 }
+                            )
+                        else:
+                            self.db.execute(
+                                "UPDATE esi_blueprint_costs SET"
+                                " ebc_job_successful_runs=%(sr)s,"
+                                " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
+                                "WHERE ebc_id=%(jid)s;",
+                                {'jid': job[1],
+                                 'sr': successful_runs,
+                                 }
+                            )
                         used_ebc_ids += found_ebc_ids
-                if successful_runs == 0:
-                    self.db.execute(
-                        "UPDATE esi_blueprint_costs SET"
-                        " ebc_job_successful_runs=0,"
-                        " ebc_transaction_type='p',"
-                        " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
-                        "WHERE ebc_id=%(jid)s;",
-                        {'jid': job[1],
-                         }
-                    )
-                else:
-                    self.db.execute(
-                        "UPDATE esi_blueprint_costs SET"
-                        " ebc_job_successful_runs=%(sr)s,"
-                        " ebc_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT' "
-                        "WHERE ebc_id=%(jid)s;",
-                        {'jid': job[1],
-                         'sr': successful_runs,
-                         }
-                    )
             del used_ebc_ids
 
         del unlinked_blueprint_types
