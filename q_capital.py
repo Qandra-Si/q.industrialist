@@ -132,6 +132,7 @@ def main():
             corp_ass_named_ids)
         print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
         sys.stdout.flush()
+        del corp_ass_named_ids
 
         total_assets_data.extend(corp_assets_data)
         total_blueprints_data.extend(corp_blueprints_data)

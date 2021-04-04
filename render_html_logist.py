@@ -256,6 +256,14 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         row_num = 1
         for location_id in cn_route:
             route_place = corp_cynonetwork[str(location_id)]
+            # ---
+            tickers_html = ""
+            if "found_tickers" in route_place:
+                for ft in route_place["found_tickers"]:
+                    tickers_html += '<small>&nbsp;<span class="label label-default">{t}</span></small>'.format(
+                        t=render_html.__camel_to_snake(ft, False),
+                    )
+            # ---
             system_name = route_place["solar_system"]
             lightyears = lightyear_distances[row_num-1] if row_num < len(cn_route) else None
             if not ("error" in route_place) or (route_place["error"] != "no data"):
@@ -273,7 +281,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
                 glf.write(
                     '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
-                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <th scope="row">{num}</th><td>{nm}{ct}</td>\n'
                     ' <td><abbr title="{bjumps} Badger cynos">{b:,d}</abbr></td>\n'
                     ' <td><abbr title="{vjumps} Venture cynos">{v:,d}</abbr> / {ch:,d} / {chr:,d}</td>\n'
                     ' <td>{icg:,d}</td><td>{lo:,d}</td>\n'
@@ -285,6 +293,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     format(num=row_num,
                            cnn=cynonetwork_num,
                            nm=system_name,
+                           ct=tickers_html,
                            bjumps=badger_jumps_num,
                            vjumps=venture_jumps_num,
                            b=badger_num,

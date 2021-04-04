@@ -156,6 +156,7 @@ def main():
         corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
+    del corp_ass_named_ids
 
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
     foreign_structures_data = {}
