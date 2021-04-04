@@ -118,6 +118,7 @@ def main():
             corp_ass_named_ids)
         print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
         sys.stdout.flush()
+        del corp_ass_named_ids
 
         # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
         corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
