@@ -276,7 +276,6 @@ def __dump_blueprints_list_with_materials(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids,
         global_materials_summary,
         global_materials_used,
         enable_copy_to_clipboard=False):
@@ -730,20 +729,18 @@ def __dump_conveyor_stock_all(
 """)
 
 
-def __dump_corp_conveyor(
+def __dump_corp_conveyors(
         glf,
-        conveyour_entities,
-        corp_bp_loc_data,
-        corp_industry_jobs_data,
-        corp_ass_names_data,
-        corp_ass_loc_data,
-        corp_assets_tree,
+        # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids,
         materials_for_bps,
-        research_materials_for_bps):
+        research_materials_for_bps,
+        # настройки генерации отчёта
+        # esi данные, загруженные с серверов CCP
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        conveyor_data):
     glf.write("""
 <style>
 .qind-blueprints-tbl>tbody>tr>td {
@@ -791,8 +788,6 @@ def __dump_corp_conveyor(
  </div>
 </nav>
 <div class="container-fluid">
- <!-- BEGIN: collapsable group (locations) -->
- <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
 """)
 
     stock_not_enough_materials = None
@@ -801,116 +796,121 @@ def __dump_corp_conveyor(
     global_materials_summary = []
     global_materials_used = []
 
-    for __conveyor_entity in conveyour_entities:
-        __stock_not_enough_materials = __dump_blueprints_list_with_materials(
-            glf,
-            __conveyor_entity,
-            corp_bp_loc_data,
-            corp_industry_jobs_data,
-            corp_ass_loc_data,
-            corp_assets_tree,
-            sde_type_ids,
-            sde_bp_materials,
-            sde_market_groups,
-            sde_icon_ids,
-            global_materials_summary,
-            global_materials_used,
-            enable_copy_to_clipboard=True)
-        if stock_not_enough_materials is None:
-            stock_not_enough_materials = __stock_not_enough_materials
+    for corp_conveyors in conveyor_data:
+        glf.write("""
+<!-- BEGIN: collapsable group (locations) -->
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+""")
 
-    glf.write("""
+        for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+            __stock_not_enough_materials = __dump_blueprints_list_with_materials(
+                glf,
+                conveyor_entity,
+                corp_conveyors["corp_bp_loc_data"],
+                corp_conveyors["corp_industry_jobs_data"],
+                corp_conveyors["corp_ass_loc_data"],
+                corp_conveyors["corp_assets_tree"],
+                sde_type_ids,
+                sde_bp_materials,
+                sde_market_groups,
+                global_materials_summary,
+                global_materials_used,
+                enable_copy_to_clipboard=True)
+            if stock_not_enough_materials is None:
+                stock_not_enough_materials = __stock_not_enough_materials
+
+        glf.write("""
  </div>
  <!-- END: collapsable group (locations) -->
 """)
 
-    if conveyour_entities:
-        glf.write("""
-<div id="summary-block">
+        if corp_conveyors["corp_conveyour_entities"]:
+            glf.write("""
+<div class="qind-summary-block">
  <h3>Summary</h3>
 """)
 
-        # Внимание! нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
-        __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', global_materials_used, True, True)
-        __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', global_materials_summary, False, True)
+            # Внимание! нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
+            __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', global_materials_used, True, True)
+            __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', global_materials_summary, False, True)
 
-        # получение списков контейнеров и станок из экземпляра контейнера
-        global_stock_all_loc_ids = []
-        global_exclude_loc_ids = []
-        # global_blueprint_loc_ids = []
-        global_blueprint_station_ids = []
-        for conveyor_entity in conveyour_entities:
-            for id in [int(ces["id"]) for ces in conveyor_entity["stock"]]:
-                if not (id in global_stock_all_loc_ids):
-                    global_stock_all_loc_ids.append(id)
-            for id in [int(cee["id"]) for cee in conveyor_entity["exclude"]]:
-                if not (id in global_exclude_loc_ids):
-                    global_exclude_loc_ids.append(id)
-            # for id in conveyor_entity["containers"]:
-            #     if not (id in global_blueprint_loc_ids):
-            #         global_blueprint_loc_ids.append(id)
-            if not (conveyor_entity["station_id"] in global_blueprint_station_ids):
-                global_blueprint_station_ids.append(conveyor_entity["station_id"])
-        # формирование списка ресурсов, которые используются в производстве
-        global_stock_resources = {}
-        if not (global_stock_all_loc_ids is None):
-            for loc_id in global_stock_all_loc_ids:
-                loc_flags = corp_ass_loc_data.keys()
-                for loc_flag in loc_flags:
-                    __a1 = corp_ass_loc_data[loc_flag]
-                    if str(loc_id) in __a1:
-                        __a2 = __a1[str(loc_id)]
-                        for itm in __a2:
-                            if str(itm) in global_stock_resources:
-                                global_stock_resources[itm] = global_stock_resources[itm] + __a2[itm]
-                            else:
-                                global_stock_resources.update({itm: __a2[itm]})
-        __dump_not_available_materials_list(
-            glf,
-            # esi данные, загруженные с серверов CCP
-            corp_bp_loc_data,
-            corp_industry_jobs_data,
-            corp_assets_tree,
-            # sde данные, загруженные из .converted_xxx.json файлов
-            sde_type_ids,
-            sde_bp_materials,
-            sde_market_groups,
-            # списки контейнеров и станок из экземпляра контейнера
-            global_stock_all_loc_ids,
-            global_exclude_loc_ids,
-            global_blueprint_station_ids,
-            # списком материалов, которых не хватает в производстве
-            stock_not_enough_materials,
-            # список ресурсов, которые используются в производстве
-            global_stock_resources,
-            global_materials_summary,
-            # настройки
-            True)
-        glf.write("""
+            # получение списков контейнеров и станок из экземпляра контейнера
+            global_stock_all_loc_ids = []
+            global_exclude_loc_ids = []
+            # global_blueprint_loc_ids = []
+            global_blueprint_station_ids = []
+            for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+                for id in [int(ces["id"]) for ces in conveyor_entity["stock"]]:
+                    if not (id in global_stock_all_loc_ids):
+                        global_stock_all_loc_ids.append(id)
+                for id in [int(cee["id"]) for cee in conveyor_entity["exclude"]]:
+                    if not (id in global_exclude_loc_ids):
+                        global_exclude_loc_ids.append(id)
+                # for id in conveyor_entity["containers"]:
+                #     if not (id in global_blueprint_loc_ids):
+                #         global_blueprint_loc_ids.append(id)
+                if not (conveyor_entity["station_id"] in global_blueprint_station_ids):
+                    global_blueprint_station_ids.append(conveyor_entity["station_id"])
+            # формирование списка ресурсов, которые используются в производстве
+            global_stock_resources = {}
+            if not (global_stock_all_loc_ids is None):
+                for loc_id in global_stock_all_loc_ids:
+                    loc_flags = corp_conveyors["corp_ass_loc_data"].keys()
+                    for loc_flag in loc_flags:
+                        __a1 = corp_conveyors["corp_ass_loc_data"][loc_flag]
+                        if str(loc_id) in __a1:
+                            __a2 = __a1[str(loc_id)]
+                            for itm in __a2:
+                                if str(itm) in global_stock_resources:
+                                    global_stock_resources[itm] = global_stock_resources[itm] + __a2[itm]
+                                else:
+                                    global_stock_resources.update({itm: __a2[itm]})
+            __dump_not_available_materials_list(
+                glf,
+                # esi данные, загруженные с серверов CCP
+                corp_conveyors["corp_bp_loc_data"],
+                corp_conveyors["corp_industry_jobs_data"],
+                corp_conveyors["corp_assets_tree"],
+                # sde данные, загруженные из .converted_xxx.json файлов
+                sde_type_ids,
+                sde_bp_materials,
+                sde_market_groups,
+                # списки контейнеров и станок из экземпляра контейнера
+                global_stock_all_loc_ids,
+                global_exclude_loc_ids,
+                global_blueprint_station_ids,
+                # списком материалов, которых не хватает в производстве
+                stock_not_enough_materials,
+                # список ресурсов, которые используются в производстве
+                global_stock_resources,
+                global_materials_summary,
+                # настройки
+                True)
+            glf.write("""
 </div>
 """)
 
-        # получение списков контейнеров и станок из экземпляра контейнера
-        conveyor_entity = conveyour_entities[0]
-        stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-        # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
-        render_html.__dump_any_into_modal_header_wo_button(
-            glf,
-            conveyor_entity["stock"][0]["name"],
-            'StockAll')
-        # формируем содержимое модального диалога
-        __dump_conveyor_stock_all(
-            glf,
-            corp_industry_jobs_data,
-            corp_ass_loc_data,
-            materials_for_bps,
-            research_materials_for_bps,
-            sde_type_ids,
-            sde_market_groups,
-            stock_all_loc_ids,
-            stock_not_enough_materials)
-        # закрываем footer модального диалога
-        render_html.__dump_any_into_modal_footer(glf)
+            # получение списков контейнеров и станок из экземпляра контейнера
+            conveyor_entity = corp_conveyors["corp_conveyour_entities"][0]
+            stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
+            # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+            render_html.__dump_any_into_modal_header_wo_button(
+                glf,
+                conveyor_entity["stock"][0]["name"],
+                'StockAll')
+            # формируем содержимое модального диалога
+            __dump_conveyor_stock_all(
+                glf,
+                corp_conveyors["corp_industry_jobs_data"],
+                corp_conveyors["corp_ass_loc_data"],
+                materials_for_bps,
+                research_materials_for_bps,
+                sde_type_ids,
+                sde_market_groups,
+                stock_all_loc_ids,
+                stock_not_enough_materials)
+            # закрываем footer модального диалога
+            render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
 <div id="legend-block">
@@ -1083,10 +1083,12 @@ def __dump_corp_conveyor(
     else
       $('#legend-block').addClass('hidden');
     show = ls.getItem('Show Summary');
-    if (show == 1)
-      $('#summary-block').removeClass('hidden');
-    else
-      $('#summary-block').addClass('hidden');
+    $('div.qind-summary-block').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
@@ -1211,39 +1213,27 @@ def __dump_corp_conveyor(
 def dump_conveyor_into_report(
         # путь, где будет сохранён отчёт
         ws_dir,
-        # настройки генерации отчёта
-        conveyour_entities,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids,
-        # esi данные, загруженные с серверов CCP
-        corp_industry_jobs_data,
-        corp_ass_names_data,
-        corp_ass_loc_data,
-        # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_bp_loc_data,
-        corp_assets_tree,
         materials_for_bps,
-        research_materials_for_bps):
+        research_materials_for_bps,
+        # настройки генерации отчёта
+        # esi данные, загруженные с серверов CCP
+        # данные, полученные в результате анализа и перекомпоновки входных списков
+        conveyor_data):
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Conveyor")
-        __dump_corp_conveyor(
+        __dump_corp_conveyors(
             glf,
-            conveyour_entities,
-            corp_bp_loc_data,
-            corp_industry_jobs_data,
-            corp_ass_names_data,
-            corp_ass_loc_data,
-            corp_assets_tree,
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
-            sde_icon_ids,
             materials_for_bps,
-            research_materials_for_bps)
+            research_materials_for_bps,
+            conveyor_data)
         render_html.__dump_footer(glf)
     finally:
         glf.close()

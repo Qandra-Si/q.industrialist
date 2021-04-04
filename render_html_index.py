@@ -49,6 +49,7 @@ def __dump_index(glf):
       <span class="sr-only">Variants</span>
     </button>
     <ul class="dropdown-menu" style="left:201px;">
+      <li><a href="shareholders_r_industry.html">R Industry</a></li>
       <li><a href="shareholders_r_initiative4.html">R Initiative 4</a></li>
       <li><a href="shareholders_r_initiative5.html">R Initiative 5</a></li>
       <li><a href="shareholders_r_strike.html">R Strike</a></li>
