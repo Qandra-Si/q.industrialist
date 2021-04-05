@@ -133,13 +133,14 @@ select
  to_char(ebc_created_at,'HH24:MI:SS') as dtt,
  j.ecj_runs as ecj_r,
  j.ecj_successful_runs as ecj_sr
-FROM
+from
  esi_blueprint_costs
   left outer join qi.esi_corporation_industry_jobs j
    on ecj_job_id=ebc_job_id and ecj_corporation_id=ebc_job_corporation_id
-WHERE
+where
  ebc_transaction_type in ('f','p','A')
-ORDER BY
+ and ebc_id >= 110829
+order by
  ebc_id DESC;
 EOD;
     $costs_cursor = pg_query($conn, $query)

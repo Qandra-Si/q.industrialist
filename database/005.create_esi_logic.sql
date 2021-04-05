@@ -208,27 +208,72 @@ create or replace function qi.ecb_on_insert_or_update_proc()
   language PLPGSQL
   as
 $$
+declare
+  blueprint_exist bigint;
+  blueprint_changed bool;
+  old_solar_system bigint;
+  new_solar_system bigint;
 begin
-  insert into qi.esi_blueprint_costs (
-    ebc_system_id,
-    ebc_transaction_type,
-    ebc_blueprint_id,
-    ebc_blueprint_type_id,
-    ebc_blueprint_runs,
-    ebc_time_efficiency,
-    ebc_material_efficiency,
-    ebc_created_at,
-    ebc_updated_at)
-  select
-    qi.eca_solar_system_of_asset_item(new.ecb_location_id),
-    TG_ARGV[0]::char(1),
-    new.ecb_item_id,
-    new.ecb_type_id,
-    new.ecb_runs,
-    new.ecb_time_efficiency,
-    new.ecb_material_efficiency,
-    current_timestamp at time zone 'GMT',
-    current_timestamp at time zone 'GMT';
+  if (TG_OP = 'INSERT') then
+    select ebc_blueprint_id into blueprint_exist
+    from qi.esi_blueprint_costs
+    where ebc_blueprint_id=new.ecb_item_id; -- значение ebc_transaction_type='A' проверять смысла нет
+    if blueprint_exist is null then
+      insert into qi.esi_blueprint_costs (
+        ebc_system_id,
+        ebc_transaction_type,
+        ebc_blueprint_id,
+        ebc_blueprint_type_id,
+        ebc_blueprint_runs,
+        ebc_time_efficiency,
+        ebc_material_efficiency,
+        ebc_created_at,
+        ebc_updated_at)
+      select
+        qi.eca_solar_system_of_asset_item(new.ecb_location_id),
+        'A',
+        new.ecb_item_id,
+        new.ecb_type_id,
+        new.ecb_runs,
+        new.ecb_time_efficiency,
+        new.ecb_material_efficiency,
+        current_timestamp at time zone 'GMT',
+        current_timestamp at time zone 'GMT';
+    end if;
+  elsif (TG_OP = 'UPDATE') then
+    blueprint_changed = false;
+    if (new.ecb_runs != old.ecb_runs) or (new.ecb_time_efficiency != old.ecb_time_efficiency) or (new.ecb_material_efficiency != old.ecb_material_efficiency) then
+      blueprint_changed = true;
+      new_solar_system = qi.eca_solar_system_of_asset_item(new.ecb_location_id);
+    elsif (new.ecb_location_id != old.ecb_location_id) then
+      -- не всякое изменение ecb_location_id интересно, - только если сменилась solar_system
+      old_solar_system = qi.eca_solar_system_of_asset_item(old.ecb_location_id);
+      new_solar_system = qi.eca_solar_system_of_asset_item(new.ecb_location_id);
+      blueprint_changed = (old_solar_system != new_solar_system);
+    end if;
+    if blueprint_changed then
+      insert into qi.esi_blueprint_costs (
+        ebc_system_id,
+        ebc_transaction_type,
+        ebc_blueprint_id,
+        ebc_blueprint_type_id,
+        ebc_blueprint_runs,
+        ebc_time_efficiency,
+        ebc_material_efficiency,
+        ebc_created_at,
+        ebc_updated_at)
+      select
+        qi.eca_solar_system_of_asset_item(new.ecb_location_id),
+        'C',
+        new.ecb_item_id,
+        new.ecb_type_id,
+        new.ecb_runs,
+        new.ecb_time_efficiency,
+        new.ecb_material_efficiency,
+        current_timestamp at time zone 'GMT',
+        current_timestamp at time zone 'GMT';
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -238,14 +283,14 @@ create trigger ecb_on_insert
   before insert
   on qi.esi_corporation_blueprints
   for each row
-  execute procedure qi.ecb_on_insert_or_update_proc('A');
+  execute procedure qi.ecb_on_insert_or_update_proc();
 
 drop trigger if exists ecb_on_update on qi.esi_corporation_blueprints;
 create trigger ecb_on_update
   before update
   on qi.esi_corporation_blueprints
   for each row
-  execute procedure qi.ecb_on_insert_or_update_proc('C');
+  execute procedure qi.ecb_on_insert_or_update_proc();
 --------------------------------------------------------------------------------
 
 
