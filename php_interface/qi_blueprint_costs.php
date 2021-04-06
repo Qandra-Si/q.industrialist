@@ -128,7 +128,7 @@ select
  ebc_job_product_type_id as pt,
  (select sden_name from eve_sde_names where sden_category = 1 and sden_id = ebc_job_product_type_id) as ptn,
  ebc_job_successful_runs as sr,
- ebc_job_cost as jc,
+ j.ecj_cost as jc,
  to_char(ebc_created_at,'Mon DD') as dt,
  to_char(ebc_created_at,'HH24:MI:SS') as dtt,
  j.ecj_runs as ecj_r,
@@ -139,7 +139,7 @@ from
    on ecj_job_id=ebc_job_id and ecj_corporation_id=ebc_job_corporation_id
 where
  ebc_transaction_type in ('f','p','A')
- and ebc_id >= 110829
+ and ebc_id >= 110830
 order by
  ebc_id DESC;
 EOD;

@@ -79,21 +79,20 @@ $$
 begin
   if new.ecj_activity_id in (5,8) then
     insert into qi.esi_blueprint_costs (
-  	  ebc_system_id,
-  	  ebc_transaction_type,
-  	  ebc_blueprint_type_id,
-  	  ebc_blueprint_runs,
-  	  ebc_job_id,
-  	  ebc_job_corporation_id,
-  	  ebc_job_activity,
-  	  ebc_job_runs,
-  	  ebc_job_product_type_id,
-  	  ebc_job_successful_runs,
-  	  ebc_job_time_efficiency,
-  	  ebc_job_material_efficiency,
-  	  ebc_job_cost,
-  	  ebc_created_at,
-  	  ebc_updated_at
+      ebc_system_id,
+      ebc_transaction_type,
+      ebc_blueprint_type_id,
+      ebc_blueprint_runs,
+      ebc_job_id,
+      ebc_job_corporation_id,
+      ebc_job_activity,
+      ebc_job_runs,
+      ebc_job_product_type_id,
+      ebc_job_successful_runs,
+      ebc_job_time_efficiency,
+      ebc_job_material_efficiency,
+      ebc_created_at,
+      ebc_updated_at
     )
     select
       (select distinct o.solar_system_id from qi.esi_corporation_offices o where new.ecj_facility_id = o.location_id),
@@ -111,7 +110,6 @@ begin
       new.ecj_successful_runs,
       b.ecb_time_efficiency,
       b.ecb_material_efficiency,
-      new.ecj_cost,
       current_timestamp at time zone 'GMT',
       current_timestamp at time zone 'GMT'
     from
@@ -145,24 +143,22 @@ declare
   me smallint;
 begin
   if new.ecj_activity_id in (5,8) then
-  	update qi.esi_blueprint_costs set(
-  	  ebc_transaction_type,
-  	  ebc_job_successful_runs,
-  	  ebc_job_cost,
-  	  ebc_updated_at
+    update qi.esi_blueprint_costs set(
+      ebc_transaction_type,
+      ebc_job_successful_runs,
+      ebc_updated_at
     )=(select
          case new.ecj_status when 'delivered' then 'f'
                              when 'cancelled' then 'd'
                              else 'j'
          end,
          new.ecj_successful_runs,
-         new.ecj_cost,
          current_timestamp at time zone 'GMT'
     )
     where
       new.ecj_job_id = ebc_job_id and
       new.ecj_corporation_id = ebc_job_corporation_id;
-  	-- system_id ? me, te ?
+    -- system_id ? me, te ?
     select ebc_system_id, ebc_job_material_efficiency into system_id, me
     from qi.esi_blueprint_costs
     where ebc_job_id = new.ecj_job_id and ebc_job_corporation_id = new.ecj_corporation_id;
@@ -176,7 +172,7 @@ begin
       where new.ecj_job_id = ebc_job_id and new.ecj_corporation_id = ebc_job_corporation_id;
     end if;
     -- ebc_job_time_efficiency
-  	-- ebc_job_material_efficiency
+    -- ebc_job_material_efficiency
     if me is null then
       update qi.esi_blueprint_costs set(ebc_job_time_efficiency, ebc_job_material_efficiency)=(
         select ecb_time_efficiency, ecb_material_efficiency
