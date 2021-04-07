@@ -1035,7 +1035,7 @@ class QSwaggerInterface:
         # настройки работы метода
         #  * deffered: время, после которого история не анализируется
         #  * missed: ждём кол-во часом не менее чем, чтобы дождаться когда будут добыты все недостающие данные
-        missed_hours: int = 2
+        missed_hours: int = 1
         deffered_hours: int = 24
         # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
         where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_created_at and " \
@@ -1183,7 +1183,7 @@ class QSwaggerInterface:
         # настройки работы метода
         #  * deffered: время, после которого история не анализируется
         #  * missed: ждём кол-во часом не менее чем, чтобы дождаться когда будут добыты все недостающие данные
-        missed_hours: int = 2
+        missed_hours: int = 1
         deffered_hours: int = 24
         # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
         where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_created_at and " \
@@ -1309,3 +1309,19 @@ class QSwaggerInterface:
             del used_ebc_ids
 
         del unlinked_blueprint_types
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/wallets/{division}/journal/
+    # -------------------------------------------------------------------------
+
+    def get_last_known_corporation_wallet_journal_ids(self, corporation_id: int):
+        rows = self.db.select_all_rows(
+            "SELECT MAX(ecwj_reference_id), ecwj_division "
+            "FROM esi_corporation_wallet_journals "
+            "WHERE ecwj_corporation_id=%s "
+            "GROUP BY 2;",
+            int(corporation_id),
+        )
+        if rows is None:
+            return None
+        return rows
