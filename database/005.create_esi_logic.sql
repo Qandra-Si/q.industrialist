@@ -76,45 +76,52 @@ create or replace function qi.ecj_on_insert_proc()
   language PLPGSQL
   as
 $$
+declare
+  job_exist bigint;
 begin
   if new.ecj_activity_id in (5,8) then
-    insert into qi.esi_blueprint_costs (
-      ebc_system_id,
-      ebc_transaction_type,
-      ebc_blueprint_type_id,
-      ebc_blueprint_runs,
-      ebc_job_id,
-      ebc_job_corporation_id,
-      ebc_job_activity,
-      ebc_job_runs,
-      ebc_job_product_type_id,
-      ebc_job_successful_runs,
-      ebc_job_time_efficiency,
-      ebc_job_material_efficiency,
-      ebc_created_at,
-      ebc_updated_at
-    )
-    select
-      (select distinct o.solar_system_id from qi.esi_corporation_offices o where new.ecj_facility_id = o.location_id),
-      case new.ecj_status when 'delivered' then 'f'
-                          when 'cancelled' then 'd'
-                          else 'j'
-      end,
-      new.ecj_blueprint_type_id,
-      new.ecj_licensed_runs,
-      new.ecj_job_id,
-      new.ecj_corporation_id,
-      new.ecj_activity_id,
-      new.ecj_runs,
-      new.ecj_product_type_id,
-      new.ecj_successful_runs,
-      b.ecb_time_efficiency,
-      b.ecb_material_efficiency,
-      current_timestamp at time zone 'GMT',
-      current_timestamp at time zone 'GMT'
-    from
-      (select new.ecj_blueprint_id) as bp
-        left outer join qi.esi_corporation_blueprints b on (bp.ecj_blueprint_id = b.ecb_item_id);
+    select ebc_job_id into job_exist
+    from qi.esi_blueprint_costs
+    where ebc_job_id=new.ecj_job_id and ebc_job_corporation_id=new.ecj_corporation_id;
+    if job_exist is null then
+      insert into qi.esi_blueprint_costs (
+        ebc_system_id,
+        ebc_transaction_type,
+        ebc_blueprint_type_id,
+        ebc_blueprint_runs,
+        ebc_job_id,
+        ebc_job_corporation_id,
+        ebc_job_activity,
+        ebc_job_runs,
+        ebc_job_product_type_id,
+        ebc_job_successful_runs,
+        ebc_job_time_efficiency,
+        ebc_job_material_efficiency,
+        ebc_created_at,
+        ebc_updated_at
+      )
+      select
+        (select distinct o.solar_system_id from qi.esi_corporation_offices o where new.ecj_facility_id = o.location_id),
+        case new.ecj_status when 'delivered' then 'f'
+                            when 'cancelled' then 'd'
+                            else 'j'
+        end,
+        new.ecj_blueprint_type_id,
+        new.ecj_licensed_runs,
+        new.ecj_job_id,
+        new.ecj_corporation_id,
+        new.ecj_activity_id,
+        new.ecj_runs,
+        new.ecj_product_type_id,
+        new.ecj_successful_runs,
+        b.ecb_time_efficiency,
+        b.ecb_material_efficiency,
+        current_timestamp at time zone 'GMT',
+        current_timestamp at time zone 'GMT'
+      from
+        (select new.ecj_blueprint_id) as bp
+          left outer join qi.esi_corporation_blueprints b on (bp.ecj_blueprint_id = b.ecb_item_id);
+    end if;
   end if;
   return new;
 end;
