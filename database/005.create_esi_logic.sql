@@ -68,22 +68,26 @@ $$;
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- ecj_on_insert_proc, ecj_on_insert
+-- ecj_on_insert_or_update_proc
 -- триггеры для esi_corporation_industry_jobs
 --------------------------------------------------------------------------------
-create or replace function qi.ecj_on_insert_proc()
+create or replace function qi.ecj_on_insert_or_update_proc()
   returns trigger 
   language PLPGSQL
   as
 $$
 declare
-  job_exist bigint;
+  ebc_id_exist bigint;
+  system_id bigint;
+  me smallint;
 begin
   if new.ecj_activity_id in (5,8) then
-    select ebc_job_id into job_exist
+    -- id ? system_id ? me, te ?
+    select ebc_id, ebc_system_id, ebc_job_material_efficiency into ebc_id_exist, system_id, me
     from qi.esi_blueprint_costs
     where ebc_job_id=new.ecj_job_id and ebc_job_corporation_id=new.ecj_corporation_id;
-    if job_exist is null then
+    --
+    if ebc_id_exist is null then
       insert into qi.esi_blueprint_costs (
         ebc_system_id,
         ebc_transaction_type,
@@ -121,6 +125,42 @@ begin
       from
         (select new.ecj_blueprint_id) as bp
           left outer join qi.esi_corporation_blueprints b on (bp.ecj_blueprint_id = b.ecb_item_id);
+    else
+      update qi.esi_blueprint_costs set(
+        ebc_transaction_type,
+        ebc_job_successful_runs,
+        ebc_updated_at
+      )=(select
+           case new.ecj_status when 'delivered' then 'f'
+                               when 'cancelled' then 'd'
+                               else 'j'
+           end,
+           new.ecj_successful_runs,
+           current_timestamp at time zone 'GMT'
+      )
+      where ebc_id = ebc_id_exist;
+      -- ebc_system_id
+      if system_id is null then
+        update qi.esi_blueprint_costs set(
+          ebc_system_id
+        )=(select distinct o.solar_system_id
+           from qi.esi_corporation_offices o
+           where new.ecj_facility_id = o.location_id
+        )
+        where ebc_id = ebc_id_exist;
+      end if;
+      -- ebc_job_time_efficiency
+      -- ebc_job_material_efficiency
+      if me is null then
+        update qi.esi_blueprint_costs set(
+          ebc_job_time_efficiency,
+          ebc_job_material_efficiency
+        )=(select ecb_time_efficiency, ecb_material_efficiency
+           from qi.esi_corporation_blueprints
+           where new.ecj_blueprint_id = ecb_item_id
+        )
+        where ebc_id = ebc_id_exist;
+      end if;
     end if;
   end if;
   return new;
@@ -132,73 +172,14 @@ create trigger ecj_on_insert
   before insert
   on qi.esi_corporation_industry_jobs
   for each row
-  execute procedure qi.ecj_on_insert_proc();
---------------------------------------------------------------------------------
-
-
---------------------------------------------------------------------------------
--- ecj_on_update_proc, ecj_on_update
--- триггеры для esi_corporation_industry_jobs
---------------------------------------------------------------------------------
-create or replace function qi.ecj_on_update_proc()
-  returns trigger 
-  language PLPGSQL
-  as
-$$
-declare
-  system_id bigint;
-  me smallint;
-begin
-  if new.ecj_activity_id in (5,8) then
-    update qi.esi_blueprint_costs set(
-      ebc_transaction_type,
-      ebc_job_successful_runs,
-      ebc_updated_at
-    )=(select
-         case new.ecj_status when 'delivered' then 'f'
-                             when 'cancelled' then 'd'
-                             else 'j'
-         end,
-         new.ecj_successful_runs,
-         current_timestamp at time zone 'GMT'
-    )
-    where
-      new.ecj_job_id = ebc_job_id and
-      new.ecj_corporation_id = ebc_job_corporation_id;
-    -- system_id ? me, te ?
-    select ebc_system_id, ebc_job_material_efficiency into system_id, me
-    from qi.esi_blueprint_costs
-    where ebc_job_id = new.ecj_job_id and ebc_job_corporation_id = new.ecj_corporation_id;
-    -- ebc_system_id
-    if system_id is null then
-      update qi.esi_blueprint_costs set(ebc_system_id)=(
-        select distinct o.solar_system_id
-        from qi.esi_corporation_offices o
-        where new.ecj_facility_id = o.location_id
-      )
-      where new.ecj_job_id = ebc_job_id and new.ecj_corporation_id = ebc_job_corporation_id;
-    end if;
-    -- ebc_job_time_efficiency
-    -- ebc_job_material_efficiency
-    if me is null then
-      update qi.esi_blueprint_costs set(ebc_job_time_efficiency, ebc_job_material_efficiency)=(
-        select ecb_time_efficiency, ecb_material_efficiency
-        from qi.esi_corporation_blueprints
-        where new.ecj_blueprint_id = ecb_item_id
-      )
-      where new.ecj_job_id = ebc_job_id and new.ecj_corporation_id = ebc_job_corporation_id;
-    end if;
-  end if;
-  return new;
-end;
-$$;
+  execute procedure qi.ecj_on_insert_or_update_proc();
 
 drop trigger if exists ecj_on_update on qi.esi_corporation_industry_jobs;
 create trigger ecj_on_update
   before update
   on qi.esi_corporation_industry_jobs
   for each row
-  execute procedure qi.ecj_on_update_proc();
+  execute procedure qi.ecj_on_insert_or_update_proc();
 --------------------------------------------------------------------------------
 
 

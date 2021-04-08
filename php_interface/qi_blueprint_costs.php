@@ -54,6 +54,8 @@ include_once '.settings.php';
             $sr = $item['sr'];
             $pt = $item['pt'];
             $ptn = $item['ptn'];
+            $jte = $item['jte'];
+            $jme = $item['jme'];
             switch ($aid)
             {
             case 1: $anm = '&nbsp;<span class="label label-primary">manufacturing</span>'; break;  # Manufacturing
@@ -72,10 +74,10 @@ include_once '.settings.php';
 <tr class="<?=($tt=='p')?'success':'warning'?>">
 <td<?php if (!is_null($ss)) { ?> align="left"><?=$ss?><?php } else { ?>><?php } ?><br><span class="text-muted">№ <?=$id?></span></td>
 <td><img class="icn32" src="<?=__get_img_src($bpt,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
-<td><?=$bptn?><small>&nbsp;<span class="badge"><?=$ecj_sr?> of <?=$ecj_r?> runs</span></small><br><span class="text-info">JOB № <?=$jid?></span><?=$anm?></td>
+<td><?=$bptn?><small>&nbsp;<span class="badge"><?=is_null($ecj_sr)?'?':$ecj_sr?> of <?=$ecj_r?> runs</span></small><br><span class="text-info">JOB № <?=$jid?></span><?=$anm?></td>
 <td><img class="icn32" src="<?=__get_img_src($pt,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
 <td><?=$ptn?></td>
-<td><?=$ecj_sr-$sr?> of <?=$ecj_sr?></td>
+<td><?=$ecj_sr-$sr?> of <?=is_null($ecj_sr)?'?':$ecj_sr?></td>
 <?php
             }
             else // copy
@@ -84,7 +86,7 @@ include_once '.settings.php';
 <tr class="<?=($tt=='p')?'success':'warning'?>">
 <td<?php if (!is_null($ss)) { ?> align="left"><?=$ss?><?php } else { ?>><?php } ?><br><span class="text-muted">№ <?=$id?></span></td>
 <td><img class="icn32" src="<?=__get_img_src($bpt,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
-<td colspan="3"><?=$bptn?><small>&nbsp;<span class="badge"><?=$ecj_r?> runs <?=$bpr?>x</span></small><br><span class="text-info">JOB № <?=$jid?></span><?=$anm?></td>
+<td colspan="3"><?=$bptn?><small>&nbsp;<span class="badge"><?=$ecj_r?> runs <?=$bpr?>x</span></small><br><span class="text-info">JOB № <?=$jid?></span><?=$anm?>&nbsp;<span class="label label-success"><?=is_null($jme)?'?':$jme?> <?=is_null($jte)?'?':$jte?></span></td>
 <td><?=$ecj_r-$jr?> of <?=$ecj_r?></td>
 <?php
             }
@@ -128,6 +130,8 @@ select
  ebc_job_product_type_id as pt,
  (select sden_name from eve_sde_names where sden_category = 1 and sden_id = ebc_job_product_type_id) as ptn,
  ebc_job_successful_runs as sr,
+ ebc_job_time_efficiency as jte,
+ ebc_job_material_efficiency as jme,
  j.ecj_cost as jc,
  to_char(ebc_created_at,'Mon DD') as dt,
  to_char(ebc_created_at,'HH24:MI:SS') as dtt,
@@ -138,7 +142,7 @@ from
   left outer join qi.esi_corporation_industry_jobs j
    on ecj_job_id=ebc_job_id and ecj_corporation_id=ebc_job_corporation_id
 where
- ebc_transaction_type in ('f','p','A')
+ ebc_transaction_type in ('f','p','A','j')
  and ebc_id >= 110830
 order by
  ebc_id DESC;

@@ -25,6 +25,7 @@ Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
+    * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
 """
 import sys
 
@@ -103,6 +104,14 @@ def main():
 
         # Пытаемся отследить и сохраняем связи между чертежами и работами
         dbtools.link_blueprints_and_jobs(corporation_id)
+        print("'{}' corporation link blueprints and jobs completed\n".
+              format(corporation_name))
+
+        # Requires role(s): Accountant, Junior_Accountant
+        corp_made_new_payments = dbtools.actualize_corporation_wallet_journals(corporation_id)
+        print("'{}' corporation made {} new payments\n".
+              format(corporation_name, corp_made_new_payments))
+        sys.stdout.flush()
 
     del dbtools
 

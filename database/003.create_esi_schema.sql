@@ -9,6 +9,14 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 ---
 
+DROP INDEX IF EXISTS qi.idx_ecwj_date;
+DROP INDEX IF EXISTS qi.idx_ecwj_reference_id;
+DROP INDEX IF EXISTS qi.idx_ecwj_corporation_id;
+DROP INDEX IF EXISTS qi.idx_ecwj_corporation_division_reference;
+DROP INDEX IF EXISTS qi.idx_ecwj_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_wallet_journals;
+DROP SEQUENCE IF EXISTS qi.seq_ecwj;
+
 DROP INDEX IF EXISTS qi.idx_ebc_created_at;
 DROP INDEX IF EXISTS qi.idx_ebc_transaction_type;
 DROP INDEX IF EXISTS qi.idx_ebc_job_activity;
@@ -600,6 +608,71 @@ CREATE INDEX idx_ebc_created_at
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+-- corporation_wallet_journals
+--------------------------------------------------------------------------------
+CREATE SEQUENCE qi.seq_ecwj
+    INCREMENT 1
+    START 1000
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
+ALTER SEQUENCE qi.seq_ecwj OWNER TO qi_user;
+
+CREATE TABLE qi.esi_corporation_wallet_journals
+(
+    ecwj_id BIGINT NOT NULL DEFAULT NEXTVAL('qi.seq_ecwj'::regclass),
+    ecwj_corporation_id BIGINT NOT NULL,
+    ecwj_division SMALLINT NOT NULL,
+    ecwj_reference_id BIGINT NOT NULL,
+    ecwj_date TIMESTAMP NOT NULL,
+    ecwj_ref_type CHARACTER VARYING(255) NOT NULL,
+    ecwj_first_party_id BIGINT,
+    ecwj_second_party_id BIGINT,
+    ecwj_amount DOUBLE PRECISION,
+    ecwj_balance DOUBLE PRECISION,
+    ecwj_reason TEXT,
+    ecwj_tax_receiver_id BIGINT,
+    ecwj_tax DOUBLE PRECISION,
+    ecwj_context_id BIGINT,
+    ecwj_context_id_type CHARACTER VARYING(255),
+    ecwj_description CHARACTER VARYING(255) NOT NULL,
+    ecwj_created_at TIMESTAMP,
+    ecwj_updated_at TIMESTAMP,
+    CONSTRAINT pk_ecwj PRIMARY KEY (ecwj_id),
+    CONSTRAINT fk_ecwj_corporation_id FOREIGN KEY (ecwj_corporation_id)
+        REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ecwj_pk
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ecwj_corporation_division_reference
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_corporation_id ASC NULLS LAST, ecwj_division ASC NULLS LAST, ecwj_reference_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwj_corporation_id
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwj_reference_id
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_reference_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwj_date
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_date ASC NULLS LAST)
+TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.

@@ -276,7 +276,8 @@ class QDatabaseTools:
     # characters/{character_id}/
     # -------------------------------------------------------------------------
 
-    def get_character_url(self, character_id: int):
+    @staticmethod
+    def get_character_url(character_id: int):
         # Public information about a character
         return "characters/{character_id}/".format(character_id=character_id)
 
@@ -337,7 +338,8 @@ class QDatabaseTools:
     # corporations/{corporation_id}/
     # -------------------------------------------------------------------------
 
-    def get_corporation_url(self, corporation_id: int):
+    @staticmethod
+    def get_corporation_url(corporation_id: int):
         # Public information about a corporation
         return "corporations/{corporation_id}/".format(corporation_id=corporation_id)
 
@@ -406,7 +408,8 @@ class QDatabaseTools:
     # universe/stations/{station_id}/
     # -------------------------------------------------------------------------
 
-    def get_universe_station_url(self, station_id: int):
+    @staticmethod
+    def get_universe_station_url(station_id: int):
         # Public information about a universe_station
         return "universe/stations/{station_id}/".format(station_id=station_id)
 
@@ -471,7 +474,8 @@ class QDatabaseTools:
     # universe/structures/{structure_id}/
     # -------------------------------------------------------------------------
 
-    def get_universe_structure_url(self, structure_id: int):
+    @staticmethod
+    def get_universe_structure_url(structure_id: int):
         # Requires: access token
         return "universe/structures/{structure_id}/".format(structure_id=structure_id)
 
@@ -582,7 +586,8 @@ class QDatabaseTools:
     # corporations/{corporation_id}/structures/
     # -------------------------------------------------------------------------
 
-    def get_corporation_structures_url(self, corporation_id: int):
+    @staticmethod
+    def get_corporation_structures_url(corporation_id: int):
         # Requires role(s): Station_Manager
         return "corporations/{corporation_id}/structures/".format(corporation_id=corporation_id)
 
@@ -687,7 +692,8 @@ class QDatabaseTools:
     # corporations/{corporation_id}/assets/
     # -------------------------------------------------------------------------
 
-    def get_corporation_assets_url(self, corporation_id: int):
+    @staticmethod
+    def get_corporation_assets_url(corporation_id: int):
         # Requires role(s): Director
         return "corporations/{corporation_id}/assets/".format(corporation_id=corporation_id)
 
@@ -795,7 +801,8 @@ class QDatabaseTools:
     # corporations/{corporation_id}/blueprints/
     # -------------------------------------------------------------------------
 
-    def get_corporation_blueprints_url(self, corporation_id: int):
+    @staticmethod
+    def get_corporation_blueprints_url(corporation_id: int):
         # Requires role(s): Director
         return "corporations/{corporation_id}/blueprints/".format(corporation_id=corporation_id)
 
@@ -889,7 +896,8 @@ class QDatabaseTools:
     # corporations/{corporation_id}/industry/jobs/
     # -------------------------------------------------------------------------
 
-    def get_corporation_industry_jobs_url(self, corporation_id: int):
+    @staticmethod
+    def get_corporation_industry_jobs_url(corporation_id: int):
         # Requires role(s): Director
         return "corporations/{corporation_id}/industry/jobs/?include_completed=true".format(corporation_id=corporation_id)
 
@@ -986,3 +994,48 @@ class QDatabaseTools:
 
         self.dbswagger.link_blueprint_invents_with_jobs()
         self.qidb.commit()
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/wallets/{division}/journal/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_corporation_wallets_division_journal_url(corporation_id: int, division: int):
+        # Requires role(s): Director
+        return "corporations/{corporation_id}/wallets/{division}/journal/".format(
+            corporation_id=corporation_id,
+            division=division
+        )
+
+    def actualize_corporation_wallet_journals(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+        corp_made_new_payments: int = 0
+        db_data_loaded: bool = False
+        dbdivisions = None
+
+        # Requires role(s): Accountant, Junior_Accountant
+        for division in range(1, 7):
+            url: str = self.get_corporation_wallets_division_journal_url(corporation_id, division)
+            data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+            if self.esiswagger.offline_mode:
+                updated_at = self.eve_now
+            elif not is_updated:
+                continue
+
+            # загрузка данных из БД
+            if not db_data_loaded:
+                dbdivisions = self.dbswagger.get_last_known_corporation_wallet_journal_ids(corporation_id)
+                db_data_loaded = True
+
+            # актуализация (добавление) операций в корпоративном кошельке
+            last_known_id = -1 if dbdivisions is None else next((j for j in dbdivisions if j[1] == int(division)), -1)
+            for journal_data in data:
+                if journal_data['id'] > last_known_id:
+                    corp_made_new_payments += 1
+
+            del data
+
+        if dbdivisions:
+            del dbdivisions
+
+        return corp_made_new_payments
