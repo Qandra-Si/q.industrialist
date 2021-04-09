@@ -102,16 +102,16 @@ def main():
               format(corporation_name, len([j for j in corp_industry_jobs_data if j['status'] == 'active'])))
         sys.stdout.flush()
 
-        # Пытаемся отследить и сохраняем связи между чертежами и работами
-        dbtools.link_blueprints_and_jobs(corporation_id)
-        print("'{}' corporation link blueprints and jobs completed\n".
-              format(corporation_name))
-
         # Requires role(s): Accountant, Junior_Accountant
         corp_made_new_payments = dbtools.actualize_corporation_wallet_journals(corporation_id)
         print("'{}' corporation made {} new payments\n".
               format(corporation_name, corp_made_new_payments))
         sys.stdout.flush()
+
+        # Пытаемся отследить и сохраняем связи между чертежами и работами
+        dbtools.link_blueprints_and_jobs(corporation_id)
+        print("'{}' corporation link blueprints and jobs completed\n".
+              format(corporation_name))
 
     del dbtools
 

@@ -83,7 +83,8 @@ declare
 begin
   if new.ecj_activity_id in (5,8) then
     -- id ? system_id ? me, te ?
-    select ebc_id, ebc_system_id, ebc_job_material_efficiency into ebc_id_exist, system_id, me
+    select ebc_id, ebc_system_id, ebc_job_material_efficiency
+    into ebc_id_exist, system_id, me
     from qi.esi_blueprint_costs
     where ebc_job_id=new.ecj_job_id and ebc_job_corporation_id=new.ecj_corporation_id;
     --

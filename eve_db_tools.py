@@ -987,6 +987,8 @@ class QDatabaseTools:
         # сохранённые в БД только что найденные чертежи и работы остаются там "мариноваться"
         # до тех пор, пока у ним не подгрузятся стоимость выполненных работ и все прочие
         # данные (солнечная система, me/te чертежей и т.п.)
+        self.dbswagger.link_wallet_journals_with_jobs()
+        self.qidb.commit()
 
         # вычитываем необъединённые чертежи и ищем им парные работы по копирке, объединяем их
         self.dbswagger.link_blueprint_copies_with_jobs()
@@ -1027,13 +1029,29 @@ class QDatabaseTools:
                 dbdivisions = self.dbswagger.get_last_known_corporation_wallet_journal_ids(corporation_id)
                 db_data_loaded = True
 
+            # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+            db_debug: bool = self.dbswagger.db.debug
+            if db_debug:
+                self.dbswagger.db.disable_debug()
+
             # актуализация (добавление) операций в корпоративном кошельке
-            last_known_id = -1 if dbdivisions is None else next((j for j in dbdivisions if j[1] == int(division)), -1)
+            last_known_id = -1 if dbdivisions is None else next((j[0] for j in dbdivisions if j[1] == int(division)), -1)
             for journal_data in data:
                 if journal_data['id'] > last_known_id:
                     corp_made_new_payments += 1
+                    self.dbswagger.insert_corporation_wallet_journals(
+                        journal_data,
+                        corporation_id,
+                        division,
+                        updated_at
+                    )
+
+            # если отладвка была отключена, то включаем её
+            if db_debug:
+                self.dbswagger.db.enable_debug()
 
             del data
+        self.qidb.commit()
 
         if dbdivisions:
             del dbdivisions

@@ -10,12 +10,11 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 ---
 
 DROP INDEX IF EXISTS qi.idx_ecwj_date;
+DROP INDEX IF EXISTS qi.idx_ecwj_context_id;
 DROP INDEX IF EXISTS qi.idx_ecwj_reference_id;
 DROP INDEX IF EXISTS qi.idx_ecwj_corporation_id;
-DROP INDEX IF EXISTS qi.idx_ecwj_corporation_division_reference;
 DROP INDEX IF EXISTS qi.idx_ecwj_pk;
 DROP TABLE IF EXISTS qi.esi_corporation_wallet_journals;
-DROP SEQUENCE IF EXISTS qi.seq_ecwj;
 
 DROP INDEX IF EXISTS qi.idx_ebc_created_at;
 DROP INDEX IF EXISTS qi.idx_ebc_transaction_type;
@@ -612,18 +611,8 @@ TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 -- corporation_wallet_journals
 --------------------------------------------------------------------------------
-CREATE SEQUENCE qi.seq_ecwj
-    INCREMENT 1
-    START 1000
-    MINVALUE 1
-    MAXVALUE 9223372036854775807
-    CACHE 1;
-
-ALTER SEQUENCE qi.seq_ecwj OWNER TO qi_user;
-
 CREATE TABLE qi.esi_corporation_wallet_journals
 (
-    ecwj_id BIGINT NOT NULL DEFAULT NEXTVAL('qi.seq_ecwj'::regclass),
     ecwj_corporation_id BIGINT NOT NULL,
     ecwj_division SMALLINT NOT NULL,
     ecwj_reference_id BIGINT NOT NULL,
@@ -640,8 +629,7 @@ CREATE TABLE qi.esi_corporation_wallet_journals
     ecwj_context_id_type CHARACTER VARYING(255),
     ecwj_description CHARACTER VARYING(255) NOT NULL,
     ecwj_created_at TIMESTAMP,
-    ecwj_updated_at TIMESTAMP,
-    CONSTRAINT pk_ecwj PRIMARY KEY (ecwj_id),
+    CONSTRAINT pk_ecwj PRIMARY KEY (ecwj_corporation_id, ecwj_division, ecwj_reference_id),
     CONSTRAINT fk_ecwj_corporation_id FOREIGN KEY (ecwj_corporation_id)
         REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -650,11 +638,6 @@ CREATE TABLE qi.esi_corporation_wallet_journals
 TABLESPACE pg_default;
 
 CREATE UNIQUE INDEX idx_ecwj_pk
-    ON qi.esi_corporation_wallet_journals USING btree
-    (ecwj_id ASC NULLS LAST)
-TABLESPACE pg_default;
-
-CREATE UNIQUE INDEX idx_ecwj_corporation_division_reference
     ON qi.esi_corporation_wallet_journals USING btree
     (ecwj_corporation_id ASC NULLS LAST, ecwj_division ASC NULLS LAST, ecwj_reference_id ASC NULLS LAST)
 TABLESPACE pg_default;
@@ -667,6 +650,11 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecwj_reference_id
     ON qi.esi_corporation_wallet_journals USING btree
     (ecwj_reference_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwj_context_id
+    ON qi.esi_corporation_wallet_journals USING btree
+    (ecwj_context_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
 CREATE INDEX idx_ecwj_date

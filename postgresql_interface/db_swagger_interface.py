@@ -1031,6 +1031,40 @@ class QSwaggerInterface:
     # corporations/{corporation_id}/industry/jobs/
     # -------------------------------------------------------------------------
 
+    def link_wallet_journals_with_jobs(self):
+        # список работ, которые пока что не имеют стоимости выполненных работ в базе данных
+        self.db.execute(
+            "update esi_blueprint_costs as ebc set"
+            " ebc_industry_payment = a.pay,"
+            " ebc_tax = a.tax "
+            "from ("
+            " select"
+            "  ebc_id,"  # -- ebc_job_id,
+            "  -t.ecwj_amount as tax,"
+            "  -j.ecwj_amount as pay"
+            " from"
+            "  esi_blueprint_costs"  # -- платёж, который есть не всегда, т.к. налоги м.б. низкие
+            "   left outer join esi_corporation_wallet_journals t on ("
+            "   ebc_job_id = t.ecwj_context_id and"
+            "   ebc_job_corporation_id = t.ecwj_corporation_id and"
+            "   t.ecwj_context_id_type = 'industry_job_id' and"
+            "   t.ecwj_ref_type = 'industry_job_tax'"
+            " ),"
+            " esi_corporation_wallet_journals j "
+            "where"  # -- работы без платежей
+            " ebc_transaction_type in ('f','j','p') and"
+            " ebc_industry_payment is null and"
+            # -- ограничение времени
+            " (current_timestamp at time zone 'GMT' - interval '20 minutes') >= ebc_updated_at and"
+            " ebc_updated_at >= (current_timestamp at time zone 'GMT' - interval '24 hours') and"
+            # -- платёж, который есть всегда
+            " ebc_job_id = j.ecwj_context_id and"
+            " ebc_job_corporation_id = j.ecwj_corporation_id and"
+            " j.ecwj_context_id_type = 'industry_job_id' and"
+            " j.ecwj_ref_type != 'industry_job_tax'"
+            ") a "
+            "where a.ebc_id = ebc.ebc_id")
+
     def link_blueprint_copies_with_jobs(self):
         # настройки работы метода
         #  * deffered: время, после которого история не анализируется
@@ -1038,8 +1072,8 @@ class QSwaggerInterface:
         missed_hours: int = 1
         deffered_hours: int = 24
         # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
-        where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_created_at and " \
-                           "ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '{dh} hours'))".\
+        where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_updated_at and " \
+                           "ebc_updated_at >= (current_timestamp at time zone 'GMT' - interval '{dh} hours'))".\
                            format(mh=missed_hours, dh=deffered_hours)
 
         # список продуктов, которые пока что являются не связанными в базе данных
@@ -1186,8 +1220,8 @@ class QSwaggerInterface:
         missed_hours: int = 1
         deffered_hours: int = 24
         # формируем интервал анализа несвязанных чертежей и работ (ждём 2 часа, игнорируем слишком старые)
-        where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_created_at and " \
-                           "ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '{dh} hours'))".\
+        where_hours: str = "((current_timestamp at time zone 'GMT' - interval '{mh} hours') >= ebc_updated_at and " \
+                           "ebc_updated_at >= (current_timestamp at time zone 'GMT' - interval '{dh} hours'))".\
                            format(mh=missed_hours, dh=deffered_hours)
 
         # список продуктов, которые пока что являются не связанными в базе данных
@@ -1325,3 +1359,75 @@ class QSwaggerInterface:
         if rows is None:
             return None
         return rows
+
+    def insert_corporation_wallet_journals(self, data, corporation_id: int, division: int, updated_at):
+        """ inserts corporation wallet journal data into database
+
+        :param data: corporation wallet journal data
+        """
+        # { "amount": -6957699.0,
+        #   "balance": 5659128174.57,
+        #   "context_id": 455488775,
+        #   "context_id_type": "industry_job_id",
+        #   "date": "2021-04-08T20:53:27Z",
+        #   "description": "Material efficiency research job fee between R Industry and Secure Commerce Commission (Job ID: 455488775)",
+        #   "first_party_id": 98677876,
+        #   "id": 19192237879,
+        #   "reason": "",
+        #   "ref_type": "researching_material_productivity",
+        #   "second_party_id": 1000132
+        # }
+        self.db.execute(
+            "INSERT INTO esi_corporation_wallet_journals("
+            " ecwj_corporation_id,"
+            " ecwj_division,"
+            " ecwj_reference_id,"
+            " ecwj_date,"
+            " ecwj_ref_type,"
+            " ecwj_first_party_id,"
+            " ecwj_second_party_id,"
+            " ecwj_amount,"
+            " ecwj_balance,"
+            " ecwj_reason,"
+            " ecwj_tax_receiver_id,"
+            " ecwj_tax,"
+            " ecwj_context_id,"
+            " ecwj_context_id_type,"
+            " ecwj_description,"
+            " ecwj_created_at) "
+            "VALUES("
+            " %(co)s,"
+            " %(d)s,"
+            " %(id)s,"
+            " %(dt)s,"
+            " %(rt)s,"
+            " %(fp)s,"
+            " %(sp)s,"
+            " %(a)s,"
+            " %(b)s,"
+            " %(r)s,"
+            " %(tr)s,"
+            " %(t)s,"
+            " %(c)s,"
+            " %(ct)s,"
+            " %(txt)s,"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecwj DO NOTHING;",
+            {'co': corporation_id,
+             'd': division,
+             'id': data['id'],
+             'dt': data['date'],
+             'rt': data['ref_type'],
+             'fp': data.get('first_party_id', None),
+             'sp': data.get('second_party_id', None),
+             'a': data.get('amount', None),
+             'b': data.get('balance', None),
+             'r': data.get('reason', None),
+             'tr': data.get('tax_receiver_id', None),
+             't': data.get('tax', None),
+             'c': data.get('context_id', None),
+             'ct': data.get('context_id_type', None),
+             'txt': data['description'],
+             'at': updated_at,
+             }
+        )
