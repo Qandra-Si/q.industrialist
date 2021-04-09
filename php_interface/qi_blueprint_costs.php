@@ -14,7 +14,8 @@ include_once '.settings.php';
   <th style="width:32px;"></th>
   <th>Product</th>
   <th>Rest links</th>
-  <th style="text-align: right;">Fee &amp; Tax, ISK</th>
+  <th style="text-align: right;">Cost</th>
+  <th style="text-align: right;">Pay &amp; Tax</th>
   <th>Date / time</th>
  </tr>
 </thead>
@@ -30,6 +31,8 @@ include_once '.settings.php';
         $bpr = $item['bpr'];
         $jid = $item['jid'];
         $jc = $item['jc'];
+        $jpay = $item['jpay'];
+        $jtax = $item['jtax'];
         $dt = $item['dt'];
         $dtt = $item['dtt'];
         $ecj_r = $item['ecj_r'];
@@ -94,6 +97,7 @@ include_once '.settings.php';
         // началу у записей разное, завершение одинаковое
 ?>
 <td<?php if (!is_null($jc)) { ?> align="right"><?=number_format($jc,0,'.',',')?><?php if (!is_null($ecj_sr) && ($ecj_sr>0)) { ?><br><mark><?=number_format($jc/$ecj_sr,0,'.',',')?></mark><?php } } else { ?>><?php } ?></td>
+<td<?php if (!is_null($jpay)) { ?> align="right"><?=number_format($jpay,0,'.',',').'&nbsp;/&nbsp;'.number_format($jtax,0,'.',',')?><?php if (!is_null($ecj_sr) && ($ecj_sr>0)) { ?><br><mark><?=number_format($jpay/$ecj_sr,0,'.',',').'&nbsp;/&nbsp;'.number_format($jtax/$ecj_sr,0,'.',',')?></mark><?php } } else { ?>><?php } ?></td>
 <td><?=$dt?><br><?=$dtt?></td>
 </tr>
 <?php
@@ -133,6 +137,8 @@ select
  ebc_job_time_efficiency as jte,
  ebc_job_material_efficiency as jme,
  j.ecj_cost as jc,
+ ebc_industry_payment as jpay,
+ ebc_tax as jtax,
  to_char(ebc_created_at,'Mon DD') as dt,
  to_char(ebc_created_at,'HH24:MI:SS') as dtt,
  j.ecj_runs as ecj_r,
