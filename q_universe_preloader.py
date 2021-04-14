@@ -31,11 +31,12 @@ import sys
 
 import eve_db_tools
 import console_app
+# from memory_profiler import memory_usage
 
 
 def main():
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
-    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=True)
+    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=False)
     first_time = True
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -120,4 +121,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # mem = memory_usage(main, max_usage=True)
+    # print("Memory used: {}Mb".format(mem))
+    main()  # 121.4Mb
