@@ -149,7 +149,8 @@ from
    on ecj_job_id=ebc_job_id and ecj_corporation_id=ebc_job_corporation_id
 where
  ebc_transaction_type in ('f','p','A','j')
- and ebc_id >= 110830
+ -- and ebc_id >= 110830
+ and ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '7 days')
 order by
  ebc_id DESC;
 EOD;
