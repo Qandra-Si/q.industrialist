@@ -152,7 +152,7 @@ where
  -- and ebc_id >= 110830
  and ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '7 days')
 order by
- ebc_id DESC;
+ ebc_created_at DESC;
 EOD;
     $costs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
