@@ -46,8 +46,19 @@ include_once '.settings.php';
 <tr<?=!is_null($jid)?' class="info"':''?>>
 <td<?php if (!is_null($ss)) { ?> align="left"><?=$ss?><?php } else { ?>><?php } ?><br><span class="text-muted">№ <?=$id?></span></td>
 <td><img class="icn32" src="<?=__get_img_src($bpt,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
+<?php
+            if ($bpr == -1) // BPO
+            {
+?>
+<td colspan="4"><?=$bptn?>&nbsp;<span class="label label-success"><?=$me?> <?=$te?></span>&nbsp;<span class="label label-default">original</span><br><span class="text-muted">BP № <?=$bpid?><?php if (!is_null($jid)) { ?> = <span class="text-info">JOB № <?=$jid?></span><?php } ?></span></td>
+<?php
+            }
+            else // BPC
+            {
+?>
 <td colspan="4"><?=$bptn?>&nbsp;<span class="label label-success"><?=$me?> <?=$te?></span>&nbsp;<small><span class="badge"><?=$bpr?></span></small><br><span class="text-muted">BP № <?=$bpid?><?php if (!is_null($jid)) { ?> = <span class="text-info">JOB № <?=$jid?></span><?php } ?></span></td>
 <?php
+            }
         }
         else // $tt in 'p','f'
         {
@@ -148,8 +159,9 @@ from
   left outer join qi.esi_corporation_industry_jobs j
    on ecj_job_id=ebc_job_id and ecj_corporation_id=ebc_job_corporation_id
 where
- ebc_transaction_type in ('f','p','A','j')
- -- and ebc_id >= 110830
+ ( ebc_transaction_type in ('f','p','j') or 
+   (ebc_transaction_type in ('A') and (ebc_blueprint_runs != -1))
+ )
  and ebc_created_at >= (current_timestamp at time zone 'GMT' - interval '7 days')
 order by
  ebc_created_at DESC;
