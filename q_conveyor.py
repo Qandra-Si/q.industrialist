@@ -238,6 +238,7 @@ def main():
             "corp_conveyour_entities": corp_conveyour_entities,
             # esi данные, загруженные с серверов CCP
             "corp_industry_jobs_data": corp_industry_jobs_data,
+            "corp_assets_data": corp_assets_data,
             # данные, полученные в результате анализа и перекомпоновки входных списков
             "corp_ass_loc_data": corp_ass_loc_data,
             "corp_bp_loc_data": corp_bp_loc_data,
