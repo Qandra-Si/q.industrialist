@@ -594,16 +594,18 @@ def __dump_corp_conveyors_stock_all(
         # группируются по солнечным системам, поэтому попадаем сюда для каждой системы раз за разом
         for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
             # группируются по контейнерам с чертежами
+            if len(conveyor_entity["stock"]) == 0:
+                continue
             stock = conveyor_entity["stock"][0]
             stock_id = stock["id"]  # 1035633039842
             stock_name = stock["name"]  # ..stock ALL
             stock_tree_dict = corp_conveyors["corp_assets_tree"][str(stock_id)]  # {'type_id': 17368,...
             stock_item_dict = corp_conveyors["corp_assets_data"][int(stock_tree_dict["index"])]  # {'is_singleton': True,
-            stock_item_type_id = int(stock_tree_dict["type_id"])  # 17368
+            # stock_item_type_id = int(stock_tree_dict["type_id"])  # 17368
             stock_location_flag = stock_item_dict["location_flag"]  # CorpSAG6
-            #office_id = stock_item_dict["location_id"]  # 1035631968791
-            #office_tree_dict = corp_conveyors["corp_assets_tree"][str(office_id)]  # {'items': [1030288472777, ...
-            #office_item_dict = corp_conveyors["corp_assets_data"][int(office_tree_dict["index"])]  # {'location_flag': 'OfficeFolder'
+            # office_id = stock_item_dict["location_id"]  # 1035631968791
+            # office_tree_dict = corp_conveyors["corp_assets_tree"][str(office_id)]  # {'items': [1030288472777, ...
+            # office_item_dict = corp_conveyors["corp_assets_data"][int(office_tree_dict["index"])]  # {'location_flag': 'OfficeFolder'
             station_id = conveyor_entity["station_id"]  # 1035620655696
             station_name = conveyor_entity["station"]  # Poinen - Ri4 Love Prod
             # print(stock_id, stock_location_flag, station_id, station_name, "\n\n")
