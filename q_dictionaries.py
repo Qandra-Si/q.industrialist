@@ -28,8 +28,9 @@ def main():
     exit_or_wrong_getopt = None
     workspace_cache_files_dir = None
     category = None
+    blueprints = None
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "cache_dir=", "category="])
+        opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "cache_dir=", "category=", "blueprints"])
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
     if exit_or_wrong_getopt is None:
@@ -41,6 +42,8 @@ def main():
                 workspace_cache_files_dir = arg[:-1] if arg[-1:] == '/' else arg
             elif opt in ("--category"):
                 category = int(arg)
+            elif opt in ("--blueprints"):
+                blueprints = True
         if workspace_cache_files_dir is None:
             exit_or_wrong_getopt = 0
     if not (exit_or_wrong_getopt is None):
@@ -52,27 +55,27 @@ def main():
     qidb.connect(q_industrialist_settings.g_database)
     qidbdics = db.QDictionaries(qidb)
 
-    if (category is None) or (category == 0):
+    if (blueprints is None) and ((category is None) or (category == 0)):
         sde_meta_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "metaGroups")
         qidbdics.actualize_names(sde_meta_groups, 0, "nameID")
         del sde_meta_groups
 
-    if (category is None) or (category == 1):
+    if (blueprints is None) and ((category is None) or (category == 1)):
         sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
         qidbdics.actualize_names(sde_type_ids, 1, "name")
         del sde_type_ids
 
-    if (category is None) or (category == 2):
+    if (blueprints is None) and ((category is None) or (category == 2)):
         sde_market_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "marketGroups")
         qidbdics.actualize_names(sde_market_groups, 2, "nameID")
         del sde_market_groups
 
-    if (category is None) or (category == 3):
+    if (blueprints is None) and ((category is None) or (category == 3)):
         sde_inv_names = eve_sde_tools.read_converted(workspace_cache_files_dir, "invNames")
         qidbdics.actualize_names(sde_inv_names, 3, None)
         del sde_inv_names
 
-    if (category is None) or (category == 4):
+    if (blueprints is None) and ((category is None) or (category == 4)):
         # [1..6] : https://support.eveonline.com/hc/en-us/articles/203210272-Activities-and-Job-Types
         # [0,1,3,4,5,7,8,11, +9?] : https://github.com/esi/esi-issues/issues/894
         qidbdics.clean_names(4)
@@ -86,7 +89,7 @@ def main():
         qidbdics.insert_name(11, 4, "reaction")  # Reaction
         qidb.commit()
 
-    if (category is None) or (category in [5,6,7]):
+    if (blueprints is None) and ((category is None) or (category in [5,6,7])):
         if (category is None) or (category == 5):
             qidbdics.clean_integers(5)
         if (category is None) or (category == 6):
@@ -115,9 +118,14 @@ def main():
                     __products_quantity = __bpar["products"][0]["quantity"]
                     qidbdics.insert_integer(__blueprint_type_id, 7, __products_quantity)
 
-
-        #qidbdics.actualize_names(sde_meta_groups, 0, "nameID")
+        # qidbdics.actualize_names(sde_meta_groups, 0, "nameID")
         del sde_blueprints
+
+    if (blueprints is None) or blueprints:
+        sde_bp_materials = eve_sde_tools.read_converted(workspace_cache_files_dir, "blueprints")
+        qidbdics.clean_blueprints()
+        qidbdics.actualize_blueprints(sde_bp_materials)
+        del sde_bp_materials
 
     del qidbdics
     del qidb
