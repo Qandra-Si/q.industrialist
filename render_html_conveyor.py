@@ -645,6 +645,7 @@ def __dump_corp_conveyors_stock_all(
                             in_progress = in_progress + j["runs"]
                         # сохраняем ресурс в справочник
                         resource_dict = {
+                            "stock": stock_id,
                             "id": type_id,
                             "name": item_name,
                             "q": quantity,
@@ -681,6 +682,7 @@ def __dump_corp_conveyors_stock_all(
                         in_progress = in_progress + j["runs"]
                         # сохраняем ресурс в справочник
                     resource_dict = {
+                        "stock": stock_id,
                         "id": type_id,
                         "name": item_name,
                         "q": 0,
@@ -715,14 +717,14 @@ def __dump_corp_conveyors_stock_all(
 
     # формируем dropdown список, где можон будет выбрать локации и ангары
     glf.write("""
-<div id="ddStock" class="dropdown">
-  <button class="btn btn-default dropdown-toggle" type="button" id="ddStockMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+<div id="ddStocks" class="dropdown">
+  <button class="btn btn-default dropdown-toggle" type="button" id="ddStocksMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
     <span class="qind-lb-dd">Choose Place&hellip;</span>
     <span class="caret"></span>
   </button>
   <ul class="dropdown-menu" aria-labelledby="ddMenuStock">
 """)
-    prev_station_id: int = None
+    prev_station_id = None
     for stock in enumerate(used_stock_places):
         if stock[0] > 0:
             glf.write('<li role="separator" class="divider"></li>\n')
@@ -747,6 +749,7 @@ def __dump_corp_conveyors_stock_all(
  <table id="tblStock" class="table table-condensed table-hover">
 <thead>
  <tr>
+  <th class="hidden"></th>
   <th>#</th>
   <th>Item</th>
   <th>In stock</th>
@@ -768,6 +771,7 @@ def __dump_corp_conveyors_stock_all(
             '</tr>'.
             format(nm=__group_dict["name"]))
         for resource_dict in __group_dict["items"]:
+            stock_id = resource_dict["stock"]
             type_id = resource_dict["id"]
             quantity = resource_dict["q"]
             in_progress = resource_dict["j"]
@@ -783,13 +787,15 @@ def __dump_corp_conveyors_stock_all(
             # формируем строку таблицы - найден нужный чертёж в ассетах
             glf.write(
                 '<tr>'
+                '<td class="hidden">{stock}</td>'
                 '<th scope="row">{num}</th>'
                 '<td>{nm}{mat_tag}</td>'
                 '<td align="right">{q}</td>'
                 '<td align="right">{ne}</td>'
                 '<td align="right">{ip}</td>'
                 '</tr>\n'.
-                format(num=row_num,
+                format(stock=stock_id,
+                       num=row_num,
                        nm=resource_dict["name"],
                        mat_tag=material_tag,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
@@ -1179,6 +1185,34 @@ def __dump_corp_conveyors(
       sortConveyor($(this),g_tbl_col_orders[sort_by],sort_by,g_tbl_col_types[sort_by]);
     })
   }
+  function rebuildStockMaterials() {
+    // filtering stocks
+    var stock_id = ls.getItem('Stock Id');
+    $('#tblStock').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = true;
+      if (!(stock_id === null)) {
+        show = stock_id == tr.find('td').eq(0).text();
+      }
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  // Stocks Dropdown menu setup
+  function rebuildStocksDropdown() {
+    var stock_id = ls.getItem('Stock Id');
+    if (!(stock_id === null)) {
+      var btn = $('#ddStocks');
+      btn.find('li a').each(function() {
+        if ($(this).attr('loc') == stock_id) {
+          btn.find('span.qind-lb-dd').html($(this).html());
+          btn.val($(this).html());
+        }
+      });
+    }
+  }
   // Conveyor Options menu and submenu setup
   function toggleMenuOption(name) {
     show = (ls.getItem(name) == 1) ? 0 : 1;
@@ -1208,10 +1242,19 @@ def __dump_corp_conveyors(
       rebuildOptionsMenu();
       rebuildBody();
     });
+    $('#ddStocks').on('click', 'li a', function () {
+      var li_a = $(this);
+      var stock_id = li_a.attr('loc');
+      ls.setItem('Stock Id', stock_id);
+      rebuildStocksDropdown();
+      rebuildStockMaterials();
+    });
     // first init
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     rebuildBody();
+    rebuildStocksDropdown();
+    rebuildStockMaterials();
     // Working with clipboard
     $('a.qind-copy-btn').each(function() {
       $(this).tooltip();
