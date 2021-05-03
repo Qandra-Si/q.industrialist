@@ -235,7 +235,7 @@ def __dump_not_available_materials_list(
                         '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
                         '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                         '  aria-hidden="true"></span></a>'. \
-                            format(nm=ms_item_name)
+                        format(nm=ms_item_name)
                     # вывод сведений в отчёт
                     glf.write(
                         '<tr>\n'
@@ -366,17 +366,17 @@ def __dump_blueprints_list_with_materials(
                     elif 943 in groups_chain:  # Ship Modifications
                         activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
             # ---
-            min_activity_time = None
+            max_activity_time = None  # "обгрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
                 for itm in bp["itm"]:
                     __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
                     __time = __runs * activity_time
-                    if min_activity_time is None:
-                        min_activity_time = __time
-                    elif min_activity_time > __time:
-                        min_activity_time = __time
+                    if max_activity_time is None:
+                        max_activity_time = __time
+                    elif max_activity_time < __time:
+                        max_activity_time = __time
             # ---
             glf.write(
                 '<tr><td class="hidden">{nm}</td><td class="hidden">{time}</td><td>\n'
@@ -388,7 +388,7 @@ def __dump_blueprints_list_with_materials(
                 '  <h4 class="media-heading">{nm}</h4>\n'.format(
                     src=render_html.__get_img_src(type_id, 64),
                     nm=blueprint_name,
-                    time=0 if min_activity_time is None else min_activity_time
+                    time=0 if max_activity_time is None else max_activity_time
                 )
             )
             for bpk in bp_keys:
@@ -398,16 +398,31 @@ def __dump_blueprints_list_with_materials(
                 material_efficiency = bp["me"]
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
+                # ---
+                bpk_time_html = ''
+                if (not blueprint_status or (blueprint_status != 'active')) and not (max_activity_time is None):
+                    bpk_time_max = None
+                    for itm in bp["itm"]:
+                        __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
+                        __time = __runs * activity_time * ((100-time_efficiency)/100)
+                        if (bpk_time_max is None) or (bpk_time_max < __time):
+                            bpk_time_max = __time
+                            bpk_time_html =\
+                                '&nbsp;<span class="label label-time">{:d}:{:02d}</span>'.\
+                                format(int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60))
+                # ---
                 glf.write(
                     '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
-                    '&nbsp;<span class="badge">{qr}{fnr}</span>\n'.format(
+                    '&nbsp;<span class="badge">{qr}{fnr}</span>'
+                    '{time}\n'.format(
                         qr=quantity_or_runs,
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
                         me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if show_me_te else "",
-                        status=blueprint_status if not (blueprint_status is None) else ""
+                        status=blueprint_status if not (blueprint_status is None) else "",
+                        time=bpk_time_html
                     )
                 )
                 if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
@@ -452,6 +467,14 @@ def __dump_blueprints_list_with_materials(
                     glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(manufacturing_activity))
                     glf.write('</br></span>')  # qind-blueprints-?
                 else:
+                    # подготовка элементов управления копирования данных в clipboard
+                    if enable_copy_to_clipboard:
+                        glf.write(
+                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
+                            ' data-source="table" data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
+                            ' aria-hidden="true"></span></a>'.
+                            format(nm=blueprint_name)
+                        )
                     glf.write('</br></span>')  # qind-blueprints-?
                     glf.write('<div class="qind-materials-used">\n')  # div(materials)
                     not_enough_materials = []
@@ -743,6 +766,7 @@ def __dump_corp_conveyors_stock_all(
 <style>
 #tblStock tr { font-size: small; }
 .badge-light { color: #212529; background-color: #f8f9fa; }
+.label-time { color: #131313; background-color: #7adee3; }
 </style>
 
 <div class="table-responsive">
