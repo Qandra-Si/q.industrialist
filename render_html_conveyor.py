@@ -353,7 +353,7 @@ def __dump_blueprints_list_with_materials(
             # ---
             if is_invention_activity and activity_blueprint_materials:
                 # Добавляем декрипторы (замечения и ограничения):
-                # - всегда все хулы запускаются с декриптором Parity Decryptor
+                # - всегда все хулы запускаются с декриптором Accelerant Decryptor
                 # - всегда все риги запускаются с декриптором Symmetry Decryptor
                 # - всегда все модули запускаются без декрипторов
                 # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
@@ -362,7 +362,7 @@ def __dump_blueprints_list_with_materials(
                 groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
                 if not (groups_chain is None):
                     if 204 in groups_chain:  # Ships
-                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34204})  # Parity Decryptor
+                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34201})  # Accelerant Decryptor
                     elif 943 in groups_chain:  # Ship Modifications
                         activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
             # ---
