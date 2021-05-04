@@ -366,10 +366,12 @@ def __dump_blueprints_list_with_materials(
                     elif 943 in groups_chain:  # Ship Modifications
                         activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
             # ---
-            max_activity_time = None  # "обгрызков" чертежей с малым кол-вом ранов как правило меньше
+            max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
+                if not (bp["st"] is None):
+                    continue  # пропускаем чертежи, по которым ведутся работы
                 for itm in bp["itm"]:
                     __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
                     __time = __runs * activity_time
@@ -400,16 +402,64 @@ def __dump_blueprints_list_with_materials(
                 blueprint_status = bp["st"]
                 # ---
                 bpk_time_html = ''
-                if (not blueprint_status or (blueprint_status != 'active')) and not (max_activity_time is None):
+                if (blueprint_status is None) and not (max_activity_time is None):
                     bpk_time_max = None
+                    bpk_time_min = None
                     for itm in bp["itm"]:
                         __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
-                        __time = __runs * activity_time * ((100-time_efficiency)/100)
-                        if (bpk_time_max is None) or (bpk_time_max < __time):
+                        __time = __runs * activity_time
+                        # TODO: хардкодим тут бонусы риг станций, когда же руки дойдут сделать нормально?!
+                        if manufacturing_activity in ['manufacturing']:
+                            # считаем бонус чертежа (накладываем TE чертежа на БП)
+                            __stage1 = float(__time * (100 - time_efficiency) / 100.0)
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__stage1 * (100.0 - 30.0) / 100.0)
+                            # # учитываем бонус установленного модификатора
+                            # __stage3 = float(__stage2 * (100.0 - 0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage2 + 0.99))
+                            # ---
+                            __time = __stage4
+                        elif manufacturing_activity in ['reaction']:
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__time * (100.0 - 25.0) / 100.0)
+                            # учитываем бонус установленного модификатора
+                            __stage3 = float(__stage2 * (100.0 - 22.0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage3 + 0.99))
+                            # ---
+                            __time = __stage4
+                        elif manufacturing_activity in ['invention']:
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__time * (100.0 - 20.0) / 100.0)
+                            # # учитываем бонус установленного модификатора
+                            # __stage3 = float(__stage2 * (100.0 - 22.0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage2 + 0.99))
+                            # ---
+                            __time = __stage4
+                        __changed: bool = False
+                        if bpk_time_max is None:
                             bpk_time_max = __time
-                            bpk_time_html =\
-                                '&nbsp;<span class="label label-time">{:d}:{:02d}</span>'.\
-                                format(int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60))
+                            bpk_time_min = __time
+                            __changed = True
+                        else:
+                            if bpk_time_max < __time:
+                                bpk_time_max = __time
+                                __changed = True
+                            if bpk_time_min > __time:
+                                bpk_time_min = __time
+                                __changed = True
+                        if __changed:
+                            if bpk_time_max == bpk_time_min:
+                                bpk_time_html =\
+                                    '&nbsp;<span class="label label-time">{:d}:{:02d}</span>'.\
+                                    format(int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60))
+                            else:
+                                bpk_time_html =\
+                                    '&nbsp;<span class="label label-time">{:d}:{:02d}&hellip;{:d}:{:02d}</span>'.\
+                                    format(int(bpk_time_min // 3600), int((bpk_time_min // 60) % 60),
+                                           int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60),)
                 # ---
                 glf.write(
                     '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
