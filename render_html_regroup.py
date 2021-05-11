@@ -63,7 +63,7 @@ def __dump_regroup_stations(
         sde_type_ids,
         sde_market_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_regroup_stat):
+        corp_regroup_stats):
     glf.write("""
 <style>
 .qind-fit-table {
@@ -109,112 +109,122 @@ def __dump_regroup_stations(
 """)
 
     fit_multiplexer = 0
-    for station_dict in corp_regroup_stat["regroup_containers"]:
-        station_id = station_dict["station_id"]
-        if not (station_id is None):
-            regroup_station_dict = corp_regroup_stat["regroup_stocks"].get(int(station_id))
-        else:
-            regroup_station_dict = None
-        station_name = station_dict["station_name"]
-        foreign = station_dict.get("station_foreign", False)
-        containers = station_dict["containers"]
-        stock_hangars = station_dict["stock_hangars"]
+    for corp_regroup_stat in corp_regroup_stats:
+        corporation_name = corp_regroup_stat["corporation_name"]
+        glf.write('<h4>{}</h4>'.format(corporation_name))
 
-        glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (station)
-                  ' <div class="panel-heading">\n'
-                  '  <h3 class="panel-title">{nm}{foreign}</h3>\n'
-                  ' </div>\n'
-                  ' <div class="panel-body">\n'.  # panel-body (station)
-                  format(id=station_id,
-                         nm=station_name,
-                         foreign=' <span class="label label-warning">foreign</span>' if foreign else ""))
+        for station_dict in corp_regroup_stat["regroup_containers"]:
+            station_id = station_dict["station_id"]
+            if not (station_id is None):
+                regroup_station_dict = corp_regroup_stat["regroup_stocks"].get(int(station_id))
+            else:
+                regroup_station_dict = None
+            station_name = station_dict["station_name"]
+            foreign = station_dict.get("station_foreign", False)
+            containers = station_dict["containers"]
+            stock_hangars = station_dict["stock_hangars"]
 
-        for container_dict in containers:
-            container_id = container_dict["id"]
-            regroup_container_dict = regroup_station_dict.get(int(container_id)) if not (regroup_station_dict is None) else None
-            container_name = container_dict["name"]
-
-            glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (container)
+            glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (station)
                       ' <div class="panel-heading">\n'
-                      '  <h3 class="panel-title">{nm}</h3>\n'
+                      '  <h3 class="panel-title">{nm}{foreign}</h3>\n'
                       ' </div>\n'
-                      ' <div class="panel-body">\n'  # panel-body (container)
-                      '  <div class="row">\n'  # row
-                      '   <div class="col-md-5">\n'.  # start group1 (fits)
-                      format(id=container_id, nm=container_name))
+                      ' <div class="panel-body">\n'.  # panel-body (station)
+                      format(id=station_id,
+                             nm=station_name,
+                             foreign=' <span class="label label-warning">foreign</span>' if foreign else ""))
 
-            render_html.__dump_converted_fits(
-                glf,
-                regroup_container_dict["fits"],
-                'regroup_fits{id}'.format(id=container_id),
-                'rgrpfit{id}'.format(id=container_id),
-                collapse_pn_types=None,
-                row_num_multiplexer=fit_multiplexer,
-                fit_keyword="regroup",
-                available_attr="available"
-            )
+            for container_dict in containers:
+                container_id = container_dict["id"]
+                regroup_container_dict = regroup_station_dict.get(int(container_id)) if not (regroup_station_dict is None) else None
+                if not regroup_container_dict:
+                    continue
+                container_name = container_dict["name"]
 
-            glf.write('   </div>\n'  # end group1 (fits)
-                      '   <div class="col-md-7">\n')  # start group1 (stock)
+                glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (container)
+                          ' <div class="panel-heading">\n'
+                          '  <h3 class="panel-title">{nm}</h3>\n'
+                          ' </div>\n'
+                          ' <div class="panel-body">\n'  # panel-body (container)
+                          '  <div class="row">\n'  # row
+                          '   <div class="col-md-5">\n'.  # start group1 (fits)
+                          format(id=container_id, nm=container_name))
 
-            if regroup_container_dict:
-                __dump_regroup_items_table(
-                    glf,
-                    corp_regroup_stat["regroup_market_groups"],
-                    regroup_container_dict["stock"]
-                )
+                if regroup_container_dict:
+                    render_html.__dump_converted_fits(
+                        glf,
+                        regroup_container_dict["fits"],
+                        'regroup_fits{id}'.format(id=container_id),
+                        'rgrpfit{id}'.format(id=container_id),
+                        collapse_pn_types=None,
+                        row_num_multiplexer=fit_multiplexer,
+                        fit_keyword="regroup",
+                        available_attr="available"
+                    )
 
-            glf.write('   </div>\n'  # end group1 (stock)
-                      '  </div>\n'  # row
-                      ' </div>\n'  # panel-body (container)
-                      '</div>\n')  # panel (container)
+                glf.write('   </div>\n'  # end group1 (fits)
+                          '   <div class="col-md-7">\n')  # start group1 (stock)
 
-            fit_multiplexer += 1000
+                if regroup_container_dict:
+                    __dump_regroup_items_table(
+                        glf,
+                        corp_regroup_stat["regroup_market_groups"],
+                        regroup_container_dict["stock"]
+                    )
 
-        for hangar_dict in stock_hangars:
-            hangar_id = "{}_{}".format(station_id, hangar_dict)
-            regroup_container_dict = regroup_station_dict.get(hangar_id) if not (regroup_station_dict is None) else None
-            hangar_name = "Corp Security Access Group {}".format(hangar_dict[-1:])
+                glf.write('   </div>\n'  # end group1 (stock)
+                          '  </div>\n'  # row
+                          ' </div>\n'  # panel-body (container)
+                          '</div>\n')  # panel (container)
 
-            glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (container)
-                      ' <div class="panel-heading">\n'
-                      '  <h3 class="panel-title">{nm}</h3>\n'
-                      ' </div>\n'
-                      ' <div class="panel-body">\n'  # panel-body (container)
-                      '  <div class="row">\n'  # row
-                      '   <div class="col-md-5">\n'.  # start group1 (fits)
-                      format(id=hangar_id, nm=hangar_name))
+                fit_multiplexer += 1000
 
-            render_html.__dump_converted_fits(
-                glf,
-                regroup_container_dict["fits"],
-                'regroup_fits{id}'.format(id=hangar_id),
-                'rgrpfit{id}'.format(id=hangar_id),
-                collapse_pn_types=None,
-                row_num_multiplexer=fit_multiplexer,
-                fit_keyword="regroup",
-                available_attr="available"
-            )
+            for hangar_dict in stock_hangars:
+                hangar_id = "{}_{}".format(station_id, hangar_dict)
+                regroup_hangar_dict = regroup_station_dict.get(hangar_id) if not (regroup_station_dict is None) else None
+                if not regroup_hangar_dict:
+                    continue
+                hangar_name = "Corp Security Access Group {}".format(hangar_dict[-1:])
 
-            glf.write('   </div>\n'  # end group1 (fits)
-                      '   <div class="col-md-7">\n')  # start group1 (stock)
+                glf.write('<div class="panel panel-default" id="id{id}">\n'  # panel (container)
+                          ' <div class="panel-heading">\n'
+                          '  <h3 class="panel-title">{nm}</h3>\n'
+                          ' </div>\n'
+                          ' <div class="panel-body">\n'  # panel-body (container)
+                          '  <div class="row">\n'  # row
+                          '   <div class="col-md-5">\n'.  # start group1 (fits)
+                          format(id=hangar_id, nm=hangar_name))
 
-            if regroup_container_dict:
-                __dump_regroup_items_table(
-                    glf,
-                    corp_regroup_stat["regroup_market_groups"],
-                    regroup_container_dict["stock"]
-                )
+                if regroup_hangar_dict:
+                    render_html.__dump_converted_fits(
+                        glf,
+                        regroup_hangar_dict["fits"],
+                        'regroup_fits{id}'.format(id=hangar_id),
+                        'rgrpfit{id}'.format(id=hangar_id),
+                        collapse_pn_types=None,
+                        row_num_multiplexer=fit_multiplexer,
+                        fit_keyword="regroup",
+                        available_attr="available"
+                    )
 
-            glf.write('   </div>\n'  # end group1 (stock)
-                      '  </div>\n'  # row
-                      ' </div>\n'  # panel-body (container)
-                      '</div>\n')  # panel (container)
+                glf.write('   </div>\n'  # end group1 (fits)
+                          '   <div class="col-md-7">\n')  # start group1 (stock)
 
-            fit_multiplexer += 1000
+                if regroup_hangar_dict:
+                    __dump_regroup_items_table(
+                        glf,
+                        corp_regroup_stat["regroup_market_groups"],
+                        regroup_hangar_dict["stock"]
+                    )
 
-        glf.write(' </div>\n'  # panel-body (station)
-                  '</div>\n')  # panel (station)
+                glf.write('   </div>\n'  # end group1 (stock)
+                          '  </div>\n'  # row
+                          ' </div>\n'  # panel-body (container)
+                          '</div>\n')  # panel (container)
+
+                fit_multiplexer += 1000
+
+            glf.write(' </div>\n'  # panel-body (station)
+                      '</div>\n')  # panel (station)
 
     glf.write("""
 </div> <!--container-fluid-->
@@ -289,7 +299,7 @@ def dump_regroup_into_report(
         sde_type_ids,
         sde_market_groups,
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        corp_regroup_stat):
+        corp_regroup_stats):
     glf = open('{dir}/regroup.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Regroup")
@@ -297,7 +307,7 @@ def dump_regroup_into_report(
             glf,
             sde_type_ids,
             sde_market_groups,
-            corp_regroup_stat
+            corp_regroup_stats
         )
         render_html.__dump_footer(glf)
     finally:
