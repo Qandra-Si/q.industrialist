@@ -48,7 +48,7 @@ g_module_default_settings = {
     "factory:blueprints_hangars": [1],
 
     # номера контейнеров, в которых располагаются чертежи для конвейера
-    "industry:conveyor_boxes": [],
+    # устарело, не используется: "industry:conveyor_boxes": [],
 }
 g_module_default_types = {
     "factory:station_id2": int,
@@ -104,7 +104,8 @@ def __get_blueprints_containers(
         sde_inv_names,
         corp_assets_data,
         foreign_structures_data,
-        corp_ass_names_data
+        corp_ass_names_data,
+        throw_when_not_found=False
     )
     return factories_containers
 
@@ -558,14 +559,14 @@ def __build_industry(
             "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
             " FROM qi.workflow_industry_jobs"
             " WHERE wij_activity_id=1 AND"
-            "  wij_bp_lid=ANY(%s) AND"
+            # устарело, не используется: "  wij_bp_lid=ANY(%s) AND"
             "  wij_product_tid=ANY(%s) AND"
             "  wij_end_date > (current_date - interval '93' day)"
             ") AS a "
             "WHERE mnth=%s OR mnth=%s OR mnth=%s "
             "GROUP BY 1,4 "
             "ORDER BY 1;",
-            module_settings["industry:conveyor_boxes"],
+            # устарело, не используется: module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids,
             int(db_current_month[0]),  # january=1, december=12
             int((db_current_month[0]-2+12)%12+1),
@@ -584,11 +585,11 @@ def __build_industry(
             "SELECT wij_product_tid,SUM(wij_quantity) "
             "FROM qi.workflow_industry_jobs "
             "WHERE wij_activity_id=1 AND"
-            " wij_bp_lid=ANY(%s) AND"
+            # устарело, не используется: " wij_bp_lid=ANY(%s) AND"
             " wij_product_tid=ANY(%s) AND"
             " wij_end_date > (current_date - interval '30' day) "
             "GROUP BY 1;",
-            module_settings["industry:conveyor_boxes"],
+            # устарело, не используется: module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids)
         corp_industry_stat["workflow_last_industry_jobs"] = [{
             "ptid": wij[0],

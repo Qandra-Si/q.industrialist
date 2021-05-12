@@ -593,7 +593,8 @@ def get_containers_on_stations(
                 station_id,
                 hangars_filter,
                 sde_type_ids,
-                corp_assets_data)
+                corp_assets_data,
+                throw_when_not_found=throw_when_not_found)
 
             if not station_containers["station_foreign"]:
                 station_name = next((an['name'] for an in corp_ass_names_data if an["item_id"] == station_id), None)
