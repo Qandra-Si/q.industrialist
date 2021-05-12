@@ -102,13 +102,51 @@ class QDictionaries:
     def clean_blueprints(self):
         self.db.execute("DELETE FROM eve_sde_blueprints;")
 
+    def insert_blueprint_activity(self, blueprint_id: int, activity_id: int, time: int, materials, products):
+        self.db.execute(
+            "INSERT INTO eve_sde_blueprints("
+            " sdeb_blueprint_type_id,"
+            " sdeb_activity,"
+            " sdeb_time) "
+            "VALUES (%s,%s,%s);",
+            int(blueprint_id),
+            int(activity_id),
+            int(time)
+        )
+        if products:
+            for p in products:
+                self.db.execute(
+                    "INSERT INTO eve_sde_blueprint_products("
+                    " sdebp_blueprint_type_id,"
+                    " sdebp_activity,"
+                    " sdebp_product_id,"
+                    " sdebp_quantity,"
+                    " sdebp_probability) "
+                    "VALUES (%s,%s,%s,%s,%s);",
+                    int(blueprint_id),
+                    int(activity_id),
+                    int(p["typeID"]),
+                    int(p["quantity"]),
+                    p.get("probability", None)
+                )
+        if materials:
+            for m in materials:
+                self.db.execute(
+                    "INSERT INTO eve_sde_blueprint_materials("
+                    " sdebm_blueprint_type_id,"
+                    " sdebm_activity,"
+                    " sdebm_material_id,"
+                    " sdebm_quantity) "
+                    "VALUES (%s,%s,%s,%s);",
+                    int(blueprint_id),
+                    int(activity_id),
+                    int(m["typeID"]),
+                    m["quantity"]
+                )
+
     def actualize_blueprints(self, sde_bp_materials):
         for bp in sde_bp_materials:
             blueprint_id: int = bp
-            activity_id = None
-            time = None
-            materials = None
-            products = None
             activities = sde_bp_materials[bp].get("activities")
             if activities:
                 copying = activities.get("copying")
@@ -117,75 +155,39 @@ class QDictionaries:
                     materials = copying.get("materials")
                     products = copying.get("products")
                     time = copying["time"]
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
                 manufacturing = activities.get("manufacturing")
                 if manufacturing:
                     activity_id = 1
                     materials = manufacturing.get("materials")
                     products = manufacturing.get("products")
                     time = manufacturing["time"]
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
                 invention = activities.get("invention")
                 if invention:
                     activity_id = 8
                     materials = invention.get("materials")
                     products = invention.get("products")
                     time = invention["time"]
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
                 research_material = activities.get("research_material")
                 if research_material:
                     activity_id = 4
                     materials = research_material.get("materials")
                     products = research_material.get("products")
                     time = research_material["time"]
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
                 research_time = activities.get("research_time")
                 if research_time:
                     activity_id = 3
                     materials = research_time.get("materials")
                     products = research_time.get("products")
                     time = research_time["time"]
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
                 reaction = activities.get("reaction")
                 if reaction:
                     activity_id = 9
                     materials = reaction.get("materials")
                     products = reaction.get("products")
                     time = reaction["time"]
-                if activity_id is None:
-                    continue
-                self.db.execute(
-                    "INSERT INTO eve_sde_blueprints("
-                    " sdeb_blueprint_type_id,"
-                    " sdeb_activity,"
-                    " sdeb_time) "
-                    "VALUES (%s,%s,%s);",
-                    int(blueprint_id),
-                    int(activity_id),
-                    int(time)
-                )
-                if products:
-                    for p in products:
-                        self.db.execute(
-                            "INSERT INTO eve_sde_blueprint_products("
-                            " sdebp_blueprint_type_id,"
-                            " sdebp_activity,"
-                            " sdebp_product_id,"
-                            " sdebp_quantity,"
-                            " sdebp_probability) "
-                            "VALUES (%s,%s,%s,%s,%s);",
-                            int(blueprint_id),
-                            int(activity_id),
-                            int(p["typeID"]),
-                            int(p["quantity"]),
-                            p.get("probability", None)
-                        )
-                if materials:
-                    for m in materials:
-                        self.db.execute(
-                            "INSERT INTO eve_sde_blueprint_materials("
-                            " sdebm_blueprint_type_id,"
-                            " sdebm_activity,"
-                            " sdebm_material_id,"
-                            " sdebm_quantity) "
-                            "VALUES (%s,%s,%s,%s);",
-                            int(blueprint_id),
-                            int(activity_id),
-                            int(m["typeID"]),
-                            m["quantity"]
-                        )
+                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
