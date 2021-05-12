@@ -86,22 +86,26 @@ def __build_blueprints(
         __quantity: int = __blueprint_dict["quantity"]
         __is_blueprint_copy: bool = bool(__quantity == -2)
         __type_id: int = int(__blueprint_dict["type_id"])
-        __type_desc = sde_type_ids[str(__type_id)]
-        __is_t2_blueprint = __type_desc.get("metaGroupID") == 2
-        # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
-        # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
-        # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
-        # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
-        if not __is_t2_blueprint:
-            __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-            if __group_id != 2:  # Blueprints & Reactions
-                continue
+        __type_desc = sde_type_ids.get(str(__type_id), None)
+        if __type_desc is None:
+            __type_desc = {}
+            __is_t2_blueprint = None
+        else:
+            __is_t2_blueprint = __type_desc.get("metaGroupID", None) == 2
+            # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
+            # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+            # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
+            # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
+            if not __is_t2_blueprint:
+                __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if __group_id != 2:  # Blueprints & Reactions
+                    continue
         __blueprint_id = __blueprint_dict["item_id"]
         __location_id = __blueprint_dict["location_id"]
         __blueprint = {
             "item_id": __blueprint_id,
             "type_id": __type_id,
-            "name": __type_desc["name"]["en"],
+            "name": __type_desc.get("name", {}).get("en", "Unknown Type {} Blueprint".format(__type_id)),
             "copy": __is_blueprint_copy,
             "me": __blueprint_dict["material_efficiency"],
             "te": __blueprint_dict["time_efficiency"],
@@ -159,7 +163,7 @@ def __build_blueprints(
         if not same_blueprint_found:
             # T2 чертежи не имеют какую-то точную маркет-цену, т.к. либо не продаются, либо продаются через
             # контракты, поэтому base_price и/или average_price, или adjusted_price невалидны
-            if not __is_t2_blueprint:
+            if __is_t2_blueprint == False:
                 # выясняем стоимость чертежа
                 if "basePrice" in __type_desc:
                     __blueprint.update({"base_price": __type_desc["basePrice"]})
@@ -200,13 +204,13 @@ def __build_blueprints(
                 elif not bool(__items_dict["is_included"]):
                    continue
                 __type_id = __items_dict["type_id"]
-                __type_desc = sde_type_ids[str(__type_id)]
-                __is_t2_blueprint = __type_desc.get("metaGroupID") == 2
+                __type_desc = sde_type_ids.get(str(__type_id), {})
+                __is_t2_blueprint = __type_desc.get("metaGroupID", None) == 2
                 # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
                 # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
                 # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
                 # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
-                if not __is_t2_blueprint:
+                if __is_t2_blueprint == False:
                     # Blueprints and Reactions (добавляем только этот тип), а также T2-чертежи
                     __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
                     if __group_id != 2:
@@ -228,7 +232,7 @@ def __build_blueprints(
                 __blueprint = {
                     "item_id": __items_dict["record_id"],
                     "type_id": __type_id,
-                    "name": __type_desc["name"]["en"],
+                    "name": __type_desc.get("name", {}).get("en", "Unknown Type {} Blueprint".format(__type_id)),
                     "copy": __is_blueprint_copy,
                     # "me": None,
                     # "te": None,

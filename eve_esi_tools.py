@@ -512,7 +512,9 @@ def find_containers_in_hangars(
         station_id,
         hangars_filter,
         sde_type_ids,
-        corp_assets_data):
+        corp_assets_data,
+        # настройки
+        throw_when_not_found=True):
     # пытаемся получить станцию, как item (это возможно, если она есть в корп-ассетах, т.е. является
     # имуществом корпорации, иначе она принадлежит альянсу, или корпорация просто имеет там офис)
     __station_dict = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None)
@@ -520,7 +522,11 @@ def find_containers_in_hangars(
     __office_dict = next((a for a in corp_assets_data if (a["location_id"] == int(station_id)) and (a["location_flag"] == "OfficeFolder")), None)
 
     if (__station_dict is None) and (__office_dict is None):
-        raise Exception('Not found station or office {} in assets!!!'.format(station_id))
+        if throw_when_not_found:
+            raise Exception('Not found station or office {} in assets!!!'.format(station_id))
+        else:
+            print("ERROR: not found station or office {} in assets!!!".format(station_id))
+            return []
 
     # поиск контейнеров на станции station_id в ангарах hangars_filter
     __containers = []
@@ -637,7 +643,8 @@ def get_containers_on_stations(
                     station_id,
                     hangars_filter,
                     sde_type_ids,
-                    corp_assets_data)
+                    corp_assets_data,
+                    throw_when_not_found=throw_when_not_found)
 
         elif throw_when_not_found:
             raise Exception('Not found station identity and name!!!')

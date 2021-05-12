@@ -236,7 +236,7 @@ def __dump_not_available_materials_list(
                         '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
                         '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                         '  aria-hidden="true"></span></a>'. \
-                            format(nm=ms_item_name)
+                        format(nm=ms_item_name)
                     # вывод сведений в отчёт
                     glf.write(
                         '<tr>\n'
@@ -354,7 +354,7 @@ def __dump_blueprints_list_with_materials(
             # ---
             if is_invention_activity and activity_blueprint_materials:
                 # Добавляем декрипторы (замечения и ограничения):
-                # - всегда все хулы запускаются с декриптором Parity Decryptor
+                # - всегда все хулы запускаются с декриптором Accelerant Decryptor
                 # - всегда все риги запускаются с декриптором Symmetry Decryptor
                 # - всегда все модули запускаются без декрипторов
                 # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
@@ -363,21 +363,23 @@ def __dump_blueprints_list_with_materials(
                 groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
                 if not (groups_chain is None):
                     if 204 in groups_chain:  # Ships
-                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34204})  # Parity Decryptor
+                        activity_blueprint_materials.append({'quantity': 1, 'typeID': 34201})  # Accelerant Decryptor
                     elif 943 in groups_chain:  # Ship Modifications
                         activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
             # ---
-            min_activity_time = None
+            max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
                 bp = __bp2[type_id][bpk]
+                if not (bp["st"] is None):
+                    continue  # пропускаем чертежи, по которым ведутся работы
                 for itm in bp["itm"]:
                     __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
                     __time = __runs * activity_time
-                    if min_activity_time is None:
-                        min_activity_time = __time
-                    elif min_activity_time > __time:
-                        min_activity_time = __time
+                    if max_activity_time is None:
+                        max_activity_time = __time
+                    elif max_activity_time < __time:
+                        max_activity_time = __time
             # ---
             glf.write(
                 '<tr><td class="hidden">{nm}</td><td class="hidden">{time}</td><td>\n'
@@ -389,7 +391,7 @@ def __dump_blueprints_list_with_materials(
                 '  <h4 class="media-heading">{nm}</h4>\n'.format(
                     src=render_html.__get_img_src(type_id, 64),
                     nm=blueprint_name,
-                    time=0 if min_activity_time is None else min_activity_time
+                    time=0 if max_activity_time is None else max_activity_time
                 )
             )
             for bpk in bp_keys:
@@ -399,16 +401,79 @@ def __dump_blueprints_list_with_materials(
                 material_efficiency = bp["me"]
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
+                # ---
+                bpk_time_html = ''
+                if (blueprint_status is None) and not (max_activity_time is None):
+                    bpk_time_max = None
+                    bpk_time_min = None
+                    for itm in bp["itm"]:
+                        __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
+                        __time = __runs * activity_time
+                        # TODO: хардкодим тут бонусы риг станций, когда же руки дойдут сделать нормально?!
+                        if manufacturing_activity in ['manufacturing']:
+                            # считаем бонус чертежа (накладываем TE чертежа на БП)
+                            __stage1 = float(__time * (100 - time_efficiency) / 100.0)
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__stage1 * (100.0 - 30.0) / 100.0)
+                            # # учитываем бонус установленного модификатора
+                            # __stage3 = float(__stage2 * (100.0 - 0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage2 + 0.99))
+                            # ---
+                            __time = __stage4
+                        elif manufacturing_activity in ['reaction']:
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__time * (100.0 - 25.0) / 100.0)
+                            # учитываем бонус установленного модификатора
+                            __stage3 = float(__stage2 * (100.0 - 22.0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage3 + 0.99))
+                            # ---
+                            __time = __stage4
+                        elif manufacturing_activity in ['invention']:
+                            # учитываем бонус профиля сооружения
+                            __stage2 = float(__time * (100.0 - 20.0) / 100.0)
+                            # # учитываем бонус установленного модификатора
+                            # __stage3 = float(__stage2 * (100.0 - 22.0) / 100.0)
+                            # округляем вещественное число до старшего целого
+                            __stage4 = int(float(__stage2 + 0.99))
+                            # ---
+                            __time = __stage4
+                        __changed: bool = False
+                        if bpk_time_max is None:
+                            bpk_time_max = __time
+                            bpk_time_min = __time
+                            __changed = True
+                        else:
+                            if bpk_time_max < __time:
+                                bpk_time_max = __time
+                                __changed = True
+                            if bpk_time_min > __time:
+                                bpk_time_min = __time
+                                __changed = True
+                        if __changed:
+                            if bpk_time_max == bpk_time_min:
+                                bpk_time_html =\
+                                    '&nbsp;<span class="label label-time">{:d}:{:02d}</span>'.\
+                                    format(int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60))
+                            else:
+                                bpk_time_html =\
+                                    '&nbsp;<span class="label label-time">{:d}:{:02d}&hellip;{:d}:{:02d}</span>'.\
+                                    format(int(bpk_time_min // 3600), int((bpk_time_min // 60) % 60),
+                                           int(bpk_time_max // 3600), int((bpk_time_max // 60) % 60),)
+                # ---
                 glf.write(
                     '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
-                    '&nbsp;<span class="badge">{qr}{fnr}</span>\n'.format(
+                    '&nbsp;<span class="badge">{qr}{fnr}</span>'
+                    '{time}\n'.format(
                         qr=quantity_or_runs,
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
                         me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if show_me_te else "",
-                        status=blueprint_status if not (blueprint_status is None) else ""
+                        status=blueprint_status if not (blueprint_status is None) else "",
+                        time=bpk_time_html
                     )
                 )
                 if not (blueprint_status is None):  # [ active, cancelled, delivered, paused, ready, reverted ]
@@ -453,6 +518,14 @@ def __dump_blueprints_list_with_materials(
                     glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(manufacturing_activity))
                     glf.write('</br></span>')  # qind-blueprints-?
                 else:
+                    # подготовка элементов управления копирования данных в clipboard
+                    if enable_copy_to_clipboard:
+                        glf.write(
+                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
+                            ' data-source="table" data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
+                            ' aria-hidden="true"></span></a>'.
+                            format(nm=blueprint_name)
+                        )
                     glf.write('</br></span>')  # qind-blueprints-?
                     glf.write('<div class="qind-materials-used">\n')  # div(materials)
                     not_enough_materials = []
@@ -580,92 +653,178 @@ def __dump_blueprints_list_with_materials(
     return stock_not_enough_materials
 
 
-def __dump_conveyor_stock_all(
+def __dump_corp_conveyors_stock_all(
         glf,
+        conveyor_data,
         corp_industry_jobs_data,
-        corp_ass_loc_data,
-        materials_for_bps,
-        research_materials_for_bps,
         sde_type_ids,
         sde_market_groups,
-        stock_all_loc_ids,
-        stock_not_enough_materials):
-    if stock_all_loc_ids is None:
-        return
-    # формирование списка ресурсов, которые используются в производстве
+        materials_for_bps,
+        research_materials_for_bps):
+    used_stock_places = []
     stock_resources = {}
-    loc_flags = corp_ass_loc_data.keys()
-    for loc_flag in loc_flags:
-        __a1 = corp_ass_loc_data[loc_flag]
-        for loc_id in __a1:
-            if not (int(loc_id) in stock_all_loc_ids):
-                continue
-            __a2 = __a1[str(loc_id)]
-            __a2_keys = __a2.keys()
-            for __a3 in __a2_keys:
-                __type_id = int(__a3)
-                __quantity = __a2[__type_id]
-                # определяем группу, которой принадлежат материалы
-                __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-                if str(__market_group) in stock_resources:
-                    __stock_group = stock_resources[str(__market_group)]
-                else:
-                    __group_name = sde_market_groups[str(__market_group)]["nameID"]["en"] if str(__market_group) in sde_market_groups else None  # устарел sde?
-                    if not (__group_name is None):
-                        __stock_group = {"name": __group_name, "items": []}
-                        stock_resources.update({str(__market_group): __stock_group})
-                    else:
-                        __stock_group = {"name": "Unknown", "items": []}
-                        stock_resources.update({"0": __stock_group})
-                # пополняем список материалов в группе
-                __resource_dict = next((r for r in __stock_group["items"] if r['id'] == __type_id), None)
-                if __resource_dict is None:
-                    __name = sde_type_ids[str(__type_id)]["name"]["en"] if str(__type_id) in sde_type_ids else str(__type_id)
-                    __resource_dict = {"id": __type_id,
-                                       "name": __name,
-                                       "q": __quantity}
-                    __stock_group["items"].append(__resource_dict)
-                else:
-                    __resource_dict["q"] += __quantity
-    # пополняем список ресурсом записями с недостающим (отсутствующим количеством)
-    for ne in stock_not_enough_materials:
-        __type_id = ne["id"]
-        # определяем группу, которой принадлежат материалы
-        __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-        if str(__market_group) in stock_resources:
-            __stock_group = stock_resources[str(__market_group)]
-        else:
-            __stock_group = {"name": sde_market_groups[str(__market_group)]["nameID"]["en"], "items": []}
-            stock_resources.update({str(__market_group): __stock_group})
-        __resource_dict = next((r for r in __stock_group["items"] if r['id'] == __type_id), None)
-        # пополняем список материалов в группе
-        if __resource_dict is None:
-            __name = sde_type_ids[str(__type_id)]["name"]["en"] if str(__type_id) in sde_type_ids else str(__type_id)
-            __resource_dict = {"id": __type_id,
-                               "name": __name,
-                               "q": 0}
-            __stock_group["items"].append(__resource_dict)
 
+    for corp_conveyors in conveyor_data:
+        # группируются по солнечным системам, поэтому попадаем сюда для каждой системы раз за разом
+        for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+            # группируются по контейнерам с чертежами
+            if len(conveyor_entity["stock"]) == 0:
+                continue
+            stock = conveyor_entity["stock"][0]
+            stock_id = stock["id"]  # 1035633039842
+            stock_name = stock["name"]  # ..stock ALL
+            stock_tree_dict = corp_conveyors["corp_assets_tree"][str(stock_id)]  # {'type_id': 17368,...
+            stock_item_dict = corp_conveyors["corp_assets_data"][int(stock_tree_dict["index"])]  # {'is_singleton': True,
+            # stock_item_type_id = int(stock_tree_dict["type_id"])  # 17368
+            stock_location_flag = stock_item_dict["location_flag"]  # CorpSAG6
+            # office_id = stock_item_dict["location_id"]  # 1035631968791
+            # office_tree_dict = corp_conveyors["corp_assets_tree"][str(office_id)]  # {'items': [1030288472777, ...
+            # office_item_dict = corp_conveyors["corp_assets_data"][int(office_tree_dict["index"])]  # {'location_flag': 'OfficeFolder'
+            station_id = conveyor_entity["station_id"]  # 1035620655696
+            station_name = conveyor_entity["station"]  # Poinen - Ri4 Love Prod
+            # print(stock_id, stock_location_flag, station_id, station_name, "\n\n")
+
+            # формирование списка ресурсов, которые используются в производстве
+            if "items" in stock_tree_dict:
+                for item_id in stock_tree_dict["items"]:
+                    tree_dict = corp_conveyors["corp_assets_tree"][str(item_id)]  # {'type_id': 25592...
+                    item_dict = corp_conveyors["corp_assets_data"][int(tree_dict["index"])]  # {'quantity': 24...
+                    # print(stock_id, item_id, tree_dict, item_dict, "\n\n")
+                    type_id: int = int(tree_dict["type_id"])
+                    quantity: int = int(item_dict["quantity"])
+                    # определяем группу, которой принадлежат материалы
+                    item_market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
+                    if str(item_market_group) in stock_resources:
+                        stock_group = stock_resources[str(item_market_group)]
+                    else:
+                        group_name = sde_market_groups[str(item_market_group)]["nameID"]["en"] if str(item_market_group) in sde_market_groups else None  # устарел sde?
+                        if not (group_name is None):
+                            stock_group = {"name": group_name, "items": []}
+                            stock_resources.update({str(item_market_group): stock_group})
+                        else:
+                            stock_group = {"name": "Unknown", "items": []}
+                            stock_resources.update({"0": stock_group})
+                    # пополняем список материалов в группе
+                    resource_dict = next((r for r in stock_group["items"] if r['id'] == type_id), None)
+                    if resource_dict is None:
+                        # получаем данные из корпассетов по этому элементу
+                        item_type_desc = sde_type_ids.get(str(type_id), {})
+                        item_name = item_type_desc.get("name", {}).get("en", "Unknown Type {}".format(type_id))
+                        # получаем статистику по текущим работам, считаем сколько производится этих материалов?
+                        jobs = [j for j in corp_conveyors["corp_industry_jobs_data"] if
+                                (j["product_type_id"] == type_id) and
+                                (j['output_location_id']==stock_id)]
+                        in_progress: int = 0
+                        for j in jobs:
+                            in_progress = in_progress + j["runs"]
+                        # сохраняем ресурс в справочник
+                        resource_dict = {
+                            "stock": stock_id,
+                            "id": type_id,
+                            "name": item_name,
+                            "q": quantity,
+                            "j": in_progress,
+                            "ne": 0
+                        }
+                        stock_group["items"].append(resource_dict)
+                    else:
+                        resource_dict["q"] += quantity
+
+            # пополняем список ресурсом записями с недостающим (отсутствующим количеством)
+            for ne in corp_conveyors["stock_not_enough_materials"]:
+                type_id = ne["id"]
+                not_enough_quantity = ne["q"]
+                # определяем группу, которой принадлежат материалы
+                market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
+                if str(market_group) in stock_resources:
+                    stock_group = stock_resources[str(market_group)]
+                else:
+                    stock_group = {"name": sde_market_groups[str(market_group)]["nameID"]["en"], "items": []}
+                    stock_resources.update({str(market_group): stock_group})
+                # пополняем список материалов в группе
+                resource_dict = next((r for r in stock_group["items"] if r['id'] == type_id), None)
+                if resource_dict is None:
+                    # получаем данные из корпассетов по этому элементу
+                    item_type_desc = sde_type_ids.get(str(type_id), {})
+                    item_name = item_type_desc.get("name", {}).get("en", "Unknown Type {}".format(type_id))
+                    # получаем статистику по текущим работам, считаем сколько производится этих материалов?
+                    jobs = [j for j in corp_conveyors["corp_industry_jobs_data"] if
+                            (j["product_type_id"] == type_id) and
+                            (j['output_location_id']==stock_id)]
+                    in_progress: int = 0
+                    for j in jobs:
+                        in_progress = in_progress + j["runs"]
+                        # сохраняем ресурс в справочник
+                    resource_dict = {
+                        "stock": stock_id,
+                        "id": type_id,
+                        "name": item_name,
+                        "q": 0,
+                        "j": in_progress,
+                        "ne": not_enough_quantity,
+                    }
+                    stock_group["items"].append(resource_dict)
+                else:
+                    resource_dict["ne"] += not_enough_quantity
+
+            used_stock_places.append({
+                "stock_id": stock_id,
+                "stock_name": stock_name,
+                "hangar_name": stock_location_flag,
+                "station_id": station_id,
+                "station_name": station_name,
+                "stock_resources": stock_resources,
+            })
+
+            #del office_item_dict
+            #del office_tree_dict
+            del stock_item_dict
+            del stock_tree_dict
+            del stock
+
+    # сортируем станции, ангары и контейнеры по названиям
+    used_stock_places = sorted(used_stock_places, key=lambda x: "{}_{}_{}".format(x["station_name"], x["hangar_name"], x["stock_name"]))
     # сортируем материалы по названию
     stock_keys = stock_resources.keys()
     for stock_key in stock_keys:
         stock_resources[str(stock_key)]["items"].sort(key=lambda r: r["name"])
 
+    # формируем dropdown список, где можон будет выбрать локации и ангары
     glf.write("""
+<div id="ddStocks" class="dropdown">
+  <button class="btn btn-default dropdown-toggle" type="button" id="ddStocksMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+    <span class="qind-lb-dd">Choose Place&hellip;</span>
+    <span class="caret"></span>
+  </button>
+  <ul class="dropdown-menu" aria-labelledby="ddMenuStock">
+""")
+    prev_station_id = None
+    for stock in enumerate(used_stock_places):
+        if stock[0] > 0:
+            glf.write('<li role="separator" class="divider"></li>\n')
+        if not prev_station_id or (prev_station_id != int(stock[1]["station_id"])):
+            prev_station_id = int(stock[1]["station_id"])
+            glf.write('<li class="dropdown-header">{st}</li>\n'.format(st=stock[1]["station_name"]))
+        glf.write('<li><a href="#" loc="{id}">{hg} <mark>{nm}</mark></a></li>\n'.
+                  format(
+                      id=stock[1]["stock_id"],
+                      hg=stock[1]["hangar_name"],
+                      nm=stock[1]["stock_name"]))
+    glf.write("""
+  </ul>
+</div>
+
 <style>
-#tblStockAll tr {
-  font-size: small;
-}
-.badge-light {
-  color: #212529;
-  background-color: #f8f9fa;
-}
+#tblStock tr { font-size: small; }
+.badge-light { color: #212529; background-color: #f8f9fa; }
+.label-time { color: #131313; background-color: #7adee3; }
 </style>
 
 <div class="table-responsive">
- <table id="tblStockAll" class="table table-condensed table-hover">
+ <table id="tblStock" class="table table-condensed table-hover">
 <thead>
  <tr>
+  <th class="hidden"></th>
   <th>#</th>
   <th>Item</th>
   <th>In stock</th>
@@ -674,6 +833,8 @@ def __dump_conveyor_stock_all(
  </tr>
 </thead>
 <tbody>""")
+
+    stock_not_enough_materials = []
 
     row_num = 1
     stock_keys = stock_resources.keys()
@@ -684,40 +845,36 @@ def __dump_conveyor_stock_all(
             ' <td class="active" colspan="5"><strong>{nm}</strong></td>\n'
             '</tr>'.
             format(nm=__group_dict["name"]))
-        for __resource_dict in __group_dict["items"]:
-            __type_id = __resource_dict["id"]
-            __quantity = __resource_dict["q"]
-            # получаем статистику по текущим работам, считаем сколько производится этих материалов?
-            jobs = [j for j in corp_industry_jobs_data if
-                    (j["product_type_id"] == __type_id) and
-                    (j['output_location_id'] in stock_all_loc_ids)]
-            in_progress = 0
-            for j in jobs:
-                in_progress = in_progress + j["runs"]
-            # получаем статистику по недостающим материалам
-            not_enough = next((ne for ne in stock_not_enough_materials if ne['id'] == __type_id), None)
+        for resource_dict in __group_dict["items"]:
+            stock_id = resource_dict["stock"]
+            type_id = resource_dict["id"]
+            quantity = resource_dict["q"]
+            in_progress = resource_dict["j"]
+            not_enough = resource_dict["ne"]
             # проверяем списки метариалов, используемых в исследованиях и производстве
             material_tag = ""
-            if __type_id in materials_for_bps:
+            if type_id in materials_for_bps:
                 pass
-            elif __type_id in research_materials_for_bps:
+            elif type_id in research_materials_for_bps:
                 material_tag = ' <span class="label label-warning">research material</span></small>'
             else:
                 material_tag = ' <span class="label label-danger">non material</span></small>'
             # формируем строку таблицы - найден нужный чертёж в ассетах
             glf.write(
                 '<tr>'
+                '<td class="hidden">{stock}</td>'
                 '<th scope="row">{num}</th>'
                 '<td>{nm}{mat_tag}</td>'
                 '<td align="right">{q}</td>'
                 '<td align="right">{ne}</td>'
                 '<td align="right">{ip}</td>'
                 '</tr>\n'.
-                format(num=row_num,
-                       nm=__resource_dict["name"],
+                format(stock=stock_id,
+                       num=row_num,
+                       nm=resource_dict["name"],
                        mat_tag=material_tag,
-                       q="" if __quantity == 0 else '{:,d}'.format(__quantity),
-                       ne="" if not_enough is None else '{:,d}'.format(not_enough["q"]),
+                       q="" if quantity == 0 else '{:,d}'.format(quantity),
+                       ne="" if not_enough == 0 else '{:,d}'.format(not_enough),
                        ip="" if in_progress == 0 else '{:,d}'.format(in_progress))
             )
             row_num = row_num + 1
@@ -775,7 +932,7 @@ def __dump_corp_conveyors(
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
       </ul>
     </li>
-    <li><a data-target="#modalStockAll" role="button" data-toggle="modal">Stock All</a></li>
+    <li><a data-target="#modalMaterials" role="button" data-toggle="modal">Materials</a></li>
    </ul>
    <form class="navbar-form navbar-right">
     <label>Sorting:&nbsp;</label>
@@ -787,10 +944,7 @@ def __dump_corp_conveyors(
   </div>
  </div>
 </nav>
-<div class="container-fluid">
 """)
-
-    stock_not_enough_materials = None
 
     # инициализация списка материалов, требуемых (и уже используемых) в производстве
     global_materials_summary = []
@@ -803,7 +957,7 @@ def __dump_corp_conveyors(
 """)
 
         for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
-            __stock_not_enough_materials = __dump_blueprints_list_with_materials(
+            stock_not_enough_materials = __dump_blueprints_list_with_materials(
                 glf,
                 conveyor_entity,
                 corp_conveyors["corp_bp_loc_data"],
@@ -816,8 +970,7 @@ def __dump_corp_conveyors(
                 global_materials_summary,
                 global_materials_used,
                 enable_copy_to_clipboard=True)
-            if stock_not_enough_materials is None:
-                stock_not_enough_materials = __stock_not_enough_materials
+            corp_conveyors["stock_not_enough_materials"] = stock_not_enough_materials
 
         glf.write("""
  </div>
@@ -890,27 +1043,24 @@ def __dump_corp_conveyors(
 </div>
 """)
 
-            # получение списков контейнеров и станок из экземпляра контейнера
-            conveyor_entity = corp_conveyors["corp_conveyour_entities"][0]
-            stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-            # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
-            render_html.__dump_any_into_modal_header_wo_button(
-                glf,
-                conveyor_entity["stock"][0]["name"],
-                'StockAll')
-            # формируем содержимое модального диалога
-            __dump_conveyor_stock_all(
-                glf,
-                corp_conveyors["corp_industry_jobs_data"],
-                corp_conveyors["corp_ass_loc_data"],
-                materials_for_bps,
-                research_materials_for_bps,
-                sde_type_ids,
-                sde_market_groups,
-                stock_all_loc_ids,
-                stock_not_enough_materials)
-            # закрываем footer модального диалога
-            render_html.__dump_any_into_modal_footer(glf)
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    render_html.__dump_any_into_modal_header_wo_button(
+        glf,
+        "Stock Materials",
+        unique_id="Materials",
+        modal_size="modal-lg")
+    # формируем содержимое модального диалога
+    __dump_corp_conveyors_stock_all(
+        glf,
+        conveyor_data,
+        [],
+        sde_type_ids,
+        sde_market_groups,
+        materials_for_bps,
+        research_materials_for_bps
+    )
+    # закрываем footer модального диалога
+    render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
 <div id="legend-block">
@@ -1110,6 +1260,34 @@ def __dump_corp_conveyors(
       sortConveyor($(this),g_tbl_col_orders[sort_by],sort_by,g_tbl_col_types[sort_by]);
     })
   }
+  function rebuildStockMaterials() {
+    // filtering stocks
+    var stock_id = ls.getItem('Stock Id');
+    $('#tblStock').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = true;
+      if (!(stock_id === null)) {
+        show = stock_id == tr.find('td').eq(0).text();
+      }
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  // Stocks Dropdown menu setup
+  function rebuildStocksDropdown() {
+    var stock_id = ls.getItem('Stock Id');
+    if (!(stock_id === null)) {
+      var btn = $('#ddStocks');
+      btn.find('li a').each(function() {
+        if ($(this).attr('loc') == stock_id) {
+          btn.find('span.qind-lb-dd').html($(this).html());
+          btn.val($(this).html());
+        }
+      });
+    }
+  }
   // Conveyor Options menu and submenu setup
   function toggleMenuOption(name) {
     show = (ls.getItem(name) == 1) ? 0 : 1;
@@ -1139,10 +1317,19 @@ def __dump_corp_conveyors(
       rebuildOptionsMenu();
       rebuildBody();
     });
+    $('#ddStocks').on('click', 'li a', function () {
+      var li_a = $(this);
+      var stock_id = li_a.attr('loc');
+      ls.setItem('Stock Id', stock_id);
+      rebuildStocksDropdown();
+      rebuildStockMaterials();
+    });
     // first init
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     rebuildBody();
+    rebuildStocksDropdown();
+    rebuildStockMaterials();
     // Working with clipboard
     $('a.qind-copy-btn').each(function() {
       $(this).tooltip();
