@@ -300,15 +300,24 @@ def __dump_blueprints_list_with_materials(
                         else:
                             stock_resources.update({itm: __a2[itm]})
 
+    # сортировка контейнеров по названиям
     loc_ids = corp_bp_loc_data.keys()
+    sorted_locs_by_names = []
     for loc in loc_ids:
         loc_id = int(loc)
         __container = next((cec for cec in blueprint_loc_ids if cec['id'] == loc_id), None)
         if __container is None:
             continue
         loc_name = __container["name"]
-        fixed_number_of_runs = __container["fixed_number_of_runs"]
-        manufacturing_activity = __container["manufacturing_activity"]
+        sorted_locs_by_names.append({"id": loc_id, "nm": loc_name, "box": __container})
+    sorted_locs_by_names.sort(key=lambda loc: loc["nm"])
+
+    # вывод информации по контейнерам
+    for loc in sorted_locs_by_names:
+        loc_id = int(loc["id"])
+        loc_name = loc["nm"]
+        fixed_number_of_runs = loc["box"]["fixed_number_of_runs"]
+        manufacturing_activity = loc["box"]["manufacturing_activity"]
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
