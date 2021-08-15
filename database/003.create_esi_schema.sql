@@ -8,6 +8,12 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_ecwt_date;
+DROP INDEX IF EXISTS qi.idx_ecwt_journal_ref_id;
+DROP INDEX IF EXISTS qi.idx_ecwt_transaction_id;
+DROP INDEX IF EXISTS qi.idx_ecwt_corporation_id;
+DROP INDEX IF EXISTS qi.idx_ecwt_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_wallet_transactions;
 
 DROP INDEX IF EXISTS qi.idx_ecwj_date;
 DROP INDEX IF EXISTS qi.idx_ecwj_context_id;
@@ -660,6 +666,58 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecwj_date
     ON qi.esi_corporation_wallet_journals USING btree
     (ecwj_date ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- corporation_wallet_transactions
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_corporation_wallet_transactions
+(
+    ecwt_corporation_id BIGINT NOT NULL,
+    ecwt_division SMALLINT NOT NULL,
+    ecwt_transaction_id BIGINT NOT NULL,
+    ecwt_date TIMESTAMP NOT NULL,
+    ecwt_type_id INTEGER NOT NULL,
+    ecwt_location_id BIGINT NOT NULL,
+    ecwt_unit_price DOUBLE PRECISION NOT NULL,
+    ecwt_quantity INTEGER NOT NULL,
+    ecwt_client_id INTEGER NOT NULL,
+    ecwt_is_buy BOOLEAN NOT NULL,
+    ecwt_journal_ref_id BIGINT NOT NULL,
+    ecwt_created_at TIMESTAMP,
+    CONSTRAINT pk_ecwt PRIMARY KEY (ecwt_corporation_id, ecwt_division, ecwt_transaction_id),
+    CONSTRAINT fk_ecwt_corporation_id FOREIGN KEY (ecwt_corporation_id)
+        REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ecwt_pk
+    ON qi.esi_corporation_wallet_transactions USING btree
+    (ecwt_corporation_id ASC NULLS LAST, ecwt_division ASC NULLS LAST, ecwt_transaction_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwt_corporation_id
+    ON qi.esi_corporation_wallet_transactions USING btree
+    (ecwt_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwt_transaction_id
+    ON qi.esi_corporation_wallet_transactions USING btree
+    (ecwt_transaction_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwt_journal_ref_id
+    ON qi.esi_corporation_wallet_transactions USING btree
+    (ecwt_journal_ref_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecwt_date
+    ON qi.esi_corporation_wallet_transactions USING btree
+    (ecwt_date ASC NULLS LAST)
 TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов

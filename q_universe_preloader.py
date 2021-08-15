@@ -111,6 +111,12 @@ def main():
               format(corporation_name, corp_made_new_payments))
         sys.stdout.flush()
 
+        # Requires role(s): Accountant, Junior_Accountant
+        corp_made_new_transactions = dbtools.actualize_corporation_wallet_transactions(corporation_id)
+        print("'{}' corporation made {} new transactions\n".
+              format(corporation_name, corp_made_new_transactions))
+        sys.stdout.flush()
+
         # Пытаемся отследить и сохраняем связи между чертежами и работами
         dbtools.link_blueprints_and_jobs(corporation_id)
         print("'{}' corporation link blueprints and jobs completed\n".

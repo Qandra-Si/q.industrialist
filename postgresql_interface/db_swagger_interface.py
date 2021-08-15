@@ -1431,3 +1431,77 @@ class QSwaggerInterface:
              'at': updated_at,
              }
         )
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/wallets/{division}/transactions/
+    # -------------------------------------------------------------------------
+
+    def get_last_known_corporation_wallet_transactions_ids(self, corporation_id: int):
+        rows = self.db.select_all_rows(
+            "SELECT MAX(ecwt_transaction_id), ecwt_division "
+            "FROM esi_corporation_wallet_transactions "
+            "WHERE ecwt_corporation_id=%s "
+            "GROUP BY 2;",
+            int(corporation_id),
+        )
+        if rows is None:
+            return None
+        return rows
+
+    def insert_corporation_wallet_transactions(self, data, corporation_id: int, division: int, updated_at):
+        """ inserts corporation wallet transactions data into database
+
+        :param data: corporation wallet transactions data
+        """
+        # { "client_id": 2114281846,
+        #   "date": "2021-08-15T18:32:38Z",
+        #   "is_buy": false,
+        #   "journal_ref_id": 19576191173,
+        #   "location_id": 1030049082711,
+        #   "quantity": 3,
+        #   "transaction_id": 5673651174,
+        #   "type_id": 21638,
+        #   "unit_price": 1540000.0
+        # }
+        self.db.execute(
+            "INSERT INTO esi_corporation_wallet_transactions("
+            " ecwt_corporation_id,"
+            " ecwt_division,"
+            " ecwt_transaction_id,"
+            " ecwt_date,"
+            " ecwt_type_id,"
+            " ecwt_location_id,"
+            " ecwt_unit_price,"
+            " ecwt_quantity,"
+            " ecwt_client_id,"
+            " ecwt_is_buy,"
+            " ecwt_journal_ref_id,"
+            " ecwt_created_at) "
+            "VALUES("
+            " %(co)s,"
+            " %(d)s,"
+            " %(id)s,"
+            " %(dt)s,"
+            " %(ty)s,"
+            " %(loc)s,"
+            " %(pr)s,"
+            " %(q)s,"
+            " %(cl)s,"
+            " %(b)s,"
+            " %(jr)s,"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecwt DO NOTHING;",
+            {'co': corporation_id,
+             'd': division,
+             'id': data['transaction_id'],
+             'dt': data['date'],
+             'ty': data['type_id'],
+             'loc': data['location_id'],
+             'pr': data['unit_price'],
+             'q': data['quantity'],
+             'cl': data['client_id'],
+             'b': data['is_buy'],
+             'jr': data['journal_ref_id'],
+             'at': updated_at,
+             }
+        )

@@ -1003,7 +1003,7 @@ class QDatabaseTools:
 
     @staticmethod
     def get_corporation_wallets_division_journal_url(corporation_id: int, division: int):
-        # Requires role(s): Director
+        # Requires role(s): Accountant, Junior_Accountant
         return "corporations/{corporation_id}/wallets/{division}/journal/".format(
             corporation_id=corporation_id,
             division=division
@@ -1016,7 +1016,7 @@ class QDatabaseTools:
         dbdivisions = None
 
         # Requires role(s): Accountant, Junior_Accountant
-        for division in range(1, 7):
+        for division in range(1, 8):
             url: str = self.get_corporation_wallets_division_journal_url(corporation_id, division)
             data, updated_at, is_updated = self.load_from_esi_paged_data(url)
             if self.esiswagger.offline_mode:
@@ -1035,7 +1035,7 @@ class QDatabaseTools:
                 self.dbswagger.db.disable_debug()
 
             # актуализация (добавление) операций в корпоративном кошельке
-            last_known_id = -1 if dbdivisions is None else next((j[0] for j in dbdivisions if j[1] == int(division)), -1)
+            last_known_id = -1 if (dbdivisions is None) or not dbdivisions else next((j[0] for j in dbdivisions if j[1] == int(division)), -1)
             for journal_data in data:
                 if journal_data['id'] > last_known_id:
                     corp_made_new_payments += 1
@@ -1057,3 +1057,64 @@ class QDatabaseTools:
             del dbdivisions
 
         return corp_made_new_payments
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/wallets/{division}/transactions/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_corporation_wallets_division_transactions_url(corporation_id: int, division: int):
+        # Requires role(s): Accountant, Junior_Accountant
+        return "corporations/{corporation_id}/wallets/{division}/transactions/".format(
+            corporation_id=corporation_id,
+            division=division
+        )
+
+    def actualize_corporation_wallet_transactions(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+        corp_made_new_transactions: int = 0
+        db_data_loaded: bool = False
+        dbdivisions = None
+
+        # Requires role(s): Accountant, Junior_Accountant
+        for division in range(1, 8):
+            url: str = self.get_corporation_wallets_division_transactions_url(corporation_id, division)
+            data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+            if self.esiswagger.offline_mode:
+                updated_at = self.eve_now
+            elif not is_updated:
+                continue
+
+            # загрузка данных из БД
+            if not db_data_loaded:
+                dbdivisions = self.dbswagger.get_last_known_corporation_wallet_transactions_ids(corporation_id)
+                db_data_loaded = True
+
+            # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+            db_debug: bool = self.dbswagger.db.debug
+            if db_debug:
+                self.dbswagger.db.disable_debug()
+
+            # актуализация (добавление) операций в корпоративном кошельке
+            last_known_id = -1 if (dbdivisions is None) or not dbdivisions else next((j[0] for j in dbdivisions if j[1] == int(division)), -1)
+            for transactions_data in data:
+                if transactions_data['transaction_id'] > last_known_id:
+                    corp_made_new_transactions += 1
+                    self.dbswagger.insert_corporation_wallet_transactions(
+                        transactions_data,
+                        corporation_id,
+                        division,
+                        updated_at
+                    )
+
+            # если отладвка была отключена, то включаем её
+            if db_debug:
+                self.dbswagger.db.enable_debug()
+
+            del data
+        self.qidb.commit()
+
+        if dbdivisions:
+            del dbdivisions
+
+        return corp_made_new_transactions
