@@ -12,7 +12,7 @@ from (
     -- c.eco_name,
     ks.solar_system_name,
     jt.ecwj_date::date as ecwj_date,
-    COALESCE(jt.ech_name, 'Xatul'' Madan') as pilot_name,
+    jt.ech_name as pilot_name,
     CASE WHEN sign(jt.ecwj_amount) < 0 THEN 'buy'
                                        ELSE 'sell'
                                        END as deal,

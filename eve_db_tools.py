@@ -1009,6 +1009,12 @@ class QDatabaseTools:
             division=division
         )
 
+    def actualize_corporation_wallet_journal_item_details(self, journal_data, need_data=False):
+        context_id_type = journal_data.get('context_id_type')
+        if context_id_type and (context_id_type == 'market_transaction_id'):
+            # идентификатор пилота, который осуществляет торговые операции на рынке
+            self.actualize_character(journal_data['second_party_id'], need_data=need_data)
+
     def actualize_corporation_wallet_journals(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
         corp_made_new_payments: int = 0
@@ -1039,6 +1045,7 @@ class QDatabaseTools:
             for journal_data in data:
                 if journal_data['id'] > last_known_id:
                     corp_made_new_payments += 1
+                    self.actualize_corporation_wallet_journal_item_details(journal_data, False)
                     self.dbswagger.insert_corporation_wallet_journals(
                         journal_data,
                         corporation_id,
