@@ -10,7 +10,7 @@ select
 from (
   select
     c.eco_name,
-    COALESCE(o.solar_system_name, 'Amarr') as solar_system_name,
+    ks.solar_system_name,
     jt.ecwj_date::date as ecwj_date,
     COALESCE(jt.ech_name, 'Xatul'' Madan') as pilot_name,
     jt.ecwj_amount,
@@ -48,7 +48,7 @@ from (
       ecwj_date > '2021-08-15'
     ) jt
     left outer join qi.esi_corporations c on (jt.ecwj_corporation_id = c.eco_corporation_id)
-    left outer join qi.esi_corporation_offices o on (jt.ecwj_corporation_id = o.corporation_id and jt.ecwt_location_id = o.location_id)
+    left outer join qi.esi_known_stations ks on (jt.ecwt_location_id = ks.location_id)
   ) jt
 -- where jt.amount_sign > 0
 group by jt.eco_name, jt.solar_system_name, jt.ecwj_date, jt.amount_sign --, jt.pilot_name

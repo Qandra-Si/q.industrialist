@@ -10,7 +10,7 @@ select
 from (
   select
     -- c.eco_name,
-    COALESCE(o.solar_system_name, 'Amarr') as solar_system_name,
+    ks.solar_system_name,
     jt.ecwj_date::date as ecwj_date,
     COALESCE(jt.ech_name, 'Xatul'' Madan') as pilot_name,
     CASE WHEN sign(jt.ecwj_amount) < 0 THEN 'buy'
@@ -18,7 +18,6 @@ from (
                                        END as deal,
     sum(jt.ecwj_amount) as sum_amount,
     jt.ecwt_type_id,
-    -- jt.ecwt_location_id,
     --jt.ecwt_unit_price,
     --jt.ecwt_quantity
     -- ,jt.ecwt_is_buy,
@@ -52,7 +51,7 @@ from (
       ecwj_date > '2021-08-15'
     ) jt
     left outer join qi.esi_corporations c on (jt.ecwj_corporation_id = c.eco_corporation_id)
-    left outer join qi.esi_corporation_offices o on (jt.ecwj_corporation_id = o.corporation_id and jt.ecwt_location_id = o.location_id)
+    left outer join qi.esi_known_stations ks on (jt.ecwt_location_id = ks.location_id)
   group by 1, 2, 3, 4, 6
   ) jt
   left outer join qi.eve_sde_names nm on (nm.sden_category = 1 and jt.ecwt_type_id = nm.sden_id)
