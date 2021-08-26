@@ -17,7 +17,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_logist.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
@@ -50,7 +50,9 @@ def get_cyno_solar_system_details(location_id, corp_assets_tree, subtype=None):
         return None
     loc_dict = corp_assets_tree[str(location_id)]
     if subtype is None:
-        if "location_id" in loc_dict: # иногда ESI присылает содержимое контейнеров, которые исчезают из ангаров, кораблей и звёздных систем
+        if (location_id >= 30000000) and (location_id <= 32000000):
+            solar_system_id = location_id
+        elif "location_id" in loc_dict: # иногда ESI присылает содержимое контейнеров, которые исчезают из ангаров, кораблей и звёздных систем
             solar_system_id = get_cyno_solar_system_details(
                 loc_dict["location_id"],
                 corp_assets_tree,
@@ -111,89 +113,103 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
-    # настройка Eve Online ESI Swagger interface
-    auth = esi.EveESIAuth(
-        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        debug=True)
-    client = esi.EveESIClient(
-        auth,
-        debug=False,
-        logger=True,
-        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
-    interface = esi.EveOnlineInterface(
-        client,
-        q_industrialist_settings.g_client_scope,
-        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
-        offline_mode=argv_prms["offline_mode"])
-
-    authz = interface.authenticate(argv_prms["character_names"][0])
-    character_id = authz["character_id"]
-    character_name = authz["character_name"]
-
-    # Public information about a character
-    character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id))
-    # Public information about a corporation
-    corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]))
-
-    corporation_id = character_data["corporation_id"]
-    corporation_name = corporation_data["name"]
-    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
-    sys.stdout.flush()
-
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_inv_positions = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invPositions")
 
-    # Requires role(s): Director
-    corp_assets_data = interface.get_esi_paged_data(
-        "corporations/{}/assets/".format(corporation_id))
-    print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
-    sys.stdout.flush()
+    logist_data = []
+    for pilot_name in argv_prms["character_names"]:
+        # настройка Eve Online ESI Swagger interface
+        auth = esi.EveESIAuth(
+            '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            debug=True)
+        client = esi.EveESIClient(
+            auth,
+            debug=False,
+            logger=True,
+            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+        interface = esi.EveOnlineInterface(
+            client,
+            q_industrialist_settings.g_client_scope,
+            cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+            offline_mode=argv_prms["offline_mode"])
 
-    # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_names_data = []
-    corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
+        authz = interface.authenticate(pilot_name)
+        character_id = authz["character_id"]
+        character_name = authz["character_name"]
+
+        # Public information about a character
+        character_data = interface.get_esi_data(
+            "characters/{}/".format(character_id),
+            fully_trust_cache=True)
+        # Public information about a corporation
+        corporation_data = interface.get_esi_data(
+            "corporations/{}/".format(character_data["corporation_id"]),
+            fully_trust_cache=True)
+
+        corporation_id = character_data["corporation_id"]
+        corporation_name = corporation_data["name"]
+        print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+        sys.stdout.flush()
+
         # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
+        corp_assets_data = interface.get_esi_paged_data(
+            "corporations/{}/assets/".format(corporation_id))
+        print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+        sys.stdout.flush()
+
+        # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
+        # Requires role(s): Director
+        corp_ass_names_data = interface.get_esi_piece_data(
             "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
-    print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
-    sys.stdout.flush()
+            corp_ass_named_ids)
+        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+        sys.stdout.flush()
+        del corp_ass_named_ids
 
-    # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
-    foreign_structures_data = {}
-    foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
-    foreign_structures_forbidden_ids = []
-    if len(foreign_structures_ids) > 0:
-        # Requires: access token
-        for structure_id in foreign_structures_ids:
-            try:
-                universe_structure_data = interface.get_esi_data(
-                    "universe/structures/{}/".format(structure_id))
-                foreign_structures_data.update({str(structure_id): universe_structure_data})
-            except requests.exceptions.HTTPError as err:
-                status_code = err.response.status_code
-                if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
-                    foreign_structures_forbidden_ids.append(structure_id)
-                else:
+        # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+        foreign_structures_data = {}
+        foreign_structures_ids = eve_esi_tools.get_foreign_structures_ids(corp_assets_data)
+        foreign_structures_forbidden_ids = []
+        if len(foreign_structures_ids) > 0:
+            # Requires: access token
+            for structure_id in foreign_structures_ids:
+                try:
+                    universe_structure_data = interface.get_esi_data(
+                        "universe/structures/{}/".format(structure_id),
+                        fully_trust_cache=True)
+                    foreign_structures_data.update({str(structure_id): universe_structure_data})
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
+                        foreign_structures_forbidden_ids.append(structure_id)
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
                     raise
-            except:
-                print(sys.exc_info())
-                raise
-    print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
-    if len(foreign_structures_forbidden_ids) > 0:
-        print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
-    sys.stdout.flush()
+        print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+        if len(foreign_structures_forbidden_ids) > 0:
+            print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
+        sys.stdout.flush()
 
-    # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
-    # элементов, в виде:
-    # { location1: {items:[item1,item2,...],type_id,location_id},
-    #   location2: {items:[item3],type_id} }
-    corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
-    eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+        # Построение дерева ассетов, с узлами в роли станций и систем, и листьями в роли хранящихся
+        # элементов, в виде:
+        # { location1: {items:[item1,item2,...],type_id,location_id},
+        #   location2: {items:[item3],type_id} }
+        corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
+
+        logist_data.append({
+            "corporation_ticker": corporation_data["ticker"],
+            "corp_assets_tree": corp_assets_tree,
+            "corp_assets_data": corp_assets_data,
+        })
+
+        del corp_assets_tree
+        del corp_assets_data
+        del foreign_structures_data
 
     # Фильтрация (вручную) ассетов, которые расположены на станках циносети
     corp_cynonetwork = {}
@@ -203,13 +219,21 @@ def main():
         for location_id in cn_route:
             # если системы в цино сети повторяются, не гоняем искалочку зазря (повторно)
             if not (str(location_id) in corp_cynonetwork):
-                data = get_cyno_solar_system_details(location_id, corp_assets_tree)
+                datas = []
+                found_tickers = []
+                for corp_logist in logist_data:
+                    data = get_cyno_solar_system_details(location_id, corp_logist["corp_assets_tree"])
+                    if data is None:
+                        continue
+                    datas.append(data)
+                    datas[-1].update({"corporation_ticker": corp_logist["corporation_ticker"]})
+                    found_tickers.append(corp_logist["corporation_ticker"])
                 # ---
                 # signalling_level = 0 - normal, 1 - warning, 2 - danger, 3 - ошибка получения данных
                 # оптимальный набор: 10 баджеров, 10 цин, 10'000 (по 950 на прожиг) озона
                 #              плюс: 10 вентур, 10 цин, 10'000 (по 200 на прожиг) озона, 30 риг, 10 каргохолда
                 # минимальный набор: 1 баджер, 1 вентурка, 2 цины, 1150 озона, 3 риги, 1 каргохолд
-                if data is None:
+                if not datas:
                     # print('{} {}'.format(location_id, data))
                     system_id = None
                     loc_name = "NO-DATA!"
@@ -221,7 +245,10 @@ def main():
                             if str(loc_id) in sde_inv_items:
                                 root_item = sde_inv_items[str(loc_id)]
                                 # print("root_item", root_item)
-                                if root_item["typeID"] != 5:  # not Solar System (may be Station?)
+                                if root_item["typeID"] == 5:  # Solar System
+                                    system_id = loc_id
+                                    # print(" >>> >>> ", loc_name)
+                                else:  # not Solar System (may be Station?)
                                     loc_id = root_item["locationID"]
                                     root_item = sde_inv_items[str(loc_id)]
                                     # print(" >>> ", loc_id, root_item)
@@ -229,26 +256,23 @@ def main():
                                         system_id = loc_id
                                         loc_name = sde_inv_names[str(loc_id)]  # Solar System (name)
                                         # print(" >>> >>> ", loc_name)
-                    data = {"error": "no data",
+                    data = {"error": "no data" if system_id is None else "no solar system",
                             "system_id": system_id,
                             "solar_system": loc_name,
-                            "signalling_level": 3}
+                            "signalling_level": 3,
+                            # -- используется, если 'error'='no solar system'
+                            "badger": 0,
+                            "venture": 0,
+                            "liquid_ozone": 0,
+                            "indus_cyno_gen": 0,
+                            "exp_cargohold": 0,
+                            "cargohold_rigs": 0,
+                            "nitrogen_isotope": 0,
+                            "hydrogen_isotope": 0,
+                            "oxygen_isotope": 0,
+                            "helium_isotope": 0}
                 else:
-                    system_id = data["solar_system"]
-                    badger_ids = data["badger"]
-                    venture_ids = data["venture"]
-                    liquid_ozone_ids = data["liquid_ozone"]
-                    indus_cyno_gen_ids = data["indus_cyno_gen"]
-                    exp_cargohold_ids = data["exp_cargohold"]
-                    cargohold_rigs_ids = data["cargohold_rigs"]
-                    nitrogen_isotope_ids = data["nitrogen_isotope"]
-                    hydrogen_isotope_ids = data["hydrogen_isotope"]
-                    oxygen_isotope_ids = data["oxygen_isotope"]
-                    helium_isotope_ids = data["helium_isotope"]
-                    if system_id is None:
-                        system_name = "NO-DATA!"
-                    else:
-                        system_name = sde_inv_names[str(system_id)]
+                    system_id = None
                     badger_num = 0
                     venture_num = 0
                     liquid_ozone_num = 0
@@ -260,50 +284,76 @@ def main():
                     oxygen_isotope_num = 0
                     helium_isotope_num = 0
                     # ---
-                    for a in corp_assets_data:
-                        item_id = int(a["item_id"])
-                        quantity = int(a["quantity"])
-                        if not (badger_ids is None) and badger_ids.count(item_id) > 0:
-                            badger_num = badger_num + quantity
-                        elif not (venture_ids is None) and venture_ids.count(item_id) > 0:
-                            venture_num = venture_num + quantity
-                        elif not (liquid_ozone_ids is None) and liquid_ozone_ids.count(item_id) > 0:
-                            liquid_ozone_num = liquid_ozone_num + quantity
-                        elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
-                            indus_cyno_gen_num = indus_cyno_gen_num + quantity
-                        elif not (exp_cargohold_ids is None) and exp_cargohold_ids.count(item_id) > 0:
-                            exp_cargohold_num = exp_cargohold_num + quantity
-                        elif not (cargohold_rigs_ids is None) and cargohold_rigs_ids.count(item_id) > 0:
-                            cargohold_rigs_num = cargohold_rigs_num + quantity
-                        elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
-                            nitrogen_isotope_num = nitrogen_isotope_num + quantity
-                        elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
-                            hydrogen_isotope_num = hydrogen_isotope_num + quantity
-                        elif not (oxygen_isotope_ids is None) and oxygen_isotope_ids.count(item_id) > 0:
-                            oxygen_isotope_num = oxygen_isotope_num + quantity
-                        elif not (helium_isotope_ids is None) and helium_isotope_ids.count(item_id) > 0:
-                            helium_isotope_num = helium_isotope_num + quantity
-                    # ---
+                    for data in datas:
+                        corporation_ticker = data["corporation_ticker"]
+                        if system_id is None:
+                            system_id = data["solar_system"]
+                        badger_ids = data["badger"]
+                        venture_ids = data["venture"]
+                        liquid_ozone_ids = data["liquid_ozone"]
+                        indus_cyno_gen_ids = data["indus_cyno_gen"]
+                        exp_cargohold_ids = data["exp_cargohold"]
+                        cargohold_rigs_ids = data["cargohold_rigs"]
+                        nitrogen_isotope_ids = data["nitrogen_isotope"]
+                        hydrogen_isotope_ids = data["hydrogen_isotope"]
+                        oxygen_isotope_ids = data["oxygen_isotope"]
+                        helium_isotope_ids = data["helium_isotope"]
+                        # ---
+                        corp_assets_data = []
+                        for corp_logist in logist_data:
+                            if corporation_ticker == corp_logist["corporation_ticker"]:
+                                corp_assets_data = corp_logist["corp_assets_data"]
+                                break
+                        # ---
+                        for a in corp_assets_data:
+                            item_id = int(a["item_id"])
+                            quantity = int(a["quantity"])
+                            if not (badger_ids is None) and badger_ids.count(item_id) > 0:
+                                badger_num = badger_num + quantity
+                            elif not (venture_ids is None) and venture_ids.count(item_id) > 0:
+                                venture_num = venture_num + quantity
+                            elif not (liquid_ozone_ids is None) and liquid_ozone_ids.count(item_id) > 0:
+                                liquid_ozone_num = liquid_ozone_num + quantity
+                            elif not (indus_cyno_gen_ids is None) and indus_cyno_gen_ids.count(item_id) > 0:
+                                indus_cyno_gen_num = indus_cyno_gen_num + quantity
+                            elif not (exp_cargohold_ids is None) and exp_cargohold_ids.count(item_id) > 0:
+                                exp_cargohold_num = exp_cargohold_num + quantity
+                            elif not (cargohold_rigs_ids is None) and cargohold_rigs_ids.count(item_id) > 0:
+                                cargohold_rigs_num = cargohold_rigs_num + quantity
+                            elif not (nitrogen_isotope_ids is None) and nitrogen_isotope_ids.count(item_id) > 0:
+                                nitrogen_isotope_num = nitrogen_isotope_num + quantity
+                            elif not (hydrogen_isotope_ids is None) and hydrogen_isotope_ids.count(item_id) > 0:
+                                hydrogen_isotope_num = hydrogen_isotope_num + quantity
+                            elif not (oxygen_isotope_ids is None) and oxygen_isotope_ids.count(item_id) > 0:
+                                oxygen_isotope_num = oxygen_isotope_num + quantity
+                            elif not (helium_isotope_ids is None) and helium_isotope_ids.count(item_id) > 0:
+                                helium_isotope_num = helium_isotope_num + quantity
+                        # ---
+                        del corp_assets_data
                     if system_id is None:
+                        system_name = "NO-DATA!"
                         signalling_level = 3
-                    elif (badger_num >= 10) and\
-                       (venture_num >= 10) and\
-                       (liquid_ozone_num >= 20000) and\
-                       (indus_cyno_gen_num >= 20) and\
-                       (exp_cargohold_num >= 10) and\
-                       (cargohold_rigs_num >= 30):
-                        signalling_level = 0
-                    elif (badger_num >= 1) and \
-                         (venture_num >= 1) and \
-                         (liquid_ozone_num >= 1150) and \
-                         (indus_cyno_gen_num >= 2) and \
-                         (exp_cargohold_num >= 1) and \
-                         (cargohold_rigs_num >= 3):
-                        signalling_level = 1
                     else:
-                        signalling_level = 2
+                        system_name = sde_inv_names[str(system_id)]
+                        if (badger_num >= 10) and\
+                           (venture_num >= 10) and\
+                           (liquid_ozone_num >= 20000) and\
+                           (indus_cyno_gen_num >= 20) and\
+                           (exp_cargohold_num >= 10) and\
+                           (cargohold_rigs_num >= 30):
+                            signalling_level = 0
+                        elif (badger_num >= 1) and \
+                             (venture_num >= 1) and \
+                             (liquid_ozone_num >= 1150) and \
+                             (indus_cyno_gen_num >= 2) and \
+                             (exp_cargohold_num >= 1) and \
+                             (cargohold_rigs_num >= 3):
+                            signalling_level = 1
+                        else:
+                            signalling_level = 2
                     # ---
                     data = {
+                        "found_tickers": found_tickers,
                         "system_id": system_id,
                         "solar_system": system_name,
                         "badger": badger_num,
@@ -316,13 +366,19 @@ def main():
                         "hydrogen_isotope": hydrogen_isotope_num,
                         "oxygen_isotope": oxygen_isotope_num,
                         "helium_isotope": helium_isotope_num,
-                        "signalling_level": signalling_level
+                        "signalling_level": signalling_level,
                     }
                     if system_id is None:
                         data.update({"error": "no solar system"})
                 corp_cynonetwork.update({str(location_id): data})
+
+                del datas
             jump_num = jump_num + 1
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_cynonetwork", corp_cynonetwork)
+
+    del logist_data
+    del sde_inv_items
+    del sde_inv_names
 
     print("\nBuilding cyno network report...")
     sys.stdout.flush()

@@ -3,6 +3,8 @@ import json
 import os.path
 from pathlib import Path
 import requests
+#import datetime
+from dateutil.parser import parse as parsedate
 
 from .error import EveOnlineClientError
 from .eve_esi_client import EveESIClient
@@ -24,6 +26,9 @@ class EveOnlineInterface:
         if not isinstance(client, EveESIClient):
             raise EveOnlineClientError("You should use EveESIClient to configure interface")
         self.__client = client
+
+        self.__is_last_data_updated = False
+        self.__last_modified = None
 
     @property
     def client(self):
@@ -70,6 +75,19 @@ class EveOnlineInterface:
         """
         return not self.__offline_mode
 
+    @property
+    def is_last_data_updated(self):
+        """ flag which says that we are not fetch data from CCP server because cached data used
+        """
+        return self.__is_last_data_updated
+
+    @property
+    def last_modified(self):
+        """ Last-Modified property from http header
+        :returns: :class:`datetime.datetime`
+        """
+        return self.__last_modified
+
     def __get_f_name(self, url):
         """ converts urls to filename to store it in filesystem, for example:
         url=/corporations/98553333/assets/names/
@@ -113,6 +131,9 @@ class EveOnlineInterface:
                 f.write(s)
             finally:
                 f.close()
+        del s
+        del cache
+        del f_name
         return
 
     def __take_cache_from_file(self, url):
@@ -130,6 +151,15 @@ class EveOnlineInterface:
         return None
 
     @staticmethod
+    def __get_merged_pages(cached_data):
+        if "json" in cached_data:
+            merged = []
+            for p in cached_data["json"]:
+                merged += p
+            return merged
+        return None
+
+    @staticmethod
     def __esi_raise_for_status(code, message):
         """ generates HTTPError to emulate 403, 404 exceptions when working in offline mode
         """
@@ -137,19 +167,35 @@ class EveOnlineInterface:
         rsp.status_code = code
         raise requests.exceptions.HTTPError(message, response=rsp)
 
-    def get_esi_data(self, url, body=None):
+    def get_esi_data(self, url, body=None, fully_trust_cache=False):
         """ performs ESI GET/POST-requests in online mode,
         or returns early retrieved data when working on offline mode
+
+        :param url: EVE Swagger Interface ulr
+        :param body: parameters to send to ESI API with POST request
+        :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = True
+        self.__last_modified = None
+        if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
+            # иногда возникает ситуация, когда данные по указанному url не закачались (упали с ошибкой), и так
+            # и будут вечно восстанавливаться из кеша, - все ошибки обновляем в online-режиме!
+            if not ("Http-Error" in cached_data["headers"]):
+                url_time = cached_data["headers"].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
+                return cached_data.get("json", None)
         if self.__offline_mode:
+            if cached_data is None:
+                return None
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
             if "Http-Error" in cached_data["headers"]:
                 code = int(cached_data["headers"]["Http-Error"])
                 self.__esi_raise_for_status(
                     code,
                     '{} Client Error: Offline-cache for url: {}'.format(code, url))
-            return cached_data["json"] if "json" in cached_data else None
+            return cached_data.get("json", None)
         else:
             # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
             data_path = ("{srv}{url}".format(srv=self.server_url, url=url))
@@ -160,9 +206,14 @@ class EveOnlineInterface:
             try:
                 data = self.__client.send_esi_request_http(data_path, etag, body)
                 if data.status_code == 304:
-                    return cached_data["json"] if "json" in cached_data else None
+                    url_time = cached_data["headers"].get("last-modified", None)
+                    if not (url_time is None):
+                        self.__last_modified = parsedate(url_time)
+                    return cached_data.get("json", None)
                 else:
                     self.__dump_cache_into_file(url, self.__get_cached_headers(data), data.json())
+                    self.__is_last_data_updated = True
+                    self.__last_modified = self.__client.last_modified
                     return data.json()
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
@@ -177,66 +228,122 @@ class EveOnlineInterface:
             except:
                 raise
 
-    def get_esi_paged_data(self, url):
+    def get_esi_paged_data(self, url, fully_trust_cache=False):
         """ performs ESI GET-request in online mode and loads paginated data,
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = False
+        self.__last_modified = None
+        if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
+            # аналогично методу get_esi_data, хотя вроде в этом методе HttpError-ы не ожидаются?!
+            if not ("Http-Error" in cached_data["headers"][0]):
+                url_time = cached_data["headers"][0].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
+                return self.__get_merged_pages(cached_data)
         if self.__offline_mode:
+            if cached_data is None:
+                return None
             # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
-            return cached_data["json"] if "json" in cached_data else None
+            if "Http-Error" in cached_data["headers"][0]:
+                code = int(cached_data["headers"][0]["Http-Error"])
+                self.__esi_raise_for_status(
+                    code,
+                    '{} Client Error: Offline-cache for url: {}'.format(code, url))
+            # Offline mode (выдаёт ранее сохранённый кэшированный набор json-данных)
+            return self.__get_merged_pages(cached_data)
         else:
             # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
             restart = True
             restart_cache = False
-            first_start = True
+            diff_pages = 0
+            match_pages = 0
+            data_headers = []
+            data_pages = []
             while True:
                 if restart:
                     page = 1
+                    diff_pages = 0
                     match_pages = 0
                     all_pages = None
+                    if data_headers:
+                        del data_headers
                     data_headers = []
-                    data_json = []
+                    if data_pages:
+                        del data_pages
+                    data_pages = []
                     if restart_cache:
                         cached_data = None
                     restart = False
-                data_path = ("{srv}{url}?page={page}".format(
-                    srv=self.server_url,
-                    url=url,
-                    page=page))  # noqa
+                if url.find('?') == -1:
+                    data_path = ("{srv}{url}?page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
+                else:
+                    data_path = ("{srv}{url}&page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
                 # см. рекомендации по программированию тут
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
-                etag = cached_data["headers"][page-1]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
-                        len(cached_data["headers"]) >= page) and ("etag" in cached_data["headers"][page-1]) else None
-                page_data = self.__client.send_esi_request_http(data_path, etag)
+                if not (cached_data is None) and \
+                   ("headers" in cached_data) and \
+                   (len(cached_data["headers"]) >= page) and \
+                   ("etag" in cached_data["headers"][page-1]):
+                    etag = cached_data["headers"][page-1]["etag"]
+                else:
+                    etag = None
+                # возможна ситуация, когда page=1 считался с кодом 200, причём в кеше имеется
+                # page=2, при этом X-Pages=2:
+                #   200 corporations/98615601/contracts/?page=1 14:10:23 "3f60dac1..."
+                #   304 corporations/98615601/contracts/?page=2 14:10:23 "fb294fda..." (из кеша)
+                # в этом случае, если уже встречались 200-коды, то etag не отправляем
+                try:
+                    page_data = self.__client.send_esi_request_http(data_path, etag)
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # это нормально, CCP используют 404-ответ для индикации "нет данных" ingame-доступа
+                        if 1 == page:
+                            # сохраняем информацию в кеше и выходим с тем же кодом ошибки
+                            self.__dump_cache_into_file(url, [{"Http-Error": 404}], None)
+                        raise
+                    raise
+                except:
+                    raise
                 if page_data.status_code == 304:
-                    # ускоренный вывод данных из этого метода - если находимся в цикле загрузке данных с сервера
-                    # и при первом же обращении к первой же странице совпал etag, следовательно весь набор актуален
-                    # и заниматься загрузкой остальных страниц (дожидаясь, а может быть на этот раз именно во время
-                    # загрузки данные обновятся) - нет никакого смысла! (О) - оптимизация! :)
-                    if first_start and 3 == page:
-                        return cached_data["json"] if "json" in cached_data else None
+                    url_time = cached_data["headers"][0].get("last-modified", None)
+                    if not (url_time is None):
+                        self.__last_modified = parsedate(url_time)
+
+                    # возможна ситуация, когда etag у первых 3х страниц не меняется несколько суток подряд, тогда
+                    # как страницы с 4й по ...20ю (например) меняются часто; такое поведение нередко наблюдается
+                    # у corporation/blueprints отчёта, где первые страницы хранят младшие идентификаторы и долгое
+                    # время не будут обновлятся потому, что чертежи не используются, лежат к хранилищах
+                    # нет никакого смысла проверять только первых 3и страницы, - их надо проверять все, т.к.
+                    # изменениям могут быть подвержены часть данных (в середине отчёта)
+                    match_pages += 1
                     # если известны etag-параметры, то все страницы должны совпасть, тогда набор данных
                     # считаем полностью валидным
-                    match_pages = match_pages + 1  # noqa
+                    if len(data_pages) < page:
+                        data_headers.append(cached_data["headers"][page-1])
+                        data_pages.append(cached_data["json"][page-1])
+                    else:
+                        data_headers[page-1] = cached_data["headers"][page-1]
+                        data_pages[page-1] = cached_data["json"][page-1]
                     if 1 == page:
                         all_pages = len(cached_data["headers"])
                 else:
-                    if match_pages > 0:  # noqa
-                        # если какая-либо страница посреди набора данных не совпала с ранее известным etag, то весь набор
-                        # данных будем считать невалидным, а ранее загруженные данные устаревшими полностью
-                        page = 1
-                        match_pages = 0
-                        all_pages = None
-                        data_headers = []
-                        data_json = []
-                        cached_data = None
-                        restart = True
-                        restart_cache = True
-                        first_start = False
-                        continue
-                    data_headers.append(self.__get_cached_headers(page_data))  # noqa
-                    data_json.extend(page_data.json())  # noqa
+                    diff_pages += 1
+                    # если какая-либо страница посреди набора данных не совпала с ранее известным etag,
+                    # то обновляем только её, причём данные по другим страницам продолжаем считать валидными
+                    if len(data_pages) < page:
+                        data_headers.append(self.__get_cached_headers(page_data))
+                        data_pages.append(page_data.json())
+                    else:
+                        data_headers[page-1] = self.__get_cached_headers(page_data)
+                        data_pages[page-1] = page_data.json()
                     if 1 == page:
                         all_pages = int(page_data.headers["X-Pages"]) if "X-Pages" in page_data.headers else 1
                     elif (int(all_pages) != int(page_data.headers["X-Pages"])):  # noqa
@@ -244,18 +351,88 @@ class EveOnlineInterface:
                         # элемента этого набора, то весь набор признаётся невалидным
                         restart = True
                         restart_cache = True
-                        first_start = False
                         continue
                 if page == all_pages:
                     break
                 page = page + 1
-            if 0 == match_pages:
-                self.__dump_cache_into_file(url, data_headers, data_json)
-                return data_json
+            if (diff_pages > 0) or (match_pages == 0):
+                self.__dump_cache_into_file(url, data_headers, data_pages)
+                self.__is_last_data_updated = True
+                self.__last_modified = self.__client.last_modified
+                merged = []
+                for p in data_pages:
+                    merged += p
+                return merged
             elif len(cached_data["headers"]) == match_pages:
-                return cached_data["json"] if "json" in cached_data else None
+                url_time = cached_data["headers"][0].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
+                return self.__get_merged_pages(cached_data)
             else:
+                print("ERROR! : ", match_pages, diff_pages)
+                print("ERROR! : ", cached_data["headers"])
                 raise
+
+    def get_esi_piece_data(self, url, body: list, fully_trust_cache=False):
+        # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        piece_data = []
+        problem_ids = []
+        if body:
+            try:
+                # Requires role(s): ???
+                piece_data = self.get_esi_data(
+                    url,
+                    json.dumps(body, indent=0, sort_keys=False),
+                    fully_trust_cache)
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if not self.__offline_mode and (status_code == 404):
+                    # изредка бывает так, что corp_assets_data включает в себя id, которые уже удалены, т.е. в ассетах
+                    # контейнер ещё есть, а в names уже нет (вот такая печальная ситуация по синхронизации данных у ССР)
+                    # какой именно id из сотни возможных оказался "битым" неизвестно, поэтому разбиваем список id по частям
+                    # пытаемся их скачать по отдельности
+                    # а во время активных мувопсов и перетаскивании ассетов, ситуация усугубляется - множество названий
+                    # разом исчезает из списков и подолгу мешает грузить данные (значит будем грузить частями)
+                    parted_body = body[:]
+                    while parted_body:
+                        parted_ids = parted_body[:10]
+                        parted_body = parted_body[10:]
+                        try:
+                            parted_names = self.get_esi_data(
+                                url,
+                                json.dumps(parted_ids, indent=0, sort_keys=False),
+                                False)
+                            piece_data.extend(parted_names)
+                        except requests.exceptions.HTTPError as err:
+                            status_code = err.response.status_code
+                            if status_code == 404:
+                                for single_id in parted_ids:
+                                    try:
+                                        single_name = self.get_esi_data(
+                                            url,
+                                            json.dumps([single_id], indent=0, sort_keys=False),
+                                            False)
+                                        piece_data.append(single_name[0])
+                                    except requests.exceptions.HTTPError as err:
+                                        status_code = err.response.status_code
+                                        if status_code == 404:
+                                            problem_ids.append(single_id)
+                                        else:
+                                            raise
+                            else:
+                                raise
+                    # после того как все данные успешно загрузились... повторяем!!! операцию чтения, чтобы
+                    # кеш с данными был корректно сформирован
+                    body = [b for b in body if b not in problem_ids]
+                    piece_data = self.get_esi_data(
+                        url,
+                        json.dumps(body, indent=0, sort_keys=False),
+                        fully_trust_cache)
+                else:
+                    raise
+            except:
+                raise
+        return piece_data
 
     def authenticate(self, character_name=None):
         """ Main authenticate method to login character into system

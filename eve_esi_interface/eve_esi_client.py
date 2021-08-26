@@ -13,6 +13,8 @@ import base64
 import hashlib
 import secrets
 import time
+#import datetime
+from dateutil.parser import parse as parsedate
 
 from .auth_cache import EveESIAuth
 from .error import EveOnlineClientError
@@ -47,6 +49,9 @@ class EveESIClient:
 
         # для корректной работы с ESI Swagger Interface следует указать User-Agent в заголовках запросов
         self.__user_agent = user_agent
+
+        # данные-состояния, которые были получены во время обработки http-запросов
+        self.__last_modified = None
 
     @property
     def auth_cache(self):
@@ -100,6 +105,13 @@ class EveESIClient:
         :param user_agent: format recomendation - '<project_url> Maintainer: <maintainer_name> <maintainer_email>'
         """
         self.__user_agent = user_agent
+
+    @property
+    def last_modified(self):
+        """ Last-Modified property from http header
+        :returns: :class:`datetime.datetime`
+        """
+        return self.__last_modified
 
     @staticmethod
     def __combine_client_scopes(scopes):
@@ -198,75 +210,133 @@ class EveESIClient:
             headers.update({"User-Agent": self.__user_agent})
 
         res = None
-        try:
-            proxy_error_times = 0
-            throttle_error_times = 0
-            while True:
-                if body is None:
-                    res = requests.get(uri, headers=headers)
-                    if self.__debug:
-                        print("\nMade GET request to {} with headers: "
-                              "{}\nAnd the answer {} was received with "
-                              "headers {} and encoding {}".
-                              format(uri,
-                                     res.request.headers,
-                                     res.status_code,
-                                     res.headers,
-                                     res.encoding))
-                else:
-                    headers.update({"Content-Type": "application/json"})
-                    res = requests.post(uri, data=body, headers=headers)
-                    if self.__debug:
-                        print("\nMade POST request to {} with data {} and headers: "
-                              "{}\nAnd the answer {} was received with "
-                              "headers {} and encoding {}".
-                              format(uri,
-                                     body,
-                                     res.request.headers,
-                                     res.status_code,
-                                     res.headers,
-                                     res.encoding))
-                # вывод отладочной информации : код, uri, last-modified, etag
-                if self.__logger:
-                    log_line = str(res.status_code) + " " + uri[31:]
-                    if 'Last-Modified' in res.headers:
-                        log_line = log_line + " " + str(res.headers['Last-Modified'])[17:-4]
-                    if 'Etag' in res.headers:
-                        log_line = log_line + " " + str(res.headers['Etag'])
-                    print(log_line)
-                # обработка исключительных ситуаций
-                if (res.status_code in [502, 504]) and (proxy_error_times < self.__attempts_to_reconnect):
-                    # пять раз пытаемся повторить отправку сломанного запроса (часто случается
-                    # при подключении через 3G-модем)
-                    proxy_error_times = proxy_error_times + 1
+        http_connection_times = 0
+        self.__last_modified = None
+        requests_get_times = 0
+        timeout_connect = 3
+        timeout_read = 7
+        while True:
+            try:
+                proxy_error_times = 0
+                throttle_error_times = 0
+                while True:
+                    if body is None:
+                        requests_get_finished = False
+                        while not requests_get_finished:
+                            try:
+                                # при попытке загружать рыночные данные (их и только их) начинает зависать
+                                # метод get, и висит бесконечно - добавил таймауты на переподключения, которые
+                                # подобрал экспериментально, см. также https://ru.stackoverflow.com/a/1189363
+                                requests_get_times += 1
+                                res = requests.get(uri, headers=headers, timeout=(timeout_connect, timeout_read))
+                            except (requests.ConnectionError, requests.Timeout):
+                                continue
+                            else:
+                                requests_get_finished = True
+                        if self.__debug:
+                            print("\nMade GET request to {} with headers: "
+                                  "{}\nAnd the answer {} was received with "
+                                  "headers {} and encoding {}".
+                                  format(uri,
+                                         res.request.headers,
+                                         res.status_code,
+                                         res.headers,
+                                         res.encoding))
+                    else:
+                        headers.update({"Content-Type": "application/json"})
+                        res = requests.post(uri, data=body, headers=headers)
+                        if self.__debug:
+                            print("\nMade POST request to {} with data {} and headers: "
+                                  "{}\nAnd the answer {} was received with "
+                                  "headers {} and encoding {}".
+                                  format(uri,
+                                         body,
+                                         res.request.headers,
+                                         res.status_code,
+                                         res.headers,
+                                         res.encoding))
+                    # вывод отладочной информации : код, uri, last-modified, etag
+                    if self.__logger:
+                        log_line = str(res.status_code) + " " + uri[31:]
+                        if 'Last-Modified' in res.headers:
+                            url_time = str(res.headers['Last-Modified'])
+                            self.__last_modified = parsedate(url_time)
+                            log_line += " " + url_time[17:-4]
+                        if 'Etag' in res.headers:
+                            etag = str(res.headers['Etag'])
+                            log_line += " " + etag[:17] + '"'
+                        if requests_get_times > 1:
+                            log_line += " (" + str(requests_get_times) + ")"
+                        print(log_line)
+                    if res.status_code == 401:
+                        print(res.json())
+                        # переаутентификация
+                        self.re_auth(self.__auth_cache.auth_cache["scope"])
+                        headers.update({"Authorization": "Bearer {}".format(self.__auth_cache.access_token)})
+                        sys.stdout.flush()
+                        continue
+                    elif (res.status_code in [502, 504]) and (proxy_error_times < self.__attempts_to_reconnect):
+                        # пять раз пытаемся повторить отправку сломанного запроса (часто случается
+                        # при подключении через 3G-модем)
+                        proxy_error_times = proxy_error_times + 1
+                        continue
+                    elif (res.status_code in [503]) and (proxy_error_times < self.__attempts_to_reconnect):
+                        # иногда падает интерфейс к серверу tranquility (почему-то как правило на загрузке
+                        # item-ов контракта)
+                        print(res.json())
+                        # 503 Server Error: service unavailable for url:
+                        #     https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                        # {'error': 'The datasource tranquility is temporarily unavailable'}
+                        proxy_error_times = proxy_error_times + 1
+                        time.sleep(2*proxy_error_times)
+                        continue
+                    elif (res.status_code in [520]) and (throttle_error_times < self.__attempts_to_reconnect):
+                        # возможная ситация: сервер детектирует спам-запросы (на гитхабе написано, что порог
+                        # срабатывания находится около 20 запросов в 10 секунд от одного персонажа), см. подробнее
+                        # здесь: https://github.com/esi/esi-issues/issues/636#issuecomment-342150532
+                        print(res.json())
+                        # 520 Server Error: status code 520 for url:
+                        #     https://esi.evetech.net/latest/corporations/?/contracts/?/items/
+                        # {'error': 'ConStopSpamming, details: {"remainingTime": 12038505}'}
+                        throttle_error_times = throttle_error_times + 1
+                        time.sleep(5)
+                        continue
+                    res.raise_for_status()
+                    break
+            except requests.exceptions.ConnectionError as err:
+                print(err)
+                # возможная ситуация: наблюдаются проблемы с доступом к серверам CCP (обычно в те же самые
+                # моменты, когда падают чаты...), возникает следующая ошибка:
+                # HTTPSConnectionPool(host='esi.evetech.net', port=443):
+                # Max retries exceeded with url: /latest/corporations/98615601/contracts/162519958/items/
+                # Caused by NewConnectionError('<urllib3.connection.VerifiedHTTPSConnection object at 0x7f948ecea780>:
+                # Failed to establish a new connection: [Errno -3] Temporary failure in name resolution')
+                if http_connection_times < self.__attempts_to_reconnect:
+                    # повторям попытку подключения спустя секунду
+                    http_connection_times += 1
+                    time.sleep(1)
                     continue
-                elif (res.status_code in [503]) and (proxy_error_times < self.__attempts_to_reconnect):
-                    # иногда падает интерфейс к серверу tranquility (почему-то как правило на загрузке item-ов контракта)
+                raise
+            except requests.exceptions.HTTPError as err:
+                # встречаются ошибки типа: 403 Client Error: Forbidden for url:
+                #     https://esi.evetech.net/latest/corporations/98615601/contracts/163946879/items/
+                # {'error': 'token is expired', 'sso_status': 200}
+                if (res.status_code == 403) and (res.json().get('error', {'error': ''}) == 'token is expired'):
                     print(res.json())
-                    # 503 Server Error: service unavailable for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
-                    # {'error': 'The datasource tranquility is temporarily unavailable'}
-                    proxy_error_times = proxy_error_times + 1
-                    time.sleep(2*proxy_error_times)
+                    # переаутентификация
+                    self.re_auth(self.__auth_cache.auth_cache["scope"])
+                    headers.update({"Authorization": "Bearer {}".format(self.__auth_cache.access_token)})
+                    sys.stdout.flush()
                     continue
-                elif (res.status_code in [520]) and (throttle_error_times < self.__attempts_to_reconnect):
-                    # возможная ситация: сервер детектирует спам-запросы (на гитхабе написано, что порог
-                    # срабатывания находится около 20 запросов в 10 секунд от одного персонажа), см. подробнее
-                    # здесь: https://github.com/esi/esi-issues/issues/636#issuecomment-342150532
-                    print(res.json())
-                    # 520 Server Error: status code 520 for url: https://esi.evetech.net/latest/corporations/?/contracts/?/items/
-                    # {'error': 'ConStopSpamming, details: {"remainingTime": 12038505}'}
-                    throttle_error_times = throttle_error_times + 1
-                    time.sleep(5)
-                    continue
-                res.raise_for_status()
-                break
-        except requests.exceptions.HTTPError as err:
-            print(err)
-            print(res.json())
-            raise
-        except:
-            print(sys.exc_info())
-            raise
+                # сюда попадают 403 и 404 ошибки, и это нормально, т.к. CCP использует их для передачи
+                # application-информации
+                print(err)
+                print(res.json())
+                raise
+            except:
+                print(sys.exc_info())
+                raise
+            break
         return res
 
     def send_esi_request_json(self, uri, etag, body=None):
@@ -295,7 +365,7 @@ class EveESIClient:
 
         if not client_id:
             client_id = input("Copy your SSO application's client ID and enter it "
-                              "here [press 'Enter' for R Initiative 4 app]: ")
+                              "here [press 'Enter' for default Q.Industrialist app]: ")
             if not client_id:
                 client_id = self.__default_ri4_client_id
 

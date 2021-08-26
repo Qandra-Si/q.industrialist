@@ -120,6 +120,7 @@ def __dump_corp_blueprints_sales(
                     __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
                 __me = __blueprint_dict["me"]
                 __te = __blueprint_dict["te"]
+                __copy = __blueprint_dict["copy"]
                 __type_id = __blueprint_dict["type_id"]
                 __price = ""
                 # выясняем сколько стоит чертёж?
@@ -139,20 +140,29 @@ def __dump_corp_blueprints_sales(
                     __status = '&nbsp;<span class="label label-default">{}</span>'.format(__blueprint_status)
                     # [ outstanding, in_progress, finished_issuer, finished_contractor, finished, cancelled, rejected, failed, deleted, reversed ]
                     __blueprint_contract_activity = __cntrct_dict["cntrct_sta"]
-                    __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
+                    if __blueprint_contract_activity in ["outstanding", "finished_issuer", "finished_contractor", "reversed"]:
+                        __activity = '&nbsp;<span class="label label-warning">{}</span>'.format(__blueprint_contract_activity)
+                    elif __blueprint_contract_activity in ["in_progress"]:
+                        __activity = '&nbsp;<span class="label label-success">{}</span>'.format(__blueprint_contract_activity)
+                    else:
+                        __activity = '&nbsp;<span class="label label-danger">{}</span>'.format(__blueprint_contract_activity)
+                    # issuer
+                    __issuer = '&nbsp;<a href="https://evewho.com/character/{id}" target="_blank">{nm}</a>'. \
+                               format(id=__cntrct_dict["cntrct_issuer"],nm=__cntrct_dict["cntrct_issuer_name"])
                     # summary по контракту
                     if __contracts_summary:
                         __contracts_summary += '</br>\n'
                     __contracts_summary += \
-                        '{prc:,.1f}{st}{act}'. \
+                        '{prc:,.1f}{st}{act}{iss}'. \
                         format(prc=__cntrct_dict["price"],
                                st=__status,
-                               act=__activity)
+                               act=__activity,
+                               iss=__issuer)
                 # формируем строку таблицы - найден нужный чертёж в ассетах
                 glf.write(
                     '<tr>'
                     '<th scope="row">{num}</th>'
-                    '<td>{nm} <span class="label label-{lbclr}">{me} {te}</span></td>'
+                    '<td>{nm} <span class="label label-{lbclr}">{me} {te}</span>{cp}</td>'
                     '<td class="hidden">{loc}</td>'
                     '<td class="hidden">{pl}</td>'
                     '<td align="right">{prc}</td>'
@@ -162,6 +172,7 @@ def __dump_corp_blueprints_sales(
                            nm=__blueprint_dict["name"],
                            me=__me,
                            te=__te,
+                           cp='&nbsp;<span class="label label-copy">copy</span>' if __copy else '',
                            lbclr="success" if (__me == 10) and (__te == 20) else "warning",
                            loc=__location_name,
                            pl=__place,
@@ -252,6 +263,18 @@ def __dump_corp_blueprints_tbl(
        <li><a id="btnTogglePriceTags" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPriceTags"></span> Show Price tags</a></li>
        <li><a id="btnTogglePlace" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlace"></span> Show Place column</a></li>
        <li><a id="btnToggleBox" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBox"></span> Show Box column</a></li>
+       <li><a id="btnToggleOut" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowOut"></span> Show Output Box column</a></li>
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Show by Types <mark id="lbSelBPx"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li class="dropdown-header">[Blueprint Types]</li>
+           <li><a id="btnSelBPx" copy="0" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-selbpx" aria-hidden="true" copy="0"></span> Originals only</a></li>
+           <li><a id="btnSelBPx" copy="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-selbpx" aria-hidden="true" copy="1"></span> Copies only</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnSelBPx" copy="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star qind-img-selbpx" aria-hidden="true" copy="2"></span> Show all</a></li>
+         </ul>
+       </li>
+
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleShowContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowContracts"></span> Show Contracts</a></li>
        <li><a id="btnToggleShowFinishedContracts" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowFinishedContracts"></span> Show Finished Contracts</a></li>
@@ -328,6 +351,9 @@ def __dump_corp_blueprints_tbl(
 tr.qind-bp-row {
   font-size: small;
 }
+.label-copy {
+    background-color: #a49e9329;
+}
 </style>
 
 <div class="container-fluid">
@@ -363,6 +389,7 @@ tr.qind-bp-row {
   <th class="hvr-icon-fade" id="thSortSel" col="5">Location<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-plc hvr-icon-fade" id="thSortSel" col="6">Place<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
   <th class="qind-td-box hvr-icon-fade" id="thSortSel" col="7">Box<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
+  <th class="qind-td-out hvr-icon-fade" id="thSortSel" col="8">Output<span class="glyphicon glyphicon-sort hvr-icon" aria-hidden="true"></span></th>
  </tr>
 </thead>
 <tbody>
@@ -390,6 +417,7 @@ tr.qind-bp-row {
             __activity = ""
             __blueprint_activity = None
             __blueprint_contract_activity = None
+            __output_location_id = None
             if "st" in __blueprint_dict:
                 # [ active, cancelled, delivered, paused, ready, reverted ]
                 __blueprint_status = __blueprint_dict["st"]
@@ -446,10 +474,21 @@ tr.qind-bp-row {
             __place = __blueprint_dict["flag"]
             if __place[:-1] == "CorpSAG":
                 __place = 'Hangar {}'.format(__place[-1:])  # Corp Security Access Group
+            # определяем выход готовой продукции
+            __output_location_id = __blueprint_dict.get("out", None)
+            __output_location_box = __blueprint_dict.get("out", "")
+            if not (__output_location_id is None):
+                if str(__output_location_id) in __corp["locations"]:
+                    # определяем название контейнера выхода готовой продукции (названия ingame задают игроки)
+                    __loc_dict = __corp["locations"][str(__output_location_id)]
+                    if not (__loc_dict["name"] is None):
+                        __output_location_box = __loc_dict["name"]
+            # определяем, является ли чертёж БПО или БПЦ
+            __is_blueprint_copy = bool(__blueprint_dict["copy"])
             # вывод в таблицу информацию о чертеже
-            glf.write('<tr class="qind-bp-row"{job}{cntrct}>'
+            glf.write('<tr class="qind-bp-row"{job}{cntrct}{copy}>'
                       ' <th scope="row">{num}</th>\n'
-                      ' <td>{nm}{st}{act}</td>'
+                      ' <td>{nm}{cp}{st}{act}</td>'
                       ' <td align="right">{me}</td>'
                       ' <td align="right">{te}</td>'
                       ' <td align="right">{q}</td>'
@@ -457,9 +496,12 @@ tr.qind-bp-row {
                       ' <td>{loc}</td>'
                       ' <td class="qind-td-plc">{plc}</td>'
                       ' <td class="qind-td-box">{box}</td>'
+                      ' <td class="qind-td-out">{out}</td>'
                       '</tr>\n'.
                       format(num=row_num,
                              nm=__blueprint_dict["name"],
+                             cp='&nbsp;<span class="label label-copy">copy</span>' if __is_blueprint_copy else '',
+                             copy=' copy="1"' if __is_blueprint_copy else ' copy="0"',
                              st=__status,
                              act=__activity,
                              job="" if __blueprint_activity is None else ' job="{}"'.format(__blueprint_activity),
@@ -468,10 +510,11 @@ tr.qind-bp-row {
                              te=__blueprint_dict["te"] if "te" in __blueprint_dict else "",
                              q=__blueprint_dict["q"],
                              price=__price,
-                             iprice=__fprice,
+                             iprice='0' if not __fprice else __fprice,
                              loc=__location_name,
                              plc=__place,
-                             box=__location_box))
+                             box=__location_box,
+                             out=__output_location_box))
             # подсчёт общей статистики
             # __summary_cost = __summary_cost + __stat_dict["cost"]
             row_num = row_num + 1
@@ -487,6 +530,7 @@ tr.qind-bp-row {
  <td></td>
  <td class="qind-td-plc"></td>
  <td class="qind-td-box"></td>
+ <td class="qind-td-out"></td>
 </tr>
 <tr class="qind-summary-contracts" style="font-weight:bold;">
  <th></th>
@@ -496,6 +540,7 @@ tr.qind-bp-row {
  <td></td>
  <td class="qind-td-plc"></td>
  <td class="qind-td-box"></td>
+ <td class="qind-td-out"></td>
 </tr>
 </tfoot>
       </table>
@@ -571,7 +616,8 @@ tr.qind-bp-row {
     'Reverse Engineering', 'Invention', 'Reactions', '', '',
     'Show', 'Hide'
   ];
-  var g_tbl_col_types = [0,1,1,1,2,0,0,0]; // 0:str, 1:num, 2:x-data
+  var g_blueprint_types = ['Original', 'Copy', 'All'];
+  var g_tbl_col_types = [0,1,1,1,2,0,0,0,0]; // 0:str, 1:num, 2:x-data
   var g_tbl_filter = null;
 
   // Blueprints Options storage (prepare)
@@ -644,6 +690,9 @@ tr.qind-bp-row {
     if (!ls.getItem('Show Industry Jobs')) {
       ls.setItem('Show Industry Jobs', 12);
     }
+    if (!ls.getItem('Show by Types')) {
+      ls.setItem('Show by Types', 2);
+    }
     if (!ls.getItem('Show Contracts')) {
       ls.setItem('Show Contracts', 1);
     }
@@ -688,6 +737,11 @@ tr.qind-bp-row {
       $('#imgShowBox').removeClass('hidden');
     else
       $('#imgShowBox').addClass('hidden');
+    show = ls.getItem('Show Out');
+    if (show == 1)
+      $('#imgShowOut').removeClass('hidden');
+    else
+      $('#imgShowOut').addClass('hidden');
     show = ls.getItem('Show Unused Blueprints');
     if (show == 1)
       $('#imgShowUnusedBlueprints').removeClass('hidden');
@@ -702,6 +756,15 @@ tr.qind-bp-row {
         $(this).addClass('hidden');
     })
     $('#lbSelJob').html(g_job_activities[job]);
+    cp = ls.getItem('Show by Types');
+    $('span.qind-img-selbpx').each(function() {
+      _cp = $(this).attr('copy');
+      if (cp == _cp)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+    $('#lbSelBPx').html(g_blueprint_types[cp]);
     loc = ls.getItem('Show Only Location');
     if (!loc) {
       $('span.qind-img-selloc').each(function() { $(this).addClass('hidden'); })
@@ -718,11 +781,12 @@ tr.qind-bp-row {
     }
   }
   // Blueprints filter method (to rebuild body components)
-  function isBlueprintVisible(el, loc, unused, job, cntrct, cntrct_fin) {
+  function isBlueprintVisible(el, loc, unused, job, cntrct, cntrct_fin, cp) {
     _res = 1;
     _loc = el.find('td').eq(5).text();
     _job = el.attr('job');
     _cntrct = el.attr('cntrct');
+    _cp = el.attr('copy');
     _res = (loc && (_loc != loc)) ? 0 : 1;
     if (!(_cntrct === undefined)) {
       if (_res && (cntrct == 0))
@@ -730,6 +794,10 @@ tr.qind-bp-row {
       if (_res && (cntrct_fin == 0) && (_cntrct == "finished"))
         _res = 0;
     } else {
+      if (_res && (!(_cp === undefined))) {
+        if ((cp != 2) && (cp != _cp))
+          _res = 0;
+      }
       if (_res && (unused == 0)) {
         if (_job === undefined)
           _res = 0;
@@ -757,6 +825,10 @@ tr.qind-bp-row {
           if (!_res) {
             txt = el.find('td').eq(7).text().toLowerCase();
             _res = txt.includes(g_tbl_filter);
+            if (!_res) {
+              txt = el.find('td').eq(8).text().toLowerCase();
+              _res = txt.includes(g_tbl_filter);
+            }
           }
         }
       }
@@ -798,11 +870,19 @@ tr.qind-bp-row {
       else
         $(this).addClass('hidden');
     })
+    show = ls.getItem('Show Out');
+    $('.qind-td-out').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     loc = ls.getItem('Show Only Location');
     unused = ls.getItem('Show Unused Blueprints');
     job = ls.getItem('Show Industry Jobs');
     cntrct = ls.getItem('Show Contracts');
     cntrct_fin = ls.getItem('Show Finished Contracts');
+    cp = ls.getItem('Show by Types');
     $('table').each(function() {
       _summary_a_qty = 0;
       _summary_a_price = 0.0;
@@ -810,7 +890,7 @@ tr.qind-bp-row {
       _summary_c_price = 0.0;
       // filtering
       $(this).find('tr.qind-bp-row').each(function() {
-        show = isBlueprintVisible($(this), loc, unused, job, cntrct, cntrct_fin);
+        show = isBlueprintVisible($(this), loc, unused, job, cntrct, cntrct_fin, cp);
         if (show == 1) {
           $(this).removeClass('hidden');
           _cntrct = $(this).attr('cntrct');
@@ -879,6 +959,12 @@ tr.qind-bp-row {
       rebuildOptionsMenu();
       rebuildBody();
     });
+    $('a#btnSelBPx').on('click', function() {
+      cp = $(this).attr('copy');
+      ls.setItem('Show by Types', cp);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
     $('#btnToggleLegend').on('click', function () {
       show = (ls.getItem('Show Legend') == 1) ? 0 : 1;
       ls.setItem('Show Legend', show);
@@ -924,6 +1010,12 @@ tr.qind-bp-row {
     $('#btnToggleBox').on('click', function () {
       show = (ls.getItem('Show Box') == 1) ? 0 : 1;
       ls.setItem('Show Box', show);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('#btnToggleOut').on('click', function () {
+      show = (ls.getItem('Show Out') == 1) ? 0 : 1;
+      ls.setItem('Show Out', show);
       rebuildOptionsMenu();
       rebuildBody();
     });
@@ -1031,7 +1123,9 @@ def dump_blueprints_into_report(
     glf = open('{dir}/blueprints.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Blueprints")
-        __dump_corp_blueprints_tbl(glf, corps_blueprints)
+        __dump_corp_blueprints_tbl(
+            glf,
+            corps_blueprints)
         render_html.__dump_footer(glf)
     finally:
         glf.close()

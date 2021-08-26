@@ -2,7 +2,8 @@
 
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
+>>> python q_dictionaries.py --cache_dir=~/.q_industrialist
 """
 import sys
 import os
@@ -12,8 +13,10 @@ import json
 from yaml import SafeLoader
 from pathlib import Path
 
+import pyfa_conversions as conversions
 
-# type=2 : unpacked SDE-yyyymmdd-TRANQUILITY.zip
+
+# type=static_data_interface : unpacked SDE-yyyymmdd-TRANQUILITY.zip
 def __get_yaml(type, sub_url, item):
     f_name = '{cwd}/{type}/{url}'.format(type=type, cwd=os.getcwd(), url=sub_url)
     item_to_search = "\n{}\n".format(item)
@@ -41,7 +44,7 @@ def __get_yaml(type, sub_url, item):
 
 
 def __get_source_name(subname, name):
-    return '{cwd}/{type}/{url}'.format(type=2, cwd=os.getcwd(), url="sde/{}/{}.yaml".format(subname, name))
+    return '{cwd}/{type}/{url}'.format(cwd=os.getcwd(), type="static_data_interface", url="{}/{}.yaml".format(subname, name))
 
 
 def __get_converted_name(ws_dir, name):
@@ -116,6 +119,7 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
             s = json.dumps(yaml_data, indent=1, sort_keys=False)
             f = open(f_name_json, "wt+", encoding='utf8')
             f.write(s)
+            del yaml_data
         finally:
             f.close()
 
@@ -144,6 +148,8 @@ def __rebuild_list2dict_by_key(ws_dir, name, key, val=None):
     s = json.dumps(dct, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del dct
+    del lst
 
 
 def get_item_name_by_type_id(type_ids, type_id):
@@ -158,41 +164,105 @@ def get_item_name_by_type_id(type_ids, type_id):
     return name
 
 
-def get_type_id_by_item_name(type_ids, name):
+def convert_sde_type_ids(type_ids):
+    named_type_ids = {}
+    keys = type_ids.keys()
+    for type_id in keys:
+        type_dict = type_ids[str(type_id)]
+        if ("name" in type_dict) and ("en" in type_dict["name"]):
+            __name = type_dict["name"]["en"]
+            named_dict = type_dict.copy()
+            del named_dict["name"]
+            named_dict["id"] = int(type_id)
+            named_type_ids.update({__name: named_dict})
+    return named_type_ids
+
+
+def find_type_id_by_item_name_ex(named_type_ids, name):
+    __item = named_type_ids.get(name)
+    if __item is None:
+        return None, None
+    return __item["id"], __item
+
+
+def find_type_id_by_item_name(named_type_ids, name):
+    type_id, __dummy0 = find_type_id_by_item_name_ex(named_type_ids, name)
+    return type_id
+
+
+def get_type_id_by_item_name_ex(type_ids, name):
     keys = type_ids.keys()
     for type_id in keys:
         type_dict = type_ids[str(type_id)]
         if ("name" in type_dict) and ("en" in type_dict["name"]):
             __name = type_dict["name"]["en"]
             if __name == name:
-                return int(type_id)
-    return None
+                return int(type_id), type_dict
+    return None, None
 
 
-def get_market_group_by_type_id(type_ids, type_id):
-    if not (str(type_id) in type_ids):
+def get_type_id_by_item_name(type_ids, name):
+    type_id, __dummy0 = get_type_id_by_item_name_ex(type_ids, name)
+    return type_id
+
+
+def get_market_group_name_by_id(sde_type_ids, group_id):
+    group_sid = str(group_id)
+    if group_sid in sde_type_ids:
+        group_dict = sde_type_ids[group_sid]
+        if ("nameID" in group_dict) and ("en" in group_dict["nameID"]):
+            return group_dict["nameID"]["en"]
+        else:
+            return group_sid
+    return group_sid
+
+
+def get_market_group_by_type_id(sde_type_ids, type_id):
+    if not (str(type_id) in sde_type_ids):
         return None
-    type_dict = type_ids[str(type_id)]
+    type_dict = sde_type_ids[str(type_id)]
     if "marketGroupID" in type_dict:
         return type_dict["marketGroupID"]
     return None
 
 
-def get_root_market_group_by_type_id(type_ids, market_groups, type_id):
-    group_id = get_market_group_by_type_id(type_ids, type_id)
+def get_market_group_by_name(sde_market_groups, name):
+    for grp in sde_market_groups.items():
+        if name == grp[1]["nameID"]["en"]:
+            return grp  # id=grp[0], dict=grp[1]
+    return None
+
+
+def get_market_group_id_by_name(sde_market_groups, name):
+    grp = get_market_group_by_name(sde_market_groups, name)
+    return None if grp is None else grp[0]
+
+
+def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
-        return None
+        return []
     __group_id = group_id
+    __groups_chain = [group_id]
     while True:
-        __grp1 = market_groups[str(__group_id)]
+        __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
             __group_id = __grp1["parentGroupID"]
+            # переворачиваем элементы списка, где корень будет в его начале
+            __groups_chain.insert(0, __group_id)
         else:
-            return __group_id
+            return __groups_chain
 
 
-def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
-    group_id = get_market_group_by_type_id(type_ids, type_id)
+def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+    if (groups_chain is None) or not groups_chain:
+        return None
+    return groups_chain[0]
+
+
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return None
     __group_id = group_id
@@ -205,7 +275,7 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
                           1112,  # Subsystems (parent:955)
                          ]:
             return __group_id
-        __grp1 = market_groups[str(__group_id)]
+        __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
             __parent_group_id = __grp1["parentGroupID"]
             # группа материалов для целей производства должна делиться на подгруппы (производство и заказы
@@ -222,50 +292,51 @@ def get_basis_market_group_by_type_id(type_ids, market_groups, type_id):
 
 
 def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
-    if group_id is None:
+    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+    if groups_chain is None:
         return None
-    __group_id = group_id
-    while True:
-        if int(__group_id) in market_groups:
-            return True
-        __grp1 = sde_market_groups[str(__group_id)]
-        if "parentGroupID" in __grp1:
-            __group_id = __grp1["parentGroupID"]
+    return bool(set(groups_chain) & set(market_groups))
+
+
+def get_blueprint_any_activity(blueprints, activity: str, type_id: int):
+    #  manufacturing - производство
+    #  invention - запуск инвентов
+    #  copying - копирка
+    #  research_material - запуск ME
+    #  research_time - запуск TE
+    #  reaction - реакции
+    if activity in ['manufacturing', 'invention', 'copying', 'research_material', 'research_time', 'reaction']:
+        if not (str(type_id) in blueprints):
+            return None
         else:
-            return False
-
-
-def get_blueprint_manufacturing_materials(blueprints, type_id):
-    if not (str(type_id) in blueprints):
-        return None
+            bp = blueprints[str(type_id)]
+            bp1 = bp.get('activities')
+            if bp1 is None:
+                return None
+            bp2 = bp1.get(activity)
+            if bp2 is None:
+                return None
+            bp3 = bp2.get('materials')
+            if bp3 is None:
+                return None
+            return bp2
     else:
-        bp = blueprints[str(type_id)]
-        if not ("activities" in bp):
-            return None
-        elif not ("manufacturing" in bp["activities"]):
-            return None
-        elif not ("materials" in bp["activities"]["manufacturing"]):
-            return None
-        else:
-            materials = bp["activities"]["manufacturing"]["materials"]
-            return materials
-
-
-def get_blueprint_reaction_materials(blueprints, type_id):
-    if not (str(type_id) in blueprints):
         return None
-    else:
-        bp = blueprints[str(type_id)]
-        if not ("activities" in bp):
-            return None
-        elif not ("reaction" in bp["activities"]):
-            return None
-        elif not ("materials" in bp["activities"]["reaction"]):
-            return None
-        else:
-            materials = bp["activities"]["reaction"]["materials"]
-            return materials
+
+
+def get_blueprint_any_materials(blueprints, activity: str, type_id: int):
+    a = get_blueprint_any_activity(blueprints, activity, type_id)
+    if a is None:
+        return None
+    return a['materials']
+
+
+def get_blueprint_manufacturing_activity(blueprints, type_id: int):
+    return get_blueprint_any_activity(blueprints, 'manufacturing', type_id)
+
+
+def get_blueprint_manufacturing_materials(blueprints, type_id: int):
+    return get_blueprint_any_materials(blueprints, 'manufacturing', type_id)
 
 
 def get_materials_for_blueprints(sde_bp_materials):
@@ -306,22 +377,127 @@ def get_research_materials_for_blueprints(sde_bp_materials):
     return research_materials_for_bps
 
 
-def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
+def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing"):
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
     """
     for bp in sde_bp_materials:
         __bpm1 = sde_bp_materials[bp]["activities"]
+        if activity in __bpm1:
+            __bpm2 = __bpm1[activity]
+            if "products" in __bpm2:
+                __bpm3 = __bpm2["products"]
+                for m in __bpm3:
+                    type_id = int(m["typeID"])
+                    if product_id == type_id:
+                        return int(bp), sde_bp_materials[bp]
+    return None, None
+
+
+def get_blueprint_type_id_by_manufacturing_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing")
+    return a, b
+
+
+def get_blueprint_type_id_by_invention_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="invention")
+    return a, b
+
+
+def get_product_by_blueprint_type_id(blueprint_type_id, activity_id, sde_bp_materials):
+    """
+    Поиск идентификатора manufacturing/reaction-продукта по известному идентификатору чертежа
+    """
+    __bpm0 = sde_bp_materials.get(str(blueprint_type_id), None)
+    if __bpm0 is None:
+        return None, None, None
+    __bpm1 = __bpm0.get("activities", None)
+    if __bpm1 is None:
+        return None, None, None
+    __bpm2 = None
+    if activity_id == 1:
+        if "manufacturing" in __bpm1:
+            __bpm2 = __bpm1["manufacturing"]
+    elif activity_id == 8:
+        if "invention" in __bpm1:
+            __bpm2 = __bpm1["invention"]
+    elif activity_id in (9, 11):
+        if "reaction" in __bpm1:
+            __bpm2 = __bpm1["reaction"]
+    if __bpm2 is None:
+        return None, None, None
+    __bpm3 = __bpm2.get("products")
+    for m in __bpm3:
+        product_id = int(m["typeID"])
+        quantity = int(m["quantity"])
+        return product_id, quantity, __bpm2["materials"]
+    return None, None, None
+
+
+def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_materials):
+    """
+    Поиск идентификатора manufacturing-продукта по известному идентификатору чертежа
+    """
+    if str(blueprint_type_id) in sde_bp_materials:
+        __bpm1 = sde_bp_materials[str(blueprint_type_id)]["activities"]
         if "manufacturing" in __bpm1:
             __bpm2 = __bpm1["manufacturing"]
             if "products" in __bpm2:
                 __bpm3 = __bpm2["products"]
                 for m in __bpm3:
-                    if "typeID" in m:
-                        type_id = int(m["typeID"])
-                        if product_id == type_id:
-                            return int(bp), sde_bp_materials[bp]
-    return None, None
+                    product_id = int(m["typeID"])
+                    quantity = int(m["quantity"])
+                    return product_id, quantity, __bpm2["materials"]
+    return None, None, None
+
+
+def get_industry_material_efficiency(
+        # тип производства - это чертёж или формула, или реакция?
+        manufacturing_activity: str,
+        # кол-во run-ов
+        runs_quantity: int,
+        # кол-во из исходного чертежа (до учёта всех бонусов)
+        __bpo_materials_quantity: int,
+        # me-параметр чертежа
+        material_efficiency: int):
+    if __bpo_materials_quantity == 1:
+        # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
+        # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
+        __need = runs_quantity
+    else:
+        if manufacturing_activity == 'reaction':
+            # TODO: хардкодим -2.2% structure role bonus
+            __stage1 = runs_quantity * __bpo_materials_quantity
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage3 = int(float(__stage2 + 0.99))
+            # ---
+            __need = __stage3
+        elif manufacturing_activity == 'manufacturing':
+            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+            # см. 1 x run: http://prntscr.com/u0g07w
+            # см. 4 x run: http://prntscr.com/u0g0cd
+            # см.11 x run: https://prnt.sc/v3mk1m
+            # см. экономия материалов: http://prntscr.com/u0g11u
+            # ---
+            # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
+            __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
+            # учитываем бонус установленного модификатора
+            __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage4 = int(float(__stage3 + 0.99))
+            # ---
+            __need = __stage4
+        elif manufacturing_activity == 'invention':
+            # TODO: не используется structure role bonus
+            __need = runs_quantity * __bpo_materials_quantity
+        else:
+            # TODO: не поддерживается расчёт... доделать
+            __need = runs_quantity * __bpo_materials_quantity
+    return __need
 
 
 def get_market_groups_tree_root(groups_tree, group_id):
@@ -362,6 +538,163 @@ def get_market_groups_tree(sde_market_groups):
     return groups_tree
 
 
+# только для работы с текстовыми фитами, где возможно хранятся устаревшие названия модулей
+def __try_to_get_type_id_by_item_name(name, sde_named_type_ids):
+    __type_id = __item = None
+    __item_name = name
+    for i in range(10):
+        # шаг №0 : поиск item-а в справочнике, актуальном на дату обновления EVE static data resources
+        # шаг №1 : поиск item-а в pyfa_conversions-справочнике переименованных модулей
+        # шаг №2..9 : повторный поиск item-а в pyfa_conversions, возможны множественные переименования
+        __type_id, __item = find_type_id_by_item_name_ex(sde_named_type_ids, name)
+        if not (__type_id is None):
+            if bool(__item["published"]):
+                break
+        # пытаемся найти item в pyfa_conversions, возможно он устарел и переименован?
+        __converted_name = conversions.all.get(name)
+        if __converted_name is None:
+            return None, None, None
+        # если найден item с другим названием, то пытаемся снова определить его type_id
+        __item_name = name = __converted_name
+    return __type_id, __item, __item_name
+
+
+# описание формата см. на этой странице https://www.eveonline.com/ru/article/import-export-fittings
+def get_items_list_from_eft(
+        eft,
+        sde_named_type_ids,
+        exclude_specified_meta_groups=None,
+        include_only_meta_groups=None):
+    __converted = {
+        "ship": None,
+        "comment": None,
+        "eft": eft,
+        "items": [],
+        "problems": []
+    }
+    items = __converted["items"]
+    problems = __converted["problems"]
+
+    def push_into_problems(name, quantity, is_blueprint_copy, problem):
+        __problem_dict = next((p for p in problems if (p["name"] == name) and (p["problem"] == problem)), None)
+        if __problem_dict is None:
+            __problem_dict = {"name": name, "quantity": int(quantity), "problem": problem}
+            if not (is_blueprint_copy is None):
+                __problem_dict.update({"is_blueprint_copy": bool(is_blueprint_copy)})
+            problems.append(__problem_dict)
+        else:
+            __problem_dict["quantity"] += int(quantity)
+
+    def push_item_into_problems(item, problem):
+        push_into_problems(
+            item["name"],
+            item["quantity"],
+            item["is_blueprint_copy"] if "is_blueprint_copy" in item else None,
+            problem
+        )
+
+    # начинаем обработку входных данных
+    item_names = eft.split("\n")
+    for __line in enumerate(item_names):
+        __original_name = __line[1].strip()
+        # пропускаем пустые строки, и даже не считаем позиции для определения к чему относится
+        # модуль, к разъёму малой или большой мощности? т.к. нам надо получить лишь список
+        # модулей, из которых состоит фит,... лежат ли они в карго, тоже не имеет значения
+        if not __original_name:
+            continue
+        # пропускаем строки вида [Empty Low slot], [Empty High slot], [Empty Rig slot],...
+        if (__original_name[:7] == '[Empty ') and (__original_name[-6:] == ' slot]'):
+            continue
+        # распаковываем название корабля из первой строки с квадратными скобками,
+        # например: [Stratios, Vinnegar Douche's Stratios]
+        __quantity = 1
+        __ship_flag = False
+        __is_blueprint_copy = None
+        if __line[0] == 0:
+            if (__original_name[:1] == '[') and (__original_name[-1:] == ']'):
+                # выполняем поиск названия корабля в строке
+                __end = __line[1].find(",")
+                if __end < 0:
+                    continue
+                __converted["comment"] = __original_name[__end+1:-1].strip()
+                __original_name = __original_name[1:__end]
+                if not __original_name:
+                    continue
+                __ship_flag = True
+        else:
+            # попытка найти в конце строке сочетание x?, например: Nanite Repair Paste x50
+            __quantity_pos = __original_name.rfind(" x")
+            if __quantity_pos > 1:
+                __num = __original_name[__quantity_pos + 2:]
+                if __num.isnumeric():
+                    __quantity = __num
+                    __original_name = __original_name[:__quantity_pos]
+            # попытка найти в строке сочетание (Copy), например: Vespa I Blueprint (Copy) x2
+            __copy_pos = __original_name.rfind(" (Copy)")
+            if __copy_pos >= 1:
+                __original_name = __original_name.replace(" (Copy)", "")
+                __is_blueprint_copy = True
+        # попытка получить сведения об item-е по его наименованию
+        __item_dicts = None
+        __type_id, __item, __name = __try_to_get_type_id_by_item_name(__original_name, sde_named_type_ids)
+        # Внимание! если известен __type_id, то с __name и __original_name могут не совпадать!!!
+        if not (__type_id is None):
+            __item_dicts = [{"name": __name,
+                             "type_id": __type_id,
+                             "quantity": int(__quantity),
+                             "details": __item}]
+            if not (__is_blueprint_copy is None) and __is_blueprint_copy:
+                __item_dicts[0].update({"is_blueprint_copy": True})
+            if __original_name != __name:
+                __item_dicts[0].update({"renamed": True})
+        else:
+            # возможно встретилась ситуация: Sisters Core Probe Launcher,Sisters Core Scanner Probe
+            pair = __original_name.split(",")
+            if len(pair) == 2:
+                __type_id0, __item0, pair[0] = __try_to_get_type_id_by_item_name(pair[0], sde_named_type_ids)
+                __type_id1, __item1, pair[1] = __try_to_get_type_id_by_item_name(pair[1], sde_named_type_ids)
+                if not (__type_id0 is None) and not (__type_id1 is None):
+                    __quantity = 1
+                    if ("capacity" in __item0) and ("volume" in __item1):
+                        __quantity = int(__item0["capacity"]/__item1["volume"])
+                    __item_dicts = [  # флаг __is_blueprint_copy здесь не может быть выставлен
+                        {"name": pair[0], "type_id": __type_id0, "quantity": 1, "details": __item0},
+                        {"name": pair[1], "type_id": __type_id1, "quantity": __quantity, "details": __item1}
+                    ]
+        # в случае, если элемент не найден, то сохраняем об этом информацию в список проблем
+        if __item_dicts is None:
+            push_into_problems(__original_name, __quantity, __is_blueprint_copy, "obsolete")
+        elif __ship_flag:
+            # хул корабля всегда существует в одном экземпляре (не путать с тем, что валяется в карго)
+            __converted["ship"] = __item_dicts[0]
+        else:
+            for __item_dict in __item_dicts:
+                if not bool(__item_dict["details"]["published"]):
+                    push_item_into_problems(__item_dict, "suppressed")
+                    continue
+                # Внимание! Хул корабля сохранён не в items, а в ship, т.о. если корабль перевозит
+                # в карго такие-же хулы, то их там будет ровно столько, сколько и должно быть
+                __exists = next((i for i in items if i["name"] == __item_dict["name"]), None)
+                if __exists is None:
+                    if "metaGroupID" in __item_dict["details"]:
+                        __mg_num = __item_dict["details"]["metaGroupID"]
+                        # если указано не включать модуль неподходящей мета-группы в
+                        # список item-ов, то пропускаем его
+                        if not (exclude_specified_meta_groups is None) and (__mg_num in exclude_specified_meta_groups):
+                            continue
+                        # если указано, что включать модули только указанной мета-группы в
+                        # список item-ов, то добавляем только его
+                        if not (include_only_meta_groups is None) and not (__mg_num is include_only_meta_groups):
+                            continue
+                    elif not (exclude_specified_meta_groups is None) or not (include_only_meta_groups is None):
+                        push_item_into_problems(__item_dict, "unknown meta group")
+                        continue
+                    items.append(__item_dict)
+                else:
+                    __exists["quantity"] += int(__item_dict["quantity"])
+    return __converted
+
+
 def __rebuild_icons(ws_dir, name):
     icons = read_converted(ws_dir, name)
     icon_keys = icons.keys()
@@ -375,6 +708,8 @@ def __rebuild_icons(ws_dir, name):
     s = json.dumps(icons, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del icon_keys
+    del icons
 
 
 def __clean_positions(ws_dir, name):
@@ -385,6 +720,7 @@ def __clean_positions(ws_dir, name):
     s = json.dumps(positions, indent=1, sort_keys=False)
     f = open(f_name_json, "wt+", encoding='utf8')
     f.write(s)
+    del positions
 
 
 def main():  # rebuild .yaml files
@@ -408,10 +744,14 @@ def main():  # rebuild .yaml files
             format(app=sys.argv[0]))
         sys.exit(exit_or_wrong_getopt)
 
+    print("Rebuilding metaGroups.yaml file...")
+    sys.stdout.flush()
+    __rebuild(workspace_cache_files_dir, "fsd", "metaGroups", ["iconID", {"nameID": ["en"]}])
+
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
-    
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
+
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "bsd", "invPositions", ["itemID", "x", "y", "z"])
@@ -444,22 +784,18 @@ def main():  # rebuild .yaml files
     sys.stdout.flush()
     __rebuild_list2dict_by_key(workspace_cache_files_dir, "invItems", "itemID")
 
-    print("Rebuilding typeIDs.yaml file...")
-    sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "iconID", "published", "marketGroupID", {"name": ["en"]}, "volume"])
-
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities"])
 
 
 def test():
-    data = __get_yaml(2, 'sde/fsd/typeIDs.yaml', "32859:")
+    data = __get_yaml("static_data_interface", 'fsd/typeIDs.yaml', "32859:")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["name"]["en"]))  # Small Standard Container Blueprint
 
-    data = __get_yaml(2, 'sde/bsd/invUniqueNames.yaml', "    itemID: 60003760")
+    data = __get_yaml("static_data_interface", 'bsd/invUniqueNames.yaml', "    itemID: 60003760")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["itemName"]))  # Jita IV - Moon 4 - Caldari Navy Assembly Plant

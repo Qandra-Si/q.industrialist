@@ -2,18 +2,139 @@
 import eve_sde_tools
 
 
+def __dump_industry_jobs_details(
+        glf,
+        corporation_name,
+        corporation_id,
+        __jobs):
+    render_html.__dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> Contracts'.format(nm=corporation_name),
+        unique_id='{nm}_industry'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
+    # собираем названия всех продуктов
+    __ship_type_id = -1
+    __ship_names = []
+    __jobs.sort(key=lambda s: s["name"])
+    for a in range(2):
+        if a == 0:
+            __activity = [1]
+            glf.write('<h4>Manufacturing</h4>')
+        else:
+            __activity = [9, 11]
+            glf.write('<h4>Reactions</h4>')
+        __jobs_activity = [j for j in __jobs if j['activity_id'] in __activity]
+        glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th>Product</th>
+  <th style="text-align:right;">Quantity</th>
+  <th style="text-align:right; width:120px;">Price,&nbsp;ISK</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        __sum_price = 0.0
+        for j in __jobs_activity:
+            __sum_price += j['price']
+            glf.write('<tr style="font-size: x-small;">'
+                      ' <td>{nm}</th>'
+                      ' <td align="right">{q}</td>'
+                      ' <td align="right">{price:,.1f}</td>'
+                      '</tr>\n'.
+                      format(nm=j['name'],
+                             q=j['quantity'],
+                             price=j['price']))
+        glf.write('<tr style="font-weight:bold;">'
+                  ' <td>Summary</td>'
+                  ' <td colspan="2" align="right">{sum:,.0f}</td>'
+                  '</tr>\n'.
+                  format(sum=__sum_price))
+        glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+    render_html.__dump_any_into_modal_footer(glf)
+
+
+def __dump_corp_contracts_details(
+        glf,
+        corporation_name,
+        corporation_id,
+        __corp_contracts):
+    render_html.__dump_any_into_modal_header(
+        glf,
+        '<span class="text-primary">{nm}</span> Contracts'.format(nm=corporation_name),
+        unique_id='{nm}_contracts'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
+    # собираем названия всех кораблей выставленных на продажу (сортируем и пропускаем дубликаты)
+    __ship_type_id = -1
+    __ship_names = []
+    __corp_contracts.sort(key=lambda s: s["ship_name"])
+    for c in __corp_contracts:
+        if __ship_type_id == c["ship_type_id"]:
+            continue
+        __ship_type_id = c["ship_type_id"]
+        __ship_names.append({"id":__ship_type_id, "nm": c["ship_name"]})
+    # выводим названия кораблей
+    for cn in __ship_names:
+        __ship_type_id = cn["id"]
+        __ship_name = cn["nm"]
+        glf.write('<h4>{}</h4>'.format(__ship_name))
+        glf.write("""
+<div class="table-responsive">
+  <table class="table table-condensed">
+<thead>
+ <tr>
+  <th>Contract</th>
+  <th style="text-align:right;">Issuer</th>
+  <th style="text-align:right; width:120px;">Sell price,&nbsp;ISK</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        __sum_price = 0.0
+        for c in [c for c in __corp_contracts if c['ship_type_id']==__ship_type_id]:
+            __sum_price += c['price']
+            glf.write('<tr style="font-size: x-small;">'
+                      ' <td>{flag}</th>'
+                      ' <td align="right">{issuer}</td>'
+                      ' <td align="right">{price:,.0f}</td>'
+                      '</tr>\n'.
+                      format(flag=c['flag'],
+                             price=c['price'],
+                             issuer=c['cntrct_issuer_name']))
+        glf.write('<tr style="font-weight:bold;">'
+                  ' <td>Summary</td>'
+                  ' <td colspan="2" align="right">{sum:,.0f}</td>'
+                  '</tr>\n'.
+                  format(sum=__sum_price))
+        glf.write("""
+</tbody>
+ </table>
+</div>
+""")
+    render_html.__dump_any_into_modal_footer(glf)
+
+
 def __dump_corp_wallets_details(
         glf,
         corporation_name,
         corporation_id,
-        __corp_wallets):
+        __corp_wallets,
+        __corp_wallet_names,
+        __corp_wallets_stat):
     render_html.__dump_any_into_modal_header(
         glf,
         '<span class="text-primary">{nm}</span> Wallets'.format(nm=corporation_name),
-        '{nm}_wallets'.format(nm=corporation_id),
-        "btn-xs",
-        "details&hellip;",
-        "modal-sm")
+        unique_id='{nm}_wallets'.format(nm=corporation_id),
+        btn_size="btn-xs",
+        btn_nm="details&hellip;")
     glf.write("""
 <div class="table-responsive">
   <table class="table table-condensed">
@@ -26,11 +147,28 @@ def __dump_corp_wallets_details(
 <tbody>
 """)
     for w in __corp_wallets:
-        glf.write('<tr>'
-                  ' <th scope="row">{num}</th>'
+        __wallet_division = w["division"]
+        __wallet_name = next((wn["name"] for wn in __corp_wallet_names if (wn['division'] == __wallet_division) and ("name" in wn)), None)
+        glf.write('<tr class="success">'
+                  ' <th scope="row">{nm}</th>'
                   ' <td align="right">{blnc:,.1f}</td>'
                   '</tr>\n'.
-                  format(num=w["division"], blnc=w["balance"]))
+                  format(nm="{nm} [{d}]".format(nm=__wallet_name,d=__wallet_division) if not (__wallet_name is None) else "{d} Wallet [{d}]".format(d=__wallet_division),
+                         blnc=w["balance"]))
+        __wd_keys = __corp_wallets_stat[__wallet_division-1].keys()
+        __wd_sort = []
+        for __wd_key in __wd_keys:
+            __wd_sort.append({"ref":__wd_key, "amount": __corp_wallets_stat[__wallet_division-1][__wd_key]})
+        __wd_sort.sort(key=lambda s: s["amount"], reverse=True)
+        for __wd_dict in __wd_sort:
+            __amount = __wd_dict['amount']
+            glf.write('<tr>'
+                      ' <td>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{ref}</th>'
+                      ' <td align="right"{clr}>{amount:,.1f}</td>'
+                      '</tr>\n'.
+                      format(ref=__wd_dict['ref'],
+                             amount=__amount,
+                             clr=' class="text-danger"' if __amount < 0 else ""))
     glf.write('<tr style="font-weight:bold;">'
               ' <td>Summary</td>'
               ' <td align="right">{sum:,.1f}</td>'
@@ -48,6 +186,7 @@ def __dump_corp_accounting_nested_tbl(
         glf,
         loc_id,
         loc_dict,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids,
         filter_flags):
@@ -169,10 +308,11 @@ def __dump_corp_accounting_nested_tbl(
                                 __summary_hangar_groups = __hangar_num_qty[int(__hangar_num)]
                                 __summary_hangar_cost = 0
                                 __summary_hangar_volume = 0
+                                __hangar_name = next((hn["name"] for hn in __corp_hangar_names if (hn['division'] == __hangar_num) and ("name" in hn)), None)
                                 glf.write('<tr style="font-weight:bold;background-color:#{hngr_clr}">'
-                                          ' <td colspan="5">Hangar {hangar}</td>'
+                                          ' <td colspan="5">{nm}</td>'
                                           '</tr>\n'.
-                                          format(hangar=__hangar_num,
+                                          format(nm="{nm} [{num}]".format(nm=__hangar_name,num=__hangar_num) if not (__hangar_name is None) else "{num} Hangar [{num}]".format(num=__hangar_num),
                                                  hngr_clr=__hangar_colors[__hangar_num]))
                             # создание искусственной вложенности (ангары и прочие категории)
                             if not (__hangar_num is None):
@@ -200,8 +340,42 @@ def __dump_corp_accounting_nested_tbl(
                                              volume=__group_dict["volume"],
                                              tag='' if not (filter_flags is None) and (len(filter_flags) == 1) else
                                                  ' <small><span class="label label-default">{flag}</span></small>'.
-                                                 format(flag=render_html.__camel_to_snake(str(__flag))
-                                            )))
+                                                 format(flag=render_html.__camel_to_snake(str(__flag)))
+                                            ))
+                            # вывод данных по кораблям, находящимся в этой локации
+                            __td_ships = ''
+                            if "ships" in __group_dict:
+                                __ships = __group_dict["ships"]
+                                # сортировка по названиям
+                                for ship in __ships:
+                                    ship.update({"nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, ship["type_id"])})
+                                __ships.sort(key=lambda s: s["nm"])
+                                # подготовка в выводу в подвале раздела Ships
+                                for ship in __ships:
+                                    __ship_type_id = ship["type_id"]
+                                    __td_cost = '{cost:,.1f}'.format(cost=ship["cost"])
+                                    __td_volume = '{volume:,.1f}'.format(volume=ship["volume"]+ship["volume_nested"])
+                                    __tag_nested = ''
+                                    if ship["volume_nested"] > 0:
+                                        __td_cost += ' <mark>+ {cost:,.1f}</mark>'.format(cost=ship["cost_nested"])
+                                    else:
+                                        __tag_nested = ' <span class="label label-primary">hull only</span>'
+                                    glf.write(
+                                        '<tr style="font-size: x-small;{hngr_clr}">'
+                                        ' <td colspan="2"></td>'
+                                        ' <td>&nbsp; <img class="icn16" src="{src}" style="display:inline;"> <strong>{q}x</strong> {nm}{tagn}</td>'
+                                        ' <td align="right">{cost}</td>'
+                                        ' <td align="right">{volume}</td>'
+                                        '</tr>\n'.
+                                        format(
+                                            hngr_clr='' if __hangar_num is None else 'background-color:#{};'.format(__hangar_colors[__hangar_num]),
+                                            src=render_html.__get_img_src(__ship_type_id, 32),
+                                            nm=ship["nm"],
+                                            tagn=__tag_nested,
+                                            q=ship["quantity"],
+                                            cost=__td_cost,
+                                            volume=__td_volume
+                                    ))
                             row_id = row_id + 1
                             __summary_cost = __group_dict["cost"] if __summary_cost is None else __summary_cost + __group_dict["cost"]
                             __summary_volume += __group_dict["volume"]
@@ -267,31 +441,33 @@ def __dump_corp_accounting_nested_tbl(
 
 def __dump_corp_accounting_details(
         glf,
-        __key,
+        __association,
+        __keys,
         corporation_name,
         corporation_id,
         __corp_tree,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids):
     render_html.__dump_any_into_modal_header(
         glf,
         '<span class="text-primary">{nm}</span> {key}'.format(nm=corporation_name,
-                                                              key="" if __key is None else __key),
+                                                              key=__association),
         '{nm}_{key}'.format(nm=corporation_id,
-                            key="all" if __key is None else __key),
+                            key="all" if __keys is None else render_html.__camel_to_snake(__association)),
         "btn-xs",
         "details&hellip;",
         "modal-lg")
     __roots = __corp_tree.keys()
-    __filter = None if __key is None else [__key]
     for root in __roots:
         __dump_corp_accounting_nested(
             glf,
             root,
             __corp_tree[str(root)],
+            __corp_hangar_names,
             sde_type_ids,
             sde_icon_ids,
-            __filter)  # ["CorpDeliveries"]
+            __keys)  # ["CorpDeliveries"]
     render_html.__dump_any_into_modal_footer(glf)
 
 
@@ -299,6 +475,7 @@ def __dump_corp_accounting_nested(
         glf,
         root_id,
         root,
+        __corp_hangar_names,
         sde_type_ids,
         sde_icon_ids,
         filter_flags):
@@ -315,10 +492,10 @@ def __dump_corp_accounting_nested(
         __sys_keys = root["systems"].keys()
         for loc_id in __sys_keys:
             system = root["systems"][str(loc_id)]
-            __dump_corp_accounting_nested_tbl(glf, loc_id, system, sde_type_ids, sde_icon_ids, filter_flags)
+            __dump_corp_accounting_nested_tbl(glf, loc_id, system, __corp_hangar_names, sde_type_ids, sde_icon_ids, filter_flags)
     else:
         glf.write('<h2>???</h2>\n')
-        __dump_corp_accounting_nested_tbl(glf, root_id, root, sde_type_ids, sde_icon_ids, filter_flags)
+        __dump_corp_accounting_nested_tbl(glf, root_id, root, __corp_hangar_names, sde_type_ids, sde_icon_ids, filter_flags)
 
 
 def __dump_corp_accounting(
@@ -385,34 +562,95 @@ def __dump_corp_accounting(
         __wallets_balance = sum([w["balance"] for w in __corp["wallet"]])
         # создание первой строчки - название корпорации
         # создание второй строчки - кошельки корпорации
+        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                        '  aria-hidden="true"></span></a>'. \
+                        format(isk=__wallets_balance)
         glf.write('<tr class="active">'
                   ' <td colspan="5"><span class="text-primary"><strong>{nm}</strong></span></td>'
                   '</tr>\n'
                   '<tr>'
                   ' <th scope="row">1</th>'
                   ' <td>Wallets</td>'
-                  ' <td align="right">{wallet:,.1f}</td>'
+                  ' <td align="right">{wallet:,.1f}{clbrd}</td>'
                   ' <td></td>'
                   ' <td align="center">'.
                   format(nm=__corp["corporation"],
-                         wallet=__wallets_balance))
+                         wallet=__wallets_balance,
+                         clbrd=__copy2clpbrd))
         # добавление details на страницу (подробности по кошелькам)
         __dump_corp_wallets_details(
             glf,
             __corp["corporation"],
             corporation_id,
-            __corp["wallet"])
+            __corp["wallet"],
+            __corp["divisions"]["wallet"] if "wallet" in __corp["divisions"] else [],
+            __corp["wallet_stat"])
         glf.write('</td>'
                   '</tr>\n')
+
         # вывод третьей, четвёртой, ... строчек - ассеты корпорации
         row_num = 2
         __summary_cost = __wallets_balance
         __summary_volume = 0
         __stat_keys = __corp["stat"].keys()
+
+        # [
+        #  { "Structures": [{"AutoFit": ...}, {"ServiceSlot0": ...}, ...] },
+        #  { "OfficeFolder": [{"OfficeFolder": ...}]] },
+        #  { "FighterTube": [{"FighterTube0": ...}, {"FighterTube1": ...}, ...]] },
+        # ]
+        __sorted_keys = []
+
+        def add_into_sorted_keys(__association, __key, __stat_dict):
+            __association_dict = next((k442 for k442 in __sorted_keys if __association in k442), None)
+            if __association_dict is None:
+                __sorted_keys.append({__association: [{__key: __stat_dict}]})
+            else:
+                __association_dict[__association].append({__key: __stat_dict})
+
         for __key in __stat_keys:
             __stat_dict = __corp["stat"][str(__key)]
             if ("omit_in_summary" in __stat_dict) and __stat_dict["omit_in_summary"]:
                 continue
+            # удаляем из нумерованных ключей последнюю цифру
+            __unnumbered_key = __key[:-1]
+            # https://github.com/esi/eve-glue/blob/master/eve_glue/location_flag.py
+            if (__key == "AutoFit") or (__unnumbered_key == "ServiceSlot") or \
+               (__key == "StructureFuel") or (__unnumbered_key == "RigSlot") or \
+               (__key == "QuantumCoreRoom"):
+                # собираем структурные keys (AutoFit, ServiceSlot? => Structures)
+                add_into_sorted_keys("Structures", __key, __stat_dict)
+            else:
+                # FighterTube0, FighterTube1, ..., SubSystemSlot0, SubSystemSlot1, ...
+                if (__unnumbered_key == "FighterTube") or \
+                   (__unnumbered_key == "CorpSAG") or \
+                   (__unnumbered_key == "HiSlot") or \
+                   (__unnumbered_key == "MedSlot") or \
+                   (__unnumbered_key == "LoSlot") or \
+                   (__unnumbered_key == "SubSystemSlot"):
+                    add_into_sorted_keys(__unnumbered_key, __key, __stat_dict)
+                else:
+                    add_into_sorted_keys(__key, __key, __stat_dict)
+
+        __sorted_keys = sorted(__sorted_keys, key=lambda x: str(list(x.keys())[0]))
+        for ka in __sorted_keys:
+            __association = list(ka.keys())[0]      # "Structures"
+            __association_dict = ka[__association]  # [{"AutoFit": ...}, {"ServiceSlot0": ...}, ...]
+            __association_dict = sorted(__association_dict, key=lambda x: str(list(x.keys())[0]))
+            # подсчёт общей статистики
+            __association_cost = 0
+            __association_volume = 0
+            __association_keys = []
+            for ad in __association_dict:
+                __key = list(ad.keys())[0]  # "AutoFit"
+                __stat_dict = ad[__key]     # ...
+                __association_keys.append(__key)
+                # подсчёт общей статистики
+                __association_cost += __stat_dict["cost"]
+                __association_volume += __stat_dict["volume"]
+                __summary_cost += __stat_dict["cost"]
+                __summary_volume += __stat_dict["volume"]
             glf.write('<tr>'
                       ' <th scope="row">{num}</th>\n'
                       ' <td>{nm}</td>'
@@ -420,28 +658,29 @@ def __dump_corp_accounting(
                       ' <td align="right">{volume:,.1f}</td>'
                       ' <td align="center">'.
                       format(num=row_num,
-                             nm=__key,  # "CorpDeliveries"
-                             cost=__stat_dict["cost"],
-                             volume=__stat_dict["volume"]))
-            # подсчёт общей статистики
-            __summary_cost = __summary_cost + __stat_dict["cost"]
-            __summary_volume = __summary_volume + __stat_dict["volume"]
+                             nm=__association,  # "CorpDeliveries"
+                             cost=__association_cost,
+                             volume=__association_volume))
             # добавление details на страницу
             __dump_corp_accounting_details(
                 glf,
-                __key,
+                __association,
+                __association_keys,
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
+                __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
                 sde_type_ids,
                 sde_icon_ids)
             glf.write('</td>'
                       '</tr>\n')
             row_num = row_num + 1
-        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{cost:.1f}" class="qind-copy-btn"' \
+
+        # добавление строки Summary
+        __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
                         '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                         '  aria-hidden="true"></span></a>'. \
-                        format(cost=__summary_cost)
+                        format(isk=__summary_cost)
         glf.write('<tr>'
                   ' <th></th>\n'
                   ' <td><strong>Summary</strong></td>\n'
@@ -454,14 +693,17 @@ def __dump_corp_accounting(
         # добавление details в summary
         __dump_corp_accounting_details(
             glf,
+            "Summary",
             None,
             __corp["corporation"],
             corporation_id,
             __corp["tree"],
+            __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
             sde_type_ids,
             sde_icon_ids)
         glf.write('</td>'
                   '</tr>\n')
+
         # добавление в подвал (под summary) информацию об omitted-категориях (такая у нас Blueprints & Reactions)
         # повторно запускаем цикл
         for __key in __stat_keys:
@@ -480,12 +722,70 @@ def __dump_corp_accounting(
             # добавление details на страницу
             __dump_corp_accounting_details(
                 glf,
-                __key,
+                __key,  # "BlueprintsReactions"
+                [__key],
                 __corp["corporation"],
                 corporation_id,
                 __corp["tree"],
+                __corp["divisions"]["hangar"] if "hangar" in __corp["divisions"] else [],
                 sde_type_ids,
                 sde_icon_ids)
+            glf.write('</td>'
+                      '</tr>\n')
+
+        # добавление в подвал (под summary) информацию о контрактах
+        __contr_dict = __corp["sell_contracts"]
+        if __contr_dict:
+            __sum_price = 0.0
+            __sum_volume = 0.0
+            for c in __contr_dict:
+                __sum_price += c["price"]
+                __sum_volume += c["volume"]
+            __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                            '  aria-hidden="true"></span></a>'. \
+                            format(isk=__sum_price)
+            glf.write('<tr>'
+                      ' <th></th>\n'
+                      ' <td style="color:#5058df;">Sell Contracts</td>'
+                      ' <td style="color:#5058df;" align="right">{cost:,.1f}{clbrd}</td>'
+                      ' <td style="color:#5058df;" align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(cost=__sum_price, volume=__sum_volume, clbrd=__copy2clpbrd))
+            # добавление details на страницу
+            __dump_corp_contracts_details(
+                glf,
+                __corp["corporation"],
+                corporation_id,
+                __contr_dict)
+            glf.write('</td>'
+                      '</tr>\n')
+
+        # добавление в подвал (под summary) информацию о запущеных работах
+        __jobs_dict = __corp["jobs_stat"]
+        if __jobs_dict:
+            __sum_price = 0.0
+            __sum_volume = 0.0
+            for c in __jobs_dict:
+                __sum_price += c["price"]
+                __sum_volume += c["item_volume"] * c['quantity']
+            __copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-copy="{isk:.1f}" class="qind-copy-btn"' \
+                            '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                            '  aria-hidden="true"></span></a>'. \
+                            format(isk=__sum_price)
+            glf.write('<tr>'
+                      ' <th></th>\n'
+                      ' <td style="color:#914600;">Industrial Jobs</td>'
+                      ' <td style="color:#914600;" align="right">{cost:,.1f}{clbrd}</td>'
+                      ' <td style="color:#914600;" align="right">{volume:,.1f}</td>'
+                      ' <td align="center">'.
+                      format(cost=__sum_price, volume=__sum_volume, clbrd=__copy2clpbrd))
+            # добавление details на страницу
+            __dump_industry_jobs_details(
+                glf,
+                __corp["corporation"],
+                corporation_id,
+                __jobs_dict)
             glf.write('</td>'
                       '</tr>\n')
 

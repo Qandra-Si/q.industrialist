@@ -59,11 +59,14 @@ def get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data):
         else:
             __bp2[type_id][bp_key]["qr"] = __bp2[type_id][bp_key]["qr"] + quantity_or_runs
         # { "1033160348166": { "30014": { "o_10_20": { "cp":false,"me":10,..., [{"id":?,"q":?,"r":?}, {...}] } } } }
-        __bp2[type_id][bp_key]["itm"].append({
-            "id": int(bp["item_id"]),
+        __itm_dict = {
+            "id": blueprint_id,
             "q": quantity,
             "r": runs
-        })
+        }
+        if not (__job_dict is None):
+            __itm_dict.update({"jc": __job_dict["cost"]})
+        __bp2[type_id][bp_key]["itm"].append(__itm_dict)
     return corp_bp_loc_data
 
 
@@ -77,7 +80,7 @@ def get_corp_ass_loc_data(corp_assets_data, containers_filter=None):
         type_id = int(a["type_id"])
         # if materials_for_bps.count(type_id) > 0:
         loc_flag = str(a["location_flag"])
-        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked"):
+        if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
         loc_id = int(a["location_id"])
         if not (containers_filter is None):
@@ -424,3 +427,244 @@ def is_location_nested_into_another(
                 return False
         else:
             return False
+
+
+def __find_containers_in_hangars_nested(
+        item_id,
+        hangars_filter,
+        sde_type_ids,
+        corp_assets_data):
+    item_dict = next((a for a in corp_assets_data if a["item_id"] == int(item_id)), None)
+    # пытаемся в дереве asset-ов найти идентификатор, если его нет, то это терминальный узел, например
+    # чертёж, и он нам не интересен, т.к. требуется выдать идентификаторы контейнеров
+    if item_dict is None:
+        return []
+    __nested_items = [a for a in corp_assets_data if a["location_id"] == int(item_id)]
+    # нас интересуют только те контейнеры и ангары, в которых что-то есть, т.к. из них мы будем
+    # впоследствии доставать информацию о находящихся чертежах, т.ч. пустые коробки пропускаем
+    if not __nested_items:
+        return []
+    # ---
+    containers = []
+    for __item_dict in __nested_items:
+        # пропускаем экземпляры контейнеров, сложенные в стопки (у них нет уник. id и названий
+        # тоже не будет)
+        if not __item_dict["is_singleton"]:
+            continue
+        # ожидаем найти офис со списком ангаров, а пока...
+        # ...если список ангаров ещё не найден, то продолжаем поиски; как только нужные ангары будет
+        # найдены, то зануляем параметр blueprints_hangar, что будет в дальнейшем означать, что поиск
+        # ангаров уже остановлен и идёт поиск контейнеров в ангарах
+        __item_id = __item_dict["item_id"]
+        __location_flag = __item_dict["location_flag"]
+        if __location_flag[:-1] == "CorpSAG":
+            str_hangar_num = __location_flag[-1:]
+            if not (int(str_hangar_num) in hangars_filter):
+                continue
+            # debug: print(str_hangar_num, "  ", __item_id)
+            # если текущий item является контейнером, то выдаём его номер и внутрь не заглядываем
+            __type_id = __item_dict["type_id"]
+            __is_container = __type_id in [
+                # 379: Cargo Containers
+                #   1651: Secure Containers
+                3465,   # Large Secure Container
+                3466,   # Medium Secure Container
+                3467,   # Small Secure Container
+                11488,  # Huge Secure Container
+                11489,  # Giant Secure Container
+                #   1652: Audit Log Containers
+                17363,  # Small Audit Log Secure Container
+                17364,  # Medium Audit Log Secure Container
+                17365,  # Large Audit Log Secure Container
+                #   1653: Freight Containers
+                24445,  # Giant Freight Container
+                33003,  # Enormous Freight Container
+                33005,  # Huge Freight Container
+                33007,  # Large Freight Container
+                33009,  # Medium Freight Container
+                33011,  # Small Freight Container
+                #   1657: Standard Containers
+                3293,   # Medium Standard Container
+                3296,   # Large Standard Container
+                3297,   # Small Standard Container
+                #   1658: Station Containers
+                17366,  # Station Container
+                17367,  # Station Vault Container
+                17368,  # Station Warehouse Container
+            ]
+            if __is_container:
+                if next((c for c in containers if c["id"] == int(__item_id)), None) is None:
+                    # container_name = next((an["name"] for an in corp_ass_names_data if an["item_id"] == __item_id), None)
+                    # debug: print("       ", item_id, __type_id, container_name)
+                    containers.append({"id": __item_id, "type_id": __type_id})  # "name": container_name
+                continue
+        else:
+            # debug: print(" ", __item_id, __location_flag)
+            containers.extend(__find_containers_in_hangars_nested(
+                __item_id,
+                hangars_filter,
+                sde_type_ids,
+                corp_assets_data))
+    return containers
+
+
+def find_containers_in_hangars(
+        station_id,
+        hangars_filter,
+        sde_type_ids,
+        corp_assets_data,
+        # настройки
+        throw_when_not_found=True):
+    # пытаемся получить станцию, как item (это возможно, если она есть в корп-ассетах, т.е. является
+    # имуществом корпорации, иначе она принадлежит альянсу, или корпорация просто имеет там офис)
+    __station_dict = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None)
+    # на своих станциях тоже офис бывает
+    __office_dict = next((a for a in corp_assets_data if (a["location_id"] == int(station_id)) and (a["location_flag"] == "OfficeFolder")), None)
+
+    if (__station_dict is None) and (__office_dict is None):
+        if throw_when_not_found:
+            raise Exception('Not found station or office {} in assets!!!'.format(station_id))
+        else:
+            print("ERROR: not found station or office {} in assets!!!".format(station_id))
+            return []
+
+    # поиск контейнеров на станции station_id в ангарах hangars_filter
+    __containers = []
+    if not (__station_dict is None):
+        __containers = __find_containers_in_hangars_nested(
+            station_id,
+            hangars_filter,
+            sde_type_ids,
+            corp_assets_data)
+    if not (__office_dict is None):
+        __containers2 = __find_containers_in_hangars_nested(
+            __office_dict["item_id"],
+            hangars_filter,
+            sde_type_ids,
+            corp_assets_data)
+        for __cont in __containers2:
+            if next((c for c in __containers if c['id'] == __cont['id']), None) is None:
+                __containers.append(__cont)
+    return __containers
+
+
+def get_containers_on_stations(
+        # условия для поиска данных станций и контейнеров в ассетах, в формате:
+        # [{"station_id": int, "station_name": str, "hangars_filter": list, "user_data": {}}}]
+        # например:
+        # [{"station_id": 1029853015264, "hangars_filter": [6], "user_data": {"station_num": 1}}]
+        # или же:
+        # [{"station_name": "Keberz - fort"}, {"station_name": "BX-VEX - Two Titans. Every Hangar."}]
+        search_settings,
+        # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
+        sde_inv_names,
+        # esi данные, загруженные с серверов CCP
+        corp_assets_data,
+        foreign_structures_data,
+        corp_ass_names_data,
+        # настройки
+        throw_when_not_found=True):
+    found_containers = []
+    for station_dict in search_settings:
+        # input setings
+        hangars_filter = station_dict.get("hangars_filter", [1,2,3,4,5,6,7])
+        # output factory containers
+        station_containers = {
+            "station_id": station_dict.get("station_id", None),
+            "station_name": station_dict.get("station_name", None),
+            "station_foreign": None,
+            "hangars_filter": hangars_filter,
+            "containers": []
+        }
+        if "user_data" in station_dict:
+            station_containers.update(station_dict.get("user_data"))
+        if (hangars_filter is None) or (station_containers['station_id'] is None) and (station_containers['station_name'] is None):
+            continue
+
+        # пытаемся определить недостающее звено, либо station_id, либо station_name (если неизвестны)
+        if not (station_containers["station_id"] is None):
+            station_id = station_containers["station_id"]
+            station_name = None
+            station_containers["station_foreign"] = next((a for a in corp_assets_data if a["item_id"] == int(station_id)), None) is None
+
+            # поиск контейнеров на станции station_id в ангарах hangars_filter
+            station_containers["containers"] = find_containers_in_hangars(
+                station_id,
+                hangars_filter,
+                sde_type_ids,
+                corp_assets_data,
+                throw_when_not_found=throw_when_not_found)
+
+            if not station_containers["station_foreign"]:
+                station_name = next((an['name'] for an in corp_ass_names_data if an["item_id"] == station_id), None)
+
+            if station_containers["station_foreign"]:
+                # поиск одной единственной станции, которая не принадлежат корпорации (на них имеется офис,
+                # но самой станции в ассетах нет)
+                if str(station_id) in foreign_structures_data:
+                    station_name = foreign_structures_data[str(station_id)]["name"]
+
+            # вывод на экран найденных station_id и station_name
+            if station_name is None:
+                if throw_when_not_found:
+                    raise Exception('Not found station name for factory {}!!!'.format(station_id))
+                else:
+                    print("ERROR: not found station name for factory {}!!!".format(station_id))
+
+        elif not (station_containers["station_name"] is None):
+            station_name = station_containers["station_name"]
+            station_id = next((an for an in corp_ass_names_data if an["name"] == station_name), None)
+            if station_id is None:
+                station_id = next((int(n) for n in sde_inv_names if sde_inv_names[str(n)] == station_name), None)
+                if not (station_id is None):
+                    station_containers["station_npc"] = True
+                else:
+                    station_containers["station_foreign"] = station_id is None
+
+            if station_containers["station_foreign"]:
+                # поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
+                __foreign_keys = foreign_structures_data.keys()
+                for __foreign_id in __foreign_keys:
+                    __foreign_dict = foreign_structures_data[str(__foreign_id)]
+                    if __foreign_dict["name"] == station_name:
+                        station_id = int(__foreign_id)
+                        break
+
+            # вывод на экран найденных station_id и station_name
+            if station_id is None:
+                if throw_when_not_found:
+                    raise Exception('Not found station identity for factory {}!!!'.format(station_name))
+                else:
+                    print("ERROR: not found station identity for factory {}!!!".format(station_name))
+
+            else:
+                # поиск контейнеров на станции station_id в ангарах hangars_filter
+                station_containers["containers"] = find_containers_in_hangars(
+                    station_id,
+                    hangars_filter,
+                    sde_type_ids,
+                    corp_assets_data,
+                    throw_when_not_found=throw_when_not_found)
+
+        elif throw_when_not_found:
+            raise Exception('Not found station identity and name!!!')
+
+        else:
+            print("ERROR: not found station identity and name!!!")
+            station_id = None
+            station_name = None
+
+        station_containers["station_id"] = station_id
+        station_containers["station_name"] = station_name
+
+        # получение названий контейнеров и сохранение из в списке контейнеров
+        for __cont_dict in station_containers["containers"]:
+            __item_id = __cont_dict["id"]
+            __item_name = next((an for an in corp_ass_names_data if an["item_id"] == __item_id), None)
+            if not (__item_name is None):
+                __cont_dict["name"] = __item_name["name"]
+
+        found_containers.append(station_containers)
+
+    return found_containers

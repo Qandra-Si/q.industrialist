@@ -6,10 +6,11 @@
 #  60005203 - Tama VII - Moon 9 - Republic Security Services Testing Facilities
 
 g_cynonetworks = [
-    {"url": "https://evemaps.dotlan.net/jump/Rhea,544/Jita:Tama",
-     "route": [
-         60003760,  # Jita IV - Moon 4 - Caldari Navy Assembly Plant
-         60005203   # Tama VII - Moon 9 - Republic Security Services Testing Facilities
-     ]
-     }
+    {   # route for url: "https://evemaps.dotlan.net/jump/Rhea,544/Tama:Jita"
+        "route": [
+            60003760,  # Jita IV - Moon 4 - Caldari Navy Assembly Plant
+            60005203   # Tama VII - Moon 9 - Republic Security Services Testing Facilities
+        ]
+    }
 ]
+

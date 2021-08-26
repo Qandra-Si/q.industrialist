@@ -52,10 +52,12 @@ def main():
         sys.exit(22)  # Unit errno.h : EINVAL=22 /* Invalid argument */
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-    print("\nStarting preload commonly used data...")
+    print("\nStarting preload commonly used data...\n")
 
     try:
         eve_market_prices_data = None
+        various_characters_data = []
+        various_corporations_data = []
         for pilot_name in argv_prms["character_names"]:
             # настройка Eve Online ESI Swagger interface
             auth = esi.EveESIAuth(
@@ -78,80 +80,176 @@ def main():
 
             # Public information about a character
             character_data = interface.get_esi_data(
-                "characters/{}/".format(character_id))
+                "characters/{}/".format(character_id),
+                fully_trust_cache=True)
             # Public information about a corporation
             corporation_data = interface.get_esi_data(
-                "corporations/{}/".format(character_data["corporation_id"]))
+                "corporations/{}/".format(character_data["corporation_id"]),
+                fully_trust_cache=True)
 
             corporation_id = character_data["corporation_id"]
             corporation_name = corporation_data["name"]
-            print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+            print("{} is from '{}' corporation\n".format(character_name, corporation_name))
             sys.stdout.flush()
+
+            various_characters_data.append({str(character_id): character_data})
+            various_corporations_data.append({str(corporation_id): corporation_data})
 
             if eve_market_prices_data is None:
-                # Public information about market prices
-                eve_market_prices_data = interface.get_esi_data("markets/prices/")
-                print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-                sys.stdout.flush()
+                try:
+                    # Public information about market prices
+                    eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                    print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                    sys.stdout.flush()
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                        eve_market_prices_data = []
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
 
-            # Requires role(s): Director
-            corp_wallets_data = interface.get_esi_paged_data(
-                "corporations/{}/wallets/".format(corporation_id))
-            print("\n'{}' corporation has {} wallet divisions".format(corporation_name, len(corp_wallets_data)))
+            try:
+                # Requires role(s): Accountant, Junior_Accountant
+                corp_wallets_data = interface.get_esi_paged_data(
+                    "corporations/{}/wallets/".format(corporation_id))
+                print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                    corp_wallets_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+
+            # Requires role(s): Accountant, Junior_Accountant
+            corp_wallet_journal_data = [None, None, None, None, None, None, None]
+            for w in corp_wallets_data:
+                division = w["division"]
+                try:
+                    corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
+                        "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
+                    print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
+                    sys.stdout.flush()
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.11.26 поломался доступ к журналу кошелька (ССР-шники "внесли правки")
+                        corp_wallet_journal_data[division-1] = None
+                    elif status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                        corp_wallet_journal_data[division-1] = None
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+
+            # Requires one of the following EVE corporation role(s): Director
+            corp_divisions_data = interface.get_esi_data(
+                "corporations/{}/divisions/".format(corporation_id),
+                fully_trust_cache=True)
+            print("'{}' corporation has {} hangar and {} wallet names\n".format(corporation_name, len(corp_divisions_data["hangar"]) if "hangar" in corp_divisions_data else 0, len(corp_divisions_data["wallet"]) if "wallet" in corp_divisions_data else 0))
             sys.stdout.flush()
+
+            try:
+                # Requires role(s): Director
+                corp_shareholders_data = interface.get_esi_paged_data(
+                    "corporations/{}/shareholders/".format(corporation_id))
+                print("'{}' corporation has {} shareholders\n".format(corporation_name, len(corp_shareholders_data)))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 500:  # 2021.01.28 поломался доступ к кошелькам, Internal Server Error
+                    corp_shareholders_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
+
+            for shareholder in corp_shareholders_data:
+                # Получение сведений о пилотах, имеющих акции корпорации
+                corp_id = None
+                if shareholder['shareholder_type'] == 'character':
+                    pilot_id = shareholder['shareholder_id']
+                    __pilot_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(pilot_id)), None)
+                    if __pilot_dict is None:
+                        # Public information about a character
+                        pilot_data = interface.get_esi_data(
+                            "characters/{}/".format(pilot_id),
+                            fully_trust_cache=True)
+                        corp_id = pilot_data["corporation_id"]
+                        various_characters_data.append({str(pilot_id): pilot_data})
+                    else:
+                        corp_id = __pilot_dict[str(pilot_id)]["corporation_id"]
+                    sys.stdout.flush()
+                elif shareholder['shareholder_type'] == 'corporation':
+                    corp_id = shareholder['shareholder_id']
+                # Получение сведений о корпорациях, которым принадлежат акции, либо в которых состоят пилоты
+                __corp_dict = next((i for i in various_corporations_data if int(list(i.keys())[0]) == int(corp_id)), None)
+                if __corp_dict is None:
+                    # Public information about a character
+                    corp_data = interface.get_esi_data(
+                        "corporations/{}/".format(corp_id),
+                        fully_trust_cache=True)
+                    various_corporations_data.append({str(corp_id): corp_data})
+                sys.stdout.flush()
 
             # Requires role(s): Director
             corp_assets_data = interface.get_esi_paged_data(
                 "corporations/{}/assets/".format(corporation_id))
-            print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+            print("'{}' corporation has {} assets\n".format(corporation_name, len(corp_assets_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_blueprints_data = interface.get_esi_paged_data(
                 "corporations/{}/blueprints/".format(corporation_id))
-            print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+            print("'{}' corporation has {} blueprints\n".format(corporation_name, len(corp_blueprints_data)))
             sys.stdout.flush()
 
             # Requires role(s): Factory_Manager
             corp_industry_jobs_data = interface.get_esi_paged_data(
                 "corporations/{}/industry/jobs/".format(corporation_id))
-            print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
+            print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
             sys.stdout.flush()
 
-            # Requires role(s): Station_Manager
-            corp_structures_data = interface.get_esi_paged_data(
-                "corporations/{}/structures/".format(corporation_id))
-            print("\n'{}' corporation has {} structures".format(corporation_name, len(corp_structures_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Station_Manager
+            # corp_structures_data = interface.get_esi_paged_data(
+            #     "corporations/{}/structures/".format(corporation_id))
+            # print("'{}' corporation has {} structures\n".format(corporation_name, len(corp_structures_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Director
-            corp_starbases_data = interface.get_esi_paged_data(
-                "corporations/{}/starbases/".format(corporation_id))
-            print("\n'{}' corporation has {} starbases".format(corporation_name, len(corp_starbases_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Director
+            # corp_starbases_data = interface.get_esi_paged_data(
+            #     "corporations/{}/starbases/".format(corporation_id))
+            # print("'{}' corporation has {} starbases\n".format(corporation_name, len(corp_starbases_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Factory_Manager
-            corp_facilities_data = interface.get_esi_paged_data(
-                "corporations/{}/facilities/".format(corporation_id))
-            print("\n'{}' corporation has {} facilities".format(corporation_name, len(corp_facilities_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Factory_Manager
+            # corp_facilities_data = interface.get_esi_paged_data(
+            #     "corporations/{}/facilities/".format(corporation_id))
+            # print("'{}' corporation has {} facilities\n".format(corporation_name, len(corp_facilities_data)))
+            # sys.stdout.flush()
 
-            # Requires role(s): Director
-            corp_customs_offices_data = interface.get_esi_paged_data(
-                "corporations/{}/customs_offices/".format(corporation_id))
-            print("\n'{}' corporation has {} customs offices".format(corporation_name, len(corp_customs_offices_data)))
-            sys.stdout.flush()
+            # # Requires role(s): Director
+            # corp_customs_offices_data = interface.get_esi_paged_data(
+            #     "corporations/{}/customs_offices/".format(corporation_id))
+            # print("'{}' corporation has {} customs offices\n".format(corporation_name, len(corp_customs_offices_data)))
+            # sys.stdout.flush()
 
-            # Получение названий контейнеров, станций, кошельков, и т.п. - всё что переименовывается ingame
-            corp_ass_names_data = []
+            # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
             corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-            if len(corp_ass_named_ids) > 0:
-                # Requires role(s): Director
-                corp_ass_names_data = interface.get_esi_data(
-                    "corporations/{}/assets/names/".format(corporation_id),
-                    json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+            # Requires role(s): Director
+            corp_ass_names_data = interface.get_esi_piece_data(
+                "corporations/{}/assets/names/".format(corporation_id),
+                corp_ass_named_ids)
             print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
             sys.stdout.flush()
+            del corp_ass_named_ids
 
             # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
             foreign_structures_data = {}
@@ -162,26 +260,28 @@ def main():
                 for structure_id in foreign_structures_ids:
                     try:
                         universe_structure_data = interface.get_esi_data(
-                            "universe/structures/{}/".format(structure_id))
+                            "universe/structures/{}/".format(structure_id),
+                            fully_trust_cache=True)
                         foreign_structures_data.update({str(structure_id): universe_structure_data})
                     except requests.exceptions.HTTPError as err:
                         status_code = err.response.status_code
                         if status_code == 403:  # это нормально, что часть структур со временем могут оказаться Forbidden
                             foreign_structures_forbidden_ids.append(structure_id)
                         else:
+                            # print(sys.exc_info())
                             raise
                     except:
                         print(sys.exc_info())
                         raise
-            print("\n'{}' corporation has offices in {} foreign stations".format(corporation_name, len(foreign_structures_data)))
+            print("'{}' corporation has offices in {} foreign stations\n".format(corporation_name, len(foreign_structures_data)))
             if len(foreign_structures_forbidden_ids) > 0:
-                print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
+                print("'{}' corporation has offices in {} forbidden stations : {}\n".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
             sys.stdout.flush()
 
             # Requires role(s): access token
             corp_contracts_data = interface.get_esi_paged_data(
                 "corporations/{}/contracts/".format(corporation_id))
-            print("\n'{}' corporation has {} contracts".format(corporation_name, len(corp_contracts_data)))
+            print("'{}' corporation has {} contracts\n".format(corporation_name, len(corp_contracts_data)))
             sys.stdout.flush()
 
             # Получение подробной информации о каждому из контракту в списке
@@ -196,12 +296,13 @@ def main():
                         continue
                     # в рамках работы с чертежами, нас интересует только набор контрактов, в которых продаются чертежи
                     # ищем публичные контракты типа "обмен предметами"
-                    if (c["availability"] != "public") or (c["type"] != "item_exchange"):
+                    if c["type"] != "item_exchange":
                         continue
                     contract_id = c["contract_id"]
                     try:
                         __contract_items = interface.get_esi_data(
-                            "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id))
+                            "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                            fully_trust_cache=True)
                         corp_contract_items_len += len(__contract_items)
                         corp_contract_items_data.append({str(contract_id): __contract_items})
                     except requests.exceptions.HTTPError as err:
@@ -209,20 +310,34 @@ def main():
                         if status_code == 404:  # это нормально, что часть доп.инфы по контрактам может быть не найдена!
                             corp_contract_items_not_found.append(contract_id)
                         else:
+                            # print(sys.exc_info())
                             raise
                     except:
                         print(sys.exc_info())
                         raise
+                    # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                    issuer_id = c["issuer_id"]
+                    __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                    if __issuer_dict is None:
+                        # Public information about a character
+                        issuer_data = interface.get_esi_data(
+                            "characters/{}/".format(issuer_id),
+                            fully_trust_cache=True)
+                        various_characters_data.append({str(issuer_id): issuer_data})
+                    sys.stdout.flush()
             eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
 
-            print("\n'{}' corporation has {} items in contracts".format(corporation_name, corp_contract_items_len))
+            print("'{}' corporation has {} items in contracts\n".format(corporation_name, corp_contract_items_len))
             if len(corp_contract_items_not_found) > 0:
-                print("\n'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+                print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
             sys.stdout.flush()
 
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)
+
         # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-        print("\nDone")
+        print("\nDone\n")
     except:
+        print(sys.exc_info())
         sys.exit(1)  # errno.h : EPERM=1 /* Operation not permitted */
     sys.exit(0)  # code 0, all ok
 

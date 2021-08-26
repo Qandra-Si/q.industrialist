@@ -1,0 +1,9 @@
+# -*- encoding: utf-8 -*-
+""" Entry point of qind_postgresql_db, also contains shortcuts for all required objects """
+
+from .db_interface import QIndustrialistDatabase  # noqa
+from .db_wij import QWorkflowIndustryJobs  # noqa
+from .db_dictionaries import QDictionaries  # noqa
+from .db_swagger_interface import QSwaggerInterface  # noqa
+
+__version__ = '0.8.1'

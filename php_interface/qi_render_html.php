@@ -1,0 +1,167 @@
+﻿<?php
+// --------------------------------------------------------------------------------------------------------------
+// __get_img_src
+// --------------------------------------------------------------------------------------------------------------
+function __get_img_src($tp, $sz, $use_filesystem_resources)
+{
+    if ($use_filesystem_resources)
+        return 'image_export_collection/Types/'.$tp.'_'.$sz.'.png';
+    else
+        return 'http://imageserver.eveonline.com/Type/'.$tp.'_'.$sz.'.png';
+}
+?>
+
+<?php
+// --------------------------------------------------------------------------------------------------------------
+// __dump_header
+// --------------------------------------------------------------------------------------------------------------
+function __dump_header($header_name, $use_filesystem_resources)
+{
+    # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
+    # см. https://developer.mozilla.org/ru/docs/Web/Manifest
+    # рекомендуемый набор favicon-ок, см. https://stackoverflow.com/a/52322368
+    # а также тут, см. https://developer.apple.com/design/human-interface-guidelines/ios/icons-and-images/app-icon/#app-icon-sizes
+    if ($use_filesystem_resources)
+    {
+        $bs_css = 'bootstrap/3.4.1/css/bootstrap.min.css';
+        $jq_js = 'jquery/jquery-1.12.4.min.js';
+        $bs_js = 'bootstrap/3.4.1/js/bootstrap.min.js';
+    }
+    else
+    {
+        $bs_css = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous';
+        $jq_js = 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous';
+        $bs_js = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous';
+    }
+?>
+<!doctype html>
+<html lang="ru">
+ <head>
+ <meta charset="utf-8">
+ <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="description" content="A tool for planning logistics, building plans for the manufacture of modules, ships, tracking the process of fulfilling contracts.">
+ <meta name="keywords" content="eve-online, eve, manufacturing, logistics, q.industrialist">
+<style type="text/css">
+.icn16 { width:16px; height:16px; }
+.icn24 { width:24px; height:24px; }
+.icn32 { width:32px; height:32px; }
+.icn64 { width:64px; height:64px; }
+</style>
+ <title><?=$header_name?> - Q.Industrialist</title>
+ <link rel="stylesheet" href="<?=$bs_css?>">
+ <!-- Android  -->
+ <meta name="theme-color" content="#1e2021">
+ <meta name="mobile-web-app-capable" content="yes">
+ <!-- iOS -->
+ <meta name="apple-mobile-web-app-title" content="Q.Industrialist">
+ <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <!-- Windows  -->
+ <meta name="msapplication-navbutton-color" content="#1e2021">
+ <meta name="msapplication-TileColor" content="#1e2021">
+ <meta name="msapplication-TileImage" content="ms-icon-144x144.png">
+ <meta name="msapplication-config" content="browserconfig.xml">
+ <!-- Pinned Sites  -->
+ <meta name="application-name" content="Q.Industrialist">
+ <meta name="msapplication-tooltip" content="Q.Industrialist for EVE Online game">
+ <meta name="msapplication-starturl" content="/">
+ <!-- Enable night mode for this page  -->
+ <meta name="nightmode" content="enable">
+ <meta name="color-scheme" content="dark light">
+ 
+ <!-- Main Link Tags -->
+ <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+ <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+ <link rel="icon" type="image/png" sizes="96x96" href="images/favicon/android-icon-96x96.png">
+ <!-- Android  -->
+ <link rel="icon" type="image/png" sizes="192x192" href="images/favicon/android-icon-192x192.png">
+ <link rel="icon" type="image/png" sizes="128x128" href="images/favicon/android-icon-128x128.png">
+ <!-- iOS  -->
+ <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-precomposed.png">
+ <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+ <link rel="apple-touch-icon" sizes="120x120" href="images/favicon/apple-icon-120x120.png">
+ <link rel="apple-touch-icon" sizes="152x152" href="images/favicon/apple-icon-152x152.png">
+ <link rel="apple-touch-icon" sizes="167x167" href="images/favicon/apple-icon-167x167.png">
+ <!-- Others -->
+ <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+ <!-- Manifest.json  -->
+ <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+ <div class="page-header"><h1>Q.Industrialist <small><?=$header_name?></small></h1></div>
+ <script src="<?=$jq_js?>"></script>
+ <script src="<?=$bs_js?>"></script>
+<?php } ?>
+
+
+<?php
+// --------------------------------------------------------------------------------------------------------------
+// __dump_footer
+// --------------------------------------------------------------------------------------------------------------
+function __dump_footer()
+{
+    $dt = "?"; // datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z'))
+?>
+<p><!--<small><small>Generated <?=$dt?></small><br>-->
+<br>
+&copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a><br>
+<br>
+<small>EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.</small>
+</small></p>
+</body></html>
+<?php } ?>
+
+
+<?php
+// --------------------------------------------------------------------------------------------------------------
+// __dump_any_into_modal_header_wo_button
+// --------------------------------------------------------------------------------------------------------------
+function __dump_any_into_modal_header_wo_button($name, $unique_id=NULL, $modal_size=NULL)
+{
+    $name_merged = is_null($unique_id) ? str_replace($name, ' ', '') : $unique_id;
+    $mdl_sz = is_null($modal_size) ? '' : ' '.$modal_size;
+?>
+<!-- <?=$name?> Modal -->
+<div class="modal fade" id="modal<?=$name_merged?>" tabindex="-1" role="dialog" aria-labelledby="modal<?=$name_merged?>Label">
+ <div class="modal-dialog<?=$mdl_sz?>" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <h4 class="modal-title" id="modal<?=$name_merged?>Label"><?=$name?></h4>
+   </div>
+   <div class="modal-body">
+<?php } ?>
+
+
+<?php
+// --------------------------------------------------------------------------------------------------------------
+// __dump_any_into_modal_header
+// --------------------------------------------------------------------------------------------------------------
+function __dump_any_into_modal_header($name, $unique_id=NULL, $btn_size="btn-lg", $btn_nm=NULL, $modal_size=NULL)
+{
+    $name_merged = is_null($unique_id) ? str_replace($name, ' ', '') : $unique_id;
+    $btn_nm = is_null($btn_nm) ? 'Show '.$name : $btn_nm;
+?>
+<!-- Button trigger for <?=$name?> Modal -->
+<button type="button" class="btn btn-primary <?=$btn_size?>" data-toggle="modal" data-target="#modal<?=$name_merged?>"><?=$btn_nm?></button>
+<?php
+    __dump_any_into_modal_header_wo_button($name, $unique_id, $modal_size);
+}
+?>
+
+
+<?php
+// --------------------------------------------------------------------------------------------------------------
+// __dump_any_into_modal_footer
+// --------------------------------------------------------------------------------------------------------------
+function __dump_any_into_modal_footer() { ?>
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+    <!-- <button type="button" class="btn btn-primary">Choose</button> -->
+   </div>
+  </div>
+ </div>
+</div>
+<?php } ?>

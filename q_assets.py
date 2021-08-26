@@ -15,7 +15,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_assets.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
 
 Requires application scopes:
@@ -125,10 +125,12 @@ def main():
 
     # Public information about a character
     character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id))
+        "characters/{}/".format(character_id),
+        fully_trust_cache=True)
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]))
+        "corporations/{}/".format(character_data["corporation_id"]),
+        fully_trust_cache=True)
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
@@ -147,15 +149,14 @@ def main():
     sys.stdout.flush()
 
     # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-    corp_ass_names_data = []
     corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-    if len(corp_ass_named_ids) > 0:
-        # Requires role(s): Director
-        corp_ass_names_data = interface.get_esi_data(
-            "corporations/{}/assets/names/".format(corporation_id),
-            json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+    # Requires role(s): Director
+    corp_ass_names_data = interface.get_esi_piece_data(
+        "corporations/{}/assets/names/".format(corporation_id),
+        corp_ass_named_ids)
     print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
     sys.stdout.flush()
+    del corp_ass_named_ids
 
     # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
     foreign_structures_data = {}
@@ -166,7 +167,8 @@ def main():
         for structure_id in foreign_structures_ids:
             try:
                 universe_structure_data = interface.get_esi_data(
-                    "universe/structures/{}/".format(structure_id))
+                    "universe/structures/{}/".format(structure_id),
+                    fully_trust_cache=True)
                 foreign_structures_data.update({str(structure_id): universe_structure_data})
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
@@ -182,10 +184,20 @@ def main():
         print("\n'{}' corporation has offices in {} forbidden stations : {}".format(corporation_name, len(foreign_structures_forbidden_ids), foreign_structures_forbidden_ids))
     sys.stdout.flush()
 
-    # Public information about market prices
-    eve_market_prices_data = interface.get_esi_data("markets/prices/")
-    print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-    sys.stdout.flush()
+    try:
+        # Public information about market prices
+        eve_market_prices_data = interface.get_esi_data("markets/prices/")
+        print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+        sys.stdout.flush()
+    except requests.exceptions.HTTPError as err:
+        status_code = err.response.status_code
+        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+            eve_market_prices_data = []
+        else:
+            raise
+    except:
+        print(sys.exc_info())
+        raise
 
     # # Public information with list of public structures
     # universe_structures_data = eve_esi_interface.get_esi_data(

@@ -1,0 +1,741 @@
+
+<!doctype html>
+<html lang="ru">
+ <head>
+ <meta charset="utf-8">
+ <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="description" content="A tool for planning logistics, building plans for the manufacture of modules, ships, tracking the process of fulfilling contracts.">
+ <meta name="keywords" content="eve-online, eve, manufacturing, logistics, q.industrialist">
+<style type="text/css">
+.icn16 { width:16px; height:16px; }
+.icn24 { width:24px; height:24px; }
+.icn32 { width:32px; height:32px; }
+.icn64 { width:64px; height:64px; }
+</style>
+ <title>Cyno Network - Q.Industrialist</title>
+ <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+
+ <!-- Android  -->
+ <meta name="theme-color" content="#1e2021">
+ <meta name="mobile-web-app-capable" content="yes">
+ <!-- iOS -->
+ <meta name="apple-mobile-web-app-title" content="Q.Industrialist">
+ <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <!-- Windows  -->
+ <meta name="msapplication-navbutton-color" content="#1e2021">
+ <meta name="msapplication-TileColor" content="#1e2021">
+ <meta name="msapplication-TileImage" content="ms-icon-144x144.png">
+ <meta name="msapplication-config" content="browserconfig.xml">
+ <!-- Pinned Sites  -->
+ <meta name="application-name" content="Q.Industrialist">
+ <meta name="msapplication-tooltip" content="Q.Industrialist for EVE Online game">
+ <meta name="msapplication-starturl" content="/">
+ <!-- Enable night mode for this page  -->
+ <meta name="nightmode" content="enable">
+ <meta name="color-scheme" content="dark light">
+ 
+ <!-- Main Link Tags -->
+ <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+ <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+ <link rel="icon" type="image/png" sizes="96x96" href="images/favicon/android-icon-96x96.png">
+ <!-- Android  -->
+ <link rel="icon" type="image/png" sizes="192x192" href="images/favicon/android-icon-192x192.png">
+ <link rel="icon" type="image/png" sizes="128x128" href="images/favicon/android-icon-128x128.png">
+ <!-- iOS  -->
+ <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-precomposed.png">
+ <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+ <link rel="apple-touch-icon" sizes="120x120" href="images/favicon/apple-icon-120x120.png">
+ <link rel="apple-touch-icon" sizes="152x152" href="images/favicon/apple-icon-152x152.png">
+ <link rel="apple-touch-icon" sizes="167x167" href="images/favicon/apple-icon-167x167.png">
+ <!-- Others -->
+ <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+ <!-- Manifest.json  -->
+ <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+ <div class="page-header"><h1>Q.Industrialist <small>Cyno Network</small></h1></div>
+ <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous"></script>
+ <script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+
+<style>
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu .dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -1px;
+}
+</style>
+
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-random" aria-hidden="true"></span></a>
+  </div>
+   
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a data-target="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Routes <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a id="btnCynoNetSel" cynonet="1" data-target="#" role="button"><span class="glyphicon glyphicon-star img-cyno-net" cynonet="1" aria-hidden="true"></span> Shafrak &rarr; Heydieles</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnCynoNetSel" cynonet="0" data-target="#" role="button"><span 
+              class="glyphicon glyphicon-star img-cyno-net" cynonet="0" aria-hidden="true"></span> All routes</a></li>
+     </ul>
+    </li>
+    
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Jump Options <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Ship <mark id="lbJumpShip"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li class="dropdown-header">[Jump Freighters]</li>
+           <li><a id="btnJumpShip" ship="Anshar" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipAnshar"></span> Anshar</a></li>
+           <li><a id="btnJumpShip" ship="Ark" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipArk"></span> Ark</a></li>
+           <li><a id="btnJumpShip" ship="Nomad" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipNomad"></span> Nomad</a></li>
+           <li><a id="btnJumpShip" ship="Rhea" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpShipRhea"></span> Rhea</a></li>
+           <li role="separator" class="divider"></li>
+           <li><a id="btnJumpAnyShip" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpAnyShip"></span> Any Ship</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Drive Calibration <mark id="lbJumpCalibration"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpCalibration" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration1"></span> 1</a></li>
+           <li><a id="btnJumpCalibration" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration2"></span> 2</a></li>
+           <li><a id="btnJumpCalibration" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration3"></span> 3</a></li>
+           <li><a id="btnJumpCalibration" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration4"></span> 4</a></li>
+           <li><a id="btnJumpCalibration" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpCalibration5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Fuel Conservation <mark id="lbJumpConservation"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpConservation" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation1"></span> 1</a></li>
+           <li><a id="btnJumpConservation" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation2"></span> 2</a></li>
+           <li><a id="btnJumpConservation" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation3"></span> 3</a></li>
+           <li><a id="btnJumpConservation" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation4"></span> 4</a></li>
+           <li><a id="btnJumpConservation" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpConservation5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li class="dropdown-submenu">
+         <a class="options-submenu" data-target="#" role="button">Jump Freighter <mark id="lbJumpFreighter"></mark><span class="caret"></span></a>
+         <ul class="dropdown-menu">
+           <li><a id="btnJumpFreighter" skill="1" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter1"></span> 1</a></li>
+           <li><a id="btnJumpFreighter" skill="2" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter2"></span> 2</a></li>
+           <li><a id="btnJumpFreighter" skill="3" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter3"></span> 3</a></li>
+           <li><a id="btnJumpFreighter" skill="4" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter4"></span> 4</a></li>
+           <li><a id="btnJumpFreighter" skill="5" class="option" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgJumpFreighter5"></span> 5</a></li>
+         </ul>
+       </li>
+
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
+      </ul>
+    </li>
+    
+    <li class="disabled"><a data-target="#" role="button">Problems</a></li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <div class="form-group">
+     <input type="text" class="form-control" placeholder="Solar System" disabled>
+    </div>
+    <button type="button" class="btn btn-default disabled">Search</button>
+   </form>
+  </div>
+ </div>
+</nav>
+<div class="container-fluid"><div class="panel panel-danger pn-cyno-net" cynonet="1">
+ <div class="panel-heading"><h3 class="panel-title"><span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span> Shafrak &rarr; Zayi &rarr; Leran &rarr; Heydieles</h3></div>
+  <div class="panel-body">
+   <p>Checkout Dotlan link for graphical route building: <a class="lnk-dtln" cynonet="1" routes="4" href="https://evemaps.dotlan.net/jump/Rhea,544/Shafrak:Zayi:Leran:Heydieles" class="panel-link">https://evemaps.dotlan.net/jump/Rhea,544/Shafrak:Zayi:Leran:Heydieles</a></p>
+   <div class="progress">
+    <div id="prgrCynoRoute1_1" class="progress-bar progress-bar-danger signal" role="progressbar" style="width:25%">Shafrak</div>
+    <div id="prgrCynoRoute1_2" class="progress-bar progress-bar-danger signal" role="progressbar" style="width:25%">Zayi</div>
+    <div id="prgrCynoRoute1_3" class="progress-bar progress-bar-success signal" role="progressbar" style="width:25%">Leran</div>
+    <div id="prgrCynoRoute1_4" class="progress-bar progress-bar-success signal" role="progressbar" style="width:25%">Heydieles</div>
+   </div>
+   <table class="table qind-tbl-cynonet">
+    <thead>
+     <tr>
+      <th>#</th>
+      <th>Solar System</th>
+<th><img src="http://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
+<th><img src="http://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
+ src="http://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
+ src="http://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
+<th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
+<th><img src="http://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
+<th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
+     </tr>
+    </thead>
+    <tbody>
+<tr id="rowCynoRoute1_1" system="Shafrak">
+ <th scope="row">1</th><td>Shafrak</td>
+ <td><abbr title="48 Badger cynos">48</abbr></td>
+ <td><abbr title="0 Venture cynos">44</abbr> / 112 / 0</td>
+ <td>58</td><td>135,813</td>
+ <td class="nitrogen" id="niCynoRoute1_1">3,085,154</td>
+ <td class="hydrogen" id="hyCynoRoute1_1">0</td>
+ <td class="oxygen" id="oxCynoRoute1_1">0</td>
+ <td class="helium" id="heCynoRoute1_1">0</td>
+</tr><tr class="active">
+ <th></th><td></td>
+ <td colspan="4">Distance: <strong>9.143 ly</strong></td><td colspan="4" lightyears="9.143045873762485" cynonet="1" route="1"></td>
+</tr><tr id="rowCynoRoute1_2" system="Zayi">
+ <th scope="row">2</th><td>Zayi</td>
+ <td><abbr title="5 Badger cynos">22</abbr></td>
+ <td><abbr title="0 Venture cynos">7</abbr> / 47 / 1</td>
+ <td>5</td><td>117,601</td>
+ <td class="nitrogen" id="niCynoRoute1_2">640,000</td>
+ <td class="hydrogen" id="hyCynoRoute1_2">0</td>
+ <td class="oxygen" id="oxCynoRoute1_2">0</td>
+ <td class="helium" id="heCynoRoute1_2">0</td>
+</tr><tr class="active">
+ <th></th><td></td>
+ <td colspan="4">Distance: <strong>7.933 ly</strong></td><td colspan="4" lightyears="7.933152685641335" cynonet="1" route="2"></td>
+</tr><tr id="rowCynoRoute1_3" system="Leran">
+ <th scope="row">3</th><td>Leran</td>
+ <td><abbr title="18 Badger cynos">18</abbr></td>
+ <td><abbr title="22 Venture cynos">22</abbr> / 22 / 66</td>
+ <td>46</td><td>96,900</td>
+ <td class="nitrogen" id="niCynoRoute1_3">1,180,000</td>
+ <td class="hydrogen" id="hyCynoRoute1_3">0</td>
+ <td class="oxygen" id="oxCynoRoute1_3">0</td>
+ <td class="helium" id="heCynoRoute1_3">0</td>
+</tr><tr class="active">
+ <th></th><td></td>
+ <td colspan="4">Distance: <strong>9.662 ly</strong></td><td colspan="4" lightyears="9.661884173823202" cynonet="1" route="3"></td>
+</tr><tr id="rowCynoRoute1_4" system="Heydieles">
+ <th scope="row">4</th><td>Heydieles</td>
+ <td><abbr title="11 Badger cynos">11</abbr></td>
+ <td><abbr title="20 Venture cynos">20</abbr> / 64 / 60</td>
+ <td>31</td><td>40,000</td>
+ <td class="nitrogen" id="niCynoRoute1_4">350,000</td>
+ <td class="hydrogen" id="hyCynoRoute1_4">0</td>
+ <td class="oxygen" id="oxCynoRoute1_4">0</td>
+ <td class="helium" id="heCynoRoute1_4">0</td>
+</tr>
+    </tbody>
+    <tfoot>
+     <tr>
+      <td colspan="2"></td>
+      <td colspan="5">
+<!-- Button trigger for Whats missing on the route <span class="text-primary">Shafrak &rarr; Heydieles</span>? Modal -->
+<button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#modalNotEnough1">Not enough&hellip;</button>
+<!-- Whats missing on the route <span class="text-primary">Shafrak &rarr; Heydieles</span>? Modal -->
+<div class="modal fade" id="modalNotEnough1" tabindex="-1" role="dialog" aria-labelledby="modalNotEnough1Label">
+ <div class="modal-dialog" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <h4 class="modal-title" id="modalNotEnough1Label">Whats missing on the route <span class="text-primary">Shafrak &rarr; Heydieles</span>?</h4>
+   </div>
+   <div class="modal-body">
+
+<div class="table-responsive">
+ <table class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Solar System</th>
+  <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
+           src="https://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
+           src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
+  <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
+  <th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
+ </tr>
+</thead>
+<tbody>
+<tr id="rowNotEnough1_1" system="Shafrak">
+ <th scope="row">1</th><td>Shafrak</td>
+ <td>0</td>
+ <td>0 / 0 / 33</td>
+ <td>0</td><td>0</td>
+ <td class="nitrogen"></td>
+ <td class="hydrogen"></td>
+ <td class="oxygen"></td>
+ <td class="helium"></td>
+</tr><tr id="rowNotEnough1_2" system="Zayi">
+ <th scope="row">2</th><td>Zayi</td>
+ <td>0</td>
+ <td>4 / 0 / 32</td>
+ <td>6</td><td>0</td>
+ <td class="nitrogen"></td>
+ <td class="hydrogen"></td>
+ <td class="oxygen"></td>
+ <td class="helium"></td>
+</tr><tr id="rowNotEnough1_3" system="Leran">
+ <th scope="row">3</th><td>Leran</td>
+ <td>0</td>
+ <td>0 / 0 / 0</td>
+ <td>0</td><td>0</td>
+ <td class="nitrogen"></td>
+ <td class="hydrogen"></td>
+ <td class="oxygen"></td>
+ <td class="helium"></td>
+</tr><tr id="rowNotEnough1_4" system="Heydieles">
+ <th scope="row">4</th><td>Heydieles</td>
+ <td>0</td>
+ <td>0 / 0 / 0</td>
+ <td>0</td><td>0</td>
+ <td class="nitrogen"></td>
+ <td class="hydrogen"></td>
+ <td class="oxygen"></td>
+ <td class="helium"></td>
+</tr>
+</tbody>
+<tfoot>
+<tr id="rowNotEnoughSummary1" style="font-weight:bold;">
+ <td colspan="2" align="right">Summary (not enough):</td>
+ <td>0</td>
+ <td>4 / 0 / 65</td>
+ <td>6</td><td>0</td>
+ <td class="nitrogen"></td>
+ <td class="hydrogen"></td>
+ <td class="oxygen"></td>
+ <td class="helium"></td>
+</tr>
+</tfoot>
+ </table>
+</div>
+
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+    <!-- <button type="button" class="btn btn-primary">Choose</button> -->
+   </div>
+  </div>
+ </div>
+</div>
+
+      </td>
+      </tr>
+    </tfoot>
+   </table>
+  </div>
+ </div><hr/>
+<h4>Legend</h4>
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="95" aria-valuemin="0" aria-valuemax="100" style="width: 95%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">10 or more jumps</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-warning" role="progressbar" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100" style="width: 25%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">at least 2 jumps</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar progress-bar-danger" role="progressbar" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100" style="width: 10%;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">there is a chance to stop</div>
+  </div>
+
+  <div class="row">
+   <div class="col-xs-3">
+    <div class="progress">
+     <div class="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width: 50%; background-color:#888;"></div>
+    </div>
+   </div>
+   <div class="col-xs-9">there are temporary problems with ESI (out of sync assets movements)</div>
+  </div>
+</div>
+<script>
+  // Cynonetwork contents (data)
+  var contentsCynoNetwork = [
+    [1, [
+      [1,'Shafrak','danger',9.143045873762485,3085154,0,0,0],
+      [2,'Zayi','danger',7.933152685641335,640000,0,0,0],
+      [3,'Leran','success',9.661884173823202,1180000,0,0,0],
+      [4,'Heydieles','success',0,350000,0,0,0]]
+    ]
+  ];
+  // Jump Options storage (prepare)
+  ls = window.localStorage;
+  var knownShips = ['Anshar', 'Ark', 'Nomad', 'Rhea'];
+  var usedIsotopeTags = ['th', 'td', 'span'];
+
+  // Tools & Utils
+  function numLikeEve(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  // Jump Options storage (init)
+  function resetOptionsMenuToDefault() {
+    if (!ls.getItem('CynoNetNum')) {
+      ls.setItem('CynoNetNum', 0);
+    }
+    if (!ls.getItem('Jump Drive Calibration')) {
+      ls.setItem('Jump Drive Calibration', 5);
+    }
+    if (!ls.getItem('Jump Drive Conservation')) {
+      ls.setItem('Jump Drive Conservation', 4);
+    }
+    if (!ls.getItem('Jump Freighter')) {
+      ls.setItem('Jump Freighter', 4);
+    }
+  }
+  // Jump Options storage (rebuild menu components)
+  function rebuildOptionsMenu() {
+    var cynonet = ls.getItem('CynoNetNum');
+    $('span.img-cyno-net').each(function() {
+      cn = $(this).attr('cynonet');
+      if (cn == cynonet)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    });
+    var ship = ls.getItem('Ship');
+    if (!ship) {
+      for (var s of knownShips) {
+        $('#imgJumpShip'+s).addClass('hidden');
+      }
+      $('#imgJumpAnyShip').removeClass('hidden');
+      $('#lbJumpShip').addClass('hidden');
+    }
+    else {
+      for (var s of knownShips) {
+        if (ship == s)
+          $('#imgJumpShip'+s).removeClass('hidden');
+        else
+          $('#imgJumpShip'+s).addClass('hidden');
+      }
+      $('#imgJumpAnyShip').addClass('hidden');
+      $('#lbJumpShip').html(ship);
+      $('#lbJumpShip').removeClass('hidden');
+    }
+    var skill = ls.getItem('Jump Drive Calibration');
+    $('#lbJumpCalibration').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpCalibration'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpCalibration'+i.toString()).addClass('hidden');
+    }
+    skill = ls.getItem('Jump Drive Conservation');
+    $('#lbJumpConservation').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpConservation'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpConservation'+i.toString()).addClass('hidden');
+    }
+    skill = ls.getItem('Jump Freighter');
+    $('#lbJumpFreighter').html(skill);
+    for (var i = 1; i <= 5; i++) {
+        if (skill == i)
+          $('#imgJumpFreighter'+i.toString()).removeClass('hidden');
+        else
+          $('#imgJumpFreighter'+i.toString()).addClass('hidden');
+    }
+  }
+  // Jump Options storage (rebuild panel links)
+  function rebuildPanelLinks() {
+    var ship = ls.getItem('Ship');
+    if (!ship)
+        ship = 'Rhea';
+    var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    $('a.lnk-dtln').each(function() {
+      cynonet = $(this).attr('cynonet');
+      routes = $(this).attr('routes');
+      var uri = 'https://evemaps.dotlan.net/jump/'+ship+','+calibration_skill+conservation_skill+freighter_skill+'/';
+      for (var i = 1; i <= routes; i++) {
+        if (i > 1) uri = uri + ':';
+        uri = uri + $('#rowCynoRoute'+cynonet+'_'+i.toString()).attr('system');
+      }
+      $(this).attr('href', uri);
+      $(this).html(uri);
+    });
+  }
+  // Isotope Quantity Calculator
+  function calcIsotope(lightyears, fuel_consumption, conservation_skill, freighter_skill) {
+    return parseInt(lightyears * fuel_consumption * (1 - 0.1 * conservation_skill) * (1 - 0.1 * freighter_skill), 10);
+  }
+  // Jump Options storage (rebuild progress bar signals)
+  function rebuildProgressBarSignals() {
+    var ship = ls.getItem('Ship');
+    //TODO:var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    for (var cn of contentsCynoNetwork) {
+      cn_num = cn[0];
+      for (var rt of cn[1]) {
+        ly = rt[3];
+        if (!ly) continue;
+        signal = rt[2];
+        if (signal == 'danger') continue;
+        rt_num = rt[0];
+        var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
+        var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
+        var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
+        var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
+        var nitrogen_times = parseInt(rt[4] / nitrogen_used, 10);
+        var hydrogen_times = parseInt(rt[5] / hydrogen_used, 10);
+        var oxygen_times = parseInt(rt[6] / oxygen_used, 10);
+        var helium_times = parseInt(rt[7] / helium_used, 10);
+        prgr = $('#prgrCynoRoute'+cn_num.toString()+'_'+rt_num.toString());
+        if (prgr) {
+          var times = 0;
+          if (!ship) times = Math.min(nitrogen_times, hydrogen_times, oxygen_times, helium_times);
+          else if (ship == 'Anshar') times = oxygen_times; // Gallente : Oxygen isotopes
+          else if (ship == 'Ark') times = helium_times; // Amarr : Helium isotopes
+          else if (ship == 'Nomad') times = hydrogen_times; // Minmatar : Hydrogen isotopes
+          else if (ship == 'Rhea') times = nitrogen_times; // Caldari : Nitrogen isotopes
+          if (signal == 'warning') {
+            if (times >= 10) times = 2;
+          }
+          if (times < 2) {
+            prgr.addClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-success');
+            prgr.removeClass('progress-bar-warning');
+          }
+          else if (times >= 10) {
+            prgr.addClass('progress-bar-success');
+            prgr.removeClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-warning');
+          }
+          else {
+            prgr.addClass('progress-bar-warning');
+            prgr.removeClass('progress-bar-danger');
+            prgr.removeClass('progress-bar-success');
+          }
+        }
+      }
+    }
+  }
+  // Jump Options storage (rebuild body components)
+  function rebuildBody() {
+    var ship = ls.getItem('Ship');
+    //TODO:var calibration_skill = parseInt(ls.getItem('Jump Drive Calibration'));
+    var conservation_skill = parseInt(ls.getItem('Jump Drive Conservation'));
+    var freighter_skill = parseInt(ls.getItem('Jump Freighter'));
+    $('table.qind-tbl-cynonet').each(function() {
+      var table = $(this);
+      var tbody = table.find('tbody');
+      var not_enough_summary = [0,0,0,0];
+      var not_enough_cn_num = null;
+      tbody.find('tr.active td').each(function() {
+        ly = $(this).attr('lightyears');
+        if (ly) {
+          ly = parseFloat(ly);
+          var nitrogen_used = calcIsotope(ly, 10000, conservation_skill, freighter_skill);
+          var hydrogen_used = calcIsotope(ly, 8200, conservation_skill, freighter_skill);
+          var oxygen_used = calcIsotope(ly, 9400, conservation_skill, freighter_skill);
+          var helium_used = calcIsotope(ly, 8800, conservation_skill, freighter_skill);
+          not_enough_cn_num = cn_num = $(this).attr('cynonet');
+          rt_num = $(this).attr('route');
+          times = null
+          contents = null
+          for (var rt of contentsCynoNetwork[cn_num-1][1]) {
+            if (rt[0] == rt_num) {
+              contents = [rt[4],rt[5],rt[6],rt[7]]
+              times = [parseInt(rt[4]/nitrogen_used), parseInt(rt[5]/hydrogen_used),
+                       parseInt(rt[6]/oxygen_used), parseInt(rt[7]/helium_used)];
+              break;
+            }
+          }
+          $(this).html('Isotopes needed: <span class="nitrogen"><strong>' + nitrogen_used + '</strong> Ni</span> ' +
+                        '<span class="hydrogen"><strong>' + hydrogen_used + '</strong> Hy</span> ' +
+                        '<span class="oxygen"><strong>' + oxygen_used + '</strong> Ox</span> ' +
+                        '<span class="helium"><strong>' + helium_used + '</strong> He</span>');
+          if (times && contents) {
+            if (contents[0]) {
+              $('#niCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[0]+' Rhea jumps">'+numLikeEve(contents[0])+'</abbr>');
+              var not_enough = (contents[0] >= (nitrogen_used * 11)) ? 0 : ((nitrogen_used * 11) - contents[0]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(5).html(numLikeEve(not_enough));
+              not_enough_summary[0] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(5).html(numLikeEve(nitrogen_used * 11));
+              not_enough_summary[0] += nitrogen_used * 11;
+            }
+            if (contents[1]) {
+              $('#hyCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[1]+' Nomad jumps">'+numLikeEve(contents[1])+'</abbr>');
+              var not_enough = (contents[1] >= (hydrogen_used * 11)) ? 0 : ((hydrogen_used * 11) - contents[1]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(6).html(numLikeEve(not_enough));
+              not_enough_summary[1] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(6).html(numLikeEve(hydrogen_used * 11));
+              not_enough_summary[1] += hydrogen_used * 11;
+            }
+            if (contents[2]) {
+              $('#oxCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[2]+' Anshar jumps">'+numLikeEve(contents[2])+'</abbr>');
+              var not_enough = (contents[2] >= (oxygen_used * 11)) ? 0 : ((oxygen_used * 11) - contents[2]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(7).html(numLikeEve(not_enough));
+              not_enough_summary[2] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(7).html(numLikeEve(oxygen_used * 11));
+              not_enough_summary[2] += hydrogen_used * 11;
+            }
+            if (contents[3]) {
+              $('#heCynoRoute'+cn_num+'_'+rt_num).html('<abbr title="'+times[3]+' Ark jumps">'+numLikeEve(contents[3])+'</abbr>');
+              var not_enough = (contents[3] >= (helium_used * 11)) ? 0 : ((helium_used * 11) - contents[3]);
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(8).html(numLikeEve(not_enough));
+              not_enough_summary[3] += not_enough;
+            }
+            else {
+              $('#rowNotEnough'+cn_num+'_'+rt_num).find('td').eq(8).html(numLikeEve(helium_used * 11));
+              not_enough_summary[3] += helium_used * 11;
+            }
+          }
+        }
+      });
+      var tr_summary = $('#rowNotEnoughSummary'+not_enough_cn_num.toString());
+      for (var i = 0; i < 4; ++i)
+        tr_summary.find('td').eq(5+i).html(numLikeEve(not_enough_summary[i]));
+    });
+    if (!ship) { // show all
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').removeClass('hidden');
+        $(t+'.hydrogen').removeClass('hidden');
+        $(t+'.oxygen').removeClass('hidden');
+        $(t+'.helium').removeClass('hidden');
+      }
+    }
+    else if (ship == 'Anshar') { // Gallente : Oxygen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').removeClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+    else if (ship == 'Ark') { // Amarr : Helium isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').removeClass('hidden');
+      }
+    }
+    else if (ship == 'Nomad') { // Minmatar : Hydrogen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').addClass('hidden');
+        $(t+'.hydrogen').removeClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+    else if (ship == 'Rhea') { // Caldari : Nitrogen isotopes
+      for (var t of usedIsotopeTags) {
+        $(t+'.nitrogen').removeClass('hidden');
+        $(t+'.hydrogen').addClass('hidden');
+        $(t+'.oxygen').addClass('hidden');
+        $(t+'.helium').addClass('hidden');
+      }
+    }
+    var cynonet = ls.getItem('CynoNetNum');
+    $('div.pn-cyno-net').each(function() {
+      cn = $(this).attr('cynonet');
+      if ((cynonet == 0) || (cynonet == cn.toString()))
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
+  }
+
+  // Jump Options menu and submenu setup
+  $(document).ready(function(){
+    $('.dropdown-submenu a.options-submenu').on("click", function(e){
+      $(this).next('ul').toggle();
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    $('a#btnCynoNetSel').on('click', function() {
+      cynonet = $(this).attr('cynonet');
+      ls.setItem('CynoNetNum', cynonet);
+      rebuildOptionsMenu();
+      rebuildBody();
+    });
+    $('a#btnJumpShip').on('click', function() {
+      ship = $(this).attr('ship');
+      ls.setItem('Ship', ship);
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    $('#btnJumpAnyShip').on('click', function() {
+      ls.removeItem('Ship');
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    $('a#btnJumpCalibration').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Drive Calibration', skill);
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    $('a#btnJumpConservation').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Drive Conservation', skill);
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    $('a#btnJumpFreighter').on('click', function() {
+      skill = $(this).attr('skill');
+      ls.setItem('Jump Freighter', skill);
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    $('#btnResetOptions').on('click', function () {
+      ls.clear();
+      resetOptionsMenuToDefault();
+      rebuildOptionsMenu();
+      rebuildPanelLinks();
+      rebuildProgressBarSignals();
+      rebuildBody();
+    });
+    // first init
+    resetOptionsMenuToDefault();
+    rebuildOptionsMenu();
+    rebuildPanelLinks();
+    rebuildProgressBarSignals();
+    rebuildBody();
+  });
+</script><p><small><small>Generated Thu, 24 Sep 2020 15:56:43 +0300</small></br>
+</br>
+&copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
+</br>
+<small>EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.</small>
+</small></p></body></html>

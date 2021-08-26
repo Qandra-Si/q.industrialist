@@ -205,16 +205,28 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
      <tr>
       <th>#</th>
       <th>Solar System</th>
-      <th><img src="https://imageserver.eveonline.com/Type/648_32.png" width="32px" height="32px" alt="Badger"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/32880_32.png" width="32px" height="32px" alt="Venture"/><img
-               src="https://imageserver.eveonline.com/Type/1317_32.png" width="32px" height="32px" alt="Expanded Cargohold I"/><img
-               src="https://imageserver.eveonline.com/Type/31117_32.png" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/52694_32.png" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>
-      <th><img src="https://imageserver.eveonline.com/Type/16273_32.png" width="32px" height="32px" alt="Liquid Ozone"/></th>
-      <th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
+""")
+        glf.write(
+            '<th><img src="{src648}" width="32px" height="32px" alt="Badger"/></th>\n'
+            '<th><img src="{src32880}" width="32px" height="32px" alt="Venture"/><img\n'
+            ' src="{src1317}" width="32px" height="32px" alt="Expanded Cargohold I"/><img\n'
+            ' src="{src31117}" width="32px" height="32px" alt="Small Cargohold Optimization I"/></th>\n'
+            '<th><img src="{src52694}" width="32px" height="32px" alt="Industrial Cynosural Field Generator"/></th>\n'
+            '<th><img src="{src16273}" width="32px" height="32px" alt="Liquid Ozone"/></th>\n'.
+            format(
+                src648=render_html.__get_img_src(648,32),
+                src32880=render_html.__get_img_src(32880,32),
+                src1317=render_html.__get_img_src(1317,32),
+                src31117=render_html.__get_img_src(31117,32),
+                src52694="https://imageserver.eveonline.com/Type/52694_32.png",  # there are no in IEC: render_html.__get_img_src(52694,32),
+                src16273=render_html.__get_img_src(16273,32)
+            )
+        )
+        glf.write("""<th class="nitrogen">Nitrogen</th><th class="hydrogen">Hydrogen</th><th class="oxygen">Oxygen</th><th class="helium">Helium</th>
      </tr>
     </thead>
-    <tbody>""")
+    <tbody>
+""")
         # --- расчёт дистанции прыжка
         prev_system_id = None
         row_num = 1
@@ -244,6 +256,14 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
         row_num = 1
         for location_id in cn_route:
             route_place = corp_cynonetwork[str(location_id)]
+            # ---
+            tickers_html = ""
+            if "found_tickers" in route_place:
+                for ft in route_place["found_tickers"]:
+                    tickers_html += '<small>&nbsp;<span class="label label-default">{t}</span></small>'.format(
+                        t=render_html.__camel_to_snake(ft, False),
+                    )
+            # ---
             system_name = route_place["solar_system"]
             lightyears = lightyear_distances[row_num-1] if row_num < len(cn_route) else None
             if not ("error" in route_place) or (route_place["error"] != "no data"):
@@ -261,7 +281,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 venture_jumps_num = min(venture_num, indus_cyno_gen_num, int(liquid_ozone_num/200), exp_cargohold_num, int(cargohold_rigs_num/3))
                 glf.write(
                     '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
-                    ' <th scope="row">{num}</th><td>{nm}</td>\n'
+                    ' <th scope="row">{num}</th><td>{nm}{ct}</td>\n'
                     ' <td><abbr title="{bjumps} Badger cynos">{b:,d}</abbr></td>\n'
                     ' <td><abbr title="{vjumps} Venture cynos">{v:,d}</abbr> / {ch:,d} / {chr:,d}</td>\n'
                     ' <td>{icg:,d}</td><td>{lo:,d}</td>\n'
@@ -273,6 +293,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     format(num=row_num,
                            cnn=cynonetwork_num,
                            nm=system_name,
+                           ct=tickers_html,
                            bjumps=badger_jumps_num,
                            vjumps=venture_jumps_num,
                            b=badger_num,
@@ -288,11 +309,12 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                     ))
             else:
                 glf.write(
-                    '<tr>\n'
+                    '<tr id="rowCynoRoute{cnn}_{num}" system="{nm}">\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
+                           cnn=cynonetwork_num,
                            nm=system_name))
             if row_num != len(cn_route):
                 glf.write(
@@ -397,7 +419,7 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                 glf.write(
                     '<tr>\n'
                     ' <th scope="row">{num}</th><td>{nm}</td>\n'
-                    ' <td></td><td></td><td></td><td></td><td></td>\n'
+                    ' <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>\n'
                     '</tr>'.
                     format(num=row_num,
                            nm=system_name))
@@ -517,6 +539,13 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
                                  ox=oxygen_isotope_num,
                                  he=helium_isotope_num,
                                  ly=lightyears))
+            else:
+                glf.write("      [{rn},'{nm}','{signal}',{ly},0,0,0,0]{comma}\n".
+                          format(comma=',' if not last_route else ']',
+                                 rn=route_num,
+                                 nm=system_name,
+                                 signal=__get_route_signalling_type(3),
+                                 ly=lightyears))
             route_num = route_num + 1
         glf.write('    ]{comma}\n'.format(comma=',' if cynonetwork_num != len(q_logist_settings.g_cynonetworks) else ''))
         cynonetwork_num = cynonetwork_num + 1
@@ -535,6 +564,9 @@ def __dump_corp_cynonetwork(glf, sde_inv_positions, corp_cynonetwork):
   function resetOptionsMenuToDefault() {
     if (!ls.getItem('CynoNetNum')) {
       ls.setItem('CynoNetNum', 0);
+    }
+    if (!ls.getItem('Ship')) {
+      ls.setItem('Ship', 'Rhea');
     }
     if (!ls.getItem('Jump Drive Calibration')) {
       ls.setItem('Jump Drive Calibration', 5);

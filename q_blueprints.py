@@ -17,7 +17,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_blueprints.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
@@ -27,7 +27,7 @@ Required application scopes:
     * esi-contracts.read_corporation_contracts.v1 - Requires: access token
 """
 import sys
-import json
+
 import requests
 
 import eve_esi_interface as esi
@@ -68,6 +68,7 @@ def __build_blueprints(
         eve_market_prices_data,
         corp_contracts_data,
         corp_contract_items_data,
+        various_characters_data,
         sde_type_ids,
         sde_inv_names,
         sde_inv_items,
@@ -77,37 +78,47 @@ def __build_blueprints(
         foreign_structures_data):
     blueprints = []
     blueprints_locations = {}
+    keys_to_skip_on_compare = ['name', 'item_id', 'q', 'base_price', 'average_price', 'adjusted_price']
     for __blueprint_dict in corp_blueprints_data:
         # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
         # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
         # activities performed on them yet).
-        __quantity = __blueprint_dict["quantity"]
-        __is_blueprint_copy = __quantity == -2
-        if __is_blueprint_copy:
-            continue
-        __type_id = __blueprint_dict["type_id"]
-        __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-        # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
-        # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
-        if __group_id != 2:  # Blueprints & Reactions
-            continue
+        __quantity: int = __blueprint_dict["quantity"]
+        __is_blueprint_copy: bool = bool(__quantity == -2)
+        __type_id: int = int(__blueprint_dict["type_id"])
+        __type_desc = sde_type_ids.get(str(__type_id), None)
+        if __type_desc is None:
+            __type_desc = {}
+            __is_t2_blueprint = None
+        else:
+            __is_t2_blueprint = __type_desc.get("metaGroupID", None) == 2
+            # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
+            # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+            # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
+            # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
+            if not __is_t2_blueprint:
+                __group_id = eve_sde_tools.get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                if __group_id != 2:  # Blueprints & Reactions
+                    continue
         __blueprint_id = __blueprint_dict["item_id"]
-        __type_desc = sde_type_ids[str(__type_id)]
         __location_id = __blueprint_dict["location_id"]
         __blueprint = {
             "item_id": __blueprint_id,
             "type_id": __type_id,
-            "name": __type_desc["name"]["en"],
+            "name": __type_desc.get("name", {}).get("en", "Unknown Type {} Blueprint".format(__type_id)),
+            "copy": __is_blueprint_copy,
             "me": __blueprint_dict["material_efficiency"],
             "te": __blueprint_dict["time_efficiency"],
-            "q": 1 if __quantity == -1 else __quantity,
+            "q": 1 if __quantity < 0 else __quantity,
             "loc": __location_id,
             "flag": __blueprint_dict["location_flag"]
         }
         # если чертёж в единичном экземпляре, не stacked, смотрим что с ним происходит? (jobs?)
-        if __quantity == -1:
+        blueprint_job_found = False
+        if __quantity < 0:
             __job_dict = next((j for j in corp_industry_jobs_data if j['blueprint_id'] == int(__blueprint_id)), None)
             if not (__job_dict is None):
+                blueprint_job_found = True
                 # особенность : чертежи могут отсутствовать в assets по указанному location_id, при этом чертёж будет в
                 # blueprints, но его location_id будет указывать на станцию, а не на контейнер, в то же время в
                 # industrial jobs этот же самый чертёж будет находиться в списке и иметь blueprint_location_id который
@@ -117,29 +128,65 @@ def __build_blueprints(
                 __blueprint.update({
                     "st": __job_dict["status"],
                     "act": __job_dict["activity_id"],
-                    "loc": __location_id  # переопределяем!!!
+                    "loc": __location_id,  # переопределяем!!!
+                    "out": __job_dict["output_location_id"],
                 })
-        # выясняем стоимость чертежа
-        if "basePrice" in __type_desc:
-            __blueprint.update({"base_price": __type_desc["basePrice"]})
+                # осуществляем поиск местоположения чертежа
+                __push_location_into_blueprints_locations(
+                    __job_dict["output_location_id"],
+                    blueprints_locations,
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_assets_tree,
+                    corp_ass_names_data,
+                    foreign_structures_data)
+        # ищем уже существующий чертёж в списке ранее добавленных
+        same_blueprint_found = None
+        for b in blueprints:
+            # не стравниваем чертежи у одного из которых не ведутся работы, иначе код ниже не сможет
+            # сравнить просто перебирая ключи dict-ов с разным составом параметров
+            if blueprint_job_found == bool(b.get('st') is None):
+                continue
+            same_blueprint = True
+            for key in b:
+                if key in keys_to_skip_on_compare:
+                    continue
+                elif not (key in __blueprint):
+                    same_blueprint = False
+                    break
+                elif b[key] != __blueprint[key]:
+                    same_blueprint = False
+                    break
+            if same_blueprint:
+                same_blueprint_found = b
+                break
+        if not same_blueprint_found:
+            # T2 чертежи не имеют какую-то точную маркет-цену, т.к. либо не продаются, либо продаются через
+            # контракты, поэтому base_price и/или average_price, или adjusted_price невалидны
+            if __is_t2_blueprint == False:
+                # выясняем стоимость чертежа
+                if "basePrice" in __type_desc:
+                    __blueprint.update({"base_price": __type_desc["basePrice"]})
+                else:
+                    __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
+                    if not (__price_dict is None):
+                        if "average_price" in __price_dict:
+                            __blueprint.update({"average_price": __price_dict["average_price"]})
+                        elif "adjusted_price" in __price_dict:
+                            __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
+            # осуществляем поиск местоположения чертежа
+            __push_location_into_blueprints_locations(
+                __location_id,
+                blueprints_locations,
+                sde_inv_names,
+                sde_inv_items,
+                corp_assets_tree,
+                corp_ass_names_data,
+                foreign_structures_data)
+            # добавляем собранную информацию в список чертежей
+            blueprints.append(__blueprint)
         else:
-            __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__type_id)), None)
-            if not (__price_dict is None):
-                if "average_price" in __price_dict:
-                    __blueprint.update({"average_price": __price_dict["average_price"]})
-                elif "adjusted_price" in __price_dict:
-                    __blueprint.update({"adjusted_price": __price_dict["adjusted_price"]})
-        # осуществляем поиск местоположения чертежа
-        __push_location_into_blueprints_locations(
-            __location_id,
-            blueprints_locations,
-            sde_inv_names,
-            sde_inv_items,
-            corp_assets_tree,
-            corp_ass_names_data,
-            foreign_structures_data)
-        # добавляем собранную информацию в список чертежей
-        blueprints.append(__blueprint)
+            same_blueprint_found["q"] += __blueprint["q"]
 
     # debug contracts only: blueprints = []
     # debug contracts only: blueprints_locations = {}
@@ -157,44 +204,58 @@ def __build_blueprints(
                 elif not bool(__items_dict["is_included"]):
                    continue
                 __type_id = __items_dict["type_id"]
-                __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
-                if not (__group_id is None) and (__group_id == 2):  # Blueprints and Reactions (добавляем только этот тип)
-                    # raw_qauntity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
-                    # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
-                    if "raw_qauntity" in  __items_dict:
-                        __raw_qauntity = __items_dict["raw_qauntity"]
-                        if __raw_qauntity == -2:
-                            continue
-                    # получение данных по чертежу, находящемуся в продаже
-                    __quantity = __items_dict["quantity"]
-                    __type_desc = sde_type_ids[str(__type_id)]
-                    # получение общих данных данных по контракту
-                    __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
-                    __location_id = __contract_dict["start_location_id"]
-                    __blueprint = {
-                        "item_id": __items_dict["record_id"],
-                        "type_id": __type_id,
-                        "name": __type_desc["name"]["en"],
-                        # "me": None,
-                        # "te": None,
-                        "q": __quantity,
-                        "loc": __location_id,
-                        "flag": __contract_dict["title"],
-                        "price": __contract_dict["price"],
-                        "cntrct_sta": __contract_dict["status"],
-                        "cntrct_typ": __contract_dict["type"]
-                    }
-                    # осуществляем поиск местоположения чертежа
-                    __push_location_into_blueprints_locations(
-                        __location_id,
-                        blueprints_locations,
-                        sde_inv_names,
-                        sde_inv_items,
-                        corp_assets_tree,
-                        corp_ass_names_data,
-                        foreign_structures_data)
-                    # добавляем собранную информацию в список чертежей
-                    blueprints.append(__blueprint)
+                __type_desc = sde_type_ids.get(str(__type_id), {})
+                __is_t2_blueprint = __type_desc.get("metaGroupID", None) == 2
+                # отсеиваем подраздел Manufacture & Research, который встречается в blueprints-данных от ССР, например:
+                # будут пропущены Intact Power Cores, Malfunctioning Weapon Subroutines и т.п.
+                # но поскольку проверка выполняется с помощью marketGroupID, то дополнительно проверяем, что чертёж
+                # является T2, и соответственно поскольку не продаётся на рынке - всё равно должен попасть в отчёт
+                if __is_t2_blueprint == False:
+                    # Blueprints and Reactions (добавляем только этот тип), а также T2-чертежи
+                    __group_id = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
+                    if __group_id != 2:
+                        continue
+                # raw_quantity = -1 indicates that the item is a singleton (non-stackable). If the item happens to
+                # be a Blueprint, -1 is an Original and -2 is a Blueprint Copy
+                __is_blueprint_copy: bool = False
+                if "raw_quantity" in __items_dict:
+                    __raw_qauntity = __items_dict["raw_quantity"]
+                    if __raw_qauntity == -2:
+                        __is_blueprint_copy = True
+                # получение данных по чертежу, находящемуся в продаже
+                __quantity = __items_dict["quantity"]
+                # получение общих данных данных по контракту
+                __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
+                __location_id = __contract_dict["start_location_id"]
+                __issuer_id = __contract_dict["issuer_id"]
+                __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
+                __blueprint = {
+                    "item_id": __items_dict["record_id"],
+                    "type_id": __type_id,
+                    "name": __type_desc.get("name", {}).get("en", "Unknown Type {} Blueprint".format(__type_id)),
+                    "copy": __is_blueprint_copy,
+                    # "me": None,
+                    # "te": None,
+                    "q": __quantity,
+                    "loc": __location_id,
+                    "flag": __contract_dict["title"],
+                    "price": __contract_dict["price"],
+                    "cntrct_sta": __contract_dict["status"],
+                    "cntrct_typ": __contract_dict["type"],
+                    "cntrct_issuer": __issuer_id,
+                    "cntrct_issuer_name": __issuer_name
+                }
+                # осуществляем поиск местоположения чертежа
+                __push_location_into_blueprints_locations(
+                    __location_id,
+                    blueprints_locations,
+                    sde_inv_names,
+                    sde_inv_items,
+                    corp_assets_tree,
+                    corp_ass_names_data,
+                    foreign_structures_data)
+                # добавляем собранную информацию в список чертежей
+                blueprints.append(__blueprint)
 
     return blueprints, blueprints_locations
 
@@ -211,6 +272,7 @@ def main():
 
     corps_blueprints = {}
     eve_market_prices_data = None
+    various_characters_data = []
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -233,21 +295,35 @@ def main():
 
         # Public information about a character
         character_data = interface.get_esi_data(
-            "characters/{}/".format(character_id))
+            "characters/{}/".format(character_id),
+            fully_trust_cache=True)
         # Public information about a corporation
         corporation_data = interface.get_esi_data(
-            "corporations/{}/".format(character_data["corporation_id"]))
+            "corporations/{}/".format(character_data["corporation_id"]),
+            fully_trust_cache=True)
 
         corporation_id = character_data["corporation_id"]
         corporation_name = corporation_data["name"]
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
+        various_characters_data.append({str(corporation_id): character_data})
+
         if eve_market_prices_data is None:
-            # Public information about market prices
-            eve_market_prices_data = interface.get_esi_data("markets/prices/")
-            print("\nEVE market has {} prices".format(len(eve_market_prices_data)))
-            sys.stdout.flush()
+            try:
+                # Public information about market prices
+                eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+                sys.stdout.flush()
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                    eve_market_prices_data = []
+                else:
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
 
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
@@ -268,15 +344,14 @@ def main():
         sys.stdout.flush()
 
         # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
-        corp_ass_names_data = []
         corp_ass_named_ids = eve_esi_tools.get_assets_named_ids(corp_assets_data)
-        if len(corp_ass_named_ids) > 0:
-            # Requires role(s): Director
-            corp_ass_names_data = interface.get_esi_data(
-                "corporations/{}/assets/names/".format(corporation_id),
-                json.dumps(corp_ass_named_ids, indent=0, sort_keys=False))
+        # Requires role(s): Director
+        corp_ass_names_data = interface.get_esi_piece_data(
+            "corporations/{}/assets/names/".format(corporation_id),
+            corp_ass_named_ids)
         print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
         sys.stdout.flush()
+        del corp_ass_named_ids
 
         # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
         foreign_structures_data = {}
@@ -287,7 +362,8 @@ def main():
             for structure_id in foreign_structures_ids:
                 try:
                     universe_structure_data = interface.get_esi_data(
-                        "universe/structures/{}/".format(structure_id))
+                        "universe/structures/{}/".format(structure_id),
+                        fully_trust_cache=True)
                     foreign_structures_data.update({str(structure_id): universe_structure_data})
                 except requests.exceptions.HTTPError as err:
                     status_code = err.response.status_code
@@ -326,7 +402,8 @@ def main():
                 contract_id = c["contract_id"]
                 try:
                     __contract_items = interface.get_esi_data(
-                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id))
+                        "corporations/{}/contracts/{}/items/".format(corporation_id, contract_id),
+                        fully_trust_cache=True)
                     corp_contract_items_len += len(__contract_items)
                     corp_contract_items_data.append({str(contract_id): __contract_items})
                 except requests.exceptions.HTTPError as err:
@@ -338,11 +415,22 @@ def main():
                 except:
                     print(sys.exc_info())
                     raise
+                # Получение сведений о пилотах, вовлечённых в работу с контрактом
+                issuer_id = c["issuer_id"]
+                __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
+                if __issuer_dict is None:
+                    # Public information about a character
+                    issuer_data = interface.get_esi_data(
+                        "characters/{}/".format(issuer_id),
+                        fully_trust_cache=True)
+                    various_characters_data.append({str(issuer_id): issuer_data})
+                sys.stdout.flush()
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)  # сохраняем м.б. многократно
 
         print("\n'{}' corporation has {} items in contracts".format(corporation_name, corp_contract_items_len))
         if len(corp_contract_items_not_found) > 0:
-            print("\n'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
+            print("'{}' corporation has {} contracts without details : {}".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
         sys.stdout.flush()
 
         # Построение дерева ассетов, с узлави в роли станций и систем, и листьями в роли хранящихся
@@ -361,6 +449,7 @@ def main():
             eve_market_prices_data,
             corp_contracts_data,
             corp_contract_items_data,
+            various_characters_data,
             sde_type_ids,
             sde_inv_names,
             sde_inv_items,
@@ -368,6 +457,7 @@ def main():
             corp_assets_tree,
             corp_ass_names_data,
             foreign_structures_data)
+
         corp_blueprints.sort(key=lambda bp: bp["name"])
 
         corps_blueprints.update({str(corporation_id): {
@@ -378,7 +468,7 @@ def main():
 
     eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corps_blueprints", corps_blueprints)
 
-    print("\nBuilding blueprints report...")
+    print("\nBuilding blueprints reports...")
     sys.stdout.flush()
 
     render_html_blueprints.dump_blueprints_into_report(

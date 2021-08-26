@@ -15,7 +15,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py
+>>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_bpos.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
@@ -68,10 +68,12 @@ def main():
 
     # Public information about a character
     character_data = interface.get_esi_data(
-        "characters/{}/".format(character_id))
+        "characters/{}/".format(character_id),
+        fully_trust_cache=True)
     # Public information about a corporation
     corporation_data = interface.get_esi_data(
-        "corporations/{}/".format(character_data["corporation_id"]))
+        "corporations/{}/".format(character_data["corporation_id"]),
+        fully_trust_cache=True)
 
     corporation_id = character_data["corporation_id"]
     corporation_name = corporation_data["name"]
