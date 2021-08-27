@@ -310,20 +310,32 @@ class QDatabaseTools:
         # ---
         # загружаем данные с серверов CCP или загружаем данные из БД
         if reload_esi:
-            # Public information about a character
-            url: str = self.get_character_url(character_id)
-            data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
-            if data:
-                # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
-                if updated_at < self.eve_now:
-                    updated_at = self.eve_now
-                self.dbswagger.insert_or_update_character(character_id, data, updated_at)
-            else:
-                # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
-                data, updated_at = self.dbswagger.select_character(character_id)
-                if not data:
+            try:
+                # Public information about a character
+                url: str = self.get_character_url(character_id)
+                data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
+                if data:
+                    # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
+                    if updated_at < self.eve_now:
+                        updated_at = self.eve_now
+                    self.dbswagger.insert_or_update_character(character_id, data, updated_at)
+                else:
+                    # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
+                    data, updated_at = self.dbswagger.select_character(character_id)
+                    if not data:
+                        return None
+                    reload_esi = False
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 404:
+                    # это нормально, что часть пилотов со временем могут оказаться Not Found
                     return None
-                reload_esi = False
+                else:
+                    # print(sys.exc_info())
+                    raise
+            except:
+                print(sys.exc_info())
+                raise
         else:
             data, updated_at = self.dbswagger.select_character(character_id)
         # сохраняем данные в кеше
@@ -1013,7 +1025,9 @@ class QDatabaseTools:
         context_id_type = journal_data.get('context_id_type')
         if context_id_type and (context_id_type == 'market_transaction_id'):
             # идентификатор пилота, который осуществляет торговые операции на рынке
-            self.actualize_character(journal_data['second_party_id'], need_data=need_data)
+            second_party_id = journal_data['second_party_id']
+            if second_party_id and (second_party_id >= 90000000)):  # м.б. например 'Secure Commerce Commission' = 1000132
+                self.actualize_character(journal_data['second_party_id'], need_data=need_data)
 
     def actualize_corporation_wallet_journals(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
