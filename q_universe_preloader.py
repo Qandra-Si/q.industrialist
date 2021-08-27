@@ -117,6 +117,12 @@ def main():
               format(corporation_name, corp_made_new_transactions))
         sys.stdout.flush()
 
+        # Requires role(s): Accountant, Trader
+        corp_has_active_orders = dbtools.actualize_corporation_orders(corporation_id)
+        print("'{}' corporation has {} active orders\n".
+              format(corporation_name, corp_has_active_orders))
+        sys.stdout.flush()
+
         # Пытаемся отследить и сохраняем связи между чертежами и работами
         dbtools.link_blueprints_and_jobs(corporation_id)
         print("'{}' corporation link blueprints and jobs completed\n".

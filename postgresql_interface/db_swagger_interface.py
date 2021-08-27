@@ -1505,3 +1505,60 @@ class QSwaggerInterface:
              'at': updated_at,
              }
         )
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/orders/
+    # -------------------------------------------------------------------------
+
+    def get_active_corporation_orders(self, corporation_id: int):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " ecor_corporation_id,"
+            " ecor_order_id,"
+            " ecor_type_id,"
+            " ecor_region_id,"
+            " ecor_location_id,"
+            " ecor_range,"
+            " ecor_is_buy_order,"
+            " ecor_price,"
+            " ecor_volume_total,"
+            " ecor_volume_remain,"
+            " ecor_issued,"
+            " ecor_issued_by,"
+            " ecor_min_volume,"
+            " ecor_wallet_division,"
+            " ecor_duration,"
+            " ecor_escrow,"
+            " ecor_updated_at "
+            "FROM esi_corporation_orders "
+            "WHERE ecor_corporation_id={co} AND NOT ecor_history;".
+            format(co=corporation_id)
+        )
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[2], 'corporation_id': row[0]}
+            data_item = {
+                'order_id': row[1],
+                'type_id': row[2],
+                'region_id': row[3],
+                'location_id': row[4],
+                'range': row[5],
+                'price': row[7],
+                'volume_total': row[8],
+                'volume_remain': row[9],
+                'issued': row[10],
+                'issued_by': row[11],
+                'wallet_division': row[13],
+                'duration': row[14],
+                'ext': ext,
+            }
+            if row[6]:
+                data_item.update({'is_buy_order': row[6]})
+            if row[12]:
+                data_item.update({'min_volume': row[12]})
+            if row[15]:
+                data_item.update({'escrow': row[15]})
+            data.append(data_item)
+        return data

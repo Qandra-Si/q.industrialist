@@ -118,6 +118,7 @@ class QDatabaseTools:
         self.__cached_corporation_assets: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.prepare_cache()
 
         self.depth = QEntityDepth()
@@ -127,6 +128,7 @@ class QDatabaseTools:
         """
         del self.depth
 
+        del self.__cached_corporation_orders
         del self.__cached_corporation_industry_jobs
         del self.__cached_corporation_blueprints
         del self.__cached_corporation_assets
@@ -1026,7 +1028,7 @@ class QDatabaseTools:
         if context_id_type and (context_id_type == 'market_transaction_id'):
             # идентификатор пилота, который осуществляет торговые операции на рынке
             second_party_id = journal_data['second_party_id']
-            if second_party_id and (second_party_id >= 90000000)):  # м.б. например 'Secure Commerce Commission' = 1000132
+            if second_party_id and (second_party_id >= 90000000):  # м.б. например 'Secure Commerce Commission' = 1000132
                 self.actualize_character(journal_data['second_party_id'], need_data=need_data)
 
     def actualize_corporation_wallet_journals(self, _corporation_id):
@@ -1144,3 +1146,40 @@ class QDatabaseTools:
             del dbdivisions
 
         return corp_made_new_transactions
+
+    # -------------------------------------------------------------------------
+    # /corporations/{corporation_id}/orders/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_corporation_orders_url(corporation_id: int):
+        # Requires one of the following EVE corporation role(s): Accountant, Trader
+        return "/corporations/{corporation_id}/orders/".format(corporation_id=corporation_id)
+
+    def actualize_corporation_orders(self, _corporation_id):
+        corporation_id: int = int(_corporation_id)
+
+        # Requires role(s): Accountant, Trader
+        url: str = self.get_corporation_orders_url(corporation_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return data
+
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+        self.prepare_corp_cache(
+            self.dbswagger.get_active_corporation_orders(corporation_id),
+            self.__cached_corporation_orders,
+            'order_id',
+            ['issued']
+        )
+
+        # актуализация (добавление и обновление) market order-ов
+        if self.depth.push(url):
+            for order_data in data:
+                pass  # self.actualize_corporation_order(corporation_id, order_data, updated_at)
+            self.depth.pop()
+        self.qidb.commit()
+
+        return data
