@@ -8,6 +8,15 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_ecor_history;
+DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
+DROP INDEX IF EXISTS qi.idx_ecor_issued;
+DROP INDEX IF EXISTS qi.idx_ecor_wallet_division;
+DROP INDEX IF EXISTS qi.idx_ecor_location_id;
+DROP INDEX IF EXISTS qi.idx_ecor_corporation_id;
+DROP INDEX IF EXISTS qi.idx_ecor_pk;
+DROP TABLE IF EXISTS qi.esi_corporation_orders;
+
 DROP INDEX IF EXISTS qi.idx_ecwt_date;
 DROP INDEX IF EXISTS qi.idx_ecwt_journal_ref_id;
 DROP INDEX IF EXISTS qi.idx_ecwt_transaction_id;
@@ -718,6 +727,75 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecwt_date
     ON qi.esi_corporation_wallet_transactions USING btree
     (ecwt_date ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- corporation_orders
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_corporation_orders
+(
+    ecor_corporation_id BIGINT NOT NULL,
+    ecor_order_id BIGINT NOT NULL,
+    ecor_type_id INTEGER NOT NULL,
+    ecor_region_id INTEGER NOT NULL,
+    ecor_location_id BIGINT NOT NULL,
+    ecor_range CHARACTER VARYING(255) NOT NULL,
+    ecor_is_buy_order BOOLEAN,
+    ecor_price DOUBLE PRECISION NOT NULL,
+    ecor_volume_total INTEGER NOT NULL,
+    ecor_volume_remain INTEGER NOT NULL,
+    ecor_issued TIMESTAMP NOT NULL,
+    ecor_issued_by BIGINT NOT NULL,
+    ecor_min_volume INTEGER,
+    ecor_wallet_division INTEGER,
+    ecor_duration INTEGER,
+    ecor_escrow DOUBLE PRECISION,
+    ecor_history BOOLEAN NOT NULL,
+    ecor_created_at TIMESTAMP,
+    ecor_updated_at TIMESTAMP,
+    CONSTRAINT pk_ecor PRIMARY KEY (ecor_corporation_id, ecor_order_id),
+    CONSTRAINT fk_ecor_corporation_id FOREIGN KEY (ecor_corporation_id)
+        REFERENCES qi.esi_corporations(eco_corporation_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ecor_pk
+    ON qi.esi_corporation_orders USING btree
+    (ecor_corporation_id ASC NULLS LAST, ecor_order_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_corporation_id
+    ON qi.esi_corporation_orders USING btree
+    (ecor_corporation_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_location_id
+    ON qi.esi_corporation_orders USING btree
+    (ecor_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_wallet_division
+    ON qi.esi_corporation_orders USING btree
+    (ecor_wallet_division ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_issued
+    ON qi.esi_corporation_orders USING btree
+    (ecor_issued ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_issued_by
+    ON qi.esi_corporation_orders USING btree
+    (ecor_issued_by ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_history
+    ON qi.esi_corporation_orders USING btree
+    (ecor_history ASC NULLS LAST)
 TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов

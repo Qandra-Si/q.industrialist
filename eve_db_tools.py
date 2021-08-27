@@ -1077,6 +1077,10 @@ class QDatabaseTools:
             division=division
         )
 
+    def actualize_corporation_wallet_transaction_details(self, transaction_data, need_data=False):
+        location_id: int = int(transaction_data['location_id'])
+        self.actualize_station_or_structure(location_id, need_data=need_data)
+
     def actualize_corporation_wallet_transactions(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
         corp_made_new_transactions: int = 0
@@ -1107,6 +1111,7 @@ class QDatabaseTools:
             for transactions_data in data:
                 if transactions_data['transaction_id'] > last_known_id:
                     corp_made_new_transactions += 1
+                    self.actualize_corporation_wallet_transaction_details(transactions_data, False)
                     self.dbswagger.insert_corporation_wallet_transactions(
                         transactions_data,
                         corporation_id,
