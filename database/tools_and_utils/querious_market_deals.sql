@@ -41,7 +41,7 @@ from (
         left outer join qi.esi_characters p on (j.ecwj_second_party_id = p.ech_character_id)
     where
       ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
-          ecwj_second_party_id in (2116129465,2116746261) and -- Qandra Si, Kekuit Void
+          ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
           ecwj_division = 1) or -- главный кошелёк
         ( ecwj_corporation_id in (98553333) and -- R Strike
           ecwj_second_party_id in (95858524) and -- Xatul' Madan
