@@ -1,11 +1,11 @@
 select
-  nm.sden_name as item_name,
+  tid.sdet_type_name as item_name,
   jt.type_id,
   jt.wk_volume,
   null as jita_price, -- нужна подгрузка рыночных цен
-  null as import_price, -- нужно загрузить в БД сведения о параметрах модулей
+  round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price,
   null as "3-fkcz price", -- нужна подгрузка маркета
-  so.avg_sell_price as "our price", -- нужна подгрузка ордеров
+  so.avg_sell_price as "our price",
   null as markup,
   null as "+10% price",
   null as "+10% profit"
@@ -40,7 +40,7 @@ from (
     where jt.deal = 'sell'
     group by 1
   ) jt
-  left outer join qi.eve_sde_names nm on (nm.sden_category = 1 and jt.type_id = nm.sden_id)
+  left outer join qi.eve_sde_type_ids tid on (jt.type_id = tid.sdet_type_id)
   left outer join (
     select
       o.ecor_type_id as type_id,
