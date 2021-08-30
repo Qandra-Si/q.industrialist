@@ -742,7 +742,7 @@ CREATE TABLE qi.esi_corporation_orders
     ecor_region_id INTEGER NOT NULL,
     ecor_location_id BIGINT NOT NULL,
     ecor_range CHARACTER VARYING(255) NOT NULL,
-    ecor_is_buy_order BOOLEAN,
+    ecor_is_buy_order BOOLEAN NOT NULL,
     ecor_price DOUBLE PRECISION NOT NULL,
     ecor_volume_total INTEGER NOT NULL,
     ecor_volume_remain INTEGER NOT NULL,
