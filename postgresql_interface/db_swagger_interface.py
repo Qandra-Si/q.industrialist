@@ -1510,6 +1510,90 @@ class QSwaggerInterface:
     # /corporations/{corporation_id}/orders/
     # -------------------------------------------------------------------------
 
+    def insert_or_update_corporation_orders(self, data, corporation_id, history, updated_at):
+        """ inserts corporation order data into database
+
+        :param data: corporation order data
+        """
+        # { "duration": 90,
+        #   "issued": "2021-08-17T21:36:37Z",
+        #   "issued_by": 2116129465,
+        #   "location_id": 1036927076065,
+        #   "order_id": 6061476548,
+        #   "price": 28970000.0,
+        #   "range": "region",
+        #   "region_id": 10000050,
+        #   "type_id": 28756,
+        #   "volume_remain": 4,
+        #   "volume_total": 4,
+        #   "wallet_division": 1
+        # }
+        self.db.execute(
+            "INSERT INTO esi_corporation_orders("
+            " ecor_corporation_id,"
+            " ecor_order_id,"
+            " ecor_type_id,"
+            " ecor_region_id,"
+            " ecor_location_id,"
+            " ecor_range,"
+            " ecor_is_buy_order,"
+            " ecor_price,"
+            " ecor_volume_total,"
+            " ecor_volume_remain,"
+            " ecor_issued,"
+            " ecor_issued_by,"
+            " ecor_min_volume,"
+            " ecor_wallet_division,"
+            " ecor_duration,"
+            " ecor_escrow,"
+            " ecor_history,"
+            " ecor_created_at,"
+            " ecor_updated_at) "
+            "VALUES ("
+            " %(co)s,"
+            " %(id)s,"
+            " %(t)s,"
+            " %(rid)s,"
+            " %(loc)s,"
+            " %(r)s,"
+            " %(b)s,"
+            " %(p)s,"
+            " %(vt)s,"
+            " %(vr)s,"
+            " %(dt)s,"
+            " %(who)s,"
+            " %(mv)s,"
+            " %(wd)s,"
+            " %(d)s,"
+            " %(e)s,"
+            " %(h)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ecor DO UPDATE SET"
+            " ecor_price=%(p)s,"
+            " ecor_volume_remain=%(vr)s,"
+            " ecor_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'co': corporation_id,
+             'id': data['order_id'],
+             't': data['type_id'],
+             'rid': data['region_id'],
+             'loc': data['location_id'],
+             'r': data['range'],
+             'b': data.get('is_buy_order', None),
+             'p': data['price'],
+             'vt': data['volume_total'],
+             'vr': data['volume_remain'],
+             'dt': data['issued'],
+             'who': data['issued_by'],
+             'mv': data.get('min_volume', None),
+             'wd': data['wallet_division'],
+             'd': data['duration'],
+             'e': data.get('escrow', None),
+             'h': history,
+             'at': updated_at,
+             }
+        )
+
     def get_active_corporation_orders(self, corporation_id: int):
         rows = self.db.select_all_rows(
             "SELECT"
@@ -1538,7 +1622,7 @@ class QSwaggerInterface:
             return []
         data = []
         for row in rows:
-            ext = {'updated_at': row[2], 'corporation_id': row[0]}
+            ext = {'updated_at': row[16], 'corporation_id': row[0]}
             data_item = {
                 'order_id': row[1],
                 'type_id': row[2],

@@ -95,6 +95,7 @@ class QDatabaseTools:
     corporation_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
                                   'material_efficiency', 'runs']
     corporation_industry_job_diff = ['status']
+    corporation_industry_order_diff = ['price', 'volume_remain']
 
     def __init__(self, module_name, debug):
         """ constructor
@@ -293,6 +294,10 @@ class QDatabaseTools:
 
     def actualize_character(self, _character_id, need_data=False):
         character_id: int = int(_character_id)
+        # откидываем  "пилотов" типа 'Secure Commerce Commission' = 1000132
+        # или всякую непись 'Areyara Kogachi' = 3004093
+        if character_id < 90000000:
+            return None
         in_cache = self.__cached_characters.get(character_id)
         # 1. либо данных нет в кеше
         # 2. если данные с таким id существуют, но внешнему коду не интересны сами данные, то выход выход
@@ -1028,7 +1033,7 @@ class QDatabaseTools:
         if context_id_type and (context_id_type == 'market_transaction_id'):
             # идентификатор пилота, который осуществляет торговые операции на рынке
             second_party_id = journal_data['second_party_id']
-            if second_party_id and (second_party_id >= 90000000):  # м.б. например 'Secure Commerce Commission' = 1000132
+            if second_party_id:
                 self.actualize_character(journal_data['second_party_id'], need_data=need_data)
 
     def actualize_corporation_wallet_journals(self, _corporation_id):
@@ -1154,10 +1159,49 @@ class QDatabaseTools:
     @staticmethod
     def get_corporation_orders_url(corporation_id: int):
         # Requires one of the following EVE corporation role(s): Accountant, Trader
-        return "/corporations/{corporation_id}/orders/".format(corporation_id=corporation_id)
+        return "corporations/{corporation_id}/orders/".format(corporation_id=corporation_id)
+
+    def actualize_corporation_order_item_details(self, order_data, need_data=False):
+        #self.actualize_station_or_structure(order_data['facility_id'], need_data=need_data)
+        #self.actualize_character(order_data['installer_id'], need_data=need_data)
+        #completed_character_id = order_data.get('completed_character_id')
+        #if completed_character_id:
+        #    self.actualize_character(order_data['completed_character_id'], need_data=need_data)
+        return
+
+    def actualize_corporation_order_item(self, corporation_id: int, order_data, history, updated_at):
+        order_id: int = int(order_data['order_id'])
+        corp_cache = self.get_corp_cache(self.__cached_corporation_orders, corporation_id)
+        in_cache = corp_cache.get(order_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
+        #    если данные изменились, то надо также обновить их в БД
+        data_equal: bool = False
+        if not in_cache:
+            pass
+        elif in_cache.obj:
+            data_equal = in_cache.is_obj_equal_by_keys(order_data, self.corporation_industry_order_diff)
+        # ---
+        # из соображений о том, что market ордера может читать только пилот с ролью корпорации,
+        # выполняем обновление сведений как о структурах и станциях, так и у частниках торговли, а в случае
+        # необходимости подгружаем данные из БД
+        self.actualize_corporation_order_item_details(order_data, need_data=not data_equal)
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
+        self.dbswagger.insert_or_update_corporation_orders(order_data, corporation_id, history, updated_at)
+        # сохраняем данные в кеше
+        if not in_cache:
+            corp_cache[order_id] = QEntity(True, True, order_data, updated_at)
+            in_cache = corp_cache.get(order_id)
+            in_cache.store_ext({'just_added': True})  # добавлен в кеш и в БД (ранее отсутствовал)
+        else:
+            in_cache.store(True, True, order_data, updated_at)
+            in_cache.store_ext({'changed': True})  # был в кеше, а значит и в БД (обновлён и там и тут)
 
     def actualize_corporation_orders(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
+        corp_has_active_orders: int = 0
 
         # Requires role(s): Accountant, Trader
         url: str = self.get_corporation_orders_url(corporation_id)
@@ -1165,7 +1209,7 @@ class QDatabaseTools:
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return data
+            return corp_has_active_orders
 
         # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         self.prepare_corp_cache(
@@ -1178,8 +1222,11 @@ class QDatabaseTools:
         # актуализация (добавление и обновление) market order-ов
         if self.depth.push(url):
             for order_data in data:
-                pass  # self.actualize_corporation_order(corporation_id, order_data, updated_at)
+                corp_has_active_orders += 1
+                self.actualize_corporation_order_item(corporation_id, order_data, False, updated_at)
             self.depth.pop()
         self.qidb.commit()
 
-        return data
+        del data
+
+        return corp_has_active_orders
