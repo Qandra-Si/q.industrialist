@@ -15,6 +15,10 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+DROP INDEX IF EXISTS qi.idx_sdet_market_group_id;
+DROP INDEX IF EXISTS qi.idx_sdet_pk;
+DROP TABLE IF EXISTS qi.eve_sde_type_ids;
+
 DROP INDEX IF EXISTS qi.idx_sdebm_fk;
 DROP TABLE IF EXISTS qi.eve_sde_blueprint_materials;
 DROP INDEX IF EXISTS qi.idx_sdebp_fk;
@@ -133,6 +137,40 @@ TABLESPACE pg_default;
 ALTER TABLE qi.eve_sde_blueprints OWNER TO qi_user;
 ALTER TABLE qi.eve_sde_blueprint_products OWNER TO qi_user;
 ALTER TABLE qi.eve_sde_blueprint_materials OWNER TO qi_user;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (typeIDs)
+-- сведения о параметрах типах присутствующих в игре элементов, из typeIDs.yaml
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_type_ids
+(
+    sdet_type_id INTEGER NOT NULL,
+    sdet_type_name CHARACTER VARYING(255),
+    sdet_volume DOUBLE PRECISION,
+    sdet_capacity DOUBLE PRECISION,
+    sdet_base_price BIGINT,
+    sdet_published BOOLEAN,
+    sdet_market_group_id INTEGER,
+    sdet_meta_group_id SMALLINT,
+    sdet_icon_id INTEGER,
+    -- sdet_group_id INTEGER,
+    -- sdet_portion_size INTEGER,
+    CONSTRAINT pk_sdet PRIMARY KEY (sdet_type_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_type_ids OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdet_pk
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdet_market_group_id
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_market_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
 -- получаем справку в конце выполнения всех запросов

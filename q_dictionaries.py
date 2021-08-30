@@ -29,6 +29,7 @@ def main():
     workspace_cache_files_dir = None
     category = None
     blueprints = None
+    type_ids = None
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "cache_dir=", "category=", "blueprints"])
     except getopt.GetoptError:
@@ -44,6 +45,8 @@ def main():
                 category = int(arg)
             elif opt in ("--blueprints"):
                 blueprints = True
+            elif opt in ("--type_ids"):
+                type_ids = True
         if workspace_cache_files_dir is None:
             exit_or_wrong_getopt = 0
     if not (exit_or_wrong_getopt is None):
@@ -126,6 +129,12 @@ def main():
         qidbdics.clean_blueprints()
         qidbdics.actualize_blueprints(sde_bp_materials)
         del sde_bp_materials
+
+    if (type_ids is None) or type_ids:
+        sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
+        qidbdics.clean_type_ids()
+        qidbdics.actualize_type_ids(sde_type_ids)
+        del sde_type_ids
 
     del qidbdics
     del qidb

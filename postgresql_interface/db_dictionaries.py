@@ -52,9 +52,9 @@ class QDictionaries:
 
     def actualize_names(self, items, category, name_tag):
         if isinstance(items, dict):
-            # очиска таблица по указанной категории
+            # очиска таблицы по указанной категории
             self.clean_names(category)
-            # заполнение таблица по указанной категории
+            # заполнение таблицы по указанной категории
             items_keys = items.keys()
             for itm_key in items_keys:
                 id = int(itm_key)
@@ -191,3 +191,47 @@ class QDictionaries:
                     products = reaction.get("products")
                     time = reaction["time"]
                     self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
+
+    def clean_type_ids(self):
+        self.db.execute("DELETE FROM eve_sde_type_ids;")
+
+    def insert_type_id(self, type_id: int, type_name: str, type_dict):
+        self.db.execute(
+            "INSERT INTO eve_sde_type_ids("
+            " sdet_type_id,"
+            " sdet_type_name,"
+            " sdet_volume,"
+            " sdet_capacity,"
+            " sdet_base_price,"
+            " sdet_published,"
+            " sdet_market_group_id,"
+            " sdet_meta_group_id,"
+            " sdet_icon_id) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s);",
+            type_id,
+            type_name,
+            type_dict.get('volume', None),
+            type_dict.get('capacity', None),
+            type_dict.get('basePrice', None),
+            type_dict.get('published', None),
+            type_dict.get('marketGroupID', None),
+            type_dict.get('metaGroupID', None),
+            type_dict.get('iconID', None)
+        )
+
+    def actualize_type_ids(self, sde_type_ids):
+        # заполнение таблицы typeIDs
+        items_keys = sde_type_ids.keys()
+        for itm_key in items_keys:
+            type_id: int = int(itm_key)
+            type_dict = sde_type_ids[str(itm_key)]
+            # предполагаем следущий справочник:
+            # { "0": { "key1": "val1", "name": { "en": "Shafrak IX - Moon 1" } },
+            #   "1": { "key2": 5, "name": { "en": "Vaini - Star" } },
+            #   "2": { "name": { "ru": "Шафрак" } },
+            #   "3": { "key2": 10 }
+            # }
+            type_name = None
+            if ("name" in type_dict) and ("en" in type_dict["name"]):
+                type_name = type_dict["name"]["en"]
+            self.insert_type_id(type_id, type_name, type_dict)
