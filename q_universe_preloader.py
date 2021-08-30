@@ -118,9 +118,13 @@ def main():
         sys.stdout.flush()
 
         # Requires role(s): Accountant, Trader
-        corp_has_active_orders = dbtools.actualize_corporation_orders(corporation_id)
-        print("'{}' corporation has {} active orders\n".
-              format(corporation_name, corp_has_active_orders))
+        corp_orders_stat = dbtools.actualize_corporation_orders(corporation_id)
+        if corp_orders_stat is None:
+            print("'{}' corporation has no update in orders\n".
+                  format(corporation_name))
+        else:
+            print("'{}' corporation has {} active and {} finished orders\n".
+                  format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
         sys.stdout.flush()
 
         # Пытаемся отследить и сохраняем связи между чертежами и работами

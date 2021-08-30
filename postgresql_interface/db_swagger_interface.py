@@ -1,5 +1,6 @@
-﻿# -*- encoding: utf-8 -*-
+# -*- encoding: utf-8 -*-
 import pytz
+import typing
 
 
 class QSwaggerInterface:
@@ -1572,6 +1573,7 @@ class QSwaggerInterface:
             "ON CONFLICT ON CONSTRAINT pk_ecor DO UPDATE SET"
             " ecor_price=%(p)s,"
             " ecor_volume_remain=%(vr)s,"
+            " ecor_history=%(h)s,"
             " ecor_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'co': corporation_id,
              'id': data['order_id'],
@@ -1645,4 +1647,17 @@ class QSwaggerInterface:
             if row[15]:
                 data_item.update({'escrow': row[15]})
             data.append(data_item)
+        return data
+
+    def get_absent_corporation_orders_history(self, corporation_id: int, present_ids: typing.List[int]):
+        rows = self.db.select_all_rows(
+            "SELECT id FROM (SELECT UNNEST(ARRAY{ids}) as id) e "
+            "WHERE e.id NOT IN (SELECT ecor_order_id FROM esi_corporation_orders WHERE ecor_corporation_id={co} AND ecor_history);".
+            format(co=corporation_id, ids=present_ids)
+        )
+        data: typing.List[int] = []
+        if rows is None:
+            return data
+        for row in rows:
+            data.append(row[0])
         return data

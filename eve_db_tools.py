@@ -1161,13 +1161,14 @@ class QDatabaseTools:
         # Requires one of the following EVE corporation role(s): Accountant, Trader
         return "corporations/{corporation_id}/orders/".format(corporation_id=corporation_id)
 
+    @staticmethod
+    def get_corporation_orders_history_url(corporation_id: int):
+        # Requires one of the following EVE corporation role(s): Accountant, Trader
+        return "corporations/{corporation_id}/orders/history/".format(corporation_id=corporation_id)
+
     def actualize_corporation_order_item_details(self, order_data, need_data=False):
         #self.actualize_station_or_structure(order_data['facility_id'], need_data=need_data)
-        #self.actualize_character(order_data['installer_id'], need_data=need_data)
-        #completed_character_id = order_data.get('completed_character_id')
-        #if completed_character_id:
-        #    self.actualize_character(order_data['completed_character_id'], need_data=need_data)
-        return
+        self.actualize_character(order_data['issued_by'], need_data=need_data)
 
     def actualize_corporation_order_item(self, corporation_id: int, order_data, history, updated_at):
         order_id: int = int(order_data['order_id'])
@@ -1182,13 +1183,17 @@ class QDatabaseTools:
         elif in_cache.obj:
             data_equal = in_cache.is_obj_equal_by_keys(order_data, self.corporation_industry_order_diff)
         # ---
+        # если все позиции в order-е закрыты, то откуда бы ни пришли данные, они должны стать архивными
+        if (order_data['volume_remain'] == 0):
+            data_equal = False
+            history = True
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
         # из соображений о том, что market ордера может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, так и у частниках торговли, а в случае
         # необходимости подгружаем данные из БД
         self.actualize_corporation_order_item_details(order_data, need_data=not data_equal)
-        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
-        if data_equal:
-            return
         self.dbswagger.insert_or_update_corporation_orders(order_data, corporation_id, history, updated_at)
         # сохраняем данные в кеше
         if not in_cache:
@@ -1202,31 +1207,69 @@ class QDatabaseTools:
     def actualize_corporation_orders(self, _corporation_id):
         corporation_id: int = int(_corporation_id)
         corp_has_active_orders: int = 0
+        corp_has_finished_orders: int = 0
 
         # Requires role(s): Accountant, Trader
-        url: str = self.get_corporation_orders_url(corporation_id)
-        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        active_url: str = self.get_corporation_orders_url(corporation_id)
+        active_data, active_updated_at, active_is_updated = self.load_from_esi_paged_data(active_url)
+        history_url: str = self.get_corporation_orders_history_url(corporation_id)
+        history_data, history_updated_at, history_is_updated = self.load_from_esi_paged_data(history_url)
         if self.esiswagger.offline_mode:
-            updated_at = self.eve_now
-        elif not is_updated:
-            return corp_has_active_orders
+            active_updated_at = self.eve_now
+            history_updated_at = self.eve_now
+            active_is_updated = True
+            history_is_updated = True
+        elif not active_is_updated and not history_is_updated:
+            return None
 
-        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
-        self.prepare_corp_cache(
-            self.dbswagger.get_active_corporation_orders(corporation_id),
-            self.__cached_corporation_orders,
-            'order_id',
-            ['issued']
-        )
+        if active_is_updated:
+            # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+            self.prepare_corp_cache(
+                self.dbswagger.get_active_corporation_orders(corporation_id),
+                self.__cached_corporation_orders,
+                'order_id',
+                ['issued']
+            )
 
-        # актуализация (добавление и обновление) market order-ов
-        if self.depth.push(url):
-            for order_data in data:
-                corp_has_active_orders += 1
-                self.actualize_corporation_order_item(corporation_id, order_data, False, updated_at)
-            self.depth.pop()
-        self.qidb.commit()
+            # актуализация (добавление и обновление) market order-ов
+            if self.depth.push(active_url):
+                for order_data in active_data:
+                    corp_has_active_orders += 1
+                    self.actualize_corporation_order_item(corporation_id, order_data, False, active_updated_at)
+                self.depth.pop()
+            self.qidb.commit()
 
-        del data
+            # актуализировать ЗДЕСЬ устаревшие market order-а, которые активный в БД, но отсутствуют в esi НЕЛЬЗЯ!
+            # поcкольку отсутствует актуальная информация о market order-е (м.б. изменено volume_remain, а м.б. изменён price)
+            # ...заказчиваем сохранение (обновление) актуальных market order-ов
 
-        return corp_has_active_orders
+        if history_is_updated:
+            # составляем список history market order-ов, ищем те, что отсутствуют в БД
+            # из предположения, что они были были размещены и быстро выполнены, и сразу попали в history, минуя active
+            history_order_ids: typing.List[int] = []
+            for order_data in history_data:
+                order_id: int = int(order_data['order_id'])
+                history_order_ids.append(order_id)
+
+            # обращаемся в БД за списком тех market order-ов, которые отсутствуют в БД
+            absent_db_ids: typing.List[int] = self.dbswagger.get_absent_corporation_orders_history(
+                corporation_id,
+                history_order_ids)
+
+            # поиск в esi-списке тех market order-ов, которых нет среди history в БД
+            if self.depth.push(history_url):
+                for order_id in absent_db_ids:
+                    order_data = next((o for o in history_data if o['order_id'] == order_id), None)
+                    if order_data:
+                        corp_has_finished_orders += 1
+                        self.actualize_corporation_order_item(corporation_id, order_data, True, history_updated_at)
+                self.depth.pop()
+            self.qidb.commit()
+
+            del absent_db_ids
+            del history_order_ids
+
+        del history_data
+        del active_data
+
+        return corp_has_active_orders, corp_has_finished_orders
