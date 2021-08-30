@@ -1167,7 +1167,7 @@ class QDatabaseTools:
         return "corporations/{corporation_id}/orders/history/".format(corporation_id=corporation_id)
 
     def actualize_corporation_order_item_details(self, order_data, need_data=False):
-        #self.actualize_station_or_structure(order_data['facility_id'], need_data=need_data)
+        self.actualize_station_or_structure(order_data['location_id'], need_data=need_data)
         self.actualize_character(order_data['issued_by'], need_data=need_data)
 
     def actualize_corporation_order_item(self, corporation_id: int, order_data, history, updated_at):
@@ -1184,9 +1184,9 @@ class QDatabaseTools:
             data_equal = in_cache.is_obj_equal_by_keys(order_data, self.corporation_industry_order_diff)
         # ---
         # если все позиции в order-е закрыты, то откуда бы ни пришли данные, они должны стать архивными
-        if (order_data['volume_remain'] == 0):
-            data_equal = False
-            history = True
+        #if (order_data['volume_remain'] == 0):
+        #    data_equal = False
+        #    history = True
         # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
         if data_equal:
             return

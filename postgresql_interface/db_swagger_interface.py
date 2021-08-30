@@ -1581,7 +1581,7 @@ class QSwaggerInterface:
              'rid': data['region_id'],
              'loc': data['location_id'],
              'r': data['range'],
-             'b': data.get('is_buy_order', None),
+             'b': data.get('is_buy_order', False),  # esi все buy выдаёт как True, а все sell как None 
              'p': data['price'],
              'vt': data['volume_total'],
              'vr': data['volume_remain'],
