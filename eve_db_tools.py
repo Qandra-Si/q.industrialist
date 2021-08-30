@@ -1243,7 +1243,7 @@ class QDatabaseTools:
             # поcкольку отсутствует актуальная информация о market order-е (м.б. изменено volume_remain, а м.б. изменён price)
             # ...заказчиваем сохранение (обновление) актуальных market order-ов
 
-        if history_is_updated:
+        if history_is_updated and history_data:
             # составляем список history market order-ов, ищем те, что отсутствуют в БД
             # из предположения, что они были были размещены и быстро выполнены, и сразу попали в history, минуя active
             history_order_ids: typing.List[int] = []
