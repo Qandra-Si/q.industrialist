@@ -1,12 +1,17 @@
 select
   tid.sdet_type_name as item_name,
   jt.type_id,
-  jt.wk_volume,
+  round(jt.wk_volume::numeric, 1) as wk_volume,
   case
     when mp.emp_average_price is null or (mp.emp_average_price < 0.001) then mp.emp_adjusted_price
     else mp.emp_average_price
   end as universe_price,
-  null as jita_price, -- нужна подгрузка рыночных цен
+  ( select emrh_average
+    from qi.esi_markets_region_history
+    where emrh_region_id=10000002 and jt.type_id=emrh_type_id -- The Forge
+    order by emrh_date desc
+    limit 1
+  ) as jita_price,
   round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price, -- нужно загрузить в БД сведения о параметрах модулей
   null as "3-fkcz price", -- нужна подгрузка маркета
   so.avg_sell_price as "our price", -- нужна подгрузка ордеров
