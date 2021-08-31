@@ -1751,7 +1751,8 @@ class QSwaggerInterface:
             "  WHERE emrh_region_id = %s"
             "  GROUP BY emrh_type_id"
             " ) mrh ON (mrh.type_id = sdet_type_id) "
-            "WHERE sdet_type_id in (40556, 2195) AND"
+            "WHERE"
+            #debug:" sdet_type_id in (40556, 2195) AND"
             " sdet_published AND"
             " sdet_market_group_id IS NOT NULL;",
             region_id

@@ -1370,7 +1370,7 @@ class QDatabaseTools:
         market_region_history_updates = None
         for _type_id in type_ids:
             type_id: int = int(_type_id[0])
-            last_known_date = _type_id[1].replace(tzinfo=pytz.UTC)
+            last_known_date = None if _type_id[1] is None else _type_id[1]  # datetime.date(2020, 07, 01)
             url: str = self.get_markets_region_history_url(region_id, type_id)
             data, updated_at, is_updated = self.load_from_esi(url)
             if data is None:
@@ -1390,8 +1390,8 @@ class QDatabaseTools:
 
             # актуализация (добавление) narket цен в БД
             for market_data in data:
-                market_date = market_data['date'].replace(tzinfo=pytz.UTC)
-                if market_date > last_known_date:
+                market_date = datetime.datetime.strptime(market_data['date'], '%Y-%m-%d').date()  # '2020-07-01'
+                if last_known_date is None or (market_date > last_known_date):
                     # подсчёт статистики
                     if market_region_history_updates is None:
                         market_region_history_updates = 1

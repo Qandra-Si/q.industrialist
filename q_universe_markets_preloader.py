@@ -68,9 +68,9 @@ def main():
             first_time = False
 
             # Requires: public access
-            markets_prices_updated = dbtools.actualize_markets_prices()
-            print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
-            sys.stdout.flush()
+            #markets_prices_updated = dbtools.actualize_markets_prices()
+            #print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
+            #sys.stdout.flush()
 
             # Requires: public access
             if dbtools.is_market_regions_history_refreshed():
@@ -89,4 +89,4 @@ def main():
 if __name__ == "__main__":
     mem = memory_usage(main, max_usage=True)
     print("Memory used: {}Mb".format(mem))
-    main()  # 121.4Mb
+    #main()  # 75.4Mb, 0m2.712s
