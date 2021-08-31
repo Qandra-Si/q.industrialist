@@ -1718,8 +1718,8 @@ class QSwaggerInterface:
             " emp_average_price=%(av)s,"
             " emp_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'t': data['type_id'],
-             'mv': data.get('adjusted_price', None),
-             'mv': data.get('average_price', None),
+             'aj': data.get('adjusted_price', None),
+             'av': data.get('average_price', None),
              'at': updated_at,
              }
         )

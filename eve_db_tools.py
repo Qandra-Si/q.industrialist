@@ -1329,4 +1329,4 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.enable_debug()
 
-        del markets_prices_updated
+        return markets_prices_updated

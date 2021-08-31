@@ -76,6 +76,14 @@ def main():
                   format(universe_structures_new, len(universe_structures_data)))
             sys.stdout.flush()
 
+            # Requires: public access
+            markets_prices_updated = dbtools.actualize_markets_prices()
+            if markets_prices_updated is None:
+                print("Markets prices has no updates\n")
+            else:
+                print("Markets prices has {} updates\n".format(markets_prices_updated))
+            sys.stdout.flush()
+            
         # приступаем к загрузке корпоративных данных
 
         # Requires role(s): Station_Manager
@@ -125,14 +133,6 @@ def main():
         else:
             print("'{}' corporation has {} active and {} finished orders\n".
                   format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
-        sys.stdout.flush()
-
-        # Requires: public access
-        markets_prices_updated = dbtools.actualize_markets_prices()
-        if markets_prices_updated is None:
-            print("Markets prices has no updates\n")
-        else:
-            print("Markets prices has {} updates\n".format(markets_prices_updated))
         sys.stdout.flush()
 
         # Пытаемся отследить и сохраняем связи между чертежами и работами
