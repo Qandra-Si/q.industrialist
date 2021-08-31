@@ -87,11 +87,12 @@ def main():
             sys.stdout.flush()
 
             # Requires: public access
-            for region in q_industrialist_settings.g_market_regions:
-                market_region_history_updates = dbtools.actualize_market_region_history(region)
-                print("Region '{}' has {} market history updates\n".
-                      format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
-                sys.stdout.flush()
+            if dbtools.is_market_regions_history_refreshed():
+                for region in q_industrialist_settings.g_market_regions:
+                    market_region_history_updates = dbtools.actualize_market_region_history(region)
+                    print("Region '{}' has {} market history updates\n".
+                          format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
+                    sys.stdout.flush()
 
         # приступаем к загрузке корпоративных данных
 

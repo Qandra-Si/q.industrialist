@@ -1349,6 +1349,16 @@ class QDatabaseTools:
         # Requires: public access
         return "markets/{region_id}/history/?type_id={type_id}".format(region_id=region_id, type_id=type_id)
 
+    def is_market_regions_history_refreshed(self):
+        if self.esiswagger.offline_mode:
+            return False
+        else:
+            url: str = self.get_markets_region_history_url(10000002, 34)  # 'The Forge' = 10000002, 'Tritanium' = 34
+            data, updated_at, is_updated = self.load_from_esi(url)
+            if data:
+                del data
+            return is_updated
+
     def actualize_market_region_history(self, region: str):
         region_id = self.dbswagger.select_region_name_by_id(region)  # 'The Forge' = 10000002
         if region_id is None:
