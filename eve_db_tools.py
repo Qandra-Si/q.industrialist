@@ -597,7 +597,7 @@ class QDatabaseTools:
 
         updated_at = self.esiswagger.is_last_data_updated
         if not updated_at:
-            return data, 0
+            return None
 
         data_new = self.dbswagger.get_absent_universe_structure_ids(data)
         data_new = [id[0] for id in data_new]
@@ -609,7 +609,13 @@ class QDatabaseTools:
             self.actualize_universe_structure(structure_id, need_data=False)
         self.qidb.commit()
 
-        return data, len(data_new)
+        data_len: int = len(data)
+        data_new_len: int = len(data_new)
+
+        del data_new
+        del data
+
+        return data_len, data_new_len
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/structures/
