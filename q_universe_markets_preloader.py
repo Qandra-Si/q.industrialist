@@ -28,7 +28,7 @@ import sys
 
 import eve_db_tools
 import console_app
-from memory_profiler import memory_usage
+#from memory_profiler import memory_usage
 
 import q_industrialist_settings
 
@@ -87,6 +87,8 @@ def main():
 
 
 if __name__ == "__main__":
-    mem = memory_usage(main, max_usage=True)
-    print("Memory used: {}Mb".format(mem))
-    #main()  # 75.4Mb, 0m2.712s
+    # оставить либо отладочный вариант:
+    #mem = memory_usage(main, max_usage=True)
+    #print("Memory used: {}Mb".format(mem))
+    # либо оставить рабочий вариант
+    main()  # 75.4Mb, 0m2.712s
