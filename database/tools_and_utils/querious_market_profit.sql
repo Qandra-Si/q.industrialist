@@ -2,10 +2,14 @@ select
   tid.sdet_type_name as item_name,
   jt.type_id,
   jt.wk_volume,
+  case
+    when mp.emp_average_price is null or (mp.emp_average_price < 0.001) then mp.emp_adjusted_price
+    else mp.emp_average_price
+  end as universe_price,
   null as jita_price, -- нужна подгрузка рыночных цен
-  round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price,
+  round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price, -- нужно загрузить в БД сведения о параметрах модулей
   null as "3-fkcz price", -- нужна подгрузка маркета
-  so.avg_sell_price as "our price",
+  so.avg_sell_price as "our price", -- нужна подгрузка ордеров
   null as markup,
   null as "+10% price",
   null as "+10% profit"
@@ -66,4 +70,5 @@ from (
       ) o
     order by 1
   ) so on (jt.type_id = so.type_id)
+  left outer join qi.esi_markets_prices mp on (jt.type_id = mp.emp_type_id)
 order by 1
