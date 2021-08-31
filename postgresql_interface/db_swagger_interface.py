@@ -1739,11 +1739,22 @@ class QSwaggerInterface:
             return None
         return row[0]
 
-    def select_market_type_ids(self):
+    def select_market_type_ids(self, region_id: int):
         rows = self.db.select_all_rows(
-            "SELECT sdet_type_id "
-            "FROM eve_sde_type_ids "
-            "WHERE sdet_published and sdet_market_group_id is not null;",
+            "SELECT"
+            " sdet_type_id,"
+            " mrh.last_date "
+            "FROM eve_sde_type_ids"
+            " LEFT OUTER JOIN ("
+            "  SELECT emrh_type_id AS type_id, MAX(emrh_date) AS last_date"
+            "  FROM esi_markets_region_history"
+            "  WHERE emrh_region_id = %s"
+            "  GROUP BY emrh_type_id"
+            " ) mrh ON (mrh.type_id = sdet_type_id) "
+            "WHERE sdet_type_id in (40556, 2195) AND"
+            " sdet_published AND"
+            " sdet_market_group_id IS NOT NULL;",
+            region_id
         )
         if rows is None:
             return None

@@ -8,7 +8,6 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
-DROP INDEX IF EXISTS qi.idx_emrh_type_date;
 DROP INDEX IF EXISTS qi.idx_emrh_pk;
 DROP TABLE IF EXISTS qi.esi_markets_region_history;
 
@@ -848,11 +847,6 @@ TABLESPACE pg_default;
 CREATE UNIQUE INDEX idx_emrh_pk
     ON qi.esi_markets_region_history USING btree
     (emrh_region_id ASC NULLS LAST, emrh_type_id ASC NULLS LAST, emrh_date ASC NULLS LAST)
-TABLESPACE pg_default;
-
-CREATE INDEX idx_emrh_type_date
-    ON qi.esi_markets_region_history USING btree
-    (emrh_type_id ASC NULLS LAST, emrh_date ASC NULLS LAST)
 TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов
