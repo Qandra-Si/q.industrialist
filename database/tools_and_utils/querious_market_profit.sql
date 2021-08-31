@@ -11,7 +11,7 @@ select
     where emrh_region_id=10000002 and jt.type_id=emrh_type_id -- The Forge
     order by emrh_date desc
     limit 1
-  ) as jita_price,
+  ) as jita_price, -- нужна подгрузка рыночных цен
   round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price, -- нужно загрузить в БД сведения о параметрах модулей
   null as "3-fkcz price", -- нужна подгрузка маркета
   so.avg_sell_price as "our price", -- нужна подгрузка ордеров
@@ -21,7 +21,7 @@ select
 from (
     select
       jt.ecwt_type_id as type_id,
-      avg(jt.ecwt_quantity) as wk_volume
+      max(jt.ecwt_quantity) as wk_volume
     from (
       select
         date_trunc('week', j.ecwj_date)::date as ecwj_date,
