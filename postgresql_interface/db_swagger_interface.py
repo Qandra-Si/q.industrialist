@@ -1770,8 +1770,7 @@ class QSwaggerInterface:
             " emrh_highest,"
             " emrh_lowest,"
             " emrh_order_count,"
-            " emrh_volume,"
-            " emrh_created_at) "
+            " emrh_volume) "
             "VALUES ("
             " %(r)s,"
             " %(t)s,"
@@ -1780,8 +1779,7 @@ class QSwaggerInterface:
             " %(h)s,"
             " %(l)s,"
             " %(o)s,"
-            " %(v)s,"
-            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
+            " %(v)s) "
             "ON CONFLICT ON CONSTRAINT pk_emrh DO NOTHING;",
             {'r': region_id,
              't': type_id,

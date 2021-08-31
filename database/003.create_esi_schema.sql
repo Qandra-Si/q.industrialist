@@ -835,13 +835,12 @@ CREATE TABLE qi.esi_markets_region_history
 (
     emrh_region_id INTEGER NOT NULL,
     emrh_type_id BIGINT NOT NULL,
-    emrh_date TIMESTAMP NOT NULL,
+    emrh_date DATE NOT NULL,
     emrh_average DOUBLE PRECISION NOT NULL,
     emrh_highest DOUBLE PRECISION NOT NULL,
     emrh_lowest DOUBLE PRECISION NOT NULL,
     emrh_order_count BIGINT NOT NULL,
     emrh_volume BIGINT NOT NULL,
-    emrh_created_at TIMESTAMP,
     CONSTRAINT pk_emrh PRIMARY KEY (emrh_region_id, emrh_type_id, emrh_date)
 )
 TABLESPACE pg_default;
