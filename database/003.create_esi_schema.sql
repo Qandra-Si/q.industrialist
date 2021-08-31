@@ -842,13 +842,13 @@ CREATE TABLE qi.esi_markets_region_history
     emrh_order_count BIGINT NOT NULL,
     emrh_volume BIGINT NOT NULL,
     emrh_created_at TIMESTAMP,
-    CONSTRAINT pk_emrh PRIMARY KEY (emrh_region_id, emrh_type_id)
+    CONSTRAINT pk_emrh PRIMARY KEY (emrh_region_id, emrh_type_id, emrh_date)
 )
 TABLESPACE pg_default;
 
 CREATE UNIQUE INDEX idx_emrh_pk
     ON qi.esi_markets_region_history USING btree
-    (emrh_region_id ASC NULLS LAST, emrh_type_id ASC NULLS LAST)
+    (emrh_region_id ASC NULLS LAST, emrh_type_id ASC NULLS LAST, emrh_date ASC NULLS LAST)
 TABLESPACE pg_default;
 
 CREATE INDEX idx_emrh_type_date

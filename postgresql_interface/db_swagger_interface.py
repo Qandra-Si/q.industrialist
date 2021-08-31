@@ -1511,7 +1511,7 @@ class QSwaggerInterface:
     # /corporations/{corporation_id}/orders/
     # -------------------------------------------------------------------------
 
-    def insert_or_update_corporation_orders(self, data, corporation_id, history, updated_at):
+    def insert_or_update_corporation_orders(self, data, corporation_id: int, history, updated_at):
         """ inserts corporation order data into database
 
         :param data: corporation order data
@@ -1694,7 +1694,7 @@ class QSwaggerInterface:
     def insert_or_update_markets_price(self, data, updated_at):
         """ inserts markets price data into database
 
-        :param data: corporation order data
+        :param data: market price data
         """
         # { "adjusted_price": 306988.09,
         #   "average_price": 306292.67,
@@ -1738,3 +1738,48 @@ class QSwaggerInterface:
         if row is None:
             return None
         return row[0]
+
+    def insert_or_update_region_market_history(self, region_id: int, type_id: int, data, updated_at):
+        """ inserts region' market price history data into database
+
+        :param data: region market history data
+        """
+        # { "average": 11490000,
+        #   "date": "2020-07-03",
+        #   "highest": 11490000,
+        #   "lowest": 11490000,
+        #   "order_count": 1,
+        #   "volume": 22
+        # }
+        self.db.execute(
+            "INSERT INTO esi_markets_region_history("
+            " emrh_region_id,"
+            " emrh_type_id,"
+            " emrh_date,"
+            " emrh_average,"
+            " emrh_highest,"
+            " emrh_lowest,"
+            " emrh_order_count,"
+            " emrh_volume,"
+            " emrh_created_at) "
+            "VALUES ("
+            " %(r)s,"
+            " %(t)s,"
+            " %(dt)s,"
+            " %(a)s,"
+            " %(h)s,"
+            " %(l)s,"
+            " %(o)s,"
+            " %(v)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT') "
+            "ON CONFLICT ON CONSTRAINT pk_emrh DO NOTHING;",
+            {'r': region_id,
+             't': type_id,
+             'dt': data['date'],
+             'a': data['average'],
+             'h': data['highest'],
+             'l': data['lowest'],
+             'o': data['order_count'],
+             'v': data['volume'],
+             }
+        )

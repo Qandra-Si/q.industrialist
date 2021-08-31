@@ -1353,7 +1353,6 @@ class QDatabaseTools:
         region_id = self.dbswagger.select_region_name_by_id(region)  # 'The Forge' = 10000002
         if region_id is None:
             return None
-        print(region, region_id)
 
         market_region_history_updates = None
         for _type_id in {40556, 2195}:
@@ -1380,7 +1379,7 @@ class QDatabaseTools:
                 else:
                     market_region_history_updates += 1
                 # отправка в БД
-                #self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
+                self.dbswagger.insert_or_update_region_market_history(region_id, type_id, market_data, updated_at)
 
             self.qidb.commit()
 
