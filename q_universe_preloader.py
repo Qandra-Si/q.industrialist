@@ -71,12 +71,12 @@ def main():
             first_time = False
 
             # Requires: access token
-            universe_structures_stat, universe_structures_new_cnt = dbtools.actualize_universe_structures()
+            universe_structures_stat = dbtools.actualize_universe_structures()
             if universe_structures_stat is None:
-                print("Universe public structures has no updates\n"))
-            else
-                print("{} of {} new public structures found in the universe\n".
-                      format(universe_structures_stat[0], universe_structures_stat[1]))
+                print("Universe public structures has no updates\n")
+            else:
+                print("{} new of {} public structures found in the universe\n".
+                      format(universe_structures_stat[1], universe_structures_stat[0]))
             sys.stdout.flush()
 
             # Requires: public access
