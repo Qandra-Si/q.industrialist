@@ -1335,4 +1335,57 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.enable_debug()
 
+        del data
+
         return markets_prices_updated
+
+    # -------------------------------------------------------------------------
+    # /markets/{region_id}/history/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_markets_region_history_url(region_id: int, type_id: int):
+        # Requires: public access
+        return "markets/{region_id}/history/?type_id={type_id}".format(region_id=region_id, type_id=type_id)
+
+    def actualize_market_region_history(self, region: str):
+        region_id = self.dbswagger.select_region_name_by_id(region)  # 'The Forge' = 10000002
+        if region_id is None:
+            return None
+        print(region, region_id)
+
+        market_region_history_updates = None
+        for type_id: int in {40556, 2195}:
+            url: str = self.get_markets_region_history_url(region_id, type_id)
+            data, updated_at, is_updated = self.load_from_esi(url)
+            if self.esiswagger.offline_mode:
+                updated_at = self.eve_now
+            elif not is_updated:
+                continue
+            elif data is None:
+                continue
+
+            # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+            db_debug: bool = self.dbswagger.db.debug
+            if db_debug:
+                self.dbswagger.db.disable_debug()
+
+            # актуализация (добавление) narket цен в БД
+            for market_data in data:
+                # подсчёт статистики
+                if market_region_history_updates is None:
+                    market_region_history_updates = 1
+                else:
+                    market_region_history_updates += 1
+                # отправка в БД
+                #self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
+
+            self.qidb.commit()
+
+            # если отладка была отключена, то включаем её
+            if db_debug:
+                self.dbswagger.db.enable_debug()
+
+            del data
+
+        return market_region_history_updates

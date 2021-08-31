@@ -8,6 +8,10 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_emrh_type_date;
+DROP INDEX IF EXISTS qi.idx_emrh_pk;
+DROP TABLE IF EXISTS qi.esi_markets_region_history;
+
 DROP INDEX IF EXISTS qi.idx_emp_pk;
 DROP TABLE IF EXISTS qi.esi_markets_prices;
 
@@ -804,7 +808,7 @@ TABLESPACE pg_default;
 
 
 --------------------------------------------------------------------------------
--- corporation_orders
+-- markets_prices
 --------------------------------------------------------------------------------
 CREATE TABLE qi.esi_markets_prices
 (
@@ -820,6 +824,36 @@ TABLESPACE pg_default;
 CREATE UNIQUE INDEX idx_emp_pk
     ON qi.esi_markets_prices USING btree
     (emp_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- markets_region_history
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_markets_region_history
+(
+    emrh_region_id INTEGER NOT NULL,
+    emrh_type_id BIGINT NOT NULL,
+    emrh_date TIMESTAMP NOT NULL,
+    emrh_average DOUBLE PRECISION NOT NULL,
+    emrh_highest DOUBLE PRECISION NOT NULL,
+    emrh_lowest DOUBLE PRECISION NOT NULL,
+    emrh_order_count BIGINT NOT NULL,
+    emrh_volume BIGINT NOT NULL,
+    emrh_created_at TIMESTAMP,
+    CONSTRAINT pk_emrh PRIMARY KEY (emrh_region_id, emrh_type_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_emrh_pk
+    ON qi.esi_markets_region_history USING btree
+    (emrh_region_id ASC NULLS LAST, emrh_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_emrh_type_date
+    ON qi.esi_markets_region_history USING btree
+    (emrh_type_id ASC NULLS LAST, emrh_date ASC NULLS LAST)
 TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов

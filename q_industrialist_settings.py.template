@@ -24,3 +24,6 @@ g_database = {
     "user":     "qi_user",
     "password": "qi_LAZ7dBLmSJb9"  # <-- this is the value you probably need to edit
 }
+g_market_regions = {
+    "The Forge",
+}
