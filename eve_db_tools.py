@@ -1405,4 +1405,6 @@ class QDatabaseTools:
 
             del data
 
+        del type_ids
+
         return market_region_history_updates
