@@ -6,18 +6,13 @@ select
     when mp.emp_average_price is null or (mp.emp_average_price < 0.001) then mp.emp_adjusted_price
     else mp.emp_average_price
   end as universe_price,
-  ( select emrh_average
-    from qi.esi_markets_region_history
-    where emrh_region_id=10000002 and jt.type_id=emrh_type_id -- The Forge
-    order by emrh_date desc
-    limit 1
-  ) as jita_price, -- нужна подгрузка рыночных цен
+  jita.emrh_average as jita_average,
   round((tid.sdet_volume * 1212.66)::numeric, 2) as import_price, -- нужно загрузить в БД сведения о параметрах модулей
   null as "3-fkcz price", -- нужна подгрузка маркета
   so.avg_sell_price as "our price", -- нужна подгрузка ордеров
   null as markup,
-  null as "+10% price",
-  null as "+10% profit"
+  round(((jita.emrh_average+(tid.sdet_volume*1212.66))*1.1)::numeric, 2) as "+10% price",
+  round(((jita.emrh_average+(tid.sdet_volume*1212.66))*1.1-jita.emrh_average-(tid.sdet_volume*1212.66))::numeric, 2) as "+10% profit"
 from (
     select
       jt.ecwt_type_id as type_id,
@@ -76,4 +71,13 @@ from (
     order by 1
   ) so on (jt.type_id = so.type_id)
   left outer join qi.esi_markets_prices mp on (jt.type_id = mp.emp_type_id)
+  left outer join (
+    select
+      h.emrh_type_id,
+      h.emrh_average
+    from qi.esi_markets_region_history h
+    where
+      h.emrh_region_id=10000002 and -- The Forge
+      h.emrh_date = (select max(emrh_date) from qi.esi_markets_region_history where emrh_region_id=10000002 and emrh_type_id = h.emrh_type_id)
+  ) jita on (jt.type_id = jita.emrh_type_id)
 order by 1
