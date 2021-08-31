@@ -1661,3 +1661,65 @@ class QSwaggerInterface:
         for row in rows:
             data.append(row[0])
         return data
+
+    # -------------------------------------------------------------------------
+    # /markets/prices/
+    # -------------------------------------------------------------------------
+
+    def get_last_known_markets_prices(self):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " emp_type_id,"
+            " emp_adjusted_price,"
+            " emp_average_price,"
+            " emp_updated_at "
+            "FROM esi_markets_prices;",
+        )
+        if rows is None:
+            return None
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[3]}
+            data_item = {
+                'type_id': row[0],
+                'ext': ext,
+            }
+            if row[1]:
+                data_item.update({'adjusted_price': row[1]})
+            if row[2]:
+                data_item.update({'average_price': row[2]})
+            data.append(data_item)
+        return data
+
+    def insert_or_update_markets_price(self, data, updated_at):
+        """ inserts markets price data into database
+
+        :param data: corporation order data
+        """
+        # { "adjusted_price": 306988.09,
+        #   "average_price": 306292.67,
+        #   "type_id": 32772
+        # }
+        self.db.execute(
+            "INSERT INTO esi_markets_prices("
+            " emp_type_id,"
+            " emp_adjusted_price,"
+            " emp_average_price,"
+            " emp_created_at,"
+            " emp_updated_at) "
+            "VALUES ("
+            " %(t)s,"
+            " %(aj)s,"
+            " %(av)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_emp DO UPDATE SET"
+            " emp_adjusted_price=%(aj)s,"
+            " emp_average_price=%(av)s,"
+            " emp_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'t': data['type_id'],
+             'mv': data.get('adjusted_price', None),
+             'mv': data.get('average_price', None),
+             'at': updated_at,
+             }
+        )

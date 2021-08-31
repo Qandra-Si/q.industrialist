@@ -8,6 +8,9 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_emp_pk;
+DROP TABLE IF EXISTS qi.esi_markets_prices;
+
 DROP INDEX IF EXISTS qi.idx_ecor_history;
 DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
 DROP INDEX IF EXISTS qi.idx_ecor_issued;
@@ -796,6 +799,27 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecor_history
     ON qi.esi_corporation_orders USING btree
     (ecor_history ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- corporation_orders
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_markets_prices
+(
+    emp_type_id BIGINT NOT NULL,
+    emp_adjusted_price DOUBLE PRECISION,
+    emp_average_price DOUBLE PRECISION,
+    emp_created_at TIMESTAMP,
+    emp_updated_at TIMESTAMP,
+    CONSTRAINT pk_emp PRIMARY KEY (emp_type_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_emp_pk
+    ON qi.esi_markets_prices USING btree
+    (emp_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
 -- получаем справку в конце выполнения всех запросов

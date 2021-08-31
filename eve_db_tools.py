@@ -120,6 +120,7 @@ class QDatabaseTools:
         self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_markets_prices: typing.Dict[int, QEntity] = {}
         self.prepare_cache()
 
         self.depth = QEntityDepth()
@@ -129,6 +130,7 @@ class QDatabaseTools:
         """
         del self.depth
 
+        del self.__cached_markets_prices
         del self.__cached_corporation_orders
         del self.__cached_corporation_industry_jobs
         del self.__cached_corporation_blueprints
@@ -202,6 +204,14 @@ class QDatabaseTools:
             'item_id',
             None
         )
+
+        rows = self.dbswagger.get_last_known_markets_prices()
+        if rows:
+            for row in rows:
+                type_id = row['type_id']
+                updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
+                del row['ext']
+                self.__cached_markets_prices[type_id] = QEntity(True, False, row, updated_at)
 
     def get_corp_cache(self, cache, corporation_id):
         corp_cache = cache.get(corporation_id)
@@ -1273,3 +1283,50 @@ class QDatabaseTools:
         del active_data
 
         return corp_has_active_orders, corp_has_finished_orders
+
+    # -------------------------------------------------------------------------
+    # /markets/prices/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_markets_prices_url():
+        # Requires: public access
+        return "markets/prices/"
+
+    def actualize_markets_prices(self):
+        url: str = self.get_markets_prices_url()
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+        elif data is None:
+            return None
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # актуализация (добавление) narket цен в БД
+        markets_prices_updated: int = 0
+        for price_data in data:
+            # подсчёт статистики
+            markets_prices_updated += 1
+            # отправка в БД
+            self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
+            # актуализация кеша
+            type_id: int = price_data['type_id']
+            in_cache = self.__cached_markets_prices.get(type_id)
+            if not in_cache:
+                self.__cached_markets_prices[type_id] = QEntity(True, True, price_data, updated_at)
+            else:
+                in_cache.store(True, True, price_data, updated_at)
+
+        self.qidb.commit()
+
+        # если отладка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        del markets_prices_updated

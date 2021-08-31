@@ -127,6 +127,14 @@ def main():
                   format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
         sys.stdout.flush()
 
+        # Requires: public access
+        markets_prices_updated = dbtools.actualize_markets_prices()
+        if markets_prices_updated is None:
+            print("Markets prices has no updates\n")
+        else:
+            print("Markets prices has {} updates\n".format(markets_prices_updated))
+        sys.stdout.flush()
+
         # Пытаемся отследить и сохраняем связи между чертежами и работами
         dbtools.link_blueprints_and_jobs(corporation_id)
         print("'{}' corporation link blueprints and jobs completed\n".
