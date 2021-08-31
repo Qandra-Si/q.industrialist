@@ -1303,11 +1303,11 @@ class QDatabaseTools:
     def actualize_markets_prices(self):
         url: str = self.get_markets_prices_url()
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if data is None:
+            return None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return None
-        elif data is None:
             return None
 
         # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
@@ -1372,12 +1372,15 @@ class QDatabaseTools:
             type_id: int = int(_type_id[0])
             url: str = self.get_markets_region_history_url(region_id, type_id)
             data, updated_at, is_updated = self.load_from_esi(url)
+            if data is None:
+                continue
             if self.esiswagger.offline_mode:
                 updated_at = self.eve_now
             elif not is_updated:
-                continue
-            elif data is None:
-                continue
+                if (region_id == 10000002) and (type_id == 34):  # 'The Forge' = 10000002, 'Tritanium' = 34
+                    pass
+                else:
+                    continue
 
             # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
             db_debug: bool = self.dbswagger.db.debug
