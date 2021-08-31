@@ -1739,6 +1739,16 @@ class QSwaggerInterface:
             return None
         return row[0]
 
+    def select_market_type_ids(self):
+        rows = self.db.select_all_rows(
+            "SELECT sdet_type_id "
+            "FROM eve_sde_type_ids "
+            "WHERE sdet_published and sdet_market_group_id is not null;",
+        )
+        if rows is None:
+            return None
+        return rows
+
     def insert_or_update_region_market_history(self, region_id: int, type_id: int, data, updated_at):
         """ inserts region' market price history data into database
 

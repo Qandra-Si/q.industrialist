@@ -1353,10 +1353,13 @@ class QDatabaseTools:
         region_id = self.dbswagger.select_region_name_by_id(region)  # 'The Forge' = 10000002
         if region_id is None:
             return None
+        type_ids = self.dbswagger.select_market_type_ids()
+        if type_ids is None:
+            return None
 
         market_region_history_updates = None
-        for _type_id in {40556, 2195}:
-            type_id: int = int(_type_id)
+        for _type_id in type_ids:
+            type_id: int = int(_type_id[0])
             url: str = self.get_markets_region_history_url(region_id, type_id)
             data, updated_at, is_updated = self.load_from_esi(url)
             if self.esiswagger.offline_mode:
