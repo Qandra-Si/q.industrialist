@@ -275,7 +275,8 @@ class QDatabaseTools:
             url,
             fully_trust_cache=fully_trust_cache)
         updated_at = self.esiswagger.last_modified
-        return data, updated_at
+        is_updated = self.esiswagger.is_last_data_updated
+        return data, updated_at, is_updated
 
     def load_from_esi_paged_data(self, url: str, fully_trust_cache=False):
         data = self.esiswagger.get_esi_paged_data(
@@ -330,7 +331,7 @@ class QDatabaseTools:
             try:
                 # Public information about a character
                 url: str = self.get_character_url(character_id)
-                data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
+                data, updated_at, is_updated = self.load_from_esi(url, fully_trust_cache=in_cache is None)
                 if data:
                     # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
                     if updated_at < self.eve_now:
@@ -411,7 +412,7 @@ class QDatabaseTools:
         if reload_esi:
             # Public information about a corporation
             url: str = self.get_corporation_url(corporation_id)
-            data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
+            data, updated_at, is_updated = self.load_from_esi(url, fully_trust_cache=in_cache is None)
             if data:
                 # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
                 if updated_at < self.eve_now:
@@ -477,7 +478,7 @@ class QDatabaseTools:
         if reload_esi:
             # Public information about a universe_station
             url: str = self.get_universe_station_url(station_id)
-            data, updated_at = self.load_from_esi(url, fully_trust_cache=in_cache is None)
+            data, updated_at, is_updated = self.load_from_esi(url, fully_trust_cache=in_cache is None)
             if data:
                 # сохраняем данные в БД, при этом актуализируем дату последней работы с esi
                 if updated_at < self.eve_now:
@@ -512,7 +513,7 @@ class QDatabaseTools:
         try:
             # Requires: access token
             url: str = self.get_universe_structure_url(structure_id)
-            data, updated_at = self.load_from_esi(url, fully_trust_cache=fully_trust_cache)
+            data, updated_at, is_updated = self.load_from_esi(url, fully_trust_cache=fully_trust_cache)
             return data, False, updated_at
         except requests.exceptions.HTTPError as err:
             status_code = err.response.status_code
@@ -1355,7 +1356,8 @@ class QDatabaseTools:
         print(region, region_id)
 
         market_region_history_updates = None
-        for type_id: int in {40556, 2195}:
+        for _type_id in {40556, 2195}:
+            type_id: int = int(_type_id)
             url: str = self.get_markets_region_history_url(region_id, type_id)
             data, updated_at, is_updated = self.load_from_esi(url)
             if self.esiswagger.offline_mode:

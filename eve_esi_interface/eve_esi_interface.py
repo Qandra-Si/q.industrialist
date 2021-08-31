@@ -1,4 +1,4 @@
-﻿# -*- encoding: utf-8 -*-
+# -*- encoding: utf-8 -*-
 import json
 import os.path
 from pathlib import Path
@@ -176,7 +176,7 @@ class EveOnlineInterface:
         :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
-        self.__is_last_data_updated = True
+        self.__is_last_data_updated = False
         self.__last_modified = None
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # иногда возникает ситуация, когда данные по указанному url не закачались (упали с ошибкой), и так
