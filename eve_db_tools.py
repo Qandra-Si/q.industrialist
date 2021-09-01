@@ -1372,7 +1372,23 @@ class QDatabaseTools:
             type_id: int = int(_type_id[0])
             last_known_date = None if _type_id[1] is None else _type_id[1]  # datetime.date(2020, 07, 01)
             url: str = self.get_markets_region_history_url(region_id, type_id)
-            data, updated_at, is_updated = self.load_from_esi(url)
+
+            try:
+                data, updated_at, is_updated = self.load_from_esi(url)
+            except requests.exceptions.HTTPError as err:
+                status_code = err.response.status_code
+                if status_code == 404:
+                    # это странно, но часть item_types может быть Not Found
+                    continue
+                else:
+                    # print(sys.exc_info())
+                    # raise
+                    continue  # продолжить загрузку очень важно!
+            except:
+                # print(sys.exc_info())
+                # raise
+                continue  # продолжить загрузку очень важно!
+
             if data is None:
                 continue
             if self.esiswagger.offline_mode:
