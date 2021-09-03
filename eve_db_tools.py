@@ -1381,6 +1381,7 @@ class QDatabaseTools:
                 status_code = err.response.status_code
                 if status_code == 404:
                     # это странно, но часть item_types может быть Not Found
+                    # либо не найден регион (ошибка в настройках, или изменения в игре)
                     continue
                 else:
                     # print(sys.exc_info())
@@ -1508,7 +1509,20 @@ class QDatabaseTools:
             return None
 
         url: str = self.get_markets_region_orders_url(region_id)
-        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        try:
+            data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:
+                # 'error': 'Region not found!' (опечатка в настройках, или изменение в игре)
+                return None
+            else:
+                # print(sys.exc_info())
+                raise
+        except:
+            print(sys.exc_info())
+            raise
+
         if data is None:
             return None
         if self.esiswagger.offline_mode:
