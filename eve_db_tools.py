@@ -1507,6 +1507,9 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.disable_debug()
 
+        # списки ордеров превращаем в сводные данные: buy price, avg price, sell price и т.п.
+        __cached_trade_hub: typing.Dict[int, QEntity] = {}
+
         # актуализация (добавление) market цен в БД
         found_market_orders: int = 0
         for order_data in data:
@@ -1514,18 +1517,55 @@ class QDatabaseTools:
             location_id: int = order_data['location_id']
             if not (location_id == ): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
                 continue
+            # актуализация кеша
+            type_id: int = order_data['type_id']
+            in_cache = __cached_trade_hub.get(type_id)
+            if not in_cache:
+                if order_data['is_buy_order']:
+                    cache_obj = {
+                        'buy': order_data['price'],
+                        'buy_volume': order_data['volume_remain'],
+                    }
+                else:
+                    cache_obj = {
+                        'sell': order_data['price'],
+                        'sell_volume': order_data['volume_remain'],
+                    }
+                __cached_trade_hub[type_id] = QEntity(True, True, cache_obj, updated_at)
+                if type_id == 24696:
+                    print('!!!!! ', found_market_orders, cache_obj)
+                del cache_obj
+            else:
+                if order_data['is_buy_order']:
+                    cache_price = in_cache.obj.get('buy')
+                    if (buy_price is None) or (cache_price < order_data['price']):
+                        in_cache.obj.update({'buy': order_data['price']})
+                    in_cache.obj.update({
+                        'buy_volume': order_data['volume_remain'] + in_cache.obj.get('buy_volume', 0)
+                    })
+                else:
+                    cache_price = in_cache.obj.get('sell')
+                    if (sell_price is None) or (cache_price > order_data['price']):
+                        in_cache.obj.update({'sell': order_data['price']})
+                    in_cache.obj.update({
+                        'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
+                    })
+                if type_id == 24696:
+                    print('!!!!! ', found_market_orders, in_cache.obj)
             # подсчёт статистики
             found_market_orders += 1
-            # отправка в БД
-            # self.dbswagger.insert_or_update_market_region_order(order_data, updated_at)
-            # ...в кеш данные не сохраняем
 
-        self.qidb.commit()
+        # отправка в БД
+        #self.dbswagger.insert_or_update_market_location_prices(order_data, updated_at)
 
         # если отладка была отключена, то включаем её
         if db_debug:
             self.dbswagger.db.enable_debug()
 
+        self.qidb.commit()
+
+        # очищаем память, данные уже в БД
+        del __cached_trade_hub
         del data
 
         return found_market_orders

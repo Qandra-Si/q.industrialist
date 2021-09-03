@@ -1803,3 +1803,53 @@ class QSwaggerInterface:
              'v': data['volume'],
              }
         )
+
+    # -------------------------------------------------------------------------
+    # /markets/region_id/orders/
+    # /markets/structures/structure_id/
+    # -------------------------------------------------------------------------
+
+    def insert_or_update_market_location_prices(self, location_id: int, type_id: int, data, updated_at):
+        """ inserts markets price data into database
+
+        :param data: market price data
+        """
+        # { "sell": 620,
+        #   "buy": 605,
+        #   "sell_volume": 80,
+        #   "buy_volume": 80
+        # }
+        self.db.execute(
+            "INSERT INTO esi_trade_hub_prices("
+            " ethp_location_id,"
+            " ethp_type_id,"
+            " ethp_sell,"
+            " ethp_buy,"
+            " ethp_sell_volume,"
+            " ethp_buy_volume,"
+            " ethp_created_at,"
+            " ethp_updated_at) "
+            "VALUES ("
+            " %(l)s,"
+            " %(t)s,"
+            " %(s)s,"
+            " %(b)s,"
+            " %(sv)s,"
+            " %(bv)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_ethp DO UPDATE SET"
+            " ethp_sell=%(s)s,"
+            " ethp_buy=%(b)s,"
+            " ethp_sell_volume=%(sv)s,"
+            " ethp_buy_volume=%(bv)s,"
+            " ethp_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'l': location_id,
+             't': type_id,
+             's': data.get('sell', None),
+             'b': data.get('buy', None),
+             'sv': data['sell_volume'],
+             'bv': data['buy_volume'],
+             'at': updated_at,
+             }
+        )

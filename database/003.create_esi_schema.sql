@@ -8,6 +8,9 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_ethp_pk;
+DROP TABLE IF EXISTS qi.esi_trade_hub_prices;
+
 DROP INDEX IF EXISTS qi.idx_emrh_pk;
 DROP TABLE IF EXISTS qi.esi_markets_region_history;
 
@@ -848,6 +851,32 @@ CREATE UNIQUE INDEX idx_emrh_pk
     ON qi.esi_markets_region_history USING btree
     (emrh_region_id ASC NULLS LAST, emrh_type_id ASC NULLS LAST, emrh_date ASC NULLS LAST)
 TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- /markets/region_id/orders/
+-- /markets/structures/structure_id/
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_trade_hub_prices
+(
+    ethp_location_id BIGINT NOT NULL,
+    ethp_type_id BIGINT NOT NULL,
+    ethp_sell DOUBLE PRECISION,
+    ethp_buy DOUBLE PRECISION,
+    ethp_sell_volume BIGINT NOT NULL,
+    ethp_buy_volume BIGINT NOT NULL,
+    ethp_created_at TIMESTAMP,
+    ethp_updated_at TIMESTAMP,
+    CONSTRAINT pk_ethp PRIMARY KEY (ethp_location_id, ethp_type_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ethp_pk
+    ON qi.esi_trade_hub_prices USING btree
+    (ethp_location_id ASC NULLS LAST, ethp_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.
