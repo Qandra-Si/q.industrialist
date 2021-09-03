@@ -1485,7 +1485,7 @@ class QDatabaseTools:
             # В действительности: order_type учитывается, так что подставляем его в параметры! но требуется контроль после получения данных от ССР
             if order_type == 'all':
                 return "markets/{region_id}/orders/".format(region_id=region_id)
-            else
+            else:
                 return "markets/{region_id}/orders/?order_type={order_type}".format(region_id=region_id, order_type=order_type)
         elif order_type == 'all':
             return "markets/{region_id}/orders/?type_id={type_id}".format(region_id=region_id, type_id=type_id)
@@ -1515,7 +1515,7 @@ class QDatabaseTools:
         for order_data in data:
             # поиск Jita Trade Hub среди всех ордеров региона
             location_id: int = order_data['location_id']
-            if not (location_id == ): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+            if not (location_id == 60003760): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
                 continue
             # актуализация кеша
             type_id: int = order_data['type_id']
