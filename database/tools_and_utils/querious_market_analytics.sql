@@ -12,7 +12,7 @@ select
 from (
   select
     mha.type_id,
-    ceil(mha.volume*week_activity/24.0) as weekly_volume,
+    round(mha.volume*week_activity/24.0, 2) as weekly_volume,
     round(mha.orders*week_activity/24.0, 1) as weekly_orders,
     round(mha.average::numeric, 2) as average,
     round(mha.lowest::numeric, 2) as lowest,
@@ -43,7 +43,7 @@ from (
       from
         qi.esi_markets_region_history
       where
-        emrh_region_id = 10000050 and
+        emrh_region_id = 10000050 and -- 10000050 'Querious', 10000002 'The Forge'
         emrh_date >= '2021-02-15' and emrh_date <= '2021-08-01'
       group by 1, 2
       ) as mh
@@ -51,6 +51,7 @@ from (
     ) mha
   ) foo
   left outer join qi.eve_sde_type_ids tid on (foo.type_id = tid.sdet_type_id)
--- order by 2 -- закладка "Все товары"
+order by 2 -- закладка "Все товары"
 -- where foo.weekly_demand >= 1.0 order by foo.weekly_demand desc, foo.persistence desc, foo.weekly_volume desc -- закладка "Еженедельные сделки (популярность)"
-where foo.weekly_demand >= 1.0 order by foo.weekly_volume desc  -- закладка "Еженедельные сделки (объём)"
+-- where foo.weekly_demand >= 1.0 order by foo.weekly_volume desc  -- закладка "Еженедельные сделки (объём)"
+-- where tid.sdet_type_name like 'Capital Core Defense Field Extender I' -- тест

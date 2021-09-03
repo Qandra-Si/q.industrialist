@@ -1427,3 +1427,105 @@ class QDatabaseTools:
         del type_ids
 
         return market_region_history_updates
+
+    # -------------------------------------------------------------------------
+    # /markets/structures/{structure_id}/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_markets_structures_url(structure_id: int):
+        # Requires: access token
+        return "markets/structures/{structure_id}/".format(structure_id=structure_id)
+
+    def actualize_markets_structures_prices(self, structure_id: int):
+        url: str = self.get_markets_structures_url(structure_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # актуализация (добавление) market цен в БД
+        orders_in_structure: int = 0
+        for order_data in data:
+            # подсчёт статистики
+            orders_in_structure += 1
+            # отправка в БД
+            self.dbswagger.insert_or_update_markets_structure_price(structure_id, order_data, updated_at)
+            # ...в кеш данные не сохраняем
+
+        self.qidb.commit()
+
+        # если отладка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        del data
+
+        return orders_in_structure
+
+    # -------------------------------------------------------------------------
+    # /markets/{region_id}/orders/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_markets_region_orders_url(region_id: int, order_type: str = 'all', type_id = None):
+        # Requires: access token
+        # 'The Forge' = 10000002
+        # 'Tritanium' = 34
+        if type_id is None:
+            # Официально так: if you query without type_id, we always return both buy and sell orders
+            # В действительности: order_type учитывается, так что подставляем его в параметры! но требуется контроль после получения данных от ССР
+            if order_type == 'all':
+                return "markets/{region_id}/orders/".format(region_id=region_id)
+            else
+                return "markets/{region_id}/orders/?order_type={order_type}".format(region_id=region_id, order_type=order_type)
+        elif order_type == 'all':
+            return "markets/{region_id}/orders/?type_id={type_id}".format(region_id=region_id, type_id=type_id)
+        else:
+            return "markets/{region_id}/orders/?order_type={order_type}&type_id={type_id}".format(region_id=region_id, order_type=order_type, type_id=type_id)
+
+    def actualize_jita_market_orders(self):
+        url: str = self.get_markets_region_orders_url(10000002)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # актуализация (добавление) market цен в БД
+        found_market_orders: int = 0
+        for order_data in data:
+            # поиск Jita Trade Hub среди всех ордеров региона
+            location_id: int = order_data['location_id']
+            if not (location_id == ): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+                continue
+            # подсчёт статистики
+            found_market_orders += 1
+            # отправка в БД
+            # self.dbswagger.insert_or_update_market_region_order(order_data, updated_at)
+            # ...в кеш данные не сохраняем
+
+        self.qidb.commit()
+
+        # если отладка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        del data
+
+        return found_market_orders

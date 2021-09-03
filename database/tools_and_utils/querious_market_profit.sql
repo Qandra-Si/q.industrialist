@@ -1,39 +1,39 @@
 select
   foo.type_id,
   foo.item_name,
-  foo.weekly_volume,
-  foo.import_price,
+  round(foo.weekly_volume / weeks_passed.diff, 1) as "weekly volume",
+  round(foo.import_price::numeric, 2) as "import price",
   foo.universe_price,
   foo.jita_average,
   foo."3-fkcz price",
-  foo."our price",
   foo.markup,
   (foo.jita_average * 1.1 + foo.import_price + foo.markup) as "+10% price",
-  foo.jita_average * 0.1 as "+10% profit"
+  foo.jita_average * 0.1 as "+10% profit",
+  foo."their price"
 from (
   select
     jt.type_id,
     tid.sdet_type_name as item_name,
-    round(jt.wk_volume::numeric, 1) as weekly_volume,
-    round((tid.sdet_volume * 866)::numeric, 2) as import_price,
+    jt.wk_volume::numeric as weekly_volume,
+    tid.sdet_volume * 866 as import_price,
     case
       when mp.emp_average_price is null or (mp.emp_average_price < 0.001) then mp.emp_adjusted_price
       else mp.emp_average_price
     end as universe_price,
     jita.emrh_average as jita_average,
-    null as "3-fkcz price", -- нужна подгрузка маркета
-    so.avg_sell_price as "our price", -- нужна подгрузка ордеров
-    (jita.emrh_average * (1.0+0.02+0.0113)) as markup -- налог + брокерская комиссия
+    so.avg_sell_price as "3-fkcz price",
+    (jita.emrh_average * (0.02+0.0113)) as markup, -- налог + брокерская комиссия
+    null as "their price" -- нужна подгрузка маркета
   from (
       select
         jt.ecwt_type_id as type_id,
-        max(jt.ecwt_quantity) as wk_volume
+        avg(jt.ecwt_quantity) as wk_volume
       from (
         select
           date_trunc('week', j.ecwj_date)::date as ecwj_date,
           t.ecwt_type_id,
-          CASE WHEN sign(j.ecwj_amount) < 0 THEN 'buy'
-                                            ELSE 'sell'
+          CASE WHEN sign(j.ecwj_amount) < 0 THEN 'b'::char -- buy
+                                            ELSE 's'::char -- sell
                                             END as deal,
           sum(t.ecwt_unit_price*t.ecwt_quantity) as ecwt_price,
           sum(t.ecwt_quantity) as ecwt_quantity
@@ -52,23 +52,18 @@ from (
           ecwj_date > '2021-08-15'
         group by 1, 2, 3
         ) jt
-      where jt.deal = 'sell'
+      where jt.deal = 's'::char
       group by 1
     ) jt
     left outer join (
       select
         o.ecor_type_id as type_id,
         round((o.sum_price / o.sum_remain)::numeric, 2) as avg_sell_price
-        -- ,o.sum_price,
-        -- o.sum_remain
       from (
         select
           ecor_type_id,
-          sum(ecor_price*ecor_volume_remain) as sum_price,
+          sum(ecor_price*ecor_volume_remain) as sum_price, -- нельзя пользоваться avg(ecor_price)
           sum(ecor_volume_remain) as sum_remain
-          --ecor_price,
-          --ecor_volume_total,
-          --ecor_volume_remain
         from qi.esi_corporation_orders
         where
           --ecor_type_id=2205 and
@@ -78,7 +73,6 @@ from (
           not ecor_history
         group by ecor_type_id
         ) o
-      order by 1
     ) so on (jt.type_id = so.type_id)
     left outer join qi.esi_markets_prices mp on (jt.type_id = mp.emp_type_id)
     left outer join (
@@ -91,6 +85,7 @@ from (
         h.emrh_date = (select max(emrh_date) from qi.esi_markets_region_history where emrh_region_id=10000002 and emrh_type_id = h.emrh_type_id)
     ) jita on (jt.type_id = jita.emrh_type_id)
     left outer join qi.eve_sde_type_ids tid on (jt.type_id = tid.sdet_type_id)
-  ) foo
+  ) foo,
+  (select (current_date - '2021-08-15'::date)/7.0 as diff) weeks_passed
 order by 1
 

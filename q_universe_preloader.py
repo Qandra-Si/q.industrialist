@@ -84,6 +84,11 @@ def main():
             print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
             sys.stdout.flush()
 
+            # Requires: public access
+            found_market_orders = dbtools.actualize_jita_market_orders()
+            print("Jita market orders has {} updates\n".format('no' if found_market_orders is None else found_market_orders))
+            sys.stdout.flush()
+
         # приступаем к загрузке корпоративных данных
 
         # Requires role(s): Station_Manager
