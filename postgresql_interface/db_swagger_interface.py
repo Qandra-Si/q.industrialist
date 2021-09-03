@@ -54,6 +54,28 @@ class QSwaggerInterface:
         )
         return aids
 
+    def select_region_id_by_name(self, region: str):
+        row = self.db.select_one_row(
+            "SELECT sden_id "
+            "FROM eve_sde_names "
+            "WHERE sden_name=%s and sden_category=3;",
+            region
+        )
+        if row is None:
+            return None
+        return row[0]
+
+    def select_station_id_by_name(self, station: str):
+        row = self.db.select_one_row(
+            "SELECT sden_id "
+            "FROM eve_sde_names "
+            "WHERE sden_name=%s and sden_category=3;",
+            station
+        )
+        if row is None:
+            return None
+        return row[0]
+
     # -------------------------------------------------------------------------
     # characters/{character_id}/
     # -------------------------------------------------------------------------
@@ -1727,17 +1749,6 @@ class QSwaggerInterface:
     # -------------------------------------------------------------------------
     # /markets/{region_id}/history/
     # -------------------------------------------------------------------------
-
-    def select_region_name_by_id(self, region: str):
-        row = self.db.select_one_row(
-            "SELECT sden_id "
-            "FROM eve_sde_names "
-            "WHERE sden_name=%s and sden_category=3;",
-            region
-        )
-        if row is None:
-            return None
-        return row[0]
 
     def select_market_type_ids(self, region_id: int):
         rows = self.db.select_all_rows(

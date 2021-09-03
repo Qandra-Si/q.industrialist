@@ -1362,7 +1362,7 @@ class QDatabaseTools:
             return is_updated
 
     def actualize_market_region_history(self, region: str):
-        region_id = self.dbswagger.select_region_name_by_id(region)  # 'The Forge' = 10000002
+        region_id = self.dbswagger.select_region_id_by_name(region)  # 'The Forge' = 10000002
         if region_id is None:
             return None
         type_ids = self.dbswagger.select_market_type_ids(region_id)
@@ -1494,8 +1494,20 @@ class QDatabaseTools:
         else:
             return "markets/{region_id}/orders/?order_type={order_type}&type_id={type_id}".format(region_id=region_id, order_type=order_type, type_id=type_id)
 
-    def actualize_jita_market_orders(self):
-        url: str = self.get_markets_region_orders_url(10000002)
+    def actualize_trade_hubs_market_orders(self, region: str, trade_hubs):
+        region_id = self.dbswagger.select_region_id_by_name(region)  # 'The Forge' = 10000002
+        if region_id is None:
+            return None
+
+        trade_hub_ids = []
+        for hub in trade_hubs:
+            station_id = self.dbswagger.select_station_id_by_name(region)  # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+            if station_id is None:
+                trade_hub_ids.append(station_id)
+        if not trade_hub_ids:
+            return None
+
+        url: str = self.get_markets_region_orders_url(region_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
         if data is None:
             return None
@@ -1509,75 +1521,85 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.disable_debug()
 
-        # списки ордеров превращаем в сводные данные: buy price, avg price, sell price и т.п.
-        __cached_trade_hub: typing.Dict[int, QEntity] = {}
+        # перебираем список торговых хабов в этом регионе
+        for _trade_hub_id in trade_hub_ids:
+            trade_hub_id: int = int(_trade_hub_id)
 
-        # актуализация (добавление) market цен в БД
-        found_market_orders: int = 0
-        for order_data in data:
-            # поиск Jita Trade Hub среди всех ордеров региона
-            location_id: int = order_data['location_id']
-            if not (location_id == 60003760): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
-                continue
-            # актуализация кеша
-            type_id: int = order_data['type_id']
-            in_cache = __cached_trade_hub.get(type_id)
-            if not in_cache:
-                if order_data['is_buy_order']:
-                    cache_obj = {
-                        'buy': order_data['price'],
-                        'buy_volume': order_data['volume_remain'],
-                        'sell_volume': 0,
-                    }
+            # списки ордеров превращаем в сводные данные: buy price, avg price, sell price и т.п.
+            __cached_trade_hub: typing.Dict[int, QEntity] = {}
+
+            # актуализация (добавление) market цен в БД
+            found_market_orders: int = 0
+            for order_data in data:
+                # поиск Jita Trade Hub среди всех ордеров региона
+                location_id: int = order_data['location_id']
+                if not (location_id == trade_hub_id): # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+                    continue
+                # актуализация кеша
+                type_id: int = order_data['type_id']
+                in_cache = __cached_trade_hub.get(type_id)
+                if not in_cache:
+                    if order_data['is_buy_order']:
+                        cache_obj = {
+                            'buy': order_data['price'],
+                            'buy_volume': order_data['volume_remain'],
+                            'sell_volume': 0,
+                        }
+                    else:
+                        cache_obj = {
+                            'sell': order_data['price'],
+                            'sell_volume': order_data['volume_remain'],
+                            'buy_volume': 0,
+                        }
+                    __cached_trade_hub[type_id] = QEntity(True, True, cache_obj, updated_at)
+                    del cache_obj
                 else:
-                    cache_obj = {
-                        'sell': order_data['price'],
-                        'sell_volume': order_data['volume_remain'],
-                        'buy_volume': 0,
-                    }
-                __cached_trade_hub[type_id] = QEntity(True, True, cache_obj, updated_at)
-                del cache_obj
-            else:
-                if order_data['is_buy_order']:
-                    cache_price = in_cache.obj.get('buy')
-                    if (cache_price is None) or (cache_price < order_data['price']):
-                        in_cache.obj.update({'buy': order_data['price']})
-                    in_cache.obj.update({
-                        'buy_volume': order_data['volume_remain'] + in_cache.obj.get('buy_volume', 0)
-                    })
-                else:
-                    cache_price = in_cache.obj.get('sell')
-                    if (cache_price is None) or (cache_price > order_data['price']):
-                        in_cache.obj.update({'sell': order_data['price']})
-                    in_cache.obj.update({
-                        'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
-                    })
-        del data
+                    if order_data['is_buy_order']:
+                        cache_price = in_cache.obj.get('buy')
+                        if (cache_price is None) or (cache_price < order_data['price']):
+                            in_cache.obj.update({'buy': order_data['price']})
+                        in_cache.obj.update({
+                            'buy_volume': order_data['volume_remain'] + in_cache.obj.get('buy_volume', 0)
+                        })
+                    else:
+                        cache_price = in_cache.obj.get('sell')
+                        if (cache_price is None) or (cache_price > order_data['price']):
+                            in_cache.obj.update({'sell': order_data['price']})
+                        in_cache.obj.update({
+                            'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
+                        })
+            # стараемся пораньше очистить память, т.к. загруженный кусок данных по Jita занимает большее 1.5 Гб
+            if len(trade_hub_ids) == 1:
+                del data
 
-        # получение из БД последних данных по ордерам на этом location_id
-        __stored_trade_hub: typing.Dict[int, QEntity] = self.dbswagger.get_market_location_prices(60003760)
+            # получение из БД последних данных по ордерам на этом location_id
+            __stored_trade_hub: typing.Dict[int, QEntity] = self.dbswagger.get_market_location_prices(trade_hub_id)
 
-        # отправка изменений в БД
-        for _type_id in __cached_trade_hub:
-            type_id: int = int(_type_id)
-            in_cache = __cached_trade_hub.get(type_id)
-            in_stored = __stored_trade_hub.get(type_id)
-            if (in_stored is None) or not in_cache.is_obj_equal(in_stored):
-                self.dbswagger.insert_or_update_market_location_prices(60003760, type_id, in_cache.obj, updated_at)
-                # подсчёт статистики
-                found_market_orders += 1
-        # удаление из БД записей, по которым в маркете отсутствуют данные
-        for _type_id in __stored_trade_hub:
-            type_id: int = int(_type_id)
-            in_cache = __cached_trade_hub.get(type_id)
-            if not in_cache:
-                self.dbswagger.delete_market_location_price(60003760, type_id)
-                # подсчёт статистики
-                found_market_orders += 1
+            # отправка изменений в БД
+            for _type_id in __cached_trade_hub:
+                type_id: int = int(_type_id)
+                in_cache = __cached_trade_hub.get(type_id)
+                in_stored = __stored_trade_hub.get(type_id)
+                if (in_stored is None) or not in_cache.is_obj_equal(in_stored):
+                    self.dbswagger.insert_or_update_market_location_prices(trade_hub_id, type_id, in_cache.obj, updated_at)
+                    # подсчёт статистики
+                    found_market_orders += 1
+            # удаление из БД записей, по которым в маркете отсутствуют данные
+            for _type_id in __stored_trade_hub:
+                type_id: int = int(_type_id)
+                in_cache = __cached_trade_hub.get(type_id)
+                if not in_cache:
+                    self.dbswagger.delete_market_location_price(trade_hub_id, type_id)
+                    # подсчёт статистики
+                    found_market_orders += 1
 
-        # очищаем память, данные уже в БД
-        del __cached_trade_hub
-        del __stored_trade_hub
+            # очищаем память, данные уже в БД
+            del __cached_trade_hub
+            del __stored_trade_hub
+
+        # стараемся пораньше очистить память, т.к. загруженный кусок данных по Jita занимает большее 1.5 Гб
+        if len(trade_hub_ids) > 1:
+            del data
 
         # если отладка была отключена, то включаем её
         if db_debug:

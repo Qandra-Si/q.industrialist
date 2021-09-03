@@ -27,3 +27,11 @@ g_database = {
 g_market_regions = {
     "The Forge",
 }
+g_market_hubs = {
+    ( "The Forge",
+      ["Jita IV - Moon 4 - Caldari Navy Assembly Plant"]
+    ),
+    ( "Amarr",
+      ["Amarr VIII (Oris) - Emperor Family Academy"]
+     ),
+}
