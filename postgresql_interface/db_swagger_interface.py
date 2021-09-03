@@ -1809,6 +1809,31 @@ class QSwaggerInterface:
     # /markets/structures/structure_id/
     # -------------------------------------------------------------------------
 
+    def get_market_location_prices(self, location_id: int):
+        data: typing.Dict[int, typing.Any] = {}
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " ethp_type_id,"
+            " ethp_sell,"
+            " ethp_buy,"
+            " ethp_sell_volume,"
+            " ethp_buy_volume "
+            "FROM esi_trade_hub_prices "
+            "WHERE ethp_location_id=%s;",
+            location_id
+        )
+        if rows is None:
+            return data
+        for row in rows:
+            type_id: int = int(row[0])
+            data[type_id] = {
+                'sell': row[2],
+                'buy': row[3],
+                'sell_volume': row[4],
+                'buy_volume': row[5],
+            }
+        return data
+
     def insert_or_update_market_location_prices(self, location_id: int, type_id: int, data, updated_at):
         """ inserts markets price data into database
 

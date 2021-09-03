@@ -48,7 +48,9 @@ class QEntity:
 
     def is_obj_equal(self, data):
         for key in self.obj:
-            if (key in data) and (data[key] != self.obj[key]):
+            if not (key in data):
+                return False
+            elif (data[key] != self.obj[key]):
                 return False
         return True
 
@@ -1554,14 +1556,20 @@ class QDatabaseTools:
             found_market_orders += 1
         del data
 
+        # получение из БД последних данных по ордерам на этом location_id
+        __stored_trade_hub: typing.Dict[int, QEntity] = self.dbswagger.get_market_location_prices(60003760)
+
         # отправка в БД
         for _type_id in __cached_trade_hub:
             type_id: int = int(_type_id)
             in_cache = __cached_trade_hub.get(type_id)
-            self.dbswagger.insert_or_update_market_location_prices(60003760, type_id, in_cache.obj, updated_at)
+            in_stored = __stored_trade_hub.get(type_id)
+            if (in_stored is None) or not in_cache.is_obj_equal(in_stored):
+                self.dbswagger.insert_or_update_market_location_prices(60003760, type_id, in_cache.obj, updated_at)
 
         # очищаем память, данные уже в БД
         del __cached_trade_hub
+        del __stored_trade_hub
 
         # если отладка была отключена, то включаем её
         if db_debug:
