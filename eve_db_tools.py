@@ -1552,20 +1552,28 @@ class QDatabaseTools:
                     in_cache.obj.update({
                         'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
                     })
-            # подсчёт статистики
-            found_market_orders += 1
         del data
 
         # получение из БД последних данных по ордерам на этом location_id
         __stored_trade_hub: typing.Dict[int, QEntity] = self.dbswagger.get_market_location_prices(60003760)
 
-        # отправка в БД
+        # отправка изменений в БД
         for _type_id in __cached_trade_hub:
             type_id: int = int(_type_id)
             in_cache = __cached_trade_hub.get(type_id)
             in_stored = __stored_trade_hub.get(type_id)
             if (in_stored is None) or not in_cache.is_obj_equal(in_stored):
                 self.dbswagger.insert_or_update_market_location_prices(60003760, type_id, in_cache.obj, updated_at)
+                # подсчёт статистики
+                found_market_orders += 1
+        # удаление из БД записей, по которым в маркете отсутствуют данные
+        for _type_id in __stored_trade_hub:
+            type_id: int = int(_type_id)
+            in_cache = __cached_trade_hub.get(type_id)
+            if not in_cache:
+                self.dbswagger.delete_market_location_price(60003760, type_id)
+                # подсчёт статистики
+                found_market_orders += 1
 
         # очищаем память, данные уже в БД
         del __cached_trade_hub

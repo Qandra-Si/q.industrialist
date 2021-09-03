@@ -1827,10 +1827,10 @@ class QSwaggerInterface:
         for row in rows:
             type_id: int = int(row[0])
             data[type_id] = {
-                'sell': row[2],
-                'buy': row[3],
-                'sell_volume': row[4],
-                'buy_volume': row[5],
+                'sell': row[1],
+                'buy': row[2],
+                'sell_volume': row[3],
+                'buy_volume': row[4],
             }
         return data
 
@@ -1878,3 +1878,12 @@ class QSwaggerInterface:
              'at': updated_at,
              }
         )
+
+    def delete_market_location_price(self, location_id: int, type_id: int):
+        self.db.execute(
+            "DELETE FROM esi_trade_hub_prices "
+            "WHERE ethp_location_id=%s AND ethp_type_id=%s;",
+            location_id,
+            type_id
+        )
+
