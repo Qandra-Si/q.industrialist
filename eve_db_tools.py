@@ -1501,8 +1501,8 @@ class QDatabaseTools:
 
         trade_hub_ids = []
         for hub in trade_hubs:
-            station_id = self.dbswagger.select_station_id_by_name(region)  # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
-            if station_id is None:
+            station_id = self.dbswagger.select_station_id_by_name(hub)  # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+            if not (station_id is None):
                 trade_hub_ids.append(station_id)
         if not trade_hub_ids:
             return None

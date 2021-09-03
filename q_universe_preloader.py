@@ -35,6 +35,8 @@ import eve_db_tools
 import console_app
 # from memory_profiler import memory_usage
 
+import q_industrialist_settings
+
 
 def main():
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
@@ -86,8 +88,8 @@ def main():
 
             # Requires: public access
             for region in q_industrialist_settings.g_market_hubs:
-                found_market_orders = dbtools.actualize_trade_hubs_market_orders(region[0], region[1])
-                print("'{}' market orders has {} updates\n".format(region[0], 'no' if found_market_orders is None else found_market_orders))
+                found_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
+                print("'{}' market orders has {} updates\n".format(region['region'], 'no' if found_market_orders is None else found_market_orders))
                 sys.stdout.flush()
 
         # приступаем к загрузке корпоративных данных
