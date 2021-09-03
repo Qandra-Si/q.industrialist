@@ -1,7 +1,8 @@
 select
   foo.type_id,
   foo.item_name,
-  round(foo.weekly_volume / weeks_passed.diff, 1) as "weekly volume",
+  --round(foo.weekly_volume / weeks_passed.diff, 1) as "weekly volume",
+  ceil(foo.weekly_volume / weeks_passed.diff) as "weekly volume",
   round(foo.import_price::numeric, 2) as "import price",
   foo.universe_price,
   foo.jita_average,
@@ -45,7 +46,7 @@ from (
               ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
               ecwj_division = 1) or -- главный кошелёк
             ( ecwj_corporation_id in (98553333) and -- R Strike
-              ecwj_second_party_id in (95858524) and -- Xatul' Madan
+              ecwj_second_party_id in (95858524,2116746261) and -- Xatul' Madan, Kekuit Void
               ecwj_division = 7)
           ) and
           ecwj_context_id_type = 'market_transaction_id' and
