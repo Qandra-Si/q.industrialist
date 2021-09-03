@@ -88,6 +88,7 @@ def main():
             found_market_orders = dbtools.actualize_jita_market_orders()
             print("Jita market orders has {} updates\n".format('no' if found_market_orders is None else found_market_orders))
             sys.stdout.flush()
+        return
 
         # приступаем к загрузке корпоративных данных
 

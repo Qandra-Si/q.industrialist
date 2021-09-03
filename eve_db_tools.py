@@ -1525,47 +1525,48 @@ class QDatabaseTools:
                     cache_obj = {
                         'buy': order_data['price'],
                         'buy_volume': order_data['volume_remain'],
+                        'sell_volume': 0,
                     }
                 else:
                     cache_obj = {
                         'sell': order_data['price'],
                         'sell_volume': order_data['volume_remain'],
+                        'buy_volume': 0,
                     }
                 __cached_trade_hub[type_id] = QEntity(True, True, cache_obj, updated_at)
-                if type_id == 24696:
-                    print('!!!!! ', found_market_orders, cache_obj)
                 del cache_obj
             else:
                 if order_data['is_buy_order']:
                     cache_price = in_cache.obj.get('buy')
-                    if (buy_price is None) or (cache_price < order_data['price']):
+                    if (cache_price is None) or (cache_price < order_data['price']):
                         in_cache.obj.update({'buy': order_data['price']})
                     in_cache.obj.update({
                         'buy_volume': order_data['volume_remain'] + in_cache.obj.get('buy_volume', 0)
                     })
                 else:
                     cache_price = in_cache.obj.get('sell')
-                    if (sell_price is None) or (cache_price > order_data['price']):
+                    if (cache_price is None) or (cache_price > order_data['price']):
                         in_cache.obj.update({'sell': order_data['price']})
                     in_cache.obj.update({
                         'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
                     })
-                if type_id == 24696:
-                    print('!!!!! ', found_market_orders, in_cache.obj)
             # подсчёт статистики
             found_market_orders += 1
+        del data
 
         # отправка в БД
-        #self.dbswagger.insert_or_update_market_location_prices(order_data, updated_at)
+        for _type_id in __cached_trade_hub:
+            type_id: int = int(_type_id)
+            in_cache = __cached_trade_hub.get(type_id)
+            self.dbswagger.insert_or_update_market_location_prices(60003760, type_id, in_cache.obj, updated_at)
+
+        # очищаем память, данные уже в БД
+        del __cached_trade_hub
 
         # если отладка была отключена, то включаем её
         if db_debug:
             self.dbswagger.db.enable_debug()
 
         self.qidb.commit()
-
-        # очищаем память, данные уже в БД
-        del __cached_trade_hub
-        del data
 
         return found_market_orders
