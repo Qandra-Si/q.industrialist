@@ -43,6 +43,8 @@ function eve_ceiling($isk) {
     $summary_market_volume = 0;
     $amarr_buy_order = '';
     $jita_buy_order = '';
+    $amarr_buy_price = 0.0;
+    $jita_buy_price = 0.0;
     foreach ($market as $product)
     {
         $problems = '';
@@ -71,10 +73,14 @@ function eve_ceiling($isk) {
         if (!is_null($packaged_volume)) $summary_market_volume += $market_volume * $packaged_volume;
 
         if (!empty($problems)) {
-            if ($amarr_sell <= $jita_sell)
+            if ($amarr_sell <= $jita_sell) {
                 $amarr_buy_order .= $nm.' '.ceil($weekly_volume)."\n";
-            else
+                $amarr_buy_price += $amarr_sell * ceil($weekly_volume);
+            }
+            else {
                 $jita_buy_order .= $nm.' '.ceil($weekly_volume)."\n";
+                $jita_buy_price += $jita_sell * ceil($weekly_volume);
+            }
         }
 ?>
 <tr>
@@ -115,12 +121,14 @@ function eve_ceiling($isk) {
   <h3>Amarr Buy Order</h3>
    <?php if (!is_null($amarr_buy_order)) { ?>
     <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$amarr_buy_order?></pre>
+    <b>Amarr sell price: <?=number_format($amarr_buy_price,2,'.',',')?></b>
    <?php } ?>
  </div>
  <div class="col-md-6">
   <h3>Jita Buy Order</h3>
    <?php if (!is_null($jita_buy_order)) { ?>
     <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$jita_buy_order?></pre>
+    <b>Jita sell price: <?=number_format($jita_buy_price,2,'.',',')?></b>
    <?php } ?>
  </div>
 </div>
