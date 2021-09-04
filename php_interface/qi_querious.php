@@ -67,7 +67,6 @@ function eve_ceiling($isk) {
         if (is_null($market_price)) $problems = '<span class="label label-danger">no orders</span>&nbsp;';
         if (is_null($market_volume) || ($weekly_volume >= $market_volume)) $problems .= '<span class="label label-info">need delivery</span>&nbsp;';
         if (!is_null($market_volume) && ($order_volume >= $market_volume)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
-        if (!empty($problems)) $problems = '<br>'.$problems;
 
         if (!is_null($market_volume)&&!is_null($market_price)) $summary_market_price += $market_volume * $market_price;
         if (!is_null($packaged_volume)) $summary_market_volume += $market_volume * $packaged_volume;
@@ -85,7 +84,7 @@ function eve_ceiling($isk) {
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm.$problems?></td>
+ <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems?></td>
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
@@ -265,7 +264,7 @@ from
 where
   not (tid.sdet_market_group_id = 1857) and -- исключая руду
   tid.sdet_type_id not in (17715,2998) -- случайно выставил от корпы
-order by 2;
+order by 7;
 EOD;
     $jobs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
