@@ -114,17 +114,13 @@ function eve_ceiling($isk) {
  <div class="col-md-6">
   <h3>Amarr Buy Order</h3>
    <?php if (!is_null($amarr_buy_order)) { ?>
-    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;">
-    <?=$amarr_buy_order?>
-    </pre>
+    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$amarr_buy_order?></pre>
    <?php } ?>
  </div>
  <div class="col-md-6">
   <h3>Jita Buy Order</h3>
    <?php if (!is_null($jita_buy_order)) { ?>
-    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;">
-    <?=$jita_buy_order?>
-    </pre>
+    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$jita_buy_order?></pre>
    <?php } ?>
  </div>
 </div>
