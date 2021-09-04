@@ -28,10 +28,10 @@ function eve_ceiling($isk) {
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
   <th style="text-align: right;">Volume<br>3-FKCZ</th>
+  <th style="text-align: right;">3-FKCZ<br>Price</th>
   <th style="text-align: right;">Jita Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
-  <th style="text-align: right;">3-FKCZ<br>Price</th>
   <th style="text-align: right;">Jita +10%<br>Price / Markup</th>
   <th style="text-align: right;">+10%<br>Profit</th>
   <th style="text-align: right;">Their<br>Price</th>
@@ -39,6 +39,11 @@ function eve_ceiling($isk) {
 </thead>
 <tbody>
 <?php
+    $min_profit = 0.05; // 3%
+    $profit = 0.1; // 10%
+    $max_profit = 0.20; // 20%
+    $taxfee = 0.02 + 0.0113;
+
     $summary_market_price = 0;
     $summary_market_volume = 0;
     $amarr_buy_order = '';
@@ -48,6 +53,8 @@ function eve_ceiling($isk) {
     foreach ($market as $product)
     {
         $problems = '';
+        $warnings = '';
+
         $tid = $product['id'];
         $nm = $product['name'];
         $weekly_volume = $product['wv'];
@@ -60,13 +67,23 @@ function eve_ceiling($isk) {
         $universe_price = $product['up'];
         $market_price = $product['mp'];
         $markup = $jita_sell * 0.0313;
-        $jita_10_price = eve_ceiling($jita_sell * (1.1+0.02+0.0113)); // Jita +10% Price
+        $jita_10_price = eve_ceiling($jita_sell * (1.0+$profit+$taxfee)); // Jita +10% Price
         $jita_10_profit = $jita_10_price - $jita_sell - $markup;
         $their_price = $product['tp'];
 
-        if (is_null($market_price)) $problems = '<span class="label label-danger">no orders</span>&nbsp;';
+        if (is_null($market_price)) $problems .= '<span class="label label-danger">no orders</span>&nbsp;';
         if (is_null($market_volume) || ($weekly_volume >= $market_volume)) $problems .= '<span class="label label-info">need delivery</span>&nbsp;';
         if (!is_null($market_volume) && ($order_volume >= $market_volume)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
+        if (!is_null($market_price)) {
+            $min_jita_price = $jita_sell * (1.0+$min_profit+$taxfee);
+            $min_amarr_price = $amarr_sell * (1.0+$min_profit+$taxfee);
+            if (($market_price < $min_jita_price) && ($market_price < $min_amarr_price))
+                $warnings .= '<span class="label label-warning" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
+            $max_jita_price = $jita_sell * (1.0+$max_profit+$taxfee);
+            $max_amarr_price = $amarr_sell * (1.0+$max_profit+$taxfee);
+            if (($market_price > $max_jita_price) && ($market_price > $max_amarr_price))
+                $warnings .= '<span class="label label-default" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
+        }
 
         if (!is_null($market_volume)&&!is_null($market_price)) $summary_market_price += $market_volume * $market_price;
         if (!is_null($packaged_volume)) $summary_market_volume += $market_volume * $packaged_volume;
@@ -84,17 +101,17 @@ function eve_ceiling($isk) {
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems?></td>
+ <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
  <td align="right"><?=number_format($market_volume,0,'.',',')?></td>
- <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
- <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
- <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
  <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($market_price,2,'.',',')?></td>
  <?php } ?>
+ <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
+ <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
+ <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
  <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($jita_10_price,2,'.',',')?><br><mark><?=number_format($markup,2,'.',',')?></mark></td>
  <?php } ?>
