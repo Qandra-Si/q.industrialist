@@ -118,9 +118,9 @@ def main():
         sys.stdout.flush()
 
         # Requires role(s): Director
-        corp_assets_data = dbtools.actualize_corporation_assets(corporation_id)
+        known_asset_items = dbtools.actualize_corporation_assets(corporation_id)
         print("'{}' corporation has {} asset items\n".
-              format(corporation_name, len(corp_assets_data)))
+              format(corporation_name, 'no updates in' if known_asset_items is None else known_asset_items))
         sys.stdout.flush()
 
         # Requires role(s): Director

@@ -774,10 +774,13 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_assets_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+        if data is None:
+            return None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return data
+            return None
 
         # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
         corp_cache = self.__cached_corporation_assets.get(corporation_id)
@@ -787,19 +790,22 @@ class QDatabaseTools:
             debug=False  # corporation_id == 98150545
         )
         if not ids_from_esi:
-            return data
+            del data
+            return None
 
+        known_asset_items: int = len(data)
         if self.depth.push(url):
             for item_data in data:
                 self.actualize_corporation_asset_item(corporation_id, item_data, updated_at)
             self.depth.pop()
+        del data
 
         # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
         # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
         self.dbswagger.delete_obsolete_corporation_assets(deleted_ids)
         self.qidb.commit()
 
-        return data
+        return known_asset_items
 
     def get_system_id_of_item(self, _corporation_id: int, _item_id: int):
         corporation_id: int = int(_corporation_id)
