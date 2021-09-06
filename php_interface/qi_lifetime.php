@@ -308,12 +308,12 @@ include_once '.settings.php';
  <td><?=$trade_hub.'<br><span class="text-muted">'.$location_id.'</span> '?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($total_quantity,0,'.',',')?></td>
- <td align="right"><?=number_format($sell_quantity,0,'.',',')?></td>
- <td align="right"><?=number_format($buy_quantity,0,'.',',')?></td>
+ <td align="right"><?=$sell_quantity?number_format($sell_quantity,0,'.',','):''?></td>
+ <td align="right"><?=$buy_quantity?number_format($buy_quantity,0,'.',','):''?></td>
  <?php if (is_null($total_updated)) { ?><td></td><td></td><td></td><?php } else { ?>
  <td align="right"><?=number_format($total_updated,0,'.',',')?></td>
- <td align="right"><?=number_format($sell_updated,0,'.',',')?></td>
- <td align="right"><?=number_format($buy_updated,0,'.',',')?></td>
+ <td align="right"><?=$sell_updated?number_format($sell_updated,0,'.',','):''?></td>
+ <td align="right"><?=$buy_updated?number_format($buy_updated,0,'.',','):''?></td>
  <?php } ?>
 </tr>
 <?php
@@ -543,9 +543,9 @@ select
   o.total as t,
   o.buy as b,
   o.total-o.buy as s,
-  o_stat.total as ta,
-  o_stat.buy as ba,
-  o_stat.total-o_stat.buy as sa,
+  o_stat.total as tu,
+  o_stat.buy as bu,
+  o_stat.total-o_stat.buy as su,
   c.eco_name as nm,
   ks.name as hub
 from (
