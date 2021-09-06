@@ -81,7 +81,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_blueprins($corp_blueprins) { ?>
+<?php function __dump_lifetime_corporation_blueprints($corp_blueprints) { ?>
 <h2>Corporation Blueprints</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -95,7 +95,7 @@ include_once '.settings.php';
 </thead>
 <tbody>
 <?php
-    foreach ($corp_blueprins as $corp)
+    foreach ($corp_blueprints as $corp)
     {
         $corporation_id = $corp['id'];
         $updated_at = $corp['uat'];
