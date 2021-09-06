@@ -122,7 +122,7 @@ EOD;
 --SET intervalstyle = 'postgres_verbose';
 select
   ca.corporation_id as id,
-  ca.updated_at as uid,
+  ca.updated_at as uat,
   date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - ca.updated_at)::interval as ui,
   ca.quantity as q,
   ca_stat.items_changed as qc,
