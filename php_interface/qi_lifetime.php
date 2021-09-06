@@ -98,6 +98,8 @@ include_once '.settings.php';
 <?php
     foreach ($corp_blueprints as $corp)
     {
+        $warning = '';
+
         $corporation_id = $corp['id'];
         $updated_at = $corp['uat'];
         $update_interval = $corp['ui'];
@@ -106,9 +108,12 @@ include_once '.settings.php';
         $stacks_quantity = $corp['q'];
         $items_changed = $corp['qc'];
         $name = $corp['nm'];
+
+        if ($stacks_quantity >= 22500) // overflow at 25'000
+            $warning .= '<span class="label label-danger" data-toggle="tooltip" data-placement="bottom" title="25000 blueprints maximum for normal working">overflow</span>&nbsp;';
 ?>
 <tr>
- <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '.$warning?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($stacks_quantity,0,'.',',')?></td>
  <td align="right"><?=number_format($bpc_quantity,0,'.',',')?></td>
@@ -126,35 +131,36 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_industry_jobs($corp_jobs) { ?>
-<h2>Corporation Blueprints</h2>
+<?php function __dump_lifetime_corporation_industry_jobs($corp_jobs) { ?>
+<h2>Corporation Industry Jobs</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
   <th>Corporation</th>
   <th>Facility</th>
   <th style="text-align: right;">Updated At</th>
-  <th style="text-align: right;">Stacks</th>
-  <th style="text-align: right;">BPO</th>
-  <th style="text-align: right;">BPC</th>
+  <th style="text-align: right;">Active Jobs</th>
   <th style="text-align: right;">Updated in 90 min</th>
  </tr>
 </thead>
 <tbody>
 <?php
+    $last_name = '';
     foreach ($corp_jobs as $facility)
     {
-        $corporation_id = $corp['id'];
-        $facility_id = $corp['fid'];
-        $updated_at = $corp['uat'];
-        $update_interval = $corp['ui'];
-        $jobs_active = $corp['ja'];
-        $jobs_changed = $corp['jc'];
-        $name = $corp['nm'];
-        $facility = $corp['fnm'];
+        $corporation_id = $facility['id'];
+        $facility_id = $facility['fid'];
+        $updated_at = $facility['uat'];
+        $update_interval = $facility['ui'];
+        $jobs_active = $facility['ja'];
+        $jobs_changed = $facility['jc'];
+        $name = $facility['nm'];
+        $facility = $facility['fnm'];
 ?>
 <tr>
+ <?php if ($name == $last_name) { ?><td></td><?php } else { ?>
  <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <?php } ?>
  <td><?=$facility.'<br><span class="text-muted">'.$facility_id.'</span> '?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($jobs_active,0,'.',',')?></td>
@@ -163,6 +169,7 @@ include_once '.settings.php';
  <?php } ?>
 </tr>
 <?php
+        $last_name = $name;
     }
 ?>
 </tbody>
