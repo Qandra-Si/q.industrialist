@@ -114,7 +114,7 @@ function get_numeric($val) {
         $name = $corp['nm'];
 
         if ($stacks_quantity >= 22500) // overflow at 25'000
-            $warning .= '<span class="label label-danger" data-toggle="tooltip" data-placement="bottom" title="25000 blueprints maximum for normal working">overflow</span>&nbsp;';
+            $warning .= '<span class="label label-danger" data-toggle="tooltip" data-placement="bottom" title="25000 blueprints maximum for normal working!">overflow</span>&nbsp;';
 ?>
 <tr>
  <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '.$warning?></td>
@@ -591,6 +591,19 @@ function get_numeric($val) {
     pg_close($conn);
 ?>
 <div class="container-fluid">
+ <div class="dropdown">
+  <button class="btn btn-default dropdown-toggle" type="button" id="dropdownIntervals" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+   Intervals
+   <span class="caret"></span>
+  </button>
+  <ul class="dropdown-menu" aria-labelledby="dropdownIntervals">
+   <li><a href="?interval=15">15 minutes</a></li>
+   <li><a href="?interval=60">1 hour</a></li>
+   <li><a href="?interval=360">6 hours</a></li>
+   <li><a href="?interval=720">12 hours</a></li>
+   <li><a href="?interval=1440">1 day</a></li>
+  </ul>
+ </div>
 <?php __dump_lifetime_market_hubs($market_hubs, $interval_minutes); ?>
 <?php __dump_lifetime_corporation_assets($corp_assets, $interval_minutes); ?>
 <?php __dump_lifetime_corporation_blueprints($corp_blueprints, $interval_minutes); ?>
