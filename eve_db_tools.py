@@ -1544,7 +1544,7 @@ class QDatabaseTools:
             return None
 
         # актуализируем данные по структуре (загружем по ESI или из БД, например её название)
-        self.actualize_universe_structure(structure_id, need_data=need_data)
+        self.actualize_universe_structure(structure_id, True)
 
         # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
         db_debug: bool = self.dbswagger.db.debug
