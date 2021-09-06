@@ -3,7 +3,11 @@ include 'qi_render_html.php';
 include_once '.settings.php';
 ?>
 
-<?php function __dump_lifetime_market_hubs($market_hubs) { ?>
+function get_numeric($val) {
+    return is_numeric($val) ? ($val + 0) : 0;
+}
+
+<?php function __dump_lifetime_market_hubs($market_hubs, $interval_minutes) { ?>
 <h2>Market Hubs and Structures</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -11,7 +15,7 @@ include_once '.settings.php';
   <th>Market Hub</th>
   <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Orders Known</th>
-  <th style="text-align: right;">Updated in 15 min</th>
+  <th style="text-align: right;">Updated in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -42,7 +46,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_assets($corp_assets) { ?>
+<?php function __dump_lifetime_corporation_assets($corp_assets, $interval_minutes) { ?>
 <h2>Corporation Assets</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -50,7 +54,7 @@ include_once '.settings.php';
   <th>Corporation</th>
   <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Asset Items</th>
-  <th style="text-align: right;">Updated in 90 min</th>
+  <th style="text-align: right;">Updated in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -81,7 +85,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_blueprints($corp_blueprints) { ?>
+<?php function __dump_lifetime_corporation_blueprints($corp_blueprints, $interval_minutes) { ?>
 <h2>Corporation Blueprints</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -91,7 +95,7 @@ include_once '.settings.php';
   <th style="text-align: right;">Stacks</th>
   <th style="text-align: right;">BPO</th>
   <th style="text-align: right;">BPC</th>
-  <th style="text-align: right;">Updated in 90 min</th>
+  <th style="text-align: right;">Updated in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -131,7 +135,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_industry_jobs($corp_jobs) { ?>
+<?php function __dump_lifetime_corporation_industry_jobs($corp_jobs, $interval_minutes) { ?>
 <h2>Corporation Industry Jobs</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -140,7 +144,7 @@ include_once '.settings.php';
   <th>Facility</th>
   <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Active Jobs</th>
-  <th style="text-align: right;">Updated in 15 min</th>
+  <th style="text-align: right;">Updated in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -177,7 +181,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_wallet_journals($corp_wjrnls) { ?>
+<?php function __dump_lifetime_corporation_wallet_journals($corp_wjrnls, $interval_minutes) { ?>
 <h2>Corporation Wallet Journals</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -186,7 +190,7 @@ include_once '.settings.php';
   <th>Wallet Division</th>
   <th style="text-align: right;">Last Event At</th>
   <th style="text-align: right;">Total Quantity</th>
-  <th style="text-align: right;">Events in 60 min</th>
+  <th style="text-align: right;">Events in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -222,7 +226,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_wallet_transactions($corp_trnsctns) { ?>
+<?php function __dump_lifetime_corporation_wallet_transactions($corp_trnsctns, $interval_minutes) { ?>
 <h2>Corporation Wallet Transactions</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -231,7 +235,7 @@ include_once '.settings.php';
   <th>Wallet Division</th>
   <th style="text-align: right;">Last Transaction At</th>
   <th style="text-align: right;">Total Quantity</th>
-  <th style="text-align: right;">Payments in 60 min</th>
+  <th style="text-align: right;">Payments in <?=$interval_minutes?> min</th>
  </tr>
 </thead>
 <tbody>
@@ -267,7 +271,7 @@ include_once '.settings.php';
 } ?>
 
 
-<?php function __dump_lifetime_corporation_orders($corp_orders) { ?>
+<?php function __dump_lifetime_corporation_orders($corp_orders, $interval_minutes) { ?>
 <h2>Corporation Orders</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
@@ -278,7 +282,7 @@ include_once '.settings.php';
   <th style="text-align: right;">Active (total)</th>
   <th style="text-align: right;">Active (sell)</th>
   <th style="text-align: right;">Active (buy)</th>
-  <th style="text-align: right;">Updated in 60 min</th>
+  <th style="text-align: right;">Updated in <?=$interval_minutes?> min</th>
   <th style="text-align: right;">Updated (sell)</th>
   <th style="text-align: right;">Updated (buy)</th>
  </tr>
@@ -326,6 +330,20 @@ include_once '.settings.php';
 
 
 <?php
+    $interval_minutes = 60;
+    if (isset($_GET['interval'])) {
+        $_get_interval = htmlentities($_GET['interval']);
+        if (is_numeric($_get_interval))
+            switch (get_numeric($_get_interval))
+            {
+            case 15: $interval_minutes = 15; break;
+            case 60: $interval_minutes = 60; break;
+            case 360: $interval_minutes = 360; break;
+            case 720: $interval_minutes = 720; break;
+            case 1440: $interval_minutes = 1440; break;
+            }
+    }
+
     __dump_header("Lifetime", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
@@ -354,13 +372,14 @@ from (
       ethp_location_id as location_id,
       count(1) as orders_changed
     from qi.esi_trade_hub_prices ethp
-    where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '15 minutes') -- интервал обновления 10 минут => статистика 15 минут
+    where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1
   ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id)
 order by ks.name;
 EOD;
-    $market_hubs_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $market_hubs_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $market_hubs = pg_fetch_all($market_hubs_cursor);
     //---
     $query = <<<EOD
@@ -385,13 +404,14 @@ from (
       eca_corporation_id as corporation_id,
       count(1) as items_changed
     from qi.esi_corporation_assets
-    where eca_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 minutes')
+    where eca_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1
   ) ca_stat on (ca_stat.corporation_id = ca.corporation_id)
 order by c.eco_name;
 EOD;
-    $corp_assets_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_assets_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_assets = pg_fetch_all($corp_assets_cursor);
     //---
     $query = <<<EOD
@@ -420,13 +440,14 @@ from (
       ecb_corporation_id as corporation_id,
       count(1) as items_changed
     from qi.esi_corporation_blueprints
-    where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 minutes')
+    where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1
   ) cb_stat on (cb_stat.corporation_id = cb.corporation_id)
 order by c.eco_name;
 EOD;
-    $corp_blueprints_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_blueprints_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_blueprints = pg_fetch_all($corp_blueprints_cursor);
     //---
     $query = <<<EOD
@@ -457,13 +478,14 @@ from (
       ecj_facility_id as facility_id,
       count(1) as jobs_changed
     from qi.esi_corporation_industry_jobs
-    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '15 minutes')
+    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1, 2
   ) cj_stat on (cj_stat.corporation_id = cj.corporation_id and cj_stat.facility_id = cj.facility_id)
 order by c.eco_name, ks.name;
 EOD;
-    $corp_jobs_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_jobs_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_jobs = pg_fetch_all($corp_jobs_cursor);
     //---
     $query = <<<EOD
@@ -491,13 +513,14 @@ from (
       ecwj_division as division,
       count(1) as rows_appear
     from qi.esi_corporation_wallet_journals
-    where ecwj_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    where ecwj_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1, 2
   ) wj_stat on (wj_stat.corporation_id = wj.corporation_id and wj_stat.division = wj.division)
 order by c.eco_name, wj.division;
 EOD;
-    $corp_wjrnls_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_wjrnls_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_wjrnls = pg_fetch_all($corp_wjrnls_cursor);
     //---
     $query = <<<EOD
@@ -525,13 +548,14 @@ from (
       ecwt_division as division,
       count(1) as payments_appear
     from qi.esi_corporation_wallet_transactions
-    where ecwt_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    where ecwt_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1, 2
   ) wt_stat on (wt_stat.corporation_id = wt.corporation_id and wt_stat.division = wt.division)
 order by c.eco_name, wt.division;
 EOD;
-    $corp_trnsctns_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_trnsctns_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_trnsctns = pg_fetch_all($corp_trnsctns_cursor);
     //---
     $query = <<<EOD
@@ -568,24 +592,25 @@ from (
       count(1) as total,
       sum(ecor_is_buy_order::int) as buy
     from qi.esi_corporation_orders
-    where ecor_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    where ecor_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
     group by 1, 2
   ) o_stat on (o_stat.corporation_id = o.corporation_id and o_stat.location_id = o.location_id)
 order by c.eco_name, ks.name;
 EOD;
-    $corp_orders_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
+    $params = array($interval_minutes);
+    $corp_orders_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query_params err: '.pg_last_error());
     $corp_orders = pg_fetch_all($corp_orders_cursor);
     //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
-<?php __dump_lifetime_market_hubs($market_hubs); ?>
-<?php __dump_lifetime_corporation_assets($corp_assets); ?>
-<?php __dump_lifetime_corporation_blueprints($corp_blueprints); ?>
-<?php __dump_lifetime_corporation_industry_jobs($corp_jobs); ?>
-<?php __dump_lifetime_corporation_wallet_journals($corp_wjrnls); ?>
-<?php __dump_lifetime_corporation_wallet_transactions($corp_trnsctns); ?>
-<?php __dump_lifetime_corporation_orders($corp_orders); ?>
+<?php __dump_lifetime_market_hubs($market_hubs, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_assets($corp_assets, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_blueprints($corp_blueprints, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_industry_jobs($corp_jobs, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_wallet_journals($corp_wjrnls, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_wallet_transactions($corp_trnsctns, $interval_minutes); ?>
+<?php __dump_lifetime_corporation_orders($corp_orders, $interval_minutes); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
