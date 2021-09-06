@@ -17,15 +17,16 @@ include_once '.settings.php';
 <?php
     foreach ($market_hubs as $hub)
     {
-        $location_id = $product['location_id'];
-        $updated_at = $product['updated_at'];
-        $orders_known = $product['orders_known'];
-        $orders_changed = $product['orders_changed'];
-        $name = $product['name'];
+        $location_id = $hub['id'];
+        $updated_at = $hub['uat'];
+        $update_interval = $hub['ui'];
+        $orders_known = $hub['ok'];
+        $orders_changed = $hub['oc'];
+        $name = $hub['nm'];
 ?>
 <tr>
  <td><?=$name.'<br><span class="text-muted">'.$location_id.'</span> '?></td>
- <td align="right"><?=$updated_at?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($orders_known,0,'.',',')?></td>
  <?php if (is_null($orders_changed)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($orders_changed,0,'.',',')?></td>
@@ -49,20 +50,21 @@ include_once '.settings.php';
     //---
     $query = <<<EOD
 select
-  hubs.location_id,
-  hubs.updated_at,
-  hubs.orders_known,
-  hubs_stat.orders_changed, -- orders changed in 15min
-  ks.name
+  hubs.ethp_location_id as id,
+  hubs.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hubs.updated_at)::interval as ui,
+  hubs.orders_known as ok,
+  hubs_stat.orders_changed as oc, -- orders changed in 15min
+  ks.name as nm
 from (
     select
-      ethp_location_id as location_id,
+      ethp_location_id,
       max(ethp_updated_at) as updated_at,
       count(1) as orders_known
     from qi.esi_trade_hub_prices ethp
     group by 1
   ) hubs
-  left outer join qi.esi_known_stations ks on (ks.location_id = hubs.location_id)
+  left outer join qi.esi_known_stations ks on (ks.location_id = hubs.ethp_location_id)
   left outer join (
     select
       ethp_location_id as location_id,
@@ -70,7 +72,7 @@ from (
     from qi.esi_trade_hub_prices ethp
     where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '15 minutes') -- интервал обновления 10 минут => статистика 15 минут
     group by 1
-  ) hubs_stat on (hubs_stat.location_id = hubs.location_id);
+  ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id);
 EOD;
     $market_hubs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
