@@ -379,228 +379,214 @@ function get_numeric($val) {
     $market_hubs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $market_hubs = pg_fetch_all($market_hubs_cursor);
-/*
     //---
-    $query = <<<EOD
-select
-  ca.corporation_id as id,
-  ca.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - ca.updated_at)::interval as ui,
-  ca.quantity as q,
-  ca_stat.items_changed as qc,
-  c.eco_name as nm
-from (
-    select
-      eca_corporation_id as corporation_id,
-      max(eca_updated_at) as updated_at,
-      sum(eca_quantity) as quantity
-    from qi.esi_corporation_assets
-    group by 1
-  ) ca
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = ca.corporation_id)
-  left outer join (
-    select
-      eca_corporation_id as corporation_id,
-      count(1) as items_changed
-    from qi.esi_corporation_assets
-    where eca_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1
-  ) ca_stat on (ca_stat.corporation_id = ca.corporation_id)
-order by c.eco_name;
-EOD;
-    $params = array($interval_minutes);
-    $corp_assets_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  ca.corporation_id as id,".
+"  ca.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - ca.updated_at)::interval as ui,".
+"  ca.quantity as q,".
+"  ca_stat.items_changed as qc,".
+"  c.eco_name as nm ".
+"from (".
+"    select".
+"      eca_corporation_id as corporation_id,".
+"      max(eca_updated_at) as updated_at,".
+"      sum(eca_quantity) as quantity".
+"    from qi.esi_corporation_assets".
+"    group by 1".
+"  ) ca".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = ca.corporation_id)".
+"  left outer join (".
+"    select".
+"      eca_corporation_id as corporation_id,".
+"      count(1) as items_changed".
+"    from qi.esi_corporation_assets".
+"    where eca_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1".
+"  ) ca_stat on (ca_stat.corporation_id = ca.corporation_id)".
+"order by c.eco_name;";
+    $corp_assets_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_assets = pg_fetch_all($corp_assets_cursor);
     //---
-    $query = <<<EOD
-select
-  cb.corporation_id as id,
-  cb.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cb.updated_at)::interval as ui,
-  cb.bpc as bpc,
-  cb.bpo as bpo,
-  cb.quantity as q,
-  cb_stat.items_changed as qc,
-  c.eco_name as nm
-from (
-    select
-      ecb_corporation_id as corporation_id,
-      max(ecb_updated_at) as updated_at,
-      sum(case when ecb_quantity=-2 then 1 else 0 end) as bpc,
-      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo,
-      count(1) as quantity
-    from qi.esi_corporation_blueprints
-    group by 1
-  ) cb
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = cb.corporation_id)
-  left outer join (
-    select
-      ecb_corporation_id as corporation_id,
-      count(1) as items_changed
-    from qi.esi_corporation_blueprints
-    where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1
-  ) cb_stat on (cb_stat.corporation_id = cb.corporation_id)
-order by c.eco_name;
-EOD;
-    $params = array($interval_minutes);
-    $corp_blueprints_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  cb.corporation_id as id,".
+"  cb.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cb.updated_at)::interval as ui,".
+"  cb.bpc as bpc,".
+"  cb.bpo as bpo,".
+"  cb.quantity as q,".
+"  cb_stat.items_changed as qc,".
+"  c.eco_name as nm ".
+"from (".
+"    select".
+"      ecb_corporation_id as corporation_id,".
+"      max(ecb_updated_at) as updated_at,".
+"      sum(case when ecb_quantity=-2 then 1 else 0 end) as bpc,".
+"      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo,".
+"      count(1) as quantity".
+"    from qi.esi_corporation_blueprints".
+"    group by 1".
+"  ) cb".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = cb.corporation_id)".
+"  left outer join (".
+"    select".
+"      ecb_corporation_id as corporation_id,".
+"      count(1) as items_changed".
+"    from qi.esi_corporation_blueprints".
+"    where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1".
+"  ) cb_stat on (cb_stat.corporation_id = cb.corporation_id)".
+"order by c.eco_name;";
+    $corp_blueprints_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_blueprints = pg_fetch_all($corp_blueprints_cursor);
     //---
-    $query = <<<EOD
-select
-  cj.corporation_id as id,
-  cj.facility_id as fid,
-  cj.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cj.updated_at)::interval as ui,
-  cj.jobs_active as ja,
-  cj_stat.jobs_changed as jc,
-  c.eco_name as nm,
-  ks.name as fnm
-from (
-    select
-      ecj_corporation_id as corporation_id,
-      ecj_facility_id as facility_id,
-      max(ecj_updated_at) as updated_at,
-      count(1) as jobs_active
-    from qi.esi_corporation_industry_jobs
-    where ecj_status = 'active'
-    group by 1, 2
-  ) cj
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = cj.corporation_id)
-  left outer join qi.esi_known_stations ks on (ks.location_id = cj.facility_id)
-  left outer join (
-    select
-      ecj_corporation_id as corporation_id,
-      ecj_facility_id as facility_id,
-      count(1) as jobs_changed
-    from qi.esi_corporation_industry_jobs
-    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1, 2
-  ) cj_stat on (cj_stat.corporation_id = cj.corporation_id and cj_stat.facility_id = cj.facility_id)
-order by c.eco_name, ks.name;
-EOD;
-    $params = array($interval_minutes);
-    $corp_jobs_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  cj.corporation_id as id,".
+"  cj.facility_id as fid,".
+"  cj.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cj.updated_at)::interval as ui,".
+"  cj.jobs_active as ja,".
+"  cj_stat.jobs_changed as jc,".
+"  c.eco_name as nm,".
+"  ks.name as fnm ".
+"from (".
+"    select".
+"      ecj_corporation_id as corporation_id,".
+"      ecj_facility_id as facility_id,".
+"      max(ecj_updated_at) as updated_at,".
+"      count(1) as jobs_active".
+"    from qi.esi_corporation_industry_jobs".
+"    where ecj_status = 'active'".
+"    group by 1, 2".
+"  ) cj".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = cj.corporation_id)".
+"  left outer join qi.esi_known_stations ks on (ks.location_id = cj.facility_id)".
+"  left outer join (".
+"    select".
+"      ecj_corporation_id as corporation_id,".
+"      ecj_facility_id as facility_id,".
+"      count(1) as jobs_changed".
+"    from qi.esi_corporation_industry_jobs".
+"    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1, 2".
+"  ) cj_stat on (cj_stat.corporation_id = cj.corporation_id and cj_stat.facility_id = cj.facility_id)".
+"order by c.eco_name, ks.name;";
+    $corp_jobs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_jobs = pg_fetch_all($corp_jobs_cursor);
     //---
-    $query = <<<EOD
-select
-  wj.corporation_id as id,
-  wj.division as d,
-  wj.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wj.updated_at)::interval as ui,
-  wj.quantity as q,
-  wj_stat.rows_appear as ra,
-  c.eco_name as nm
-from (
-    select
-      ecwj_corporation_id as corporation_id,
-      ecwj_division as division,
-      max(ecwj_created_at) as updated_at,
-      count(1) as quantity
-    from qi.esi_corporation_wallet_journals
-    group by 1, 2
-  ) wj
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = wj.corporation_id)
-  left outer join (
-    select
-      ecwj_corporation_id as corporation_id,
-      ecwj_division as division,
-      count(1) as rows_appear
-    from qi.esi_corporation_wallet_journals
-    where ecwj_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1, 2
-  ) wj_stat on (wj_stat.corporation_id = wj.corporation_id and wj_stat.division = wj.division)
-order by c.eco_name, wj.division;
-EOD;
-    $params = array($interval_minutes);
-    $corp_wjrnls_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  wj.corporation_id as id,".
+"  wj.division as d,".
+"  wj.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wj.updated_at)::interval as ui,".
+"  wj.quantity as q,".
+"  wj_stat.rows_appear as ra,".
+"  c.eco_name as nm ".
+"from (".
+"    select".
+"      ecwj_corporation_id as corporation_id,".
+"      ecwj_division as division,".
+"      max(ecwj_created_at) as updated_at,".
+"      count(1) as quantity".
+"    from qi.esi_corporation_wallet_journals".
+"    group by 1, 2".
+"  ) wj".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = wj.corporation_id)".
+"  left outer join (".
+"    select".
+"      ecwj_corporation_id as corporation_id,".
+"      ecwj_division as division,".
+"      count(1) as rows_appear".
+"    from qi.esi_corporation_wallet_journals".
+"    where ecwj_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1, 2".
+"  ) wj_stat on (wj_stat.corporation_id = wj.corporation_id and wj_stat.division = wj.division)".
+"order by c.eco_name, wj.division;";
+    $corp_wjrnls_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_wjrnls = pg_fetch_all($corp_wjrnls_cursor);
     //---
-    $query = <<<EOD
-select
-  wt.corporation_id as id,
-  wt.division as d,
-  wt.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wt.updated_at)::interval as ui,
-  wt.quantity as q,
-  wt_stat.payments_appear as pa,
-  c.eco_name as nm
-from (
-    select
-      ecwt_corporation_id as corporation_id,
-      ecwt_division as division,
-      max(ecwt_created_at) as updated_at,
-      count(1) as quantity
-    from qi.esi_corporation_wallet_transactions
-    group by 1, 2
-  ) wt
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = wt.corporation_id)
-  left outer join (
-    select
-      ecwt_corporation_id as corporation_id,
-      ecwt_division as division,
-      count(1) as payments_appear
-    from qi.esi_corporation_wallet_transactions
-    where ecwt_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1, 2
-  ) wt_stat on (wt_stat.corporation_id = wt.corporation_id and wt_stat.division = wt.division)
-order by c.eco_name, wt.division;
-EOD;
-    $params = array($interval_minutes);
-    $corp_trnsctns_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  wt.corporation_id as id,".
+"  wt.division as d,".
+"  wt.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wt.updated_at)::interval as ui,".
+"  wt.quantity as q,".
+"  wt_stat.payments_appear as pa,".
+"  c.eco_name as nm ".
+"from (".
+"    select".
+"      ecwt_corporation_id as corporation_id,".
+"      ecwt_division as division,".
+"      max(ecwt_created_at) as updated_at,".
+"      count(1) as quantity".
+"    from qi.esi_corporation_wallet_transactions".
+"    group by 1, 2".
+"  ) wt".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = wt.corporation_id)".
+"  left outer join (".
+"    select".
+"      ecwt_corporation_id as corporation_id,".
+"      ecwt_division as division,".
+"      count(1) as payments_appear".
+"    from qi.esi_corporation_wallet_transactions".
+"    where ecwt_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1, 2".
+"  ) wt_stat on (wt_stat.corporation_id = wt.corporation_id and wt_stat.division = wt.division)".
+"order by c.eco_name, wt.division;";
+    $corp_trnsctns_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_trnsctns = pg_fetch_all($corp_trnsctns_cursor);
     //---
-    $query = <<<EOD
-select
-  o.corporation_id as id,
-  o.location_id as lid,
-  o.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - o.updated_at)::interval as ui,
-  o.total as t,
-  o.buy as b,
-  o.total-o.buy as s,
-  o_stat.total as tu,
-  o_stat.buy as bu,
-  o_stat.total-o_stat.buy as su,
-  c.eco_name as nm,
-  ks.name as hub
-from (
-    select
-      ecor_corporation_id as corporation_id,
-      ecor_location_id as location_id,
-      max(ecor_updated_at) as updated_at,
-      count(1) as total,
-      sum(ecor_is_buy_order::int) as buy
-    from qi.esi_corporation_orders
-    where not ecor_history
-    group by 1, 2
-  ) o
-  left outer join qi.esi_corporations c on (c.eco_corporation_id = o.corporation_id)
-  left outer join qi.esi_known_stations ks on (ks.location_id = o.location_id)
-  left outer join (
-    select
-      ecor_corporation_id as corporation_id,
-      ecor_location_id as location_id,
-      count(1) as total,
-      sum(ecor_is_buy_order::int) as buy
-    from qi.esi_corporation_orders
-    where ecor_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1, 2
-  ) o_stat on (o_stat.corporation_id = o.corporation_id and o_stat.location_id = o.location_id)
-order by c.eco_name, ks.name;
-EOD;
-    $params = array($interval_minutes);
-    $corp_orders_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  o.corporation_id as id,".
+"  o.location_id as lid,".
+"  o.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - o.updated_at)::interval as ui,".
+"  o.total as t,".
+"  o.buy as b,".
+"  o.total-o.buy as s,".
+"  o_stat.total as tu,".
+"  o_stat.buy as bu,".
+"  o_stat.total-o_stat.buy as su,".
+"  c.eco_name as nm,".
+"  ks.name as hub ".
+"from (".
+"    select".
+"      ecor_corporation_id as corporation_id,".
+"      ecor_location_id as location_id,".
+"      max(ecor_updated_at) as updated_at,".
+"      count(1) as total,".
+"      sum(ecor_is_buy_order::int) as buy".
+"    from qi.esi_corporation_orders".
+"    where not ecor_history".
+"    group by 1, 2".
+"  ) o".
+"  left outer join qi.esi_corporations c on (c.eco_corporation_id = o.corporation_id)".
+"  left outer join qi.esi_known_stations ks on (ks.location_id = o.location_id)".
+"  left outer join (".
+"    select".
+"      ecor_corporation_id as corporation_id,".
+"      ecor_location_id as location_id,".
+"      count(1) as total,".
+"      sum(ecor_is_buy_order::int) as buy".
+"    from qi.esi_corporation_orders".
+"    where ecor_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1, 2".
+"  ) o_stat on (o_stat.corporation_id = o.corporation_id and o_stat.location_id = o.location_id)".
+"order by c.eco_name, ks.name;";
+    $corp_orders_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $corp_orders = pg_fetch_all($corp_orders_cursor);
-*/
     //---
     pg_close($conn);
 ?>
