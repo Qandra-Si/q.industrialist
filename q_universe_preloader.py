@@ -124,9 +124,9 @@ def main():
         sys.stdout.flush()
 
         # Requires role(s): Director
-        corp_blueprints_data = dbtools.actualize_corporation_blueprints(corporation_id)
+        known_blueprints = dbtools.actualize_corporation_blueprints(corporation_id)
         print("'{}' corporation has {} blueprints\n".
-              format(corporation_name, len(corp_blueprints_data)))
+              format(corporation_name, 'no updates in' if known_blueprints is None else known_blueprints))
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager

@@ -892,10 +892,13 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_blueprints_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+        if data is None:
+            return None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return data
+            return None
 
         # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         self.prepare_corp_cache(
@@ -905,7 +908,7 @@ class QDatabaseTools:
             None
         )
 
-        # список ассетов имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
+        # список чертежей имеющихся у корпорации, хранящихся в БД, в кеше, а также новых и исчезнувших
         corp_cache = self.__cached_corporation_blueprints.get(corporation_id)
         ids_from_esi, ids_in_cache, new_ids, deleted_ids = self.get_cache_status(
             corp_cache,
@@ -913,12 +916,15 @@ class QDatabaseTools:
             debug=False  # corporation_id == 98150545
         )
         if not ids_from_esi:
-            return data
+            del data
+            return None
 
+        known_blueprints: int = len(data)
         if self.depth.push(url):
             for item_data in data:
                 self.actualize_corporation_blueprint_item(corporation_id, item_data, updated_at)
             self.depth.pop()
+        del data
 
         # параметр updated_at меняется в случае, если меняются данные корпоративной структуры, т.ч. не
         # использует массовое обновление всех корпоративных структур, а лишь удаляем исчезнувшие
@@ -934,7 +940,7 @@ class QDatabaseTools:
             if in_cache:
                 in_cache.store_ext({'deleted': True})
 
-        return data
+        return known_blueprints
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/industry/jobs/

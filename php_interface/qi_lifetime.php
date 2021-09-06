@@ -9,9 +9,9 @@ include_once '.settings.php';
 <thead>
  <tr>
   <th>Market Hub</th>
-  <th>Updated At</th>
+  <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Orders Known</th>
-  <th style="text-align: right;">Orders Updated</th>
+  <th style="text-align: right;">Updated in 15 min</th>
  </tr>
 </thead>
 <tbody>
@@ -43,14 +43,14 @@ include_once '.settings.php';
 
 
 <?php function __dump_lifetime_corporation_assets($corp_assets) { ?>
-<h2>Assets of Corporations</h2>
+<h2>Corporation Assets</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
   <th>Corporation</th>
-  <th>Updated At</th>
+  <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Asset Items</th>
-  <th style="text-align: right;">Items Updated</th>
+  <th style="text-align: right;">Updated in 90 min</th>
  </tr>
 </thead>
 <tbody>
@@ -68,6 +68,48 @@ include_once '.settings.php';
  <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($items_quantity,0,'.',',')?></td>
+ <?php if (is_null($items_changed)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($items_changed,0,'.',',')?></td>
+ <?php } ?>
+</tr>
+<?php
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
+
+<?php function __dump_lifetime_corporation_blueprins($corp_blueprins) { ?>
+<h2>Corporation Blueprints</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Corporation</th>
+  <th style="text-align: right;">Updated At</th>
+  <th style="text-align: right;">BPO</th>
+  <th style="text-align: right;">BPC</th>
+  <th style="text-align: right;">Updated in 90 min</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    foreach ($corp_blueprins as $corp)
+    {
+        $corporation_id = $corp['id'];
+        $updated_at = $corp['uat'];
+        $update_interval = $corp['ui'];
+        $bpc_quantity = $corp['bpc'];
+        $bpo_quantity = $corp['bpo'];
+        $items_changed = $corp['qc'];
+        $name = $corp['nm'];
+?>
+<tr>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($bpc_quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($bpo_quantity,0,'.',',')?></td>
  <?php if (is_null($items_changed)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($items_changed,0,'.',',')?></td>
  <?php } ?>
@@ -119,7 +161,6 @@ EOD;
     $market_hubs = pg_fetch_all($market_hubs_cursor);
     //---
     $query = <<<EOD
---SET intervalstyle = 'postgres_verbose';
 select
   ca.corporation_id as id,
   ca.updated_at as uat,
@@ -149,10 +190,44 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $corp_assets = pg_fetch_all($corp_assets_cursor);
     //---
+    $query = <<<EOD
+--SET intervalstyle = 'postgres_verbose';
+select
+  cb.corporation_id as id,
+  cb.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cb.updated_at)::interval as ui,
+  cb.bpc as bpc,
+  cb.bpo as bpo,
+  cb_stat.items_changed as qc,
+  c.eco_name as nm
+from (
+    select
+      ecb_corporation_id as corporation_id,
+      max(ecb_updated_at) as updated_at,
+      sum(case when ecb_quantity=-2 then 1 else 0 end) as bpc,
+      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo
+    from qi.esi_corporation_blueprints
+    group by 1
+  ) cb
+  left outer join qi.esi_corporations c on (c.eco_corporation_id = cb.corporation_id)
+  left outer join (
+    select
+      ecb_corporation_id as corporation_id,
+      count(1) as items_changed
+    from qi.esi_corporation_blueprints
+    where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 minutes')
+    group by 1
+  ) cb_stat on (cb_stat.corporation_id = cb.corporation_id);
+EOD;
+    $corp_blueprints_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_blueprints = pg_fetch_all($corp_blueprints_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
 <?php __dump_lifetime_market_hubs($market_hubs); ?>
 <?php __dump_lifetime_corporation_assets($corp_assets); ?>
+<?php __dump_lifetime_corporation_blueprints($corp_blueprints); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
