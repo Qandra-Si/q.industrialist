@@ -186,7 +186,7 @@ include_once '.settings.php';
   <th>Wallet Division</th>
   <th style="text-align: right;">Last Event At</th>
   <th style="text-align: right;">Total Quantity</th>
-  <th style="text-align: right;">Updated in 60 min</th>
+  <th style="text-align: right;">Events in 60 min</th>
  </tr>
 </thead>
 <tbody>
@@ -211,6 +211,51 @@ include_once '.settings.php';
  <td align="right"><?=number_format($total_quantity,0,'.',',')?></td>
  <?php if (is_null($rows_appear)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($rows_appear,0,'.',',')?></td>
+ <?php } ?>
+</tr>
+<?php
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
+
+<?php function __dump_lifetime_corporation_wallet_transactions($corp_trnsctns) { ?>
+<h2>Corporation Wallet Transactions</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Corporation</th>
+  <th>Wallet Division</th>
+  <th style="text-align: right;">Last Transaction At</th>
+  <th style="text-align: right;">Total Quantity</th>
+  <th style="text-align: right;">Payments in 60 min</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    $last_name = '';
+    foreach ($corp_trnsctns as $trnsct)
+    {
+        $corporation_id = $trnsct['id'];
+        $division = $trnsct['d'];
+        $updated_at = $trnsct['uat'];
+        $update_interval = $trnsct['ui'];
+        $total_quantity = $trnsct['q'];
+        $payments_appear = $trnsct['pa'];
+        $name = $trnsct['nm'];
+?>
+<tr>
+ <?php if ($name == $last_name) { ?><td></td><?php } else { $last_name = $name; ?>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <?php } ?>
+ <td><?=$division?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($total_quantity,0,'.',',')?></td>
+ <?php if (is_null($payments_appear)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($payments_appear,0,'.',',')?></td>
  <?php } ?>
 </tr>
 <?php
@@ -397,6 +442,40 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $corp_wjrnls = pg_fetch_all($corp_wjrnls_cursor);
     //---
+    $query = <<<EOD
+select
+  wt.corporation_id as id,
+  wt.division as d,
+  wt.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wt.updated_at)::interval as ui,
+  wt.quantity as q,
+  wt_stat.payments_appear as pa,
+  c.eco_name as nm
+from (
+    select
+      ecwt_corporation_id as corporation_id,
+      ecwt_division as division,
+      max(ecwt_created_at) as updated_at,
+      count(1) as quantity
+    from qi.esi_corporation_wallet_transactions
+    group by 1, 2
+  ) wt
+  left outer join qi.esi_corporations c on (c.eco_corporation_id = wt.corporation_id)
+  left outer join (
+    select
+      ecwt_corporation_id as corporation_id,
+      ecwt_division as division,
+      count(1) as payments_appear
+    from qi.esi_corporation_wallet_transactions
+    where ecwt_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    group by 1, 2
+  ) wt_stat on (wt_stat.corporation_id = wt.corporation_id and wt_stat.division = wt.division)
+order by c.eco_name, wt.division;
+EOD;
+    $corp_trnsctns_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_trnsctns = pg_fetch_all($corp_trnsctns_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
@@ -405,5 +484,6 @@ EOD;
 <?php __dump_lifetime_corporation_blueprints($corp_blueprints); ?>
 <?php __dump_lifetime_corporation_industry_jobs($corp_jobs); ?>
 <?php __dump_lifetime_corporation_wallet_journals($corp_wjrnls); ?>
+<?php __dump_lifetime_corporation_wallet_transactions($corp_trnsctns); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
