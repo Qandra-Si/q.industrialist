@@ -1543,13 +1543,16 @@ class QDatabaseTools:
         elif not is_updated:
             return None
 
+        # актуализируем данные по структуре (загружем по ESI или из БД, например её название)
+        self.actualize_universe_structure(location_id, need_data=need_data)
+
         # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
         db_debug: bool = self.dbswagger.db.debug
         if db_debug:
             self.dbswagger.db.disable_debug()
 
         # актуализация (добавление) market цен в БД
-        found_market_orders: int = self.actualize_trade_hub_market_orders(trade_hub_id, data, updated_at)
+        found_market_orders: int = self.actualize_trade_hub_market_orders(structure_id, data, updated_at)
 
         # стараемся пораньше очистить память
         del data
