@@ -35,3 +35,11 @@ g_market_hubs = [
     #   "trade_hubs": ["Amarr VIII (Oris) - Emperor Family Academy"],
     # },
 ]
+g_market_structures = [
+    { "structure_id": 1028858195912 },  # Perimeter - Tranquility Trading Tower (Keepstar)
+    # { "structure_id": 1023968078820 },  # Ashab - Tranquility Trade & Prod Center (Sotiyo)
+
+    { "structure_id": 1034323745897,  # P-ZMZV - SUSLIK Q STAR (Keepstar)
+      "corporation_name": "R Initiative 4",  # название корпорации, от имени которой считывать market-данные (д.б. доступ)
+    },
+]

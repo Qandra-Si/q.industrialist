@@ -92,6 +92,20 @@ def main():
                 print("'{}' market orders has {} updates\n".format(region['region'], 'no' if found_market_orders is None else found_market_orders))
                 sys.stdout.flush()
 
+            # Requires: public access
+            for structure in q_industrialist_settings.g_market_structures:
+                if structure.get("corporation_name", None) is None:
+                    found_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
+                    print("'{}' market orders has {} updates\n".format(structure.get("structure_id"), 'no' if found_market_orders is None else found_market_orders))
+                    sys.stdout.flush()
+
+        # Requires: public access
+        for structure in q_industrialist_settings.g_market_structures:
+            if structure.get("corporation_name") == corporation_name:
+                found_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
+                print("'{}' market orders has {} updates\n".format(structure.get("structure_id"), 'no' if found_market_orders is None else found_market_orders))
+                sys.stdout.flush()
+
         # приступаем к загрузке корпоративных данных
 
         # Requires role(s): Station_Manager
