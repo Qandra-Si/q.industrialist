@@ -267,6 +267,64 @@ include_once '.settings.php';
 } ?>
 
 
+<?php function __dump_lifetime_corporation_orders($corp_orders) { ?>
+<h2>Corporation Orders</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Corporation</th>
+  <th>Trade Hub</th>
+  <th style="text-align: right;">Updated At</th>
+  <th style="text-align: right;">Active (total)</th>
+  <th style="text-align: right;">Active (sell)</th>
+  <th style="text-align: right;">Active (buy)</th>
+  <th style="text-align: right;">Updated in 60 min</th>
+  <th style="text-align: right;">Updated (sell)</th>
+  <th style="text-align: right;">Updated (buy)</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    $last_name = '';
+    foreach ($corp_orders as $order)
+    {
+        $corporation_id = $order['id'];
+        $location_id = $order['lid'];
+        $updated_at = $order['uat'];
+        $update_interval = $order['ui'];
+        $total_quantity = $order['t'];
+        $sell_quantity = $order['s'];
+        $buy_quantity = $order['b'];
+        $total_updated = $order['tu'];
+        $sell_updated = $order['su'];
+        $buy_updated = $order['bu'];
+        $name = $order['nm'];
+        $trade_hub = $order['hub'];
+?>
+<tr>
+ <?php if ($name == $last_name) { ?><td></td><?php } else { $last_name = $name; ?>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <?php } ?>
+ <td><?=$trade_hub.'<br><span class="text-muted">'.$location_id.'</span> '?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($total_quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($sell_quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($buy_quantity,0,'.',',')?></td>
+ <?php if (is_null($total_updated)) { ?><td></td><td></td><td></td><?php } else { ?>
+ <td align="right"><?=number_format($total_updated,0,'.',',')?></td>
+ <td align="right"><?=number_format($sell_updated,0,'.',',')?></td>
+ <td align="right"><?=number_format($buy_updated,0,'.',',')?></td>
+ <?php } ?>
+</tr>
+<?php
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
+
 <?php
     __dump_header("Lifetime", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
@@ -476,6 +534,49 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $corp_trnsctns = pg_fetch_all($corp_trnsctns_cursor);
     //---
+    $query = <<<EOD
+select
+  o.corporation_id as id,
+  o.location_id as lid,
+  o.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - o.updated_at)::interval as ui,
+  o.total as t,
+  o.buy as b,
+  o.total-o.buy as s,
+  o_stat.total as ta,
+  o_stat.buy as ba,
+  o_stat.total-o_stat.buy as sa,
+  c.eco_name as nm,
+  ks.name as hub
+from (
+    select
+      ecor_corporation_id as corporation_id,
+      ecor_location_id as location_id,
+      max(ecor_updated_at) as updated_at,
+      count(1) as total,
+      sum(ecor_is_buy_order::int) as buy
+    from qi.esi_corporation_orders
+    where not ecor_history
+    group by 1, 2
+  ) o
+  left outer join qi.esi_corporations c on (c.eco_corporation_id = o.corporation_id)
+  left outer join qi.esi_known_stations ks on (ks.location_id = o.location_id)
+  left outer join (
+    select
+      ecor_corporation_id as corporation_id,
+      ecor_location_id as location_id,
+      count(1) as total,
+      sum(ecor_is_buy_order::int) as buy
+    from qi.esi_corporation_orders
+    where ecor_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    group by 1, 2
+  ) o_stat on (o_stat.corporation_id = o.corporation_id and o_stat.location_id = o.location_id)
+order by c.eco_name, ks.name;
+EOD;
+    $corp_orders_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_orders = pg_fetch_all($corp_orders_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
@@ -485,5 +586,6 @@ EOD;
 <?php __dump_lifetime_corporation_industry_jobs($corp_jobs); ?>
 <?php __dump_lifetime_corporation_wallet_journals($corp_wjrnls); ?>
 <?php __dump_lifetime_corporation_wallet_transactions($corp_trnsctns); ?>
+<?php __dump_lifetime_corporation_orders($corp_orders); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
