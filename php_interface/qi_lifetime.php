@@ -19,13 +19,14 @@ include_once '.settings.php';
     {
         $location_id = $hub['id'];
         $updated_at = $hub['uat'];
+        $update_interval = $hub['ui'];
         $orders_known = $hub['ok'];
         $orders_changed = $hub['oc'];
         $name = $hub['nm'];
 ?>
 <tr>
  <td><?=$name.'<br><span class="text-muted">'.$location_id.'</span> '?></td>
- <td align="right"><?=$updated_at?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($orders_known,0,'.',',')?></td>
  <?php if (is_null($orders_changed)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($orders_changed,0,'.',',')?></td>
@@ -51,6 +52,7 @@ include_once '.settings.php';
 select
   hubs.ethp_location_id as id,
   hubs.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hubs.updated_at)::interval as ui,
   hubs.orders_known as ok,
   hubs_stat.orders_changed as oc, -- orders changed in 15min
   ks.name as nm
