@@ -1,11 +1,11 @@
 ﻿<?php
 include 'qi_render_html.php';
 include_once '.settings.php';
-?>
 
 function get_numeric($val) {
     return is_numeric($val) ? ($val + 0) : 0;
 }
+?>
 
 <?php function __dump_lifetime_market_hubs($market_hubs, $interval_minutes) { ?>
 <h2>Market Hubs and Structures</h2>
@@ -350,37 +350,36 @@ function get_numeric($val) {
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     //---
-    $query = <<<EOD
-select
-  hubs.ethp_location_id as id,
-  hubs.updated_at as uat,
-  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hubs.updated_at)::interval as ui,
-  hubs.orders_known as ok,
-  hubs_stat.orders_changed as oc, -- orders changed in 15min
-  ks.name as nm
-from (
-    select
-      ethp_location_id,
-      max(ethp_updated_at) as updated_at,
-      count(1) as orders_known
-    from qi.esi_trade_hub_prices ethp
-    group by 1
-  ) hubs
-  left outer join qi.esi_known_stations ks on (ks.location_id = hubs.ethp_location_id)
-  left outer join (
-    select
-      ethp_location_id as location_id,
-      count(1) as orders_changed
-    from qi.esi_trade_hub_prices ethp
-    where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '$1 minutes')
-    group by 1
-  ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id)
-order by ks.name;
-EOD;
-    $params = array($interval_minutes);
-    $market_hubs_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query_params err: '.pg_last_error());
+    $query =
+"select".
+"  hubs.ethp_location_id as id,".
+"  hubs.updated_at as uat,".
+"  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hubs.updated_at)::interval as ui,".
+"  hubs.orders_known as ok,".
+"  hubs_stat.orders_changed as oc,".
+"  ks.name as nm ".
+"from (".
+"    select".
+"      ethp_location_id,".
+"      max(ethp_updated_at) as updated_at,".
+"      count(1) as orders_known".
+"    from qi.esi_trade_hub_prices ethp".
+"    group by 1".
+"  ) hubs".
+"  left outer join qi.esi_known_stations ks on (ks.location_id = hubs.ethp_location_id)".
+"  left outer join (".
+"    select".
+"      ethp_location_id as location_id,".
+"      count(1) as orders_changed".
+"    from qi.esi_trade_hub_prices ethp".
+"    where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '".$interval_minutes." minutes')".
+"    group by 1".
+"  ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id)".
+"order by ks.name;";
+    $market_hubs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
     $market_hubs = pg_fetch_all($market_hubs_cursor);
+/*
     //---
     $query = <<<EOD
 select
@@ -601,6 +600,7 @@ EOD;
     $corp_orders_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query_params err: '.pg_last_error());
     $corp_orders = pg_fetch_all($corp_orders_cursor);
+*/
     //---
     pg_close($conn);
 ?>
