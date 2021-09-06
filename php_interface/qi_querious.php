@@ -166,6 +166,7 @@ select
   tid.sdet_type_name as name,
   case
     when (weeks_passed.volume_sell=0) or (weeks_passed.diff<0.14) then null
+    when (weeks_passed.diff < 1.14) then weeks_passed.volume_sell
     else round(weeks_passed.volume_sell/weeks_passed.diff,1)
   end as wv, -- weekly volume
   round(transactions_stat.avg_volume, 1) as ov, -- order volume

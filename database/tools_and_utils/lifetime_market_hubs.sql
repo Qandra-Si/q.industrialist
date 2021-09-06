@@ -1,6 +1,8 @@
+--SET intervalstyle = 'postgres_verbose';
 select
   hubs.location_id,
   hubs.updated_at,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hubs.updated_at)::interval,
   hubs.orders_known,
   hubs_stat.orders_changed, -- orders changed in 15min
   ks.name
