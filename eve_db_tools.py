@@ -997,10 +997,13 @@ class QDatabaseTools:
         # Requires role(s): Director
         url: str = self.get_corporation_industry_jobs_url(corporation_id)
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+        if data is None:
+            return None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return data
+            return None
 
         # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
         oldest_delivered_job = None
@@ -1020,13 +1023,16 @@ class QDatabaseTools:
         )
 
         # актуализация (добавление и обновление) производственных работ
+        known_industry_jobs: int = len(data)
+        active_industry_jobs: int = len([j for j in data if j['status'] == 'active'])
         if self.depth.push(url):
             for job_data in data:
                 self.actualize_corporation_industry_job_item(corporation_id, job_data, updated_at)
             self.depth.pop()
         self.qidb.commit()
+        del data
 
-        return data
+        return known_industry_jobs, active_industry_jobs
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/blueprints/

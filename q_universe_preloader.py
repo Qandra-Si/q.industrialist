@@ -130,9 +130,12 @@ def main():
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager
-        corp_industry_jobs_data = dbtools.actualize_corporation_industry_jobs(corporation_id)
-        print("'{}' corporation has {} active industry jobs\n".
-              format(corporation_name, len([j for j in corp_industry_jobs_data if j['status'] == 'active'])))
+        corp_industry_stat = dbtools.actualize_corporation_industry_jobs(corporation_id)
+        if corp_industry_stat is None:
+            print("'{}' corporation has no update in industry jobs\n".format(corporation_name))
+        else:
+            print("'{}' corporation has {} active of {} total industry jobs\n".
+                  format(corporation_name, corp_industry_stat[1], corp_industry_stat[0]))
         sys.stdout.flush()
 
         # Requires role(s): Accountant, Junior_Accountant
@@ -150,8 +153,7 @@ def main():
         # Requires role(s): Accountant, Trader
         corp_orders_stat = dbtools.actualize_corporation_orders(corporation_id)
         if corp_orders_stat is None:
-            print("'{}' corporation has no update in orders\n".
-                  format(corporation_name))
+            print("'{}' corporation has no update in orders\n".format(corporation_name))
         else:
             print("'{}' corporation has {} active and {} finished orders\n".
                   format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))

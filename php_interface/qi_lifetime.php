@@ -140,7 +140,7 @@ include_once '.settings.php';
   <th>Facility</th>
   <th style="text-align: right;">Updated At</th>
   <th style="text-align: right;">Active Jobs</th>
-  <th style="text-align: right;">Updated in 90 min</th>
+  <th style="text-align: right;">Updated in 15 min</th>
  </tr>
 </thead>
 <tbody>
@@ -155,13 +155,13 @@ include_once '.settings.php';
         $jobs_active = $facility['ja'];
         $jobs_changed = $facility['jc'];
         $name = $facility['nm'];
-        $facility = $facility['fnm'];
+        $fname = $facility['fnm'];
 ?>
 <tr>
- <?php if ($name == $last_name) { ?><td></td><?php } else { ?>
+ <?php if ($name == $last_name) { ?><td></td><?php } else { $last_name = $name; ?>
  <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
  <?php } ?>
- <td><?=$facility.'<br><span class="text-muted">'.$facility_id.'</span> '?></td>
+ <td><?=$fname.'<br><span class="text-muted">'.$facility_id.'</span> '?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
  <td align="right"><?=number_format($jobs_active,0,'.',',')?></td>
  <?php if (is_null($jobs_changed)) { ?><td></td><?php } else { ?>
@@ -169,7 +169,51 @@ include_once '.settings.php';
  <?php } ?>
 </tr>
 <?php
-        $last_name = $name;
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
+
+<?php function __dump_lifetime_corporation_wallet_journals($corp_wjrnls) { ?>
+<h2>Corporation Wallet Journals</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Corporation</th>
+  <th>Wallet Division</th>
+  <th style="text-align: right;">Last Event At</th>
+  <th style="text-align: right;">Total Quantity</th>
+  <th style="text-align: right;">Updated in 60 min</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    $last_name = '';
+    foreach ($corp_wjrnls as $event)
+    {
+        $corporation_id = $event['id'];
+        $division = $event['d'];
+        $updated_at = $event['uat'];
+        $update_interval = $event['ui'];
+        $total_quantity = $event['q'];
+        $rows_appear = $event['ra'];
+        $name = $event['nm'];
+?>
+<tr>
+ <?php if ($name == $last_name) { ?><td></td><?php } else { $last_name = $name; ?>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <?php } ?>
+ <td><?=$division?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($total_quantity,0,'.',',')?></td>
+ <?php if (is_null($rows_appear)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($rows_appear,0,'.',',')?></td>
+ <?php } ?>
+</tr>
+<?php
     }
 ?>
 </tbody>
@@ -310,7 +354,7 @@ from (
       ecj_facility_id as facility_id,
       count(1) as jobs_changed
     from qi.esi_corporation_industry_jobs
-    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '9000 minutes')
+    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '15 minutes')
     group by 1, 2
   ) cj_stat on (cj_stat.corporation_id = cj.corporation_id and cj_stat.facility_id = cj.facility_id)
 order by c.eco_name, ks.name;
@@ -319,6 +363,40 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $corp_jobs = pg_fetch_all($corp_jobs_cursor);
     //---
+    $query = <<<EOD
+select
+  wj.corporation_id as id,
+  wj.division as d,
+  wj.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - wj.updated_at)::interval as ui,
+  wj.quantity as q,
+  wj_stat.rows_appear as ra,
+  c.eco_name as nm
+from (
+    select
+      ecwj_corporation_id as corporation_id,
+      ecwj_division as division,
+      max(ecwj_created_at) as updated_at,
+      count(1) as quantity
+    from qi.esi_corporation_wallet_journals
+    group by 1, 2
+  ) wj
+  left outer join qi.esi_corporations c on (c.eco_corporation_id = wj.corporation_id)
+  left outer join (
+    select
+      ecwj_corporation_id as corporation_id,
+      ecwj_division as division,
+      count(1) as rows_appear
+    from qi.esi_corporation_wallet_journals
+    where ecwj_created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 minutes')
+    group by 1, 2
+  ) wj_stat on (wj_stat.corporation_id = wj.corporation_id and wj_stat.division = wj.division)
+order by c.eco_name, wj.division;
+EOD;
+    $corp_wjrnls_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_wjrnls = pg_fetch_all($corp_wjrnls_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container-fluid">
@@ -326,5 +404,6 @@ EOD;
 <?php __dump_lifetime_corporation_assets($corp_assets); ?>
 <?php __dump_lifetime_corporation_blueprints($corp_blueprints); ?>
 <?php __dump_lifetime_corporation_industry_jobs($corp_jobs); ?>
+<?php __dump_lifetime_corporation_wallet_journals($corp_wjrnls); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
