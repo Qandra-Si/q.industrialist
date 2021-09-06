@@ -5,6 +5,7 @@ select
   date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cb.updated_at)::interval as ui,
   cb.bpc as bpc,
   cb.bpo as bpo,
+  cb.quantity as q,
   cb_stat.items_changed as qc,
   c.eco_name as nm
 from (
@@ -12,7 +13,8 @@ from (
       ecb_corporation_id as corporation_id,
       max(ecb_updated_at) as updated_at,
       sum(case when ecb_quantity=-2 then 1 else 0 end) as bpc,
-      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo
+      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo,
+      count(1) as quantity
     from qi.esi_corporation_blueprints
     group by 1
   ) cb

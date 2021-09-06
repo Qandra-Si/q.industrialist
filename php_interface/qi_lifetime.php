@@ -88,6 +88,7 @@ include_once '.settings.php';
  <tr>
   <th>Corporation</th>
   <th style="text-align: right;">Updated At</th>
+  <th style="text-align: right;">Stacks</th>
   <th style="text-align: right;">BPO</th>
   <th style="text-align: right;">BPC</th>
   <th style="text-align: right;">Updated in 90 min</th>
@@ -102,16 +103,63 @@ include_once '.settings.php';
         $update_interval = $corp['ui'];
         $bpc_quantity = $corp['bpc'];
         $bpo_quantity = $corp['bpo'];
+        $stacks_quantity = $corp['q'];
         $items_changed = $corp['qc'];
         $name = $corp['nm'];
 ?>
 <tr>
  <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
  <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($stacks_quantity,0,'.',',')?></td>
  <td align="right"><?=number_format($bpc_quantity,0,'.',',')?></td>
  <td align="right"><?=number_format($bpo_quantity,0,'.',',')?></td>
  <?php if (is_null($items_changed)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($items_changed,0,'.',',')?></td>
+ <?php } ?>
+</tr>
+<?php
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
+
+<?php function __dump_lifetime_industry_jobs($corp_jobs) { ?>
+<h2>Corporation Blueprints</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Corporation</th>
+  <th>Facility</th>
+  <th style="text-align: right;">Updated At</th>
+  <th style="text-align: right;">Stacks</th>
+  <th style="text-align: right;">BPO</th>
+  <th style="text-align: right;">BPC</th>
+  <th style="text-align: right;">Updated in 90 min</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    foreach ($corp_jobs as $facility)
+    {
+        $corporation_id = $corp['id'];
+        $facility_id = $corp['fid'];
+        $updated_at = $corp['uat'];
+        $update_interval = $corp['ui'];
+        $jobs_active = $corp['ja'];
+        $jobs_changed = $corp['jc'];
+        $name = $corp['nm'];
+        $facility = $corp['fnm'];
+?>
+<tr>
+ <td><?=$name.'<br><span class="text-muted">'.$corporation_id.'</span> '?></td>
+ <td><?=$facility.'<br><span class="text-muted">'.$facility_id.'</span> '?></td>
+ <td align="right"><?=$updated_at.'<br><span class="text-warning">'.$update_interval.'</span> '?></td>
+ <td align="right"><?=number_format($jobs_active,0,'.',',')?></td>
+ <?php if (is_null($jobs_changed)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($jobs_changed,0,'.',',')?></td>
  <?php } ?>
 </tr>
 <?php
@@ -154,7 +202,8 @@ from (
     from qi.esi_trade_hub_prices ethp
     where ethp_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '15 minutes') -- интервал обновления 10 минут => статистика 15 минут
     group by 1
-  ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id);
+  ) hubs_stat on (hubs_stat.location_id = hubs.ethp_location_id)
+order by ks.name;
 EOD;
     $market_hubs_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
@@ -184,20 +233,21 @@ from (
     from qi.esi_corporation_assets
     where eca_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 minutes')
     group by 1
-  ) ca_stat on (ca_stat.corporation_id = ca.corporation_id);
+  ) ca_stat on (ca_stat.corporation_id = ca.corporation_id)
+order by c.eco_name;
 EOD;
     $corp_assets_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $corp_assets = pg_fetch_all($corp_assets_cursor);
     //---
     $query = <<<EOD
---SET intervalstyle = 'postgres_verbose';
 select
   cb.corporation_id as id,
   cb.updated_at as uat,
   date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cb.updated_at)::interval as ui,
   cb.bpc as bpc,
   cb.bpo as bpo,
+  cb.quantity as q,
   cb_stat.items_changed as qc,
   c.eco_name as nm
 from (
@@ -205,7 +255,8 @@ from (
       ecb_corporation_id as corporation_id,
       max(ecb_updated_at) as updated_at,
       sum(case when ecb_quantity=-2 then 1 else 0 end) as bpc,
-      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo
+      sum(case when ecb_quantity=-1 then 1 when ecb_quantity>0 then ecb_quantity else 0 end) as bpo,
+      count(1) as quantity
     from qi.esi_corporation_blueprints
     group by 1
   ) cb
@@ -217,11 +268,49 @@ from (
     from qi.esi_corporation_blueprints
     where ecb_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 minutes')
     group by 1
-  ) cb_stat on (cb_stat.corporation_id = cb.corporation_id);
+  ) cb_stat on (cb_stat.corporation_id = cb.corporation_id)
+order by c.eco_name;
 EOD;
     $corp_blueprints_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $corp_blueprints = pg_fetch_all($corp_blueprints_cursor);
+    //---
+    $query = <<<EOD
+select
+  cj.corporation_id as id,
+  cj.facility_id as fid,
+  cj.updated_at as uat,
+  date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - cj.updated_at)::interval as ui,
+  cj.jobs_active as ja,
+  cj_stat.jobs_changed as jc,
+  c.eco_name as nm,
+  ks.name as fnm
+from (
+    select
+      ecj_corporation_id as corporation_id,
+      ecj_facility_id as facility_id,
+      max(ecj_updated_at) as updated_at,
+      count(1) as jobs_active
+    from qi.esi_corporation_industry_jobs
+    where ecj_status = 'active'
+    group by 1, 2
+  ) cj
+  left outer join qi.esi_corporations c on (c.eco_corporation_id = cj.corporation_id)
+  left outer join qi.esi_known_stations ks on (ks.location_id = cj.facility_id)
+  left outer join (
+    select
+      ecj_corporation_id as corporation_id,
+      ecj_facility_id as facility_id,
+      count(1) as jobs_changed
+    from qi.esi_corporation_industry_jobs
+    where ecj_updated_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '9000 minutes')
+    group by 1, 2
+  ) cj_stat on (cj_stat.corporation_id = cj.corporation_id and cj_stat.facility_id = cj.facility_id)
+order by c.eco_name, ks.name;
+EOD;
+    $corp_jobs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_jobs = pg_fetch_all($corp_jobs_cursor);
     //---
     pg_close($conn);
 ?>
@@ -229,5 +318,6 @@ EOD;
 <?php __dump_lifetime_market_hubs($market_hubs); ?>
 <?php __dump_lifetime_corporation_assets($corp_assets); ?>
 <?php __dump_lifetime_corporation_blueprints($corp_blueprints); ?>
+<?php __dump_lifetime_corporation_industry_jobs($corp_jobs); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
