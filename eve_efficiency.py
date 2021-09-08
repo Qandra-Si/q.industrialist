@@ -75,38 +75,51 @@ def get_t2_bpc_attributes(product_type_id, invent_effects, sde_type_ids, sde_mar
 
 
 def get_industry_material_efficiency(
-        # признак - это чертёж или формула?
-        __is_reaction_formula,
+        # тип производства - это чертёж или формула, или реакция?
+        manufacturing_activity: str,
         # кол-во run-ов
-        runs_quantity,
+        runs_quantity: int,
         # кол-во из исходного чертежа (до учёта всех бонусов)
-        __bpo_materials_quantity,
+        __bpo_materials_quantity: int,
         # me-параметр чертежа
-        material_efficiency):
-    if __is_reaction_formula:
-        # TODO: для формул нет расчёта материалоёмкости
-        __need = runs_quantity * __bpo_materials_quantity
-    elif __bpo_materials_quantity == 1:
+        material_efficiency: int):
+    if __bpo_materials_quantity == 1:
         # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
         # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
         __need = runs_quantity
     else:
-        # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-        # см. 1 x run: http://prntscr.com/u0g07w
-        # см. 4 x run: http://prntscr.com/u0g0cd
-        # см.11 x run: https://prnt.sc/v3mk1m
-        # см. экономия материалов: http://prntscr.com/u0g11u
-        # ---
-        # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
-        __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
-        # учитываем бонус профиля сооружения
-        __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
-        # учитываем бонус установленного модификатора
-        __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
-        # округляем вещественное число до старшего целого
-        __stage4 = int(float(__stage3 + 0.99))
-        # ---
-        __need = __stage4
+        if manufacturing_activity == 'reaction':
+            # TODO: хардкодим -2.2% structure role bonus
+            __stage1 = runs_quantity * __bpo_materials_quantity
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage3 = int(float(__stage2 + 0.99))
+            # ---
+            __need = __stage3
+        elif manufacturing_activity == 'manufacturing':
+            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
+            # см. 1 x run: http://prntscr.com/u0g07w
+            # см. 4 x run: http://prntscr.com/u0g0cd
+            # см.11 x run: https://prnt.sc/v3mk1m
+            # см. экономия материалов: http://prntscr.com/u0g11u
+            # ---
+            # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
+            __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
+            # учитываем бонус установленного модификатора
+            __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage4 = int(float(__stage3 + 0.99))
+            # ---
+            __need = __stage4
+        elif manufacturing_activity == 'invention':
+            # TODO: не используется structure role bonus
+            __need = runs_quantity * __bpo_materials_quantity
+        else:
+            # TODO: не поддерживается расчёт... доделать
+            __need = runs_quantity * __bpo_materials_quantity
     return __need
 
 
@@ -115,7 +128,7 @@ def get_t2_bpc_materials_with_efficiency(t2_bpc_attributes, materials):
     materials_with_me = materials[:]
     for m in materials_with_me:
         m["quantity"] = get_industry_material_efficiency(
-            False,
+            'manufacturing',
             t2_bpc_attributes["runs"],
             m["quantity"],
             t2_bpc_attributes["me"])

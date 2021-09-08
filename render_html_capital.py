@@ -52,46 +52,6 @@ def __dump_blueprint_materials(
         bpmm1_tid = int(m1[1]["typeID"])
         bpmm1_tnm = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_tid)
         bpmm1_quantity = int(m1[1]["quantity"])
-        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
-        # поиск чертежей, имеющихся в наличии у корпорации
-        bpmm1_blueprints = None
-        bpmm1_in_progress = 0
-        if not (bpmm1_blueprint_type_id is None):
-            bpmm1_blueprints = blueprints_cache.get(bpmm1_blueprint_type_id)
-            if not bpmm1_blueprints:
-                bpmm1_blueprints = []
-                for b in corp_blueprints_data:
-                    __type_id = int(b["type_id"])
-                    if bpmm1_blueprint_type_id != __type_id:
-                        continue
-                    __location_id = int(b["location_id"])
-                    if not (__location_id in blueprint_containter_ids):
-                        continue
-                    __quantity = int(b["quantity"])
-                    # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a
-                    # copy. It can be a positive integer if it is a stack of blueprint originals fresh from the market
-                    # (e.g. no activities performed on them yet).
-                    __is_blueprint_copy = __quantity == -2
-                    __bp_dict = {
-                        "cp": __is_blueprint_copy,
-                        "me": b["material_efficiency"],
-                        "te": b["time_efficiency"],
-                        "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity)
-                    }
-                    bpmm1_blueprints.append(__bp_dict)
-                bpmm1_blueprints.sort(key=lambda bp: (100000*int(bp["cp"]) + 10000*bp["cp"] + bp["qr"]), reverse=True)
-                blueprints_cache[bpmm1_blueprint_type_id] = bpmm1_blueprints
-            # получаем список работ, которые ведутся с материалами
-            bpmm1_in_progress = industry_jobs_cache.get(bpmm1_tid)
-            if bpmm1_in_progress is None:
-                bpmm1_in_progress = 0
-                for j in corp_industry_jobs_data:
-                    __type_id = j["product_type_id"]
-                    if bpmm1_tid != __type_id:
-                        continue
-                    __runs = int(j["runs"])
-                    bpmm1_in_progress += __runs
-                industry_jobs_cache[bpmm1_tid] = bpmm1_in_progress
         # подсчёт кол-ва имеющихся в наличии материалов
         bpmm1_available = assets_cache.get(bpmm1_tid)
         if bpmm1_available is None:
@@ -110,19 +70,33 @@ def __dump_blueprint_materials(
                 __quantity = int(a["quantity"])
                 bpmm1_available += __quantity
             assets_cache[bpmm1_tid] = bpmm1_available
-        # расчёт кол-ва материала с учётом эффективности производства
-        bpmm1_efficiency = eve_efficiency.get_industry_material_efficiency(
+        # получаем список работ, которые ведутся с материалами
+        bpmm1_in_progress = industry_jobs_cache.get(bpmm1_tid)
+        if bpmm1_in_progress is None:
+            bpmm1_in_progress = 0
+            for j in corp_industry_jobs_data:
+                __type_id = j["product_type_id"]
+                if bpmm1_tid != __type_id:
+                    continue
+                __runs = int(j["runs"])
+                bpmm1_in_progress += __runs
+            industry_jobs_cache[bpmm1_tid] = bpmm1_in_progress
+        # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
+        # например с использованием BPO)
+        bpmm1_quantity_with_efficiency = eve_efficiency.get_industry_material_efficiency(
             'reaction' if bpmm0_is_reaction_formula else 'manufacturing',
-            1,
-            bpmm1_quantity * bpmm0_quantity,  # сведения из чертежа
-            bpmm0_material_efficiency)
+            bpmm0_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+            bpmm1_quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
+            bpmm0_material_efficiency)  # me-параметр чертежа предыдущего уровня
         # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
-        bpmm1_not_enough = bpmm1_efficiency - bpmm1_available - bpmm1_in_progress
+        bpmm1_not_enough = bpmm1_quantity_with_efficiency - bpmm1_available - bpmm1_in_progress
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
         # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough)
+        # debug:
+        print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough, "= n{} - a{} - j{}".format(bpmm1_quantity_with_efficiency, bpmm1_available, bpmm1_in_progress))
         # вывод наименования ресурса
         glf.write(
             '<tr{tr_class}>\n'
@@ -139,24 +113,24 @@ def __dump_blueprint_materials(
                 nm_prfx=nm_prfx, nm=bpmm1_tnm,
                 src=render_html.__get_img_src(bpmm1_tid, 32),
                 qs=bpmm1_quantity * bpmm0_quantity,
-                qe=bpmm1_efficiency,
+                qe=bpmm1_quantity_with_efficiency,
                 qa=bpmm1_available,
                 qip="" if bpmm1_in_progress == 0 else '<mark>+ {}</mark>'.format(bpmm1_in_progress),
                 qne=bpmm1_not_enough
             )
         )
         # помечаем использованными материалы и работы, чтобы на следующих элементах исопльзовалось ОСТАВШЕЕСЯ кол-во
-        if (bpmm1_available + bpmm1_in_progress) <= bpmm1_efficiency:
+        if (bpmm1_available + bpmm1_in_progress) <= bpmm1_quantity_with_efficiency:
             assets_cache[bpmm1_tid] = 0
             if bpmm1_in_progress:
                 industry_jobs_cache[bpmm1_tid] = 0
         else:
-            if bpmm1_available >= bpmm1_efficiency:
-                assets_cache[bpmm1_tid] -= bpmm1_efficiency
+            if bpmm1_available >= bpmm1_quantity_with_efficiency:
+                assets_cache[bpmm1_tid] -= bpmm1_quantity_with_efficiency
             else:
                 assets_cache[bpmm1_tid] = 0
                 if bpmm1_in_progress:
-                    __rest = bpmm1_efficiency - bpmm1_available
+                    __rest = bpmm1_quantity_with_efficiency - bpmm1_available
                     if __rest >= bpmm1_in_progress:
                         industry_jobs_cache[bpmm1_tid] = __rest
                     else:
@@ -166,28 +140,60 @@ def __dump_blueprint_materials(
         if __summary_dict is None:
             materials_summary.append({"id": bpmm1_tid,
                                       "nm": bpmm1_tnm,
-                                      "q": bpmm1_efficiency,
+                                      "q": bpmm1_quantity_with_efficiency,
                                       "a": bpmm1_available,
                                       "j": bpmm1_in_progress})
         else:
             __summary_dict["q"] += bpmm1_not_enough
+        del __summary_dict
+
         # если все материалы собраны, то переходим к следующим компонентам
         if bpmm1_not_enough == 0:
             continue
-        # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
-        # проверяем, что для текущего материала существуют чертежи для производства
+        # определяем, можно ли строить этот продукт, или возможен только его закуп?
+        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
         if bpmm1_blueprint_type_id is None:
             continue
+        # поиск чертежей, имеющихся в наличии у корпорации
+        bpmm1_blueprints = blueprints_cache.get(bpmm1_blueprint_type_id)
+        if not bpmm1_blueprints:
+            bpmm1_blueprints = []
+            for b in corp_blueprints_data:
+                __type_id = int(b["type_id"])
+                if bpmm1_blueprint_type_id != __type_id:
+                    continue
+                __location_id = int(b["location_id"])
+                if not (__location_id in blueprint_containter_ids):
+                    continue
+                __quantity = int(b["quantity"])
+                # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a
+                # copy. It can be a positive integer if it is a stack of blueprint originals fresh from the market
+                # (e.g. no activities performed on them yet).
+                __is_blueprint_copy = __quantity == -2
+                __bp_dict = {
+                    "cp": __is_blueprint_copy,
+                    "me": b["material_efficiency"],
+                    "te": b["time_efficiency"],
+                    "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity)
+                }
+                bpmm1_blueprints.append(__bp_dict)
+            bpmm1_blueprints.sort(key=lambda bp: (100000*int(bp["cp"]) + 10000*bp["cp"] + bp["qr"]), reverse=True)
+            blueprints_cache[bpmm1_blueprint_type_id] = bpmm1_blueprints
+
+        # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
+        # проверяем, что для текущего материала существуют чертежи для производства
+
         # добавление в список материалов чертежей с известным кол-вом run-ов
         __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm1_blueprint_type_id), None)
         if __summary_dict is None:
             materials_summary.append({"id": bpmm1_blueprint_type_id,
-                                      "q": bpmm1_efficiency,
+                                      "q": bpmm1_quantity_with_efficiency,
                                       "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
                                       "b": bpmm1_blueprints,
                                       "ajp": bpmm1_in_progress + bpmm1_available})
         else:
-            __summary_dict["q"] += bpmm1_blueprints
+            __summary_dict["q"] += bpmm1_quantity_with_efficiency
+        del __summary_dict
 
         # вывод списка материалов для постройки по чертежу (следующий уровень)
         bpmm1_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
