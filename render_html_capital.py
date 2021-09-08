@@ -95,8 +95,7 @@ def __dump_blueprint_materials(
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
         # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough)
-        # debug:
-        print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough, "= n{} - a{} - j{}".format(bpmm1_quantity_with_efficiency, bpmm1_available, bpmm1_in_progress))
+        # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough, "= n{} - a{} - j{}".format(bpmm1_quantity_with_efficiency, bpmm1_available, bpmm1_in_progress))
         # вывод наименования ресурса
         glf.write(
             '<tr{tr_class}>\n'
