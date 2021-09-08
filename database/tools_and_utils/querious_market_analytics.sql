@@ -8,7 +8,9 @@ select
   foo.highest,
   foo.weekly_orders as "orders per week",
   foo.weekly_demand as "days per week",
-  foo.persistence as "persistence, %"
+  foo.persistence as "persistence, %",
+  ri4.type_id is not null as "ri4 orders",
+  frtzr.ethp_type_id is not null as "3-fkcz orders"
 from (
   select
     mha.type_id,
@@ -51,6 +53,37 @@ from (
     ) mha
   ) foo
   left outer join qi.eve_sde_type_ids tid on (foo.type_id = tid.sdet_type_id)
+  left outer join (
+    select distinct type_id
+    from (
+      -- список транзакций по покупке/продаже избранными персонажами от имени 2х корпораций
+      select ecwt_type_id as type_id --, 'j'::char as type
+      from
+        qi.esi_corporation_wallet_journals j
+          left outer join qi.esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
+      where
+        not ecwt_is_buy and
+        (ecwj_date > '2021-08-15') and
+        (ecwj_context_id_type = 'market_transaction_id') and
+        ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
+            ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
+            ecwj_division = 1) or
+          ( ecwj_corporation_id in (98553333) and -- R Strike
+            ecwj_second_party_id in (95858524) and -- Xatul' Madan
+            ecwj_division = 7)
+        )
+      union
+      -- список того, что корпораци€ продавала или продаЄт
+      select ecor_type_id --, 'o'::char
+      from qi.esi_corporation_orders
+      where
+        not ecor_is_buy_order and
+        (ecor_corporation_id=98615601) and  -- R Initiative 4
+        (ecor_location_id=1036927076065) -- станка рынка
+      ) jto
+    ) ri4 on (foo.type_id = ri4.type_id)
+    -- цены на нашем Fortizar пр€мо сейчас
+    left outer join qi.esi_trade_hub_prices frtzr on (frtzr.ethp_location_id = 1036927076065 and foo.type_id = frtzr.ethp_type_id)
 order by 2 -- закладка "¬се товары"
 -- where foo.weekly_demand >= 1.0 order by foo.weekly_demand desc, foo.persistence desc, foo.weekly_volume desc -- закладка "≈женедельные сделки (попул€рность)"
 -- where foo.weekly_demand >= 1.0 order by foo.weekly_volume desc  -- закладка "≈женедельные сделки (объЄм)"
