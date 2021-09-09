@@ -29,7 +29,7 @@ function eve_ceiling($isk) {
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
   <th style="text-align: right;">RI4 Price<br>Volume</th>
-  <th style="text-align: right;">Jita Sell<br><mark>Import Price</mark></th>
+  <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita +10%<br>Price / Markup</th>
@@ -54,15 +54,18 @@ function eve_ceiling($isk) {
     {
         $problems = '';
         $warnings = '';
+        $interrupt_detected = false;
 
         $tid = $product['id'];
         $nm = $product['name'];
         $weekly_volume = $product['wv'];
         $order_volume = $product['ov'];
+        $day_volume = $product['dv'];
         $market_volume = $product['mv'];
         $packaged_volume = $product['pv'];
         $jita_import_price = $packaged_volume * 866.0;
         $jita_sell = $product['js'];
+        $jita_buy = $product['jb'];
         $amarr_sell = $product['as'];
         $universe_price = $product['up'];
         $market_price = $product['mp'];
@@ -84,6 +87,10 @@ function eve_ceiling($isk) {
             $max_amarr_price = $amarr_sell * (1.0+$max_profit+$taxfee);
             if (($market_price > $max_jita_price) && ($market_price > $max_amarr_price))
                 $warnings .= '<span class="label label-default" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
+            if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price)) {
+                $interrupt_detected = true;
+                $warnings .= '<span class="label label-warning">interrupt</span>&nbsp;';
+            }
         }
 
         if (!is_null($market_volume)&&!is_null($market_price)) $summary_market_price += $market_volume * $market_price;
@@ -102,14 +109,14 @@ function eve_ceiling($isk) {
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+ <td><?=$nm?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
  <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_volume,0,'.',',')?></mark></td>
  <?php } ?>
- <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
+ <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
  <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
  <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
@@ -119,7 +126,11 @@ function eve_ceiling($isk) {
  <td align="right"><?=number_format($jita_10_profit,2,'.',',')?></td>
  <?php } ?>
  <?php if (is_null($pzmzv_sell)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark$
+  <?php if ($interrupt_detected) { ?>
+  <td align="right" bgcolor="#e8c8c8"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
+  <?php } else { ?>
+  <td align="right"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
+  <?php } ?>
  <?php } ?>
 </tr>
 <?php
@@ -229,9 +240,11 @@ select
     else round(weeks_passed.volume_sell/weeks_passed.diff,1)
   end as wv, -- weekly volume
   round(transactions_stat.avg_volume, 1) as ov, -- order volume
+  transactions_stat.sum_last_day as dv, -- day volume
   orders_stat.volume_remain as mv, -- RI4 volume
   tid.sdet_volume as pv, -- packaged volume
   jita.sell as js, -- jita sell
+  jita.buy as jb, -- jita buy
   amarr.sell as as, -- amarr sell
   case
     when universe.emp_average_price is null or (universe.emp_average_price < 0.001) then universe.emp_adjusted_price
@@ -254,7 +267,7 @@ select
   -- round(jita.sell::numeric*0.1, 2) as "+10% profit",
   sbsq_hub.ethp_sell as ps, -- p-zmzv sell
   sbsq_hub.ethp_sell_volume as psv -- p-zmzv sell volume
-from 
+from
   ( select distinct type_id
     from (
       -- список транзакций по покупке/продаже избранными персонажами от имени 2х корпораций
@@ -287,7 +300,7 @@ from
     left outer join eve_sde_type_ids tid on (market.type_id = tid.sdet_type_id)
     -- цены в жите прямо сейчас
     left outer join (
-      select ethp_type_id, ethp_sell as sell
+      select ethp_type_id, ethp_sell as sell, ethp_buy as buy
       from esi_trade_hub_prices
       where ethp_location_id = 60003760
     ) jita on (market.type_id = jita.ethp_type_id)
@@ -313,10 +326,12 @@ from
       group by ecor_type_id
     ) weeks_passed on (market.type_id = weeks_passed.ecor_type_id)
     -- усреднённый (типовой) объём sell-ордера по продаже
+    -- количество проданных товаров за последние сутки
     left outer join (
       select
         ecwt_type_id,
-        avg(ecwt_quantity) as avg_volume
+        avg(ecwt_quantity) as avg_volume,
+        sum(case when (ecwt_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '24 hours')) then ecwt_quantity else 0 end) as sum_last_day
       from esi_corporation_wallet_transactions
       where
         not ecwt_is_buy and
@@ -377,10 +392,10 @@ select
   jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
   amarr.sell as as, -- amarr sell : to_char(amarr.sell, 'FM999G999G999G999G999.90')
   universe.price as up, -- universe price : to_char(universe.price, 'FM999G999G999G999G999.90')
-  case
-    when (ceil(abs(universe.price - jita.sell)) - ceil(abs(universe.price - amarr.sell))) < 0 then 'jita'
-    else 'amarr'
-  end as "proper hub",
+  -- case
+  --  when (ceil(abs(universe.price - jita.sell)) - ceil(abs(universe.price - amarr.sell))) < 0 then 'jita'
+  --  else 'amarr'
+  -- end as "proper hub",
   round(tid.sdet_volume::numeric * 866.0, 2) as "jita import price", -- заменить на packaged_volume, считать по ESI
   hangar.eca_created_at::date as since,
   date_trunc('minutes', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hangar.eca_updated_at)::interval as last_changed
