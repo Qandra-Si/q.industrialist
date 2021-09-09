@@ -21,6 +21,7 @@ function eve_ceiling($isk) {
 ?>
 
 <?php function __dump_querious_market($market) { ?>
+<h2>Keepstar Market</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -151,6 +152,57 @@ function eve_ceiling($isk) {
 
 <?php
 } ?>
+
+
+<?php function __dump_querious_storage($storage) { ?>
+<h2>Keepstar Storage</h2>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th></th>
+  <th>Items</th>
+  <th style="text-align: right;">Volume<br>Hangar 4</th>
+  <th style="text-align: right;">RI4<br>Sell</th>
+  <th style="text-align: right;">P-ZMZV<br>Sell</th>
+  <th style="text-align: right;">Jita<br>Buy</th>
+  <th style="text-align: right;">Jita Sell<br><mark>Import Price</mark></th>
+  <th style="text-align: right;">Amarr<br>Sell</th>
+  <th style="text-align: right;">Universe<br>Price</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    foreach ($storage as $items)
+    {
+        $tid = $items['id'];
+        $nm = $product['name'];
+        $quantity = $items['q'];
+        $ri4_sell = $items['rs'];
+        $pzmzv_sell = $items['ps'];
+        $packaged_volume = $product['pv'];
+        $jita_import_price = $packaged_volume * 866.0;
+        $jita_sell = $product['js'];
+        $jita_buy = $product['jb'];
+        $amarr_sell = $product['as'];
+        $universe_price = $product['up'];
+?>
+<tr>
+ <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
+ <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+ <td align="right"><?=number_format($quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($jita_buy,2,'.',',')?></td>
+ <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
+ <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
+ <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
+</tr>
+<?php
+    }
+?>
+</tbody>
+</table>
+<?php
+} ?>
+
 
 
 <?php
@@ -284,13 +336,108 @@ where
   tid.sdet_type_id not in (17715,2998) -- случайно выставил от корпы
 order by 7;
 EOD;
-    $jobs_cursor = pg_query($conn, $query)
+    $market_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
-    $jobs = pg_fetch_all($jobs_cursor);
+    $market = pg_fetch_all($market_cursor);
     //---
-    pg_close($conn);
+    // --SET intervalstyle = 'postgres_verbose';
+    // select eca_item_id as office_id -- 1037133900408
+    // from qi.esi_corporation_assets
+    // where eca_location_id = 1034323745897 and eca_corporation_id = 98615601 and eca_location_flag = 'OfficeFolder';
+    $query = <<<EOD
+select
+  -- hangar.eca_item_id,
+  hangar.eca_type_id as id,
+  tid.sdet_type_name as name,
+  hangar.eca_quantity as q,
+  to_char(ri4_orders.avg_price, 'FM999G999G999G999.90') || ' (x' || to_char(ri4_orders.volume, 'FM999999999999999999') || ')' as rs, -- ri4 sell
+  sbsq_hub.sell as ps, -- p-zmzv sell
+  tid.sdet_volume as pv, -- packaged volume
+  jita.sell as js, -- jita sell : to_char(jita.sell, 'FM999G999G999G999G999.90')
+  jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
+  amarr.sell as as, -- amarr sell : to_char(amarr.sell, 'FM999G999G999G999G999.90')
+  universe.price as up, -- universe price : to_char(universe.price, 'FM999G999G999G999G999.90')
+  case
+    when (ceil(abs(universe.price - jita.sell)) - ceil(abs(universe.price - amarr.sell))) < 0 then 'jita'
+    else 'amarr'
+  end as "proper hub",
+  round(tid.sdet_volume::numeric * 866.0, 2) as "jita import price", -- заменить на packaged_volume, считать по ESI
+  hangar.eca_created_at::date as since,
+  date_trunc('minutes', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hangar.eca_updated_at)::interval as last_changed
+from
+  -- предметы на продажу в ангаре
+  qi.esi_corporation_assets hangar
+    -- сведения о предмете
+    left outer join qi.eve_sde_type_ids tid on (hangar.eca_type_id = tid.sdet_type_id)
+    -- цены в жите прямо сейчас
+    left outer join (
+      select ethp_type_id, ethp_sell as sell, ethp_buy as buy
+      from qi.esi_trade_hub_prices
+      where ethp_location_id = 60003760
+    ) jita on (hangar.eca_type_id = jita.ethp_type_id)
+    -- цены в амарре прямо сейчас
+    left outer join (
+      select ethp_type_id, ethp_sell as sell
+      from qi.esi_trade_hub_prices
+      where ethp_location_id = 60008494
+    ) amarr on (hangar.eca_type_id = amarr.ethp_type_id)
+    -- усреднённые цены по евке прямо сейчас
+    left outer join (
+      select
+        emp_type_id,
+        case
+          when emp_average_price is null or (emp_average_price < 0.001) then emp_adjusted_price
+          else emp_average_price
+        end as price
+      from qi.esi_markets_prices
+    ) universe on (hangar.eca_type_id = universe.emp_type_id)
+    -- ордера на данный товар на на нашей структуре
+    left outer join (
+      select
+        ethp_type_id,
+        to_char(ethp_sell, 'FM999G999G999G999.90') || ' (x' || to_char(ethp_sell_volume, 'FM999999999999999999') || ')' as sell
+        --, ethp_sell, ethp_sell_volume
+        --, ethp_buy, ethp_buy_volume
+      from qi.esi_trade_hub_prices
+      where ethp_location_id = 1034323745897
+    ) sbsq_hub on (hangar.eca_type_id = sbsq_hub.ethp_type_id)
+    -- сведения об sell-ордерах, активных прямо сейчас
+    left outer join (
+      select
+        o.ecor_type_id,
+        o.volume_remain as volume,
+        round(o.price_remain::numeric / o.volume_remain::numeric, 2) as avg_price
+      from (
+        select
+          ecor_type_id,
+          sum(ecor_volume_remain) as volume_remain,
+          sum(ecor_price*ecor_volume_remain) as price_remain
+        from qi.esi_corporation_orders
+        where
+          not ecor_is_buy_order and
+          (ecor_volume_remain > 0) and
+          not ecor_history and
+          (ecor_corporation_id=98615601) and  -- R Initiative 4
+          (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
+        group by 1
+      ) o
+    ) ri4_orders on (hangar.eca_type_id = ri4_orders.ecor_type_id)
+where
+  hangar.eca_location_id = 1037133900408 and
+  hangar.eca_location_flag = 'CorpSAG4' and
+  hangar.eca_location_type = 'item' and
+  not exists (select box.eca_item_id from qi.esi_corporation_assets as box where box.eca_location_id = hangar.eca_item_id)
+-- order by universe.price desc
+order by tid.sdet_type_name;
+EOD;
+    $storage_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $market = pg_fetch_all($storage_cursor);
+    //---
+    pg_close($storage);
 ?>
 <div class="container-fluid">
-<?php __dump_querious_market($jobs); ?>
+<?php __dump_querious_market($market); ?>
+<?php __dump_querious_storage($storage); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>

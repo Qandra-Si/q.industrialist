@@ -9,6 +9,7 @@ select
   hangar.eca_type_id as type_id,
   tid.sdet_type_name as name,
   hangar.eca_quantity as quantity,
+  to_char(ri4_orders.avg_price, 'FM999G999G999G999.90') || ' (x' || to_char(ri4_orders.volume, 'FM999999999999999999') || ')' as "ri4 sell",
   sbsq_hub.sell as "p-zmzv sell",
   to_char(jita.buy, 'FM999G999G999G999G999.90') as "jita buy",
   to_char(jita.sell, 'FM999G999G999G999G999.90') as "jita sell",
@@ -58,6 +59,27 @@ from
       from qi.esi_trade_hub_prices
       where ethp_location_id = 1034323745897
     ) sbsq_hub on (hangar.eca_type_id = sbsq_hub.ethp_type_id)
+    -- сведения об sell-ордерах, активных прямо сейчас
+    left outer join (
+      select
+        o.ecor_type_id,
+        o.volume_remain as volume,
+        round(o.price_remain::numeric / o.volume_remain::numeric, 2) as avg_price
+      from (
+        select
+          ecor_type_id,
+          sum(ecor_volume_remain) as volume_remain,
+          sum(ecor_price*ecor_volume_remain) as price_remain
+        from qi.esi_corporation_orders
+        where
+          not ecor_is_buy_order and
+          (ecor_volume_remain > 0) and
+          not ecor_history and
+          (ecor_corporation_id=98615601) and  -- R Initiative 4
+          (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
+        group by 1
+      ) o
+    ) ri4_orders on (hangar.eca_type_id = ri4_orders.ecor_type_id)
 where
   hangar.eca_location_id = 1037133900408 and
   hangar.eca_location_flag = 'CorpSAG4' and
