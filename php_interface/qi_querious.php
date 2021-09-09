@@ -27,8 +27,8 @@ function eve_ceiling($isk) {
   <th></th>
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">Volume<br>3-FKCZ</th>
-  <th style="text-align: right;">3-FKCZ<br>Price</th>
+  <th style="text-align: right;">Volume<br>P-ZMZV</th>
+  <th style="text-align: right;">P-ZMZV<br>Price</th>
   <th style="text-align: right;">Jita Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -170,7 +170,7 @@ select
     else round(weeks_passed.volume_sell/weeks_passed.diff,1)
   end as wv, -- weekly volume
   round(transactions_stat.avg_volume, 1) as ov, -- order volume
-  orders_stat.volume_remain as mv, -- 3-fkcz volume
+  orders_stat.volume_remain as mv, -- p-zmzv volume
   tid.sdet_volume as pv, -- packaged volume
   jita.sell as js, -- jita sell
   amarr.sell as as, -- amarr sell
@@ -178,7 +178,7 @@ select
     when universe.emp_average_price is null or (universe.emp_average_price < 0.001) then universe.emp_adjusted_price
     else universe.emp_average_price
   end as up, -- universe price
-  round(orders_stat.price_remain::numeric / orders_stat.volume_remain::numeric, 2) as mp, -- 3-fkcz price
+  round(orders_stat.price_remain::numeric / orders_stat.volume_remain::numeric, 2) as mp, -- p-zmzv price
   -- round(jita.sell::numeric*0.0313, 2) as markup,
   -- case
   --   when jita.sell::numeric*1.1313 < 100.0 then round(ceil(jita.sell::numeric*113.13)/100.0, 2)
@@ -220,7 +220,7 @@ from
       where
         not ecor_is_buy_order and
         (ecor_corporation_id=98615601) and  -- R Initiative 4
-        (ecor_location_id=1036927076065) -- станка рынка
+        (ecor_location_id in (1036927076065,1034323745897)) -- станка рынка
       ) jto
   ) market
     -- сведения о предмете
@@ -249,7 +249,7 @@ from
       where
         not ecor_is_buy_order and
         (ecor_corporation_id=98615601) and  -- R Initiative 4
-        (ecor_location_id=1036927076065)  -- станка рынка
+        (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
       group by ecor_type_id
     ) weeks_passed on (market.type_id = weeks_passed.ecor_type_id)
     -- усреднённый (типовой) объём sell-ордера по продаже
@@ -261,7 +261,7 @@ from
       where
         not ecwt_is_buy and
         (ecwt_corporation_id=98615601) and  -- R Initiative 4
-        (ecwt_location_id=1036927076065) -- станка рынка
+        (ecwt_location_id in (1036927076065,1034323745897)) -- станка рынка
       group by 1
     ) transactions_stat on (market.type_id = transactions_stat.ecwt_type_id)
     -- сведения об sell-ордерах, активных прямо сейчас
@@ -276,7 +276,7 @@ from
         (ecor_volume_remain > 0) and
         not ecor_history and
         (ecor_corporation_id=98615601) and  -- R Initiative 4
-        (ecor_location_id=1036927076065)  -- станка рынка
+        (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
       group by 1
     ) orders_stat on (market.type_id = orders_stat.ecor_type_id)
 where
