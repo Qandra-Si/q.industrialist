@@ -14,7 +14,79 @@ function get_numeric($val) {
 .label-overstock { color: #333; background-color: #b5d2ea; }
 .label-understock { color: #333; background-color: #ff0; }
 </style>
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<button class="btn btn-default" type="button" data-toggle="collapse" data-target="#collapseAnnotation" aria-expanded="false" aria-controls="collapseAnnotation">Аннотация</button>
+<div class="btn-group btn-group-toggle" data-toggle="buttons" id="#btnGroups">
+ <label class="btn btn-default active" id="btnGroupAll"><input type="radio" name="options" autocomplete="off" checked>Все</label>
+ <label class="btn btn-default" id="btnGroupLost"><input type="radio" name="options" autocomplete="off">Потеряшки</label>
+ <label class="btn btn-default" id="btnGroupOverstock"><input type="radio" name="options" autocomplete="off">С избытком</label>
+ <label class="btn btn-default" id="btnGroupUnderstock"><input type="radio" name="options" autocomplete="off">Маловато</label>
+ <label class="btn btn-default" id="btnGroupObsolete"><input type="radio" name="options" autocomplete="off">Забытые</label>
+</div>
+<div class="collapse" id="collapseAnnotation">
+  <div class="card card-body">
+<p>Автоматический расчёт состояния стока. В таблице приведена информация об используемых материалах, сколько их используется, сколько использовалось, какие материалы застряли в стоке, а каких не хватает. Маркеры, которые могут появиться в отчёте:
+<ul>
+ <li><span class="label label-danger">lost</span> - материал потерялся, надо достать и отправить на продажу;
+ <li><span class="label label-warning">not used</span> - материал может быть использован в каком-либо из чертежей, но мы такое не крафтим (аналог потеряшки), например мы не производим 'Augmented' Infiltrator из Infiltrator II;
+ <li><span class="label label-forgotten">forgotten</span> - уже месяц, как не используется в работках;
+ <li><span class="label label-obsolete">obsolete</span> - уже два месяца не используется;
+ <li><span class="label label-default">abandoned</span> - забыт на три месяца;
+ <li><span class="label label-understock">understock</span> - материалов в скопилось слишком много;
+ <li><span class="label label-overstock">overstock</span> - материалов не хватает.
+</ul></p>
+<p>Также считается количество материала (в штуках) которое мы ежемесячно используем... правда без учёта ME (только сводные данные по чертежам). Параметр <strong>Quantity</strong> - это потраченное кол-во материалов за последние 30 дней. Выборка с помощью бегущего окна, то есть завтра даты обновятся и интервал подвинется. Last 2 Month Quantity - аналогично, но за последние 60 дней. <strong>Times</strong> - количество работ.</p>
+<p>Параметр <strong>Since</strong> показывает дату, когда стак с материалами "трогался" последний раз (переупаковывался, пополнялся, или уменьшался). Параметр <strong>Last Using</strong> показывет дату, когда материал использовался в какой-либо из последних работ, <strong>Used in Jobs</strong> - общее количество работ, проведённых с эпомянутым материалом. Параметр <strong>Blueprint Variations</strong> - показывает число возможных работ, в которых может быть задействован материал.</p>
+<p>Также возможно формирование отчёта не только по <mark>..stock ALL</mark> коробке. Отчёт может быть сформирован по любому другому списку материалов, находящемуся в ином контейнере, для этого вам необходимо знать его номер и создать закладку в браузере, например <a href="http://<?=$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF']?>?stock=1036613601158">1036613601158</a>. Для получения уникальной ссылки на ваш контейнер обратитесь к Qandra Si.</p>
+  </div>
+</div>
+<script>
+  function rebuildStockMaterials(show_group) {
+    $('#tblStock').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = false;
+      if (show_group == 0) // all
+        show = true;
+      else if (show_group == 1) // lost, not-used
+        show = tr.find('td').eq(1).find('span.label-danger').length ||
+               tr.find('td').eq(1).find('span.label-warning').length;
+      else if (show_group == 2) // overstock
+        show = tr.find('td').eq(1).find('span.label-overstock').length;
+      else if (show_group == 3) // understock
+        show = tr.find('td').eq(1).find('span.label-understock').length;
+      else if (show_group == 4) // abandoned, obsolete, forgotten
+        show = tr.find('td').eq(1).find('span.label-obsolete').length ||
+               tr.find('td').eq(1).find('span.label-forgotten').length ||
+               tr.find('td').eq(1).find('span.label-default').length;
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  $(document).ready(function(){
+    $('#btnGroupAll').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(0);
+    });
+    $('#btnGroupLost').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(1);
+    });
+    $('#btnGroupOverstock').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(2);
+    });
+    $('#btnGroupUnderstock').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(3);
+    });
+    $('#btnGroupObsolete').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(4);
+    });
+  });
+</script>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
  <tr>
   <th></th>
@@ -147,7 +219,7 @@ select
   ceil(jita.buy * stock.quantity) as jb, -- jita buy
   stock.since as s, -- lie up since
   materials_using.variations as bv, -- blueprint variations
-  materials_using.jobs_times as uj, -- using in jobs
+  materials_using.jobs_times as uj, -- used in jobs
   materials_using.last_using as lu, -- last using
   materials_using.using_last_1month as m1, -- last 1 month using
   materials_using.using_last_2month as m2, -- last 2 month using
@@ -164,7 +236,7 @@ from
       sum(eca_quantity) as quantity,
       max(eca_created_at::date) as since
     from qi.esi_corporation_assets
-    where eca_location_id = 1036612408249
+    where eca_location_id = $1
     group by 1
     -- order by 1
   ) stock
@@ -225,7 +297,8 @@ from
 -- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
 order by tid.sdet_market_group_id;
 EOD;
-    $stock_cursor = pg_query($conn, $query)
+    $params = array($stock_location_id);
+    $stock_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $stock = pg_fetch_all($stock_cursor);
     //---
