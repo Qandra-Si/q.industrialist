@@ -13,7 +13,8 @@ function get_numeric($val) {
  <tr>
   <th></th>
   <th>Material</th>
-  <th style="text-align: right;">Universe Price<br><mark>Quantity</mark></th>
+  <th style="text-align: right;">Quantity</th>
+  <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
   <th style="text-align: right;">Since</th>
   <th style="text-align: right;">Blueprint<br>Variations</th>
@@ -46,7 +47,8 @@ function get_numeric($val) {
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
- <td align="right"><?=number_format($universe_avg_price,0,'.',',').'<br><mark>'.number_format($quantity,0,'.',',').'</mark>'?></td>
+ <td align="right"><?=number_format($quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($universe_avg_price,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
  <td align="right"><?=$lie_up_since?></td>
  <?php if (is_null($blueprint_variations) || !$blueprint_variations) { ?><td></td><?php } else { ?>
@@ -96,7 +98,7 @@ function get_numeric($val) {
 select
   stock.type_id as id,
   tid.sdet_type_name as name,
-  stock.quantity as quantity,
+  stock.quantity as q, -- quantity
   ceil(universe.price * stock.quantity) as uap, -- universe avg price
   ceil(jita.sell * stock.quantity) as js, -- jita sell
   ceil(jita.buy * stock.quantity) as jb, -- jita buy
@@ -170,7 +172,7 @@ from
       -- order by 1
     ) materials_using on (stock.type_id = materials_using.material_id)
 -- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
-;
+order by tid.sdet_market_group_id;
 EOD;
     $stock_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
@@ -178,6 +180,7 @@ EOD;
     //---
     pg_close($conn);
 ?>
+<div class="container-fluid">
 <?php __dump_obsolete_stock($stock); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
