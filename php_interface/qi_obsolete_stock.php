@@ -203,10 +203,16 @@ function get_numeric($val) {
 
 <?php
     $stock_location_id = 1036612408249;
+    $show_absent = 0;
     if (isset($_GET['stock'])) {
         $_get_id = htmlentities($_GET['stock']);
         if (is_numeric($_get_id))
             $stock_location_id = get_numeric($_get_id);
+    }
+    if (isset($_GET['absent'])) {
+        $_get_absent = htmlentities($_GET['absent']);
+        if (is_numeric($_get_absent))
+            $show_absent = get_numeric($_get_absent) ? 1 : 0;
     }
 
     __dump_header("Obsolete Stock", FS_RESOURCES);
@@ -246,16 +252,17 @@ from
     from qi.esi_corporation_assets
     where eca_location_id = $1
     group by 1
-    --union
+    union
     -- список материалов, которых нет в коробке
-    --select distinct m.sdebm_material_id, 0, null::date
-    --from
-    --  qi.eve_sde_blueprint_materials m,
-    --  qi.esi_corporation_industry_jobs j
-    --where
-    --  m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
-    --  m.sdebm_activity = j.ecj_activity_id and
-    --  j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
+    select distinct m.sdebm_material_id, 0, null::date
+    from
+      qi.eve_sde_blueprint_materials m,
+      qi.esi_corporation_industry_jobs j
+    where
+      $2 = 1 and
+      m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
+      m.sdebm_activity = j.ecj_activity_id and
+      j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
   ) stock
     -- сведения о предмете
     left outer join qi.eve_sde_type_ids tid on (stock.type_id = tid.sdet_type_id)
@@ -314,7 +321,7 @@ from
 -- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
 order by tid.sdet_market_group_id;
 EOD;
-    $params = array($stock_location_id);
+    $params = array($stock_location_id, $show_absent);
     $stock_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $stock = pg_fetch_all($stock_cursor);
