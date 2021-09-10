@@ -15,6 +15,7 @@ include_once '.settings.php';
  <br><a class="btn btn-warning" href="/qi_regroup.php" role="button">Regroup Settings</a>
  </p>
 
+<h2>Мониторинг состояния закрытого раздела</h2>
  <p>
  Полный список тех материалов, которые производились или инвентились нашими корпорациями. Расчёт стоимости работ и уплаченных налогов на запуск.
  <br><a class="btn btn-info" href="/qi_industry.php" role="button">Industry</a>
@@ -30,6 +31,7 @@ include_once '.settings.php';
  <br><a class="btn btn-info" href="/qi_lifetime.php" role="button">Lifetime</a>
  </p>
 
+<h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
  Текущее состояние рынка в Querious. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.
  <br><a class="btn btn-success" href="/qi_querious.php" role="button">Querious Market</a>
