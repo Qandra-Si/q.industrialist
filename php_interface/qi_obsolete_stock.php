@@ -13,6 +13,7 @@ function get_numeric($val) {
 .label-forgotten { color: #fff; background-color: #ddd; }
 .label-overstock { color: #333; background-color: #b5d2ea; }
 .label-understock { color: #333; background-color: #ff0; }
+.label-absent { color: #fff; background-color: #d9534f; }
 </style>
 <button class="btn btn-default" type="button" data-toggle="collapse" data-target="#collapseAnnotation" aria-expanded="false" aria-controls="collapseAnnotation">Аннотация</button>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" id="#btnGroups">
@@ -32,7 +33,8 @@ function get_numeric($val) {
  <li><span class="label label-obsolete">obsolete</span> - уже два месяца не используется;
  <li><span class="label label-default">abandoned</span> - забыт на три месяца;
  <li><span class="label label-understock">understock</span> - материалов в скопилось слишком много;
- <li><span class="label label-overstock">overstock</span> - материалов не хватает.
+ <li><span class="label label-overstock">overstock</span> - материалов не хватает;
+ <li><span class="label label-absent">absent</span> - материал отсутствует в стоке, хотя использовался в каких-либо работах за последние 2 месяца.
 </ul></p>
 <p>Также считается количество материала (в штуках) которое мы ежемесячно используем... правда без учёта ME (только сводные данные по чертежам). Параметр <strong>Quantity</strong> - это потраченное кол-во материалов за последние 30 дней. Выборка с помощью бегущего окна, то есть завтра даты обновятся и интервал подвинется. Last 2 Month Quantity - аналогично, но за последние 60 дней. <strong>Times</strong> - количество работ.</p>
 <p>Параметр <strong>Since</strong> показывает дату, когда стак с материалами "трогался" последний раз (переупаковывался, пополнялся, или уменьшался). Параметр <strong>Last Using</strong> показывет дату, когда материал использовался в какой-либо из последних работ, <strong>Used in Jobs</strong> - общее количество работ, проведённых с эпомянутым материалом. Параметр <strong>Blueprint Variations</strong> - показывает число возможных работ, в которых может быть задействован материал.</p>
@@ -147,6 +149,9 @@ function get_numeric($val) {
                 $warnings .= '<span class="label label-understock">understock</span>&nbsp;';
             else if (!is_null($last_2_month_quantity) && $last_2_month_quantity && ($last_2_month_quantity < $quantity))
                 $warnings .= '<span class="label label-overstock">overstock</span>&nbsp;';
+
+            if (is_null($quantity) || !$quantity)
+                $warnings .= '<span class="label label-absent">absent</span>&nbsp;';
         }
 
         $summary_stock_price += $universe_avg_price;
@@ -157,8 +162,10 @@ function get_numeric($val) {
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$warnings?></td>
  <td align="right"><?=number_format($quantity,0,'.',',')?></td>
+ <?php if (is_null($quantity) || !$quantity) { ?><td></td><td></td><?php } else { ?>
  <td align="right"><?=number_format($universe_avg_price,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
+ <?php } ?>
  <td align="right"><?=$lie_up_since?></td>
  <?php if (is_null($blueprint_variations) || !$blueprint_variations) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($blueprint_variations,0,'.',',')?></td>
@@ -230,15 +237,25 @@ select
   materials_using.quantity_last_3month as m3q, -- last 3 month quantity
   materials_using.quantity_last_4month as m4q  -- last 4 month quantity
 from
-  -- содержимое коробки ..stock ALL на Сотие
-  ( select
+  -- список материалов, которые должны попасть в отчёт
+  ( -- содержимое коробки ..stock ALL на Сотие
+    select
       eca_type_id as type_id,
       sum(eca_quantity) as quantity,
       max(eca_created_at::date) as since
     from qi.esi_corporation_assets
     where eca_location_id = $1
     group by 1
-    -- order by 1
+    --union
+    -- список материалов, которых нет в коробке
+    --select distinct m.sdebm_material_id, 0, null::date
+    --from
+    --  qi.eve_sde_blueprint_materials m,
+    --  qi.esi_corporation_industry_jobs j
+    --where
+    --  m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
+    --  m.sdebm_activity = j.ecj_activity_id and
+    --  j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
   ) stock
     -- сведения о предмете
     left outer join qi.eve_sde_type_ids tid on (stock.type_id = tid.sdet_type_id)

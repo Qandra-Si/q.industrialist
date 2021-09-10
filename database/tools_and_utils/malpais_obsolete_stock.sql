@@ -1,4 +1,4 @@
-select
+п»їselect
   stock.type_id,
   tid.sdet_type_name as name,
   stock.quantity as "quantity",
@@ -18,19 +18,29 @@ select
   materials_using.quantity_last_3month as m3q, -- last 3 month quantity
   materials_using.quantity_last_4month as m4q  -- last 4 month quantity
 from
-  -- содержимое коробки ..stock ALL на ‘отие
-  ( select
+  -- СЃРїРёСЃРѕРє РјР°С‚РµСЂРёР°Р»РѕРІ, РєРѕС‚РѕСЂС‹Рµ РґРѕР»Р¶РЅС‹ РїРѕРїР°СЃС‚СЊ РІ РѕС‚С‡С‘С‚
+  ( -- СЃРѕРґРµСЂР¶РёРјРѕРµ РєРѕСЂРѕР±РєРё ..stock ALL РЅР° РЎРѕС‚РёРµ
+    select
       eca_type_id as type_id,
       sum(eca_quantity) as quantity,
       max(eca_created_at::date) as since
     from qi.esi_corporation_assets
     where eca_location_id = 1036612408249
     group by 1
-    -- order by 1
+    union
+    -- СЃРїРёСЃРѕРє РјР°С‚РµСЂРёР°Р»РѕРІ, РєРѕС‚РѕСЂС‹С… РЅРµС‚ РІ РєРѕСЂРѕР±РєРµ
+    select distinct m.sdebm_material_id, 0, null::date
+    from
+      qi.eve_sde_blueprint_materials m,
+      qi.esi_corporation_industry_jobs j
+    where
+      m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
+      m.sdebm_activity = j.ecj_activity_id and
+      j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
   ) stock
-    -- сведениЯ о предмете
+    -- СЃРІРµРґРµРЅРёРЇ Рѕ РїСЂРµРґРјРµС‚Рµ
     left outer join qi.eve_sde_type_ids tid on (stock.type_id = tid.sdet_type_id)
-    -- усреднЮнные цены по евке прЯмо сейчас
+    -- СѓСЃСЂРµРґРЅР®РЅРЅС‹Рµ С†РµРЅС‹ РїРѕ РµРІРєРµ РїСЂРЇРјРѕ СЃРµР№С‡Р°СЃ
     left outer join (
       select
         emp_type_id,
@@ -40,13 +50,13 @@ from
         end as price
       from qi.esi_markets_prices
     ) universe on (stock.type_id = universe.emp_type_id)
-    -- цены в жите прЯмо сейчас
+    -- С†РµРЅС‹ РІ Р¶РёС‚Рµ РїСЂРЇРјРѕ СЃРµР№С‡Р°СЃ
     left outer join (
       select ethp_type_id, ethp_sell as sell, ethp_buy as buy
       from qi.esi_trade_hub_prices
       where ethp_location_id = 60003760
     ) jita on (stock.type_id = jita.ethp_type_id)
-    -- производственные работы с обнаруженным материалом
+    -- РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅС‹Рµ СЂР°Р±РѕС‚С‹ СЃ РѕР±РЅР°СЂСѓР¶РµРЅРЅС‹Рј РјР°С‚РµСЂРёР°Р»РѕРј
     left outer join (
       select
         -- sdebm_blueprint_type_id,
@@ -64,7 +74,7 @@ from
         sum(jobs.using_last_4month*sdebm_quantity) as quantity_last_4month
       from
         qi.eve_sde_blueprint_materials
-          -- подсчЮт кол-ва работ, запущенных с использованием этого типа чертежей
+          -- РїРѕРґСЃС‡Р®С‚ РєРѕР»-РІР° СЂР°Р±РѕС‚, Р·Р°РїСѓС‰РµРЅРЅС‹С… СЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј СЌС‚РѕРіРѕ С‚РёРїР° С‡РµСЂС‚РµР¶РµР№
           left outer join (
             select
               ecj_blueprint_type_id,
@@ -82,4 +92,4 @@ from
       group by 1
       -- order by 1
     ) materials_using on (stock.type_id = materials_using.material_id)
--- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
+-- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- РїР»Р°РЅРµС‚Р°СЂРєР° РІ СЃС‚РѕРєРµ
