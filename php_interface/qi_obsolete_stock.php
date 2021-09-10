@@ -210,11 +210,11 @@ from
               ecj_blueprint_type_id,
               ecj_activity_id,
               count(1) as times,
-              max(ecj_end_date::date) as last_using,
-              sum(case when ecj_end_date::date >= '2021-08-10' then 1 else 0 end) as using_last_1month,
-              sum(case when ecj_end_date::date >= '2021-07-10' then 1 else 0 end) as using_last_2month,
-              sum(case when ecj_end_date::date >= '2021-06-10' then 1 else 0 end) as using_last_3month,
-              sum(case when ecj_end_date::date >= '2021-05-10' then 1 else 0 end) as using_last_4month
+              max(ecj_start_date::date) as last_using,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '30 days') then 1 else 0 end) as using_last_1month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days') then 1 else 0 end) as using_last_2month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 days') then 1 else 0 end) as using_last_3month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '120 days') then 1 else 0 end) as using_last_4month
             from qi.esi_corporation_industry_jobs jobs
             where jobs.ecj_corporation_id = 98677876
             group by 1, 2
