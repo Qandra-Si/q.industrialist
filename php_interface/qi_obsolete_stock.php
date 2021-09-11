@@ -203,12 +203,12 @@ function get_numeric($val) {
 
 <?php
     $stock_location_id = 1036612408249;
-    $show_absent = 0;
     if (isset($_GET['stock'])) {
         $_get_id = htmlentities($_GET['stock']);
         if (is_numeric($_get_id))
             $stock_location_id = get_numeric($_get_id);
     }
+    $show_absent = 0;
     if (isset($_GET['absent'])) {
         $_get_absent = htmlentities($_GET['absent']);
         if (is_numeric($_get_absent))
@@ -221,7 +221,6 @@ function get_numeric($val) {
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     //---
-    $query =
     $query = <<<EOD
 select
   stock.type_id as id,
@@ -259,7 +258,7 @@ from
       qi.eve_sde_blueprint_materials m,
       qi.esi_corporation_industry_jobs j
     where
-      $2 = 1 and
+      ($2 = 1) and
       m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
       m.sdebm_activity = j.ecj_activity_id and
       j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
@@ -319,7 +318,7 @@ from
       -- order by 1
     ) materials_using on (stock.type_id = materials_using.material_id)
 -- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
-order by tid.sdet_market_group_id;
+order by tid.sdet_market_group_id, tid.sdet_type_name;
 EOD;
     $params = array($stock_location_id, $show_absent);
     $stock_cursor = pg_query_params($conn, $query, $params)

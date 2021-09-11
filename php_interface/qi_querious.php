@@ -22,6 +22,11 @@ function eve_ceiling($isk) {
 
 <?php function __dump_querious_market($market) { ?>
 <h2>Keepstar Market</h2>
+<style>
+.label-noordersreal { color: #fff; background-color: #d9534f; }
+.label-noorders { color: #fff; background-color: #eebbb9; }
+.label-interrupt { color: #8e8e8e; background-color: #e8ce43; }
+</style>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -75,21 +80,28 @@ function eve_ceiling($isk) {
         $pzmzv_sell = $product['ps'];
         $pzmzv_sell_volume = $product['psv'];
 
-        if (is_null($market_price)) $problems .= '<span class="label label-danger">no orders</span>&nbsp;';
+        if (is_null($market_price)) {
+            if (is_null($pzmzv_sell_volume) || !$pzmzv_sell_volume)
+                $problems .= '<span class="label label-noordersreal">no orders</span>&nbsp;';
+            else
+                $problems .= '<span class="label label-noorders">no orders</span>&nbsp;';
+        }
         if (is_null($market_volume) || ($weekly_volume >= $market_volume)) $problems .= '<span class="label label-info">need delivery</span>&nbsp;';
         if (!is_null($market_volume) && ($order_volume >= $market_volume)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
         if (!is_null($market_price)) {
-            $min_jita_price = $jita_sell * (1.0+$min_profit+$taxfee);
-            $min_amarr_price = $amarr_sell * (1.0+$min_profit+$taxfee);
-            if (($market_price < $min_jita_price) && ($market_price < $min_amarr_price))
-                $warnings .= '<span class="label label-warning" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
+            if ($market_price > 100000 || $packaged_volume < 5) {
+                $min_jita_price = $jita_sell * (1.0+$min_profit+$taxfee);
+                $min_amarr_price = $amarr_sell * (1.0+$min_profit+$taxfee);
+                if (($market_price < $min_jita_price) && ($market_price < $min_amarr_price))
+                    $warnings .= '<span class="label label-warning" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
+            }
             $max_jita_price = $jita_sell * (1.0+$max_profit+$taxfee);
             $max_amarr_price = $amarr_sell * (1.0+$max_profit+$taxfee);
             if (($market_price > $max_jita_price) && ($market_price > $max_amarr_price))
                 $warnings .= '<span class="label label-default" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
             if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price)) {
                 $interrupt_detected = true;
-                $warnings .= '<span class="label label-warning">interrupt</span>&nbsp;';
+                $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
             }
         }
 
@@ -183,21 +195,22 @@ function eve_ceiling($isk) {
 </thead>
 <tbody>
 <?php
-    foreach ($storage as $product)
-    {
-        $tid = $product['id'];
-        $nm = $product['name'];
-        $quantity = $product['q'];
-        $ri4_sell = $product['rs'];
-        $ri4_sell_volume = $product['rsv'];
-        $pzmzv_sell = $product['ps'];
-        $pzmzv_sell_volume = $product['psv'];
-        $packaged_volume = $product['pv'];
-        $jita_import_price = $packaged_volume * 866.0;
-        $jita_sell = $product['js'];
-        $jita_buy = $product['jb'];
-        $amarr_sell = $product['as'];
-        $universe_price = $product['up'];
+    if ($storage)
+        foreach ($storage as $product)
+        {
+            $tid = $product['id'];
+            $nm = $product['name'];
+            $quantity = $product['q'];
+            $ri4_sell = $product['rs'];
+            $ri4_sell_volume = $product['rsv'];
+            $pzmzv_sell = $product['ps'];
+            $pzmzv_sell_volume = $product['psv'];
+            $packaged_volume = $product['pv'];
+            $jita_import_price = $packaged_volume * 866.0;
+            $jita_sell = $product['js'];
+            $jita_buy = $product['jb'];
+            $amarr_sell = $product['as'];
+            $universe_price = $product['up'];
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -214,7 +227,7 @@ function eve_ceiling($isk) {
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
 </tr>
 <?php
-    }
+        }
 ?>
 </tbody>
 </table>
@@ -367,7 +380,7 @@ from
 where
   not (tid.sdet_market_group_id = 1857) and -- исключая руду
   tid.sdet_type_id not in (17715,2998) -- случайно выставил от корпы
-order by 7;
+order by 7 desc;
 EOD;
     $market_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
@@ -463,13 +476,13 @@ where
   hangar.eca_location_type = 'item' and
   not exists (select box.eca_item_id from qi.esi_corporation_assets as box where box.eca_location_id = hangar.eca_item_id)
 -- order by universe.price desc
-order by tid.sdet_type_name;
+order by tid.sdet_market_group_id, tid.sdet_type_name;
 EOD;
     $storage_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
     $storage = pg_fetch_all($storage_cursor);
     //---
-    pg_close($storage);
+    pg_close($conn);
 ?>
 <div class="container-fluid">
 <?php __dump_querious_market($market); ?>
