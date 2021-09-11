@@ -1,4 +1,5 @@
-﻿import typing
+﻿import math
+import typing
 import render_html
 import eve_sde_tools
 import eve_efficiency
@@ -92,6 +93,9 @@ def __dump_blueprint_materials(
         bpmm1_not_enough = bpmm1_quantity_with_efficiency - bpmm1_available - bpmm1_in_progress
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
+        # поиск чертежа для этого типа продукта (которого может и не быть, например если возможен только закуп)
+        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
+        bpmm1_product_quantity = None if bpmm1_blueprint_type_id is None else bpmm1_blueprint_materials['activities']['manufacturing']['products'][0]['quantity']
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
         # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough)
@@ -100,7 +104,7 @@ def __dump_blueprint_materials(
         glf.write(
             '<tr{tr_class}>\n'
             ' <th scope="row"><span class="text-muted">{num_prfx}</span>{num}</th>\n'
-            ' <td><img class="icn24" src="{src}"> <tt><span class="text-muted">{nm_prfx}</span></tt> {nm}</td>\n'
+            ' <td><img class="icn24" src="{src}"> <tt><span class="text-muted">{nm_prfx}</span></tt> {nm}{bpq}</td>\n'
             ' <td>{qa:,d}{qip}</td>\n'
             ' <td>{qs:,d}</td>\n'
             ' <td>{qe:,d}</td>\n'
@@ -110,6 +114,7 @@ def __dump_blueprint_materials(
                 tr_class=' class="active"' if not row0_prefix else '',
                 num_prfx=row0_prefix, num=row1_num,
                 nm_prfx=nm_prfx, nm=bpmm1_tnm,
+                bpq='' if bpmm1_product_quantity is None or bpmm1_product_quantity == 1 else " <strong>x{}</strong>".format(bpmm1_product_quantity),
                 src=render_html.__get_img_src(bpmm1_tid, 32),
                 qs=bpmm1_quantity * bpmm0_quantity,
                 qe=bpmm1_quantity_with_efficiency,
@@ -150,9 +155,9 @@ def __dump_blueprint_materials(
         if bpmm1_not_enough == 0:
             continue
         # определяем, можно ли строить этот продукт, или возможен только его закуп?
-        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
         if bpmm1_blueprint_type_id is None:
             continue
+        # debug : print(bpmm1_blueprint_type_id, bpmm1_tnm, bpmm1_blueprint_materials['activities']['manufacturing']['products'])
         # поиск чертежей, имеющихся в наличии у корпорации
         bpmm1_blueprints = blueprints_cache.get(bpmm1_blueprint_type_id)
         if not bpmm1_blueprints:
@@ -196,6 +201,8 @@ def __dump_blueprint_materials(
 
         # вывод списка материалов для постройки по чертежу (следующий уровень)
         bpmm1_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
+        bpmm2_bp_runs = 1 if bpmm1_product_quantity is None or bpmm1_product_quantity == 1 else math.ceil(bpmm1_not_enough / bpmm1_product_quantity)
+        # debug : print(bpmm1_tnm, bpmm1_not_enough, bpmm1_product_quantity, bpmm2_bp_runs)
         # ...
         row2_levels = row0_levels[:]
         row2_levels.append(row1_num == len(bpmm0_materials))
@@ -204,7 +211,7 @@ def __dump_blueprint_materials(
             "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num),
             row2_levels,
             # сведения о чертеже, его материалах, эффективности и т.п.
-            bpmm1_not_enough,
+            bpmm2_bp_runs,
             bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"],
             report_options["missing_blueprints"]["material_efficiency"],
             bpmm1_is_reaction_formula,
