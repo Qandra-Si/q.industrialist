@@ -33,7 +33,7 @@ function eve_ceiling($isk) {
   <th></th>
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">RI4 Price<br>Volume</th>
+  <th style="text-align: right;">RI4 Price<br>Quantity</th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -51,6 +51,8 @@ function eve_ceiling($isk) {
 
     $summary_market_price = 0;
     $summary_market_volume = 0;
+    $summary_jita_sell = 0;
+    $summary_jita_buy = 0;
     $amarr_buy_order = '';
     $jita_buy_order = '';
     $amarr_buy_price = 0.0;
@@ -66,7 +68,7 @@ function eve_ceiling($isk) {
         $weekly_volume = $product['wv'];
         $order_volume = $product['ov'];
         $day_volume = $product['dv'];
-        $market_volume = $product['mv'];
+        $market_quantity = $product['mv'];
         $packaged_volume = $product['pv'];
         $jita_import_price = $packaged_volume * 866.0;
         $jita_sell = $product['js'];
@@ -86,8 +88,8 @@ function eve_ceiling($isk) {
             else
                 $problems .= '<span class="label label-noorders">no orders</span>&nbsp;';
         }
-        if (is_null($market_volume) || ($weekly_volume >= $market_volume)) $problems .= '<span class="label label-info">need delivery</span>&nbsp;';
-        if (!is_null($market_volume) && ($order_volume >= $market_volume)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
+        if (is_null($market_quantity) || ($weekly_volume >= $market_quantity)) $problems .= '<span class="label label-info">need delivery</span>&nbsp;';
+        if (!is_null($market_quantity) && ($order_volume >= $market_quantity)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
         if (!is_null($market_price)) {
             if ($market_price > 100000 || $packaged_volume < 5) {
                 $min_jita_price = $jita_sell * (1.0+$min_profit+$taxfee);
@@ -99,14 +101,16 @@ function eve_ceiling($isk) {
             $max_amarr_price = $amarr_sell * (1.0+$max_profit+$taxfee);
             if (($market_price > $max_jita_price) && ($market_price > $max_amarr_price))
                 $warnings .= '<span class="label label-default" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
-            if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price)) {
+            if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price) && ($pzmzv_sell_volume > $market_quantity)) {
                 $interrupt_detected = true;
                 $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
             }
         }
 
-        if (!is_null($market_volume)&&!is_null($market_price)) $summary_market_price += $market_volume * $market_price;
-        if (!is_null($packaged_volume)) $summary_market_volume += $market_volume * $packaged_volume;
+        if (!is_null($market_quantity)&&!is_null($market_price)) $summary_market_price += $market_quantity * $market_price;
+        if (!is_null($packaged_volume)) $summary_market_volume += $market_quantity * $packaged_volume;
+        $summary_jita_sell += $market_quantity * $jita_sell;
+        $summary_jita_buy += $market_quantity * $jita_buy;
 
         if (!empty($problems)) {
             if ($amarr_sell <= $jita_sell) {
@@ -126,7 +130,7 @@ function eve_ceiling($isk) {
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
  <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_volume,0,'.',',')?></mark></td>
+ <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_quantity,0,'.',',')?></mark></td>
  <?php } ?>
  <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
  <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
@@ -150,27 +154,35 @@ function eve_ceiling($isk) {
 ?>
 <tr style="font-weight:bold;">
  <td colspan="3" align="right">Summary</td>
- <td align="right"><?=number_format($summary_market_volume,0,'.',',')?></td>
- <td colspan="5" align="right"><?=number_format($summary_market_price,0,'.',',')?></td>
- <td colspan="3"></td>
+ <td align="right"><?=number_format($summary_market_price,0,'.',',').'<br>'.number_format($summary_market_volume,0,'.',',')?>m³</td>
+ <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
+ <td colspan="5"></td>
 </tr>
 </tbody>
 </table>
 
 <div class="row">
  <div class="col-md-6">
-  <h3>Amarr Buy Order</h3>
-   <?php if (!is_null($amarr_buy_order)) { ?>
-    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$amarr_buy_order?></pre>
-    <b>Amarr sell price: <?=number_format($amarr_buy_price,2,'.',',')?></b>
-   <?php } ?>
+  <button class="btn btn-default" type="button" data-toggle="collapse" data-target="#collapseAmarrBuyOrder" aria-expanded="false" aria-controls="collapseAmarrBuyOrder">Amarr Buy Order</button>
+  <div class="collapse" id="collapseAmarrBuyOrder">
+   <div class="card card-body">
+    <?php if (!is_null($amarr_buy_order)) { ?>
+     <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$amarr_buy_order?></pre>
+     <b>Amarr sell price: <?=number_format($amarr_buy_price,2,'.',',')?></b>
+    <?php } ?>
+   </div>
+  </div>
  </div>
  <div class="col-md-6">
-  <h3>Jita Buy Order</h3>
-   <?php if (!is_null($jita_buy_order)) { ?>
-    <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$jita_buy_order?></pre>
-    <b>Jita sell price: <?=number_format($jita_buy_price,2,'.',',')?></b>
-   <?php } ?>
+  <button class="btn btn-default" type="button" data-toggle="collapse" data-target="#collapseJitaBuyOrder" aria-expanded="false" aria-controls="collapseJitaBuyOrder">Jita Buy Order</button>
+  <div class="collapse" id="collapseJitaBuyOrder">
+   <div class="card card-body">
+    <?php if (!is_null($jita_buy_order)) { ?>
+     <pre class="pre-scrollable" style="border: 0; background-color: transparent; font-size: 11px;"><?=$jita_buy_order?></pre>
+     <b>Jita sell price: <?=number_format($jita_buy_price,2,'.',',')?></b>
+    <?php } ?>
+   </div>
+  </div>
  </div>
 </div>
 
@@ -195,6 +207,8 @@ function eve_ceiling($isk) {
 </thead>
 <tbody>
 <?php
+    $summary_jita_sell = 0;
+    $summary_jita_buy = 0;
     if ($storage)
         foreach ($storage as $product)
         {
@@ -211,13 +225,16 @@ function eve_ceiling($isk) {
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
             $universe_price = $product['up'];
+
+            $summary_jita_sell += $jita_sell * $ri4_sell_volume;
+            $summary_jita_buy += $jita_buy * $ri4_sell_volume;
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+ <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '?></td>
  <td align="right"><?=number_format($quantity,0,'.',',')?></td>
- <?php if (is_null($ri4_price)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($ri4_price,2,'.',',')?><br><mark><?=number_format($ri4_sell_volume,0,'.',',')?></mark></td>
+ <?php if (is_null($ri4_sell)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($ri4_sell,2,'.',',')?><br><mark><?=number_format($ri4_sell_volume,0,'.',',')?></mark></td>
  <?php } ?>
  <?php if (is_null($pzmzv_sell)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
@@ -229,6 +246,11 @@ function eve_ceiling($isk) {
 <?php
         }
 ?>
+<tr style="font-weight:bold;">
+ <td colspan="5" align="right">Summary</td>
+ <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
+ <td colspan="3"></td>
+</tr>
 </tbody>
 </table>
 <?php
@@ -289,14 +311,16 @@ from
         esi_corporation_wallet_journals j
           left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
       where
-        not ecwt_is_buy and
         (ecwj_date > '2021-08-15') and
         (ecwj_context_id_type = 'market_transaction_id') and
         ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
             ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
+            ( ecwt_location_id in (1036927076065,1034323745897) and not ecwt_is_buy or
+              ecwt_location_id not in (1036927076065,1034323745897) and ecwt_is_buy) and -- станка рынка
             ecwj_division = 1) or
           ( ecwj_corporation_id in (98553333) and -- R Strike
             ecwj_second_party_id in (95858524) and -- Xatul' Madan
+            ecwt_is_buy and
             ecwj_division = 7)
         )
       union
@@ -390,6 +414,7 @@ EOD;
     // select eca_item_id as office_id -- 1037133900408
     // from qi.esi_corporation_assets
     // where eca_location_id = 1034323745897 and eca_corporation_id = 98615601 and eca_location_flag = 'OfficeFolder';
+    //---
     $query = <<<EOD
 select
   -- hangar.eca_item_id,
@@ -471,8 +496,9 @@ from
       ) o
     ) ri4_orders on (hangar.eca_type_id = ri4_orders.ecor_type_id)
 where
-  hangar.eca_location_id = 1037133900408 and
-  hangar.eca_location_flag = 'CorpSAG4' and
+  ( hangar.eca_location_id = 1037133900408 and hangar.eca_location_flag = 'CorpSAG4' or
+    hangar.eca_location_id = 1037061477103
+  ) and
   hangar.eca_location_type = 'item' and
   not exists (select box.eca_item_id from qi.esi_corporation_assets as box where box.eca_location_id = hangar.eca_item_id)
 -- order by universe.price desc
