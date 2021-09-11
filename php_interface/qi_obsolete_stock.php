@@ -293,10 +293,10 @@ from
         sum(jobs.using_last_2month) as using_last_2month,
         sum(jobs.using_last_3month) as using_last_3month,
         sum(jobs.using_last_4month) as using_last_4month,
-        sum(jobs.using_last_1month*sdebm_quantity) as quantity_last_1month,
-        sum(jobs.using_last_2month*sdebm_quantity) as quantity_last_2month,
-        sum(jobs.using_last_3month*sdebm_quantity) as quantity_last_3month,
-        sum(jobs.using_last_4month*sdebm_quantity) as quantity_last_4month
+        sum(jobs.runs_last_1month*sdebm_quantity) as quantity_last_1month,
+        sum(jobs.runs_last_2month*sdebm_quantity) as quantity_last_2month,
+        sum(jobs.runs_last_3month*sdebm_quantity) as quantity_last_3month,
+        sum(jobs.runs_last_4month*sdebm_quantity) as quantity_last_4month
       from
         qi.eve_sde_blueprint_materials
           -- подсчёт кол-ва работ, запущенных с использованием этого типа чертежей
@@ -309,11 +309,17 @@ from
               sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '30 days') then 1 else 0 end) as using_last_1month,
               sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days') then 1 else 0 end) as using_last_2month,
               sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 days') then 1 else 0 end) as using_last_3month,
-              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '120 days') then 1 else 0 end) as using_last_4month
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '120 days') then 1 else 0 end) as using_last_4month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '30 days') then ecj_runs else 0 end) as runs_last_1month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days') then ecj_runs else 0 end) as runs_last_2month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '90 days') then ecj_runs else 0 end) as runs_last_3month,
+              sum(case when ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '120 days') then ecj_runs else 0 end) as runs_last_4month
             from qi.esi_corporation_industry_jobs jobs
             where jobs.ecj_corporation_id = 98677876
+         and ecj_start_date::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '120 days')
             group by 1, 2
           ) jobs on (sdebm_blueprint_type_id = jobs.ecj_blueprint_type_id and sdebm_activity = jobs.ecj_activity_id)
+      where jobs.ecj_blueprint_type_id is not null
       group by 1
       -- order by 1
     ) materials_using on (stock.type_id = materials_using.material_id)
