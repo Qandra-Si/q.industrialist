@@ -49,5 +49,10 @@ include_once '.settings.php';
  <a class="btn btn-success" href="/qi_market_orders.php?sell_only=1" role="button">Sell Market Orders</a> 
  <a class="btn btn-default" href="/qi_market_orders.php?querious_sales=1" role="button">Market Orders (с Querious)</a>
  </p>
+
+ <p>
+ Профессор вернулся и сразу ворвался в планетарку. Учёт наличия материалов в коробках для запуска процессов на планетах.
+ <br><a class="btn btn-success" href="/qi_professor_planetary.php" role="button">Professor' Planetary</a>
+ </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
