@@ -37,7 +37,7 @@ function get_numeric($val) {
  <li><span class="label label-absent">absent</span> - материал отсутствует в стоке, хотя использовался в каких-либо работах за последние 2 месяца.
 </ul></p>
 <p>Также считается количество материала (в штуках) которое мы ежемесячно используем... правда без учёта ME (только сводные данные по чертежам). Параметр <strong>Quantity</strong> - это потраченное кол-во материалов за последние 30 дней. Выборка с помощью бегущего окна, то есть завтра даты обновятся и интервал подвинется. Last 2 Month Quantity - аналогично, но за последние 60 дней. <strong>Times</strong> - количество работ.</p>
-<p>Параметр <strong>Since</strong> показывает дату, когда стак с материалами "трогался" последний раз (переупаковывался, пополнялся, или уменьшался). Параметр <strong>Last Using</strong> показывет дату, когда материал использовался в какой-либо из последних работ, <strong>Used in Jobs</strong> - общее количество работ, проведённых с эпомянутым материалом. Параметр <strong>Blueprint Variations</strong> - показывает число возможных работ, в которых может быть задействован материал.</p>
+<p>Параметр <strong>Last Using</strong> показывет дату, когда материал использовался в какой-либо из последних работ, <strong>Used in Jobs</strong> - общее количество работ, проведённых с эпомянутым материалом. Параметр <strong>Blueprint Variations</strong> - показывает число возможных работ, в которых может быть задействован материал.</p>
 <p>Также возможно формирование отчёта не только по <mark>..stock ALL</mark> коробке. Отчёт может быть сформирован по любому другому списку материалов, находящемуся в ином контейнере, для этого вам необходимо знать его номер и создать закладку в браузере, например <a href="http://<?=$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF']?>?stock=1036613601158">1036613601158</a>. Для получения уникальной ссылки на ваш контейнер обратитесь к Qandra Si.</p>
   </div>
 </div>
@@ -96,7 +96,6 @@ function get_numeric($val) {
   <th style="text-align: right;">Quantity</th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
-  <th style="text-align: right;">Since</th>
   <th style="text-align: right;">Blueprint<br>Variations</th>
   <th style="text-align: right;">Used in Jobs<br>Last Using</th>
   <th style="text-align: right;">Last 1 Month<br>Quantity / <mark>Times</mark></th>
@@ -120,7 +119,6 @@ function get_numeric($val) {
         $universe_avg_price = $material['uap'];
         $jita_sell = $material['js'];
         $jita_buy = $material['jb'];
-        $lie_up_since = $material['s'];
         $blueprint_variations = $material['bv'];
         $using_in_jobs = $material['uj'];
         $last_using = $material['lu'];
@@ -166,7 +164,6 @@ function get_numeric($val) {
  <td align="right"><?=number_format($universe_avg_price,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
  <?php } ?>
- <td align="right"><?=$lie_up_since?></td>
  <?php if (is_null($blueprint_variations) || !$blueprint_variations) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($blueprint_variations,0,'.',',')?></td>
  <?php } ?>
@@ -193,7 +190,7 @@ function get_numeric($val) {
  <td colspan="3" align="right">Summary</td>
  <td align="right"><?=number_format($summary_stock_price,0,'.',',')?></td>
  <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
- <td colspan="7"></td>
+ <td colspan="6"></td>
 </tr>
 </tbody>
 </table>
@@ -229,7 +226,6 @@ select
   ceil(universe.price * stock.quantity) as uap, -- universe avg price
   ceil(jita.sell * stock.quantity) as js, -- jita sell
   ceil(jita.buy * stock.quantity) as jb, -- jita buy
-  stock.since as s, -- lie up since
   materials_using.variations as bv, -- blueprint variations
   materials_using.jobs_times as uj, -- used in jobs
   materials_using.last_using as lu, -- last using
@@ -246,14 +242,13 @@ from
   ( -- содержимое коробки ..stock ALL на Сотие
     select
       eca_type_id as type_id,
-      sum(eca_quantity) as quantity,
-      max(eca_created_at::date) as since
+      sum(eca_quantity) as quantity
     from qi.esi_corporation_assets
     where eca_location_id = $1
     group by 1
     union
     -- список материалов, которых нет в коробке
-    select distinct m.sdebm_material_id, 0, null::date
+    select distinct m.sdebm_material_id, 0
     from
       qi.eve_sde_blueprint_materials m,
       qi.esi_corporation_industry_jobs j
