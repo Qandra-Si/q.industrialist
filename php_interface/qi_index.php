@@ -23,7 +23,7 @@ include_once '.settings.php';
 
  <p>
  Отслеживание того, что происходит с чертежами, - инвент и копирка, рассчёт стоимости работ с учётом процента успеха. Выборка включает события за последнюю неделю.
- <br><a class="btn btn-info" href="/qi_blueprint_costs.php" role="button">Industry</a>
+ <br><a class="btn btn-info" href="/qi_blueprint_costs.php" role="button">Blueprint Costs</a>
  </p>
 
  <p>
@@ -33,13 +33,21 @@ include_once '.settings.php';
 
 <h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
- Текущее состояние рынка в Querious. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.
+ Текущее состояние рынка в <strong>Querious</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.
  <br><a class="btn btn-success" href="/qi_querious.php" role="button">Querious Market</a>
  </p>
 
  <p>
- Учёт наличие материалов в стоке в Malpais, автоматический расчёт достаточности их количества. Поиск потерянных товаров, случайно оказавшихся в стоке, поиск товаров, которые не используются в работах иди которые надо уварить, потратить или продать.
+ Учёт наличия материалов в стоке в <strong>Malpais</strong>, автоматический расчёт достаточности их количества. Поиск потерянных товаров, случайно оказавшихся в стоке, поиск товаров, которые не используются в работах иди которые надо уварить, потратить или продать.
  <br><a class="btn btn-success" href="/qi_obsolete_stock.php" role="button">Obsolete Stock</a>
+ </p>
+
+ <p>
+ Текущий список закупок и продаж по всем корпорациям, объёмы реализации, сравнение цен.<br>
+ <a class="btn btn-success" href="/qi_market_orders.php" role="button">Market Orders (без Querious)</a>
+ <a class="btn btn-success" href="/qi_market_orders.php?buy_only=1" role="button">Buy Market Orders</a>
+ <a class="btn btn-success" href="/qi_market_orders.php?sell_only=1" role="button">Sell Market Orders</a> 
+ <a class="btn btn-success" href="/qi_market_orders.php?querious_sales=1" role="button" style="background-color:#90ca90; border-color:#90ca90;">Market Orders (с Querious)</a>
  </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>

@@ -156,6 +156,7 @@ CREATE TABLE qi.eve_sde_type_ids
     sdet_icon_id INTEGER,
     -- sdet_group_id INTEGER,
     -- sdet_portion_size INTEGER,
+    sdet_packaged_volume DOUBLE PRECISION,
     CONSTRAINT pk_sdet PRIMARY KEY (sdet_type_id)
 )
 TABLESPACE pg_default;
