@@ -43,11 +43,11 @@ include_once '.settings.php';
  </p>
 
  <p>
- Текущий список закупок и продаж по всем корпорациям, объёмы реализации, сравнение цен.<br>
+ Текущий список закупок и продаж по всем корпорациям, объёмы реализации, сравнение цен с Jita.<br>
  <a class="btn btn-success" href="/qi_market_orders.php" role="button">Market Orders (без Querious)</a>
  <a class="btn btn-success" href="/qi_market_orders.php?buy_only=1" role="button">Buy Market Orders</a>
  <a class="btn btn-success" href="/qi_market_orders.php?sell_only=1" role="button">Sell Market Orders</a> 
- <a class="btn btn-success" href="/qi_market_orders.php?querious_sales=1" role="button" style="background-color:#90ca90; border-color:#90ca90;">Market Orders (с Querious)</a>
+ <a class="btn btn-default" href="/qi_market_orders.php?querious_sales=1" role="button">Market Orders (с Querious)</a>
  </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
