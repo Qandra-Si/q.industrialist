@@ -281,8 +281,8 @@ function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity
     $warnings = '';
     if (is_null($required_quantity))
         $warnings .= '<span class="label label-danger">not planned for use</span>&nbsp;';
-    if ($we_buy_it)
-        $warnings .= '<span class="label label-success">we buy it</span>&nbsp;';
+    else if (!$we_buy_it)
+        $warnings .= '<span class="label label-warning">we don&apos;t buy it</span>&nbsp;';
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -331,7 +331,7 @@ function __dump_planetary_stock_footer($summary_jita_sell, $summary_jita_buy, $s
 }
 
 
-function __dump_planetary_stock_location($location_id, &$location_flag, &$products_in_location, &$planetary, &$jita)
+function __dump_planetary_stock_location($location_id, &$location_flag, &$products_in_location, &$planetary, &$jita, &$active_orders)
 {
     global $product_requirements;
 
@@ -377,7 +377,6 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         $tid = intval($product['id']);
         $nm = $product['name'];
         $volume = 0.0;
-        $we_buy_it = false;
 
         // поиск имеющейся в коробке планетарки
         $quantity = 0;
@@ -385,11 +384,13 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         {
             if ($l[0] != $tid) continue;
             $quantity = $l[1];
-            $we_buy_it = $l[2];
             break;
         }
         // в том случае, если нужного продукта в коробке нет, и считать остатки не надо, - пропускаем шаг
         if ($calculate_quantities == false && $quantity == 0) continue;
+
+        // определяем, выполняется ли закупка этого продукта прямо сейчас?
+        $we_buy_it = array_search($tid, array_column($active_orders, 'id')) !== false;
 
         // поиск сведений о том сколько требуется планетарки в этой коробке?
         $required_quantity = null;
@@ -466,14 +467,13 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
             $quantity = $product['q'];
             $location_id = intval($product['lid']);
             $location_flag = $product['f'];
-            $we_buy_it = array_search($tid, array_column($active_orders, 'id'));
             if ($prev_location_id == $location_id && $prev_location_flag == $location_flag)
-                array_push($products_in_location, array(intval($tid), intval($quantity), $we_buy_it !== false));
+                array_push($products_in_location, array(intval($tid), intval($quantity)));
             else if ($prev_location_id == 0)
             {
                 $prev_location_id = $location_id;
                 $prev_location_flag = $location_flag;
-                array_push($products_in_location, array(intval($tid), intval($quantity), $we_buy_it !== false));
+                array_push($products_in_location, array(intval($tid), intval($quantity)));
             }
             else
             {
@@ -482,7 +482,8 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
                     $prev_location_flag,
                     $products_in_location,
                     $planetary,
-                    $jita
+                    $jita,
+                    $active_orders
                 );
                 // обнаружена новая группа (новая коробка)
                 $prev_location_id = $location_id;
@@ -496,7 +497,8 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
             $prev_location_flag,
             $products_in_location,
             $planetary,
-            $jita
+            $jita,
+            $active_orders
         );
     }
 }
