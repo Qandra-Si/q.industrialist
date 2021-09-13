@@ -13,7 +13,8 @@ function get_numeric($val) {
 .label-forgotten { color: #fff; background-color: #ddd; }
 .label-overstock { color: #333; background-color: #b5d2ea; }
 .label-understock { color: #333; background-color: #ff0; }
-.label-absent { color: #fff; background-color: #d9534f; }
+.label-absent { color: #fff; background-color: #eebbb9; }
+.label-noorders { color: #fff; background-color: #eebbb9; }
 </style>
 <button class="btn btn-default" type="button" data-toggle="collapse" data-target="#collapseAnnotation" aria-expanded="false" aria-controls="collapseAnnotation">Аннотация</button>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" id="#btnGroups">
@@ -22,6 +23,7 @@ function get_numeric($val) {
  <label class="btn btn-default" id="btnGroupOverstock"><input type="radio" name="options" autocomplete="off">С избытком</label>
  <label class="btn btn-default" id="btnGroupUnderstock"><input type="radio" name="options" autocomplete="off">Маловато</label>
  <label class="btn btn-default" id="btnGroupObsolete"><input type="radio" name="options" autocomplete="off">Забытые</label>
+ <label class="btn btn-default" id="btnGroupBought"><input type="radio" name="options" autocomplete="off">Закуп</label>
 </div>
 <div class="collapse" id="collapseAnnotation">
   <div class="card card-body">
@@ -34,11 +36,13 @@ function get_numeric($val) {
  <li><span class="label label-default">abandoned</span> - забыт на три месяца;
  <li><span class="label label-understock">understock</span> - материалов в скопилось слишком много;
  <li><span class="label label-overstock">overstock</span> - материалов не хватает;
- <li><span class="label label-absent">absent</span> - материал отсутствует в стоке, хотя использовался в каких-либо работах за последние 2 месяца.
+ <li><span class="label label-absent">absent</span> - материал отсутствует в стоке, хотя использовался в каких-либо работах за последние 2 месяца;
+ <li><span class="label label-success">we buy it</span> - материал закупается прямо сейчас (выставлены ордера на покупку).
 </ul></p>
-<p>Также считается количество материала (в штуках) которое мы ежемесячно используем... правда без учёта ME (только сводные данные по чертежам). Параметр <strong>Quantity</strong> - это потраченное кол-во материалов за последние 30 дней. Выборка с помощью бегущего окна, то есть завтра даты обновятся и интервал подвинется. Last 2 Month Quantity - аналогично, но за последние 60 дней. <strong>Times</strong> - количество работ.</p>
+<p>Также считается количество материала (в штуках) которое мы ежемесячно используем... правда без учёта ME (только сводные данные по чертежам). Параметр <strong>Quantity</strong> - это потраченное кол-во материалов за последние 30 дней. Выборка с помощью бегущего окна, то есть завтра даты обновятся и интервал подвинется. <strong>Last 2 Month Quantity</strong> - аналогично, но за последние 60 дней. Параметр <strong>Where Else Q.</strong> показывает количество данного материала в корпассетах где бы то ни было ещё, кроме коробки <mark>..stock ALL</mark>. <strong>Times</strong> - количество работ.</p>
 <p>Параметр <strong>Last Using</strong> показывет дату, когда материал использовался в какой-либо из последних работ, <strong>Used in Jobs</strong> - общее количество работ, проведённых с эпомянутым материалом. Параметр <strong>Blueprint Variations</strong> - показывает число возможных работ, в которых может быть задействован материал.</p>
 <p>Также возможно формирование отчёта не только по <mark>..stock ALL</mark> коробке. Отчёт может быть сформирован по любому другому списку материалов, находящемуся в ином контейнере, для этого вам необходимо знать его номер и создать закладку в браузере, например <a href="http://<?=$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF']?>?stock=1036613601158">1036613601158</a>. Для получения уникальной ссылки на ваш контейнер обратитесь к Qandra Si.</p>
+<p>Для того, чтобы проверить состояние всех материалов, которые использовались в стройке за последние 2 месяца, но которых нет в коробке <mark>..stock ALL</mark>, воспользуйтесь <a href="http://<?=$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF']?>?absent=1">этой ссылкой</a>.</p>
   </div>
 </div>
 <script>
@@ -59,6 +63,8 @@ function get_numeric($val) {
         show = tr.find('td').eq(1).find('span.label-obsolete').length ||
                tr.find('td').eq(1).find('span.label-forgotten').length ||
                tr.find('td').eq(1).find('span.label-default').length;
+      else if (show_group == 5) // we buy it
+        show = tr.find('td').eq(1).find('span.label-success').length;
       if (show)
         tr.removeClass('hidden');
       else
@@ -86,6 +92,10 @@ function get_numeric($val) {
       if (!$(this).hasClass('active')) // включается
         rebuildStockMaterials(4);
     });
+    $('#btnGroupBought').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStockMaterials(5);
+    });
   });
 </script>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
@@ -93,7 +103,7 @@ function get_numeric($val) {
  <tr>
   <th></th>
   <th>Material</th>
-  <th style="text-align: right;">Quantity</th>
+  <th style="text-align: right;">Quantity<br><small>Where Else Q.</small></th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
   <th style="text-align: right;">Blueprint<br>Variations</th>
@@ -130,6 +140,8 @@ function get_numeric($val) {
         $last_2_month_quantity = $material['m2q'];
         $last_3_month_quantity = $material['m3q'];
         $last_4_month_quantity = $material['m4q'];
+        $buy_orders_remain_volume = $material['orv'];
+        $where_else_quantity = $material['weq'];
 
         if (is_null($blueprint_variations) || !$blueprint_variations)
             $warnings .= '<span class="label label-danger">lost</span>&nbsp;';
@@ -151,6 +163,8 @@ function get_numeric($val) {
             if (is_null($quantity) || !$quantity)
                 $warnings .= '<span class="label label-absent">absent</span>&nbsp;';
         }
+        if (!is_null($buy_orders_remain_volume))
+            $warnings .= '<span class="label label-success" data-toggle="tooltip" data-placement="bottom" title="Ordered '.number_format($buy_orders_remain_volume,0,'.',',').' pieces">we buy it</span>&nbsp;';
 
         $summary_stock_price += $universe_avg_price;
         $summary_jita_sell += $jita_sell;
@@ -159,7 +173,7 @@ function get_numeric($val) {
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><?=$nm.'<br><span class="text-muted">'.$tid.'</span> '.$warnings?></td>
- <td align="right"><?=number_format($quantity,0,'.',',')?></td>
+ <td align="right"><?=number_format($quantity,0,'.',',').(is_null($where_else_quantity)?'':'<br><small><span class="text-muted">'.number_format($where_else_quantity,0,'.',',').'</span></small>')?></td>
  <?php if (is_null($quantity) || !$quantity) { ?><td></td><td></td><?php } else { ?>
  <td align="right"><?=number_format($universe_avg_price,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
@@ -236,7 +250,9 @@ select
   materials_using.quantity_last_1month as m1q, -- last 1 month quantity
   materials_using.quantity_last_2month as m2q, -- last 2 month quantity
   materials_using.quantity_last_3month as m3q, -- last 3 month quantity
-  materials_using.quantity_last_4month as m4q  -- last 4 month quantity
+  materials_using.quantity_last_4month as m4q, -- last 4 month quantity
+  o.sum_remain_volume as orv,
+  where_else.sum_quantity as weq
 from
   -- список материалов, которые должны попасть в отчёт
   ( -- содержимое коробки ..stock ALL на Сотие
@@ -256,7 +272,8 @@ from
       ($2 = 1) and
       m.sdebm_blueprint_type_id = j.ecj_blueprint_type_id and
       m.sdebm_activity = j.ecj_activity_id and
-      j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days')
+      j.ecj_start_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '60 days') and
+      m.sdebm_material_id not in (select distinct eca_type_id from qi.esi_corporation_assets where eca_location_id = $1)
   ) stock
     -- сведения о предмете
     left outer join qi.eve_sde_type_ids tid on (stock.type_id = tid.sdet_type_id)
@@ -276,6 +293,24 @@ from
       from qi.esi_trade_hub_prices
       where ethp_location_id = 60003760
     ) jita on (stock.type_id = jita.ethp_type_id)
+    -- корпоративная закупка прямо сейчас
+    left outer join (
+      select ecor_type_id, sum(ecor_volume_remain) as sum_remain_volume
+      from qi.esi_corporation_orders
+      where ecor_is_buy_order and not ecor_history
+      group by 1
+    ) o on (stock.type_id = o.ecor_type_id)
+    -- 
+    left outer join (
+      select
+        eca_type_id,
+        sum(eca_quantity) as sum_quantity
+      from qi.esi_corporation_assets
+      where
+        eca_location_id <> 1036612408249 and
+        eca_corporation_id in (98677876, 98553333) -- R Industry, R Strike
+      group by 1
+    ) where_else on (stock.type_id = where_else.eca_type_id)
     -- производственные работы с обнаруженным материалом
     left outer join (
       select
