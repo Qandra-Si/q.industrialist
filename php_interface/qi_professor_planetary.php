@@ -1,6 +1,33 @@
 ﻿<?php
 include 'qi_render_html.php';
 include_once '.settings.php';
+
+$product_requirements = array(
+    array('id' =>  2329, 'name' => 'Biocells',                       'quantity' => 72000),
+    array('id' =>  3828, 'name' => 'Construction Blocks',            'quantity' => 66120),
+    array('id' =>  9836, 'name' => 'Consumer Electronics',           'quantity' => 26280),
+    array('id' =>  9832, 'name' => 'Coolant',                        'quantity' => 26280),
+    array('id' =>    44, 'name' => 'Enriched Uranium',               'quantity' => 36000),
+    array('id' =>  3693, 'name' => 'Fertilizer',                     'quantity' => 66120),
+    array('id' => 15317, 'name' => 'Genetically Enhanced Livestock', 'quantity' => 36000),
+    array('id' =>  3725, 'name' => 'Livestock',                      'quantity' => 66120),
+    array('id' =>  2327, 'name' => 'Microfiber Shielding',           'quantity' => 72000),
+    array('id' =>  9842, 'name' => 'Miniature Electronics',          'quantity' => 39840),
+    array('id' =>  2463, 'name' => 'Nanites',                        'quantity' => 62280),
+    array('id' =>  2321, 'name' => 'Polyaramids',                    'quantity' => 72000),
+    array('id' =>  3695, 'name' => 'Polytextiles',                   'quantity' => 39840),
+    array('id' =>  2398, 'name' => 'Reactive Metals',                'quantity' => 79680),
+    array('id' =>  9830, 'name' => 'Rocket Fuel',                    'quantity' => 36000),
+    array('id' =>  3697, 'name' => 'Silicate Glass',                 'quantity' => 72000),
+    array('id' =>  9838, 'name' => 'Superconductors',                'quantity' => 39840),
+    array('id' =>  2312, 'name' => 'Supertensile Plastics',          'quantity' => 72000),
+    array('id' =>  3691, 'name' => 'Synthetic Oil',                  'quantity' => 66120),
+    array('id' =>  2319, 'name' => 'Test Cultures',                  'quantity' => 62280),
+    array('id' =>  9840, 'name' => 'Transmitter',                    'quantity' => 72000),
+    array('id' =>  3775, 'name' => 'Viral Agent',                    'quantity' => 39840),
+    array('id' =>  3645, 'name' => 'Water',                          'quantity' => 79680),
+    array('id' =>  2328, 'name' => 'Water-Cooled CPU',               'quantity' => 62280),
+);
 ?>
 
 
@@ -93,7 +120,7 @@ include_once '.settings.php';
     if ($location_requirements)
     {
         foreach ($location_requirements as $x)
-            if ($x['quantity'])
+            if ($x['quantity'] != 0)
             {
                 __dump_planetary_stock_item($x['id'], $x['name'], true, 0, $x['quantity']);
             }
@@ -135,32 +162,7 @@ include_once '.settings.php';
 </thead>
 <tbody>
 <?php
-    $product_requirements = array(
-        array('id' =>  2329, 'name' => 'Biocells',                       'quantity' => 72000),
-        array('id' =>  3828, 'name' => 'Construction Blocks',            'quantity' => 66120),
-        array('id' =>  9836, 'name' => 'Consumer Electronics',           'quantity' => 26280),
-        array('id' =>  9832, 'name' => 'Coolant',                        'quantity' => 26280),
-        array('id' =>    44, 'name' => 'Enriched Uranium',               'quantity' => 36000),
-        array('id' =>  3693, 'name' => 'Fertilizer',                     'quantity' => 66120),
-        array('id' => 15317, 'name' => 'Genetically Enhanced Livestock', 'quantity' => 36000),
-        array('id' =>  3725, 'name' => 'Livestock',                      'quantity' => 66120),
-        array('id' =>  2327, 'name' => 'Microfiber Shielding',           'quantity' => 72000),
-        array('id' =>  9842, 'name' => 'Miniature Electronics',          'quantity' => 39840),
-        array('id' =>  2463, 'name' => 'Nanites',                        'quantity' => 62280),
-        array('id' =>  2321, 'name' => 'Polyaramids',                    'quantity' => 72000),
-        array('id' =>  3695, 'name' => 'Polytextiles',                   'quantity' => 39840),
-        array('id' =>  2398, 'name' => 'Reactive Metals',                'quantity' => 79680),
-        array('id' =>  9830, 'name' => 'Rocket Fuel',                    'quantity' => 36000),
-        array('id' =>  3697, 'name' => 'Silicate Glass',                 'quantity' => 72000),
-        array('id' =>  9838, 'name' => 'Superconductors',                'quantity' => 39840),
-        array('id' =>  2312, 'name' => 'Supertensile Plastics',          'quantity' => 72000),
-        array('id' =>  3691, 'name' => 'Synthetic Oil',                  'quantity' => 66120),
-        array('id' =>  2319, 'name' => 'Test Cultures',                  'quantity' => 62280),
-        array('id' =>  9840, 'name' => 'Transmitter',                    'quantity' => 72000),
-        array('id' =>  3775, 'name' => 'Viral Agent',                    'quantity' => 39840),
-        array('id' =>  3645, 'name' => 'Water',                          'quantity' => 79680),
-        array('id' =>  2328, 'name' => 'Water-Cooled CPU',               'quantity' => 62280),
-    );
+    global $product_requirements;
 
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
@@ -205,6 +207,7 @@ include_once '.settings.php';
                         $calculate_quantities ? $location_requirements : null
                     );
                 }
+                $location_requirements = null;
                 $location_requirements = array();
                 $location_requirements = $product_requirements;
                 $location_jita_sell = 0;
@@ -232,13 +235,14 @@ include_once '.settings.php';
                 $location_id == 1037161379493 ||
                 $location_id == 1037111988366;
             $required_quantity = null;
-            foreach ($location_requirements as $x)
+            foreach ($location_requirements as &$x)
             {
                 if ($x['id'] != $tid) continue;
                 $required_quantity = $x['quantity'];
                 $x['quantity'] = 0;
                 break;
             }
+            unset($x);
 
             __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity);
         }
