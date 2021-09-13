@@ -63,8 +63,8 @@ function __dump_jita_prices(&$planetary, &$jita) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
-  <th></th>
-  <th>Items</th>
+  <th style="width:32px"></th>
+  <th width="100%">Items</th>
   <th style="text-align: right;">Jita Sell</mark></th>
   <th style="text-align: right;">Jita Buy</th>
  </tr>
@@ -118,6 +118,146 @@ function __dump_jita_prices(&$planetary, &$jita) { ?>
 }
 
 
+function __dump_wallet_journals(&$wallet_journals) { ?>
+<button class="btn btn-default" type="button" data-toggle="modal" data-target="#showWalletJournals">Бухгалтерия</button>
+<!-- Modal -->
+<div class="modal fade" id="showWalletJournals" tabindex="-1" role="dialog" aria-labelledby="showWalletJournalsLabel">
+ <div class="modal-dialog" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+     <h4 class="modal-title" id="showWalletJournalsLabel">Финансовая отчётность</h4>
+   </div>
+   <div class="modal-body">
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Дата</th>
+  <th>Операция</th>
+  <th style="text-align: right;">Производственный отдел</mark></th>
+  <th style="text-align: right;">Финансовый отдел</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    if ($wallet_journals)
+        foreach ($wallet_journals as $event)
+        {
+            $date = $event['dt'];
+            $corporation_id = $event['c'];
+            $amount = $event['isk'];
+            $type = $event['tp'];
+
+            if ($type == 't')
+                $type = 'перевод';
+?>
+<tr>
+ <td><?=$date?></td>
+ <td><?=$type?></td>
+ <?php if ($corporation_id == 2053528477) { ?>
+  <td align="right"<?=($amount<0)?' class="text-danger"':''?>><?=number_format($amount,2,'.',',')?></td>
+  <td></td>
+ <?php } else { ?>
+  <td></td>
+  <td align="right"<?=($amount<0)?' class="text-danger"':''?>><?=number_format($amount,2,'.',',')?></td>
+ <?php }?>
+</tr>
+<?php
+        }
+?>
+</tbody>
+</table>
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+   </div>
+  </div>
+ </div>
+</div>
+<!-- Modal -->
+<?php
+}
+
+
+function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
+<button class="btn btn-default" type="button" data-toggle="modal" data-target="#showMarketOrders">Рыночные сделки</button>
+<!-- Modal -->
+<div class="modal fade" id="showMarketOrders" tabindex="-1" role="dialog" aria-labelledby="showMarketOrdersLabel">
+ <div class="modal-dialog" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+     <h4 class="modal-title" id="showMarketOrdersLabel">Рыночные сделки</h4>
+   </div>
+   <div class="modal-body">
+<h3>Активные ордера на покупку</h3>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th style="width:32px"></th>
+  <th width="100%">Планетарка</th>
+  <th style="text-align: right;">Количество</th>
+  <th style="text-align: right;">Закупочная<br>цена</mark></th>
+  <th style="text-align: right;">Jita Sell/Buy</mark></th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    $prev_type_id = 0;
+    if ($active_orders)
+        foreach ($active_orders as $order)
+        {
+            $tid = intval($order['id']);
+            $price = $order['p'];
+            $remaining = $order['r'];
+
+            $nm = '';
+            foreach ($planetary as $p)
+            {
+                //$market_group_id = intval($p['mgid']);
+                if ($tid != $p['id']) continue;
+                $nm = $p['name'];
+                break;
+            }
+
+            $found = false;
+            foreach ($jita as $j)
+            {
+                if ($j['id'] != $tid) continue;
+                $jita_sell = $j['js'];
+                $jita_buy = $j['jb'];
+                $found = true;
+                break;
+            }
+?>
+<tr>
+ <?php if ($prev_type_id != $tid) { $prev_type_id = $tid; ?>
+  <td><img class="icn24" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="24px" height="24px"></td>
+  <td><?=$nm?><?=get_clipboard_copy_button($nm)?></td>
+ <?php } else { ?>
+  <td colspan="2"></td>
+ <?php } ?>
+ <td align="right"><?=number_format($remaining,0,'.',',')?></td>
+ <td align="right"><?=number_format($price,2,'.',',')?></td>
+ <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><?=number_format($jita_buy,2,'.',',')?></td>
+</tr>
+<?php
+        }
+?>
+</tbody>
+</table>
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+   </div>
+  </div>
+ </div>
+</div>
+<!-- Modal -->
+<?php
+}
+
+
 function __dump_progress_element($current_num, $max_num) {
         $__progress_factor = 100.0;
     if (!is_null($max_num) && $max_num)
@@ -137,10 +277,12 @@ function __dump_progress_element($current_num, $max_num) {
 <?php }
 
 
-function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $volume) {
+function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $volume, $we_buy_it) {
     $warnings = '';
     if (is_null($required_quantity))
         $warnings .= '<span class="label label-danger">not planned for use</span>&nbsp;';
+    if ($we_buy_it)
+        $warnings .= '<span class="label label-success">we buy it</span>&nbsp;';
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -235,6 +377,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         $tid = intval($product['id']);
         $nm = $product['name'];
         $volume = 0.0;
+        $we_buy_it = false;
 
         // поиск имеющейся в коробке планетарки
         $quantity = 0;
@@ -242,6 +385,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         {
             if ($l[0] != $tid) continue;
             $quantity = $l[1];
+            $we_buy_it = $l[2];
             break;
         }
         // в том случае, если нужного продукта в коробке нет, и считать остатки не надо, - пропускаем шаг
@@ -278,7 +422,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
             $prev_market_group_id = $market_group_id;
             __dump_planetary_market_group($market_group_id, $calculate_quantities);
         }
-        __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $volume*$quantity);
+        __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $volume*$quantity, $we_buy_it);
 
         // поиск сведений о ценах на продукт
         $found = false;
@@ -302,7 +446,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
 }
 
 
-function __dump_planetary_stock(&$stock, &$planetary, &$jita) {
+function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
     $location_jita_sell = 0;
@@ -322,13 +466,14 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita) {
             $quantity = $product['q'];
             $location_id = intval($product['lid']);
             $location_flag = $product['f'];
+            $we_buy_it = array_search($tid, array_column($active_orders, 'id'));
             if ($prev_location_id == $location_id && $prev_location_flag == $location_flag)
-                array_push($products_in_location, array(intval($tid), intval($quantity)));
+                array_push($products_in_location, array(intval($tid), intval($quantity), $we_buy_it !== false));
             else if ($prev_location_id == 0)
             {
                 $prev_location_id = $location_id;
                 $prev_location_flag = $location_flag;
-                array_push($products_in_location, array(intval($tid), intval($quantity)));
+                array_push($products_in_location, array(intval($tid), intval($quantity), $we_buy_it !== false));
             }
             else
             {
@@ -415,11 +560,63 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $planetary = pg_fetch_all($planetary_cursor);
     //---
+    $query = <<<EOD
+select
+ j.ecwj_date::date as dt,
+ j.ecwj_corporation_id as c,
+ sum(j.ecwj_amount) as isk,
+ 't'::char as tp
+ -- , j.*
+from
+ qi.esi_corporation_wallet_journals j
+where
+ ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
+   j.ecwj_ref_type = 'corporation_account_withdrawal' and
+   j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, R Strike
+ ) or
+ ( j.ecwj_corporation_id = 98150545 and -- R Strike
+   j.ecwj_ref_type = 'corporation_account_withdrawal' and
+   j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+ )
+group by 1, 2
+order by 1 desc;
+EOD;
+    $wallet_journals_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $wallet_journals = pg_fetch_all($wallet_journals_cursor);
+    //---
+    $query = <<<EOD
+select
+ -- o.ecor_issued::date as dt,
+ o.ecor_type_id as id,
+ o.ecor_price as p,
+ sum(o.ecor_volume_remain) as r
+ -- , o.ecor_history as history,
+ -- o.ecor_order_id as order_id
+from
+ qi.eve_sde_type_ids tid,
+ esi_corporation_orders o
+where
+ tid.sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
+ ecor_type_id = tid.sdet_type_id and
+ ecor_is_buy_order and
+ not ecor_history and
+ ecor_issued >= '2021-08-30' and
+ ecor_issued_by = 1077301319
+group by 1, 2
+order by 1, 2 desc;
+EOD;
+    $active_orders_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $active_orders = pg_fetch_all($active_orders_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container">
  <?php __dump_jita_prices($planetary, $jita); ?>
- <?php __dump_planetary_stock($stock, $planetary, $jita); ?>
+ <?php __dump_wallet_journals($wallet_journals); ?>
+ <?php __dump_market_orders($active_orders, $planetary, $jita); ?>
+ <?php __dump_planetary_stock($stock, $planetary, $jita, $active_orders); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 
