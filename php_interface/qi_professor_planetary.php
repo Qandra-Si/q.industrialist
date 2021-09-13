@@ -472,27 +472,32 @@ EOD;
           });
         }
       }
-      if (window.isSecureContext && navigator.clipboard) {
-        navigator.clipboard.writeText(data_copy).then(() => {
-          $(this).trigger('copied', ['Copied!']);
-        }, (e) => {
-          $(this).trigger('copied', ['Data not copied!']);
-        });
-        document.execCommand("copy");
+      if (data_copy) {
+        if (window.isSecureContext && navigator.clipboard) {
+          navigator.clipboard.writeText(data_copy).then(() => {
+            $(this).trigger('copied', ['Copied!']);
+          }, (e) => {
+            $(this).trigger('copied', ['Data not copied!']);
+          });
+          document.execCommand("copy");
+        }
+        else {
+          var $temp = $("<textarea>");
+          $("body").append($temp);
+          $temp.val(data_copy).select();
+          try {
+            success = document.execCommand("copy");
+            if (success)
+              $(this).trigger('copied', ['Copied!']);
+            else
+              $(this).trigger('copied', ['Data not copied!']);
+          } finally {
+            $temp.remove();
+          }
+        }
       }
       else {
-        var $temp = $("<textarea>");
-        $("body").append($temp);
-        $temp.val(data_copy).select();
-        try {
-          success = document.execCommand("copy");
-          if (success)
-            $(this).trigger('copied', ['Copied!']);
-          else
-            $(this).trigger('copied', ['Data not copied!']);
-        } finally {
-          $temp.remove();
-        }
+        $(this).trigger('copied', ['Nothing no copy!']);
       }
     });
     $('a.qind-copy-btn').bind('copied', function(event, message) {
