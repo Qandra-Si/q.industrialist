@@ -472,23 +472,28 @@ EOD;
           });
         }
       }
-      <?php /* не работает :( var $temp = $("<textarea>");
-      $("body").append($temp);
-      $temp.val(data_copy).select();
-      try {
-        success = document.execCommand("copy");
-        if (success) {
+      if (window.isSecureContext && navigator.clipboard) {
+        navigator.clipboard.writeText(data_copy).then(() => {
           $(this).trigger('copied', ['Copied!']);
+        }, (e) => {
+          $(this).trigger('copied', ['Data not copied!']);
+        });
+        document.execCommand("copy");
+      }
+      else {
+        var $temp = $("<textarea>");
+        $("body").append($temp);
+        $temp.val(data_copy).select();
+        try {
+          success = document.execCommand("copy");
+          if (success)
+            $(this).trigger('copied', ['Copied!']);
+          else
+            $(this).trigger('copied', ['Data not copied!']);
+        } finally {
+          $temp.remove();
         }
-      } finally {
-        $temp.remove();
-      } */?>
-      navigator.clipboard.writeText(data_copy).then(() => {
-        $(this).trigger('copied', ['Copied!']);
-      }, (e) => {
-        // on error
-      });
-      document.execCommand("copy");
+      }
     });
     $('a.qind-copy-btn').bind('copied', function(event, message) {
       $(this).attr('title', message)
