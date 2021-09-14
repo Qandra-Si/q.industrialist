@@ -572,13 +572,15 @@ select
 from
  qi.esi_corporation_wallet_journals j
 where
- ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
-   j.ecwj_ref_type = 'corporation_account_withdrawal' and
-   j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, R Strike
- ) or
- ( j.ecwj_corporation_id = 98150545 and -- R Strike
-   j.ecwj_ref_type = 'corporation_account_withdrawal' and
-   j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+ ecwj_date >= '2021-08-30' and
+ ( ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
+     j.ecwj_ref_type = 'corporation_account_withdrawal' and
+     j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, R Strike
+   ) or
+   ( j.ecwj_corporation_id = 98150545 and -- R Strike
+     j.ecwj_ref_type = 'corporation_account_withdrawal' and
+     j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+   )
  )
 group by 1, 2
 order by 1 desc;
@@ -589,24 +591,31 @@ EOD;
     //---
     $query = <<<EOD
 select
- -- o.ecor_issued::date as dt,
- o.ecor_type_id as id,
- o.ecor_price as p,
- sum(o.ecor_volume_remain) as r
- -- , o.ecor_history as history,
- -- o.ecor_order_id as order_id
+ -- j.ecwj_reference_id,
+ j.ecwj_date::date as dt,
+ j.ecwj_corporation_id as c,
+ j.ecwj_amount as isk,
+ 't'::char as tp
+ -- , j.*
 from
- qi.eve_sde_type_ids tid,
- esi_corporation_orders o
+ qi.esi_corporation_wallet_journals j
 where
- tid.sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
- ecor_type_id = tid.sdet_type_id and
- ecor_is_buy_order and
- not ecor_history and
- ecor_issued >= '2021-08-30' and
- ecor_issued_by = 1077301319
-group by 1, 2
-order by 1, 2 desc;
+ ecwj_date >= '2021-08-30' and
+ ( ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
+     j.ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+     ( j.ecwj_first_party_id in (1077301319, 98150545) or -- glorden, Just A Trade Corp
+       j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, Just A Trade Corp
+     )
+   ) or
+   ( j.ecwj_corporation_id = 98150545 and -- Just A Trade Corp
+     j.ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+     ( j.ecwj_first_party_id in (364693619, 2053528477) or -- CHOAM Trader, Blade of Knowledge
+       j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+     )
+   ) or
+   j.ecwj_reference_id in (19664726799, 19641484342, 19622083601) -- начальные инвестиции
+ )
+order by j.ecwj_date desc;
 EOD;
     $active_orders_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
