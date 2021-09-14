@@ -150,10 +150,16 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
 
             if ($type == 't')
                 $type = 'перевод';
-            else if ($type == 'b')
+            else if ($type == 'f')
                 $type = 'комиссия';
             else if ($type = 'e')
                 $type = 'эскроу';
+            else if ($type = 'b') {
+                $type = 'закупка';
+                $amount = -$amount;
+            }
+            else if ($type = 's')
+                $type = 'продажа';
 ?>
 <tr>
  <td><?=$date?></td>
@@ -603,7 +609,7 @@ from (
   ecwj_date::date,
   98150545,
   sum(ecwj_amount),
-  coalesce(case when ecwj_context_id_type is null then 'b'::char else 'e'::char end) -- broker, escrow
+  coalesce(case when ecwj_context_id_type is null then 'f'::char else 'e'::char end) -- fee, escrow
  from qi.esi_corporation_wallet_journals
  where
   ecwj_date >= '2021-08-30' and
@@ -611,6 +617,22 @@ from (
   ecwj_division = 1 and
   ( ecwj_context_id_type = 'market_transaction_id' and ecwj_context_id = 1 and ecwj_ref_type = 'market_escrow' or -- возврат escrow на операциях переставления ордеров
     ecwj_context_id_type is null and ecwj_context_id is null and ecwj_ref_type = 'brokers_fee') -- комиссия брокера за market-операцию
+ group by 1, 4
+ union
+  select
+  ecwt_date::date,
+  98150545,
+  sum(ecwt_unit_price * ecwt_quantity),
+  case when ecwt_is_buy then 'b'::char else 's'::char end
+ from
+  qi.esi_corporation_wallet_transactions,
+  qi.eve_sde_type_ids
+ where
+  ecwt_date >= '2021-08-30' and
+  ecwt_corporation_id = 98150545 and --  Just A Trade Corp
+  ecwt_division = 1 and
+  sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
+  ecwt_type_id = sdet_type_id
  group by 1, 4
  ) j
 order by dt desc;
