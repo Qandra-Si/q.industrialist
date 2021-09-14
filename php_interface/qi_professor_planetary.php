@@ -150,6 +150,10 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
 
             if ($type == 't')
                 $type = 'перевод';
+            else if ($type == 'b')
+                $type = 'комиссия';
+            else if ($type = 'e')
+                $type = 'эскроу';
 ?>
 <tr>
  <td><?=$date?></td>
@@ -564,31 +568,37 @@ EOD;
     //---
     $query = <<<EOD
 select
- -- j.ecwj_reference_id,
- j.ecwj_date::date as dt,
- j.ecwj_corporation_id as c,
- j.ecwj_amount as isk,
- 't'::char as tp
- -- , j.*
-from
- qi.esi_corporation_wallet_journals j
-where
- ecwj_date >= '2021-08-30' and
- ( ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
-     j.ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
-     ( j.ecwj_first_party_id in (1077301319, 98150545) or -- glorden, Just A Trade Corp
-       j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, Just A Trade Corp
-     )
-   ) or
-   ( j.ecwj_corporation_id = 98150545 and -- Just A Trade Corp
-     j.ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
-     ( j.ecwj_first_party_id in (364693619, 2053528477) or -- CHOAM Trader, Blade of Knowledge
-       j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
-     )
-   ) or
-   j.ecwj_reference_id in (19664726799, 19641484342, 19622083601) -- начальные инвестиции
- )
-order by j.ecwj_date desc;
+  -- ecwj_reference_id,
+  ecwj_date::date as dt,
+  c,
+  isk,
+  tp
+from (
+ select
+  -- ecwj_reference_id,
+  ecwj_date,
+  ecwj_corporation_id as c,
+  ecwj_amount as isk,
+  't'::char as tp
+ from esi_corporation_wallet_journals
+ where
+  ecwj_date >= '2021-08-30' and
+  ( ( ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
+      ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+      ( ecwj_first_party_id in (1077301319, 98150545) or -- glorden, Just A Trade Corp
+        ecwj_second_party_id in (1077301319, 98150545) -- glorden, Just A Trade Corp
+      )
+    ) or
+    ( ecwj_corporation_id = 98150545 and -- Just A Trade Corp
+      ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+      ( ecwj_first_party_id in (364693619, 2053528477) or -- CHOAM Trader, Blade of Knowledge
+        ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+      )
+    ) or
+    ecwj_reference_id in (19664726799, 19641484342, 19622083601) -- начальные инвестиции
+  )
+ ) j
+order by dt desc;
 EOD;
     $wallet_journals_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
@@ -596,24 +606,52 @@ EOD;
     //---
     $query = <<<EOD
 select
- -- o.ecor_issued::date as dt,
- o.ecor_type_id as id,
- o.ecor_price as p,
- sum(o.ecor_volume_remain) as r
- -- , o.ecor_history as history,
- -- o.ecor_order_id as order_id
-from
- qi.eve_sde_type_ids tid,
- esi_corporation_orders o
-where
- tid.sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
- ecor_type_id = tid.sdet_type_id and
- ecor_is_buy_order and
- not ecor_history and
- ecor_issued >= '2021-08-30' and
- ecor_issued_by = 1077301319
-group by 1, 2
-order by 1, 2 desc;
+  -- ecwj_reference_id,
+  ecwj_date::date as dt,
+  c,
+  isk,
+  tp
+from (
+ select
+  -- ecwj_reference_id,
+  ecwj_date,
+  ecwj_corporation_id as c,
+  ecwj_amount as isk,
+  't'::char as tp
+ from qi.esi_corporation_wallet_journals
+ where
+  ecwj_date >= '2021-08-30' and
+  ( ( ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
+      ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+      ( ecwj_first_party_id in (1077301319, 98150545) or -- glorden, Just A Trade Corp
+        ecwj_second_party_id in (1077301319, 98150545) -- glorden, Just A Trade Corp
+      )
+    ) or
+    ( ecwj_corporation_id = 98150545 and -- Just A Trade Corp
+      ecwj_ref_type in ('corporation_account_withdrawal', 'player_donation') and
+      ( ecwj_first_party_id in (364693619, 2053528477) or -- CHOAM Trader, Blade of Knowledge
+        ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
+      )
+    ) or
+    ecwj_reference_id in (19664726799, 19641484342, 19622083601) -- начальные инвестиции
+  )
+ union
+ select
+  -- ecwj_reference_id,
+  ecwj_date::date,
+  98150545,
+  sum(ecwj_amount),
+  coalesce(case when ecwj_context_id_type is null then 'b'::char else 'e'::char end) -- broker, escrow
+ from qi.esi_corporation_wallet_journals
+ where
+  ecwj_date >= '2021-08-30' and
+  ecwj_corporation_id = 98150545 and --  Just A Trade Corp
+  ecwj_division = 1 and
+  ( ecwj_context_id_type = 'market_transaction_id' and ecwj_context_id = 1 or -- возврат escrow на операциях переставления ордеров
+    ecwj_context_id_type is null and ecwj_context_id is null) -- комиссия брокера за market-операцию
+ group by 1, 4
+ ) j
+order by dt desc;
 EOD;
     $active_orders_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
