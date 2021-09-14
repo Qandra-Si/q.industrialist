@@ -564,33 +564,6 @@ EOD;
     //---
     $query = <<<EOD
 select
- j.ecwj_date::date as dt,
- j.ecwj_corporation_id as c,
- sum(j.ecwj_amount) as isk,
- 't'::char as tp
- -- , j.*
-from
- qi.esi_corporation_wallet_journals j
-where
- ecwj_date >= '2021-08-30' and
- ( ( j.ecwj_corporation_id = 2053528477 and -- Blade of Knowledge
-     j.ecwj_ref_type = 'corporation_account_withdrawal' and
-     j.ecwj_second_party_id in (1077301319, 98150545) -- glorden, R Strike
-   ) or
-   ( j.ecwj_corporation_id = 98150545 and -- R Strike
-     j.ecwj_ref_type = 'corporation_account_withdrawal' and
-     j.ecwj_second_party_id in (364693619, 2053528477) -- CHOAM Trader, Blade of Knowledge
-   )
- )
-group by 1, 2
-order by 1 desc;
-EOD;
-    $wallet_journals_cursor = pg_query($conn, $query)
-            or die('pg_query err: '.pg_last_error());
-    $wallet_journals = pg_fetch_all($wallet_journals_cursor);
-    //---
-    $query = <<<EOD
-select
  -- j.ecwj_reference_id,
  j.ecwj_date::date as dt,
  j.ecwj_corporation_id as c,
@@ -616,6 +589,31 @@ where
    j.ecwj_reference_id in (19664726799, 19641484342, 19622083601) -- начальные инвестиции
  )
 order by j.ecwj_date desc;
+EOD;
+    $wallet_journals_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $wallet_journals = pg_fetch_all($wallet_journals_cursor);
+    //---
+    $query = <<<EOD
+select
+ -- o.ecor_issued::date as dt,
+ o.ecor_type_id as id,
+ o.ecor_price as p,
+ sum(o.ecor_volume_remain) as r
+ -- , o.ecor_history as history,
+ -- o.ecor_order_id as order_id
+from
+ qi.eve_sde_type_ids tid,
+ esi_corporation_orders o
+where
+ tid.sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
+ ecor_type_id = tid.sdet_type_id and
+ ecor_is_buy_order and
+ not ecor_history and
+ ecor_issued >= '2021-08-30' and
+ ecor_issued_by = 1077301319
+group by 1, 2
+order by 1, 2 desc;
 EOD;
     $active_orders_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
