@@ -154,12 +154,12 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
                 $type = 'комиссия';
             else if ($type = 'e')
                 $type = 'эскроу';
-            else if ($type = 'b') {
+            else if ($type == 's')
+                $type = 'продажа';
+            else if ($type == 'b') {
                 $type = 'закупка';
                 $amount = -$amount;
             }
-            else if ($type = 's')
-                $type = 'продажа';
 ?>
 <tr>
  <td><?=$date?></td>
