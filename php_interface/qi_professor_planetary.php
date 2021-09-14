@@ -152,7 +152,7 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
                 $type = 'перевод';
             else if ($type == 'f')
                 $type = 'комиссия';
-            else if ($type = 'e')
+            else if ($type == 'e')
                 $type = 'эскроу';
             else if ($type == 's')
                 $type = 'продажа';
