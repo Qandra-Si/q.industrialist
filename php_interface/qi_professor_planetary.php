@@ -140,6 +140,7 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
 </thead>
 <tbody>
 <?php
+    $prev_date = null;
     if ($wallet_journals)
         foreach ($wallet_journals as $event)
         {
@@ -162,7 +163,7 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
             }
 ?>
 <tr>
- <td><?=$date?></td>
+ <td><?=($prev_date==$date)?'':$date?></td>
  <td><?=$type?></td>
  <?php if ($corporation_id == 2053528477) { ?>
   <td align="right"<?=($amount<0)?' class="text-danger"':''?>><?=number_format($amount,2,'.',',')?></td>
@@ -173,6 +174,7 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
  <?php }?>
 </tr>
 <?php
+            $prev_date = $date;
         }
 ?>
 </tbody>
