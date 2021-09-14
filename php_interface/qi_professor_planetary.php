@@ -571,7 +571,7 @@ select
   -- ecwj_reference_id,
   ecwj_date::date as dt,
   c,
-  isk,
+  round(isk::numeric, 2) as isk,
   tp
 from (
  select
@@ -609,8 +609,8 @@ from (
   ecwj_date >= '2021-08-30' and
   ecwj_corporation_id = 98150545 and --  Just A Trade Corp
   ecwj_division = 1 and
-  ( ecwj_context_id_type = 'market_transaction_id' and ecwj_context_id = 1 or -- возврат escrow на операциях переставления ордеров
-    ecwj_context_id_type is null and ecwj_context_id is null) -- комиссия брокера за market-операцию
+  ( ecwj_context_id_type = 'market_transaction_id' and ecwj_context_id = 1 and ecwj_ref_type = 'market_escrow' or -- возврат escrow на операциях переставления ордеров
+    ecwj_context_id_type is null and ecwj_context_id is null and ecwj_ref_type = 'brokers_fee') -- комиссия брокера за market-операцию
  group by 1, 4
  ) j
 order by dt desc;
