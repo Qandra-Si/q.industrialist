@@ -293,7 +293,7 @@ function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity
     $warnings = '';
     if (is_null($required_quantity))
         $warnings .= '<span class="label label-danger">not planned for use</span>&nbsp;';
-    else if (!$we_buy_it)
+    else if (!$we_buy_it && ($quantity != $required_quantity))
         $warnings .= '<span class="label label-warning">we don&apos;t buy it</span>&nbsp;';
 ?>
 <tr>
@@ -309,8 +309,18 @@ function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity
 }
 
 
-function __dump_planetary_stock_header($location_name) { ?>
-<h3><?=$location_name?></h3>
+$planetary_stock_header = 0;
+
+
+function __dump_planetary_stock_header($location_name) { global $planetary_stock_header; $planetary_stock_header++; ?>
+<div class="panel panel-default">
+ <div class="panel-heading" role="tab" id="heading<?=$planetary_stock_header?>">
+  <h3 class="panel-title">
+   <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapse<?=$planetary_stock_header?>" aria-expanded="true" aria-controls="collapse<?=$planetary_stock_header?>"><?=$location_name?></a>
+  </h3>
+ </div>
+ <div id="collapse<?=$planetary_stock_header?>" class="panel-collapse collapse" role="tabpanel" aria-labelledby="heading<?=$planetary_stock_header?>">
+  <div class="panel-body">
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -339,6 +349,9 @@ function __dump_planetary_stock_footer($summary_jita_sell, $summary_jita_buy, $s
 </tr>
 </tbody>
 </table>
+  </div> <!-- panel-body -->
+ </div> <!-- panel-collapse -->
+</div> <!-- panel -->
 <?php
 }
 
@@ -347,7 +360,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
 {
     global $product_requirements;
 
-    // debug: print($location_id.' '.$location_flag); var_dump($products_in_location); print('<br><br><br>');
+    // debug:print($location_id.' '.$location_flag); var_dump($products_in_location); print('<br><br><br>');
 
     // для начала надо определиться - выводим ли мы содержимое коробки вразнобой (с учётом
     // недостающих материалов), или же выводим в порядке P0, P1, P2,... и перемещаем вывод
@@ -355,6 +368,8 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
     $calculate_quantities =
         $location_id == 1037088632771 ||
         $location_id == 1037161379493 ||
+        $location_id == 1037088203784 ||
+        $location_id == 1037175000957 ||
         $location_id == 1037111988366;
     // поскольку на сервере пока нет сведений о названиях коробок (и они не актуализируются)
     // прописываем дальше их вручную
@@ -363,15 +378,17 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
     {
     case 1037088632771: $location_name = "Stock planet 1"; break;
     case 1037161379493: $location_name = "Stock planet 2"; break;
+    case 1037088203784: $location_name = "Stock planet 3"; break;
+    case 1037175000957: $location_name = "Stock planet 4"; break;
     case 1037111988366: $location_name = "Stock"; break;
     case 1030492564838: $location_name = "Ангар №".substr($location_flag, -1)." корпоративного офиса"; break;
     default:
         if ($location_flag == "CorpDeliveries")
             $location_name = $location_flag." в ".$location_id;
         else
-            $location_name = "Unknown".$location_id.' '.$location_flag;
+            $location_name = "Unknown ".$location_id.' '.$location_flag;
     }
-    
+
     __dump_planetary_stock_header($location_name);
 
     // выделяем память для summary-расчётов
@@ -454,7 +471,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
             $location_jita_buy += $jita_buy * $quantity;
         }
     }
-    
+
     __dump_planetary_stock_footer($location_jita_sell, $location_jita_buy, $location_volume);
 }
 
@@ -502,6 +519,7 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
                 $prev_location_flag = $location_flag;
                 $products_in_location = null;
                 $products_in_location = array();
+                array_push($products_in_location, array(intval($tid), intval($quantity)));
             }
         }
         __dump_planetary_stock_location(
@@ -611,14 +629,13 @@ from (
   ecwj_date::date,
   98150545,
   sum(ecwj_amount),
-  coalesce(case when ecwj_context_id_type is null then 'f'::char else 'e'::char end) -- fee, escrow
+  'f'::char -- fee
  from qi.esi_corporation_wallet_journals
  where
   ecwj_date >= '2021-08-30' and
   ecwj_corporation_id = 98150545 and --  Just A Trade Corp
   ecwj_division = 1 and
-  ( ecwj_context_id_type = 'market_transaction_id' and ecwj_context_id = 1 and ecwj_ref_type = 'market_escrow' or -- возврат escrow на операциях переставления ордеров
-    ecwj_context_id_type is null and ecwj_context_id is null and ecwj_ref_type = 'brokers_fee') -- комиссия брокера за market-операцию
+  ecwj_context_id_type is null and ecwj_context_id is null and ecwj_ref_type = 'brokers_fee' -- комиссия брокера за market-операцию
  group by 1, 4
  union
   select
@@ -674,7 +691,9 @@ EOD;
  <?php __dump_jita_prices($planetary, $jita); ?>
  <?php __dump_wallet_journals($wallet_journals); ?>
  <?php __dump_market_orders($active_orders, $planetary, $jita); ?>
+ <div class="panel-group" id="accordionStock" role="tablist" aria-multiselectable="true">
  <?php __dump_planetary_stock($stock, $planetary, $jita, $active_orders); ?>
+ </div>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 
