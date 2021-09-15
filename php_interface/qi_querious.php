@@ -303,7 +303,7 @@ select
     when universe.emp_average_price is null or (universe.emp_average_price < 0.001) then universe.emp_adjusted_price
     else universe.emp_average_price
   end as up, -- universe price
-  round(orders_stat.price_remain::numeric / orders_stat.volume_remain::numeric, 2) as mp, -- RI4 price
+  round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
   -- round(jita.sell::numeric*0.0313, 2) as markup,
   -- case
   --   when jita.sell::numeric*1.1313 < 100.0 then round(ceil(jita.sell::numeric*113.13)/100.0, 2)
@@ -399,7 +399,7 @@ from
       select
         ecor_type_id,
         sum(ecor_volume_remain) as volume_remain,
-        sum(ecor_price*ecor_volume_remain) as price_remain
+        min(ecor_price) as ri4_price
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
