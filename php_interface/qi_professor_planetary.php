@@ -195,20 +195,22 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
 <button class="btn btn-default" type="button" data-toggle="modal" data-target="#showMarketOrders">Рыночные сделки</button>
 <!-- Modal -->
 <div class="modal fade" id="showMarketOrders" tabindex="-1" role="dialog" aria-labelledby="showMarketOrdersLabel">
- <div class="modal-dialog" role="document">
+ <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
    <div class="modal-header">
      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
      <h4 class="modal-title" id="showMarketOrdersLabel">Рыночные сделки</h4>
    </div>
    <div class="modal-body">
+    <div class="row">
+     <div class="col-md-6">
 <h3>Активные ордера на покупку</h3>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
   <th style="width:32px"></th>
   <th width="100%">Планетарка</th>
-  <th style="text-align: right;">Количество</th>
+  <th style="text-align: right;">Кол-во</th>
   <th style="text-align: right;">Закупочная<br>цена</mark></th>
   <th style="text-align: right;">Jita Sell/Buy</mark></th>
  </tr>
@@ -219,6 +221,8 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
     if ($active_orders)
         foreach ($active_orders as $order)
         {
+	    $is_buy = $order['b'] == 't';
+	    if ($is_buy == false) continue;
             $tid = intval($order['id']);
             $price = $order['p'];
             $remaining = $order['r'];
@@ -250,7 +254,7 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
   <td colspan="2"></td>
  <?php } ?>
  <td align="right"><?=number_format($remaining,0,'.',',')?></td>
- <td align="right"><?=number_format($price,2,'.',',')?></td>
+ <td align="right" class="text-<?=($price>$jita_buy)?'danger':(($price==$jita_buy)?'warning':'success')?>"><?=number_format($price,2,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><?=number_format($jita_buy,2,'.',',')?></td>
 </tr>
 <?php
@@ -258,6 +262,68 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
 ?>
 </tbody>
 </table>
+     </div> <!-- col-md-6 -->
+     <div class="col-md-6">
+<h3>Активные ордера на продажу</h3>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th style="width:32px"></th>
+  <th width="100%">Планетарка</th>
+  <th style="text-align: right;">Кол-во</th>
+  <th style="text-align: right;">Продажная<br>цена</mark></th>
+  <th style="text-align: right;">Jita Sell/Buy</mark></th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    $prev_type_id = 0;
+    if ($active_orders)
+        foreach ($active_orders as $order)
+        {
+	    $is_buy = $order['b'] == 't';
+	    if ($is_buy == true) continue;
+            $tid = intval($order['id']);
+            $price = $order['p'];
+            $remaining = $order['r'];
+
+            $nm = '';
+            foreach ($planetary as $p)
+            {
+                //$market_group_id = intval($p['mgid']);
+                if ($tid != $p['id']) continue;
+                $nm = $p['name'];
+                break;
+            }
+
+            $found = false;
+            foreach ($jita as $j)
+            {
+                if ($j['id'] != $tid) continue;
+                $jita_sell = $j['js'];
+                $jita_buy = $j['jb'];
+                $found = true;
+                break;
+            }
+?>
+<tr>
+ <?php if ($prev_type_id != $tid) { $prev_type_id = $tid; ?>
+  <td><img class="icn24" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="24px" height="24px"></td>
+  <td><?=$nm?><?=get_clipboard_copy_button($nm)?></td>
+ <?php } else { ?>
+  <td colspan="2"></td>
+ <?php } ?>
+ <td align="right"><?=number_format($remaining,0,'.',',')?></td>
+ <td align="right" class="text-<?=($price>$jita_sell)?'danger':(($price==$jita_sell)?'warning':'success')?>"><?=number_format($price,2,'.',',')?></td>
+ <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><?=number_format($jita_buy,2,'.',',')?></td>
+</tr>
+<?php
+        }
+?>
+</tbody>
+</table>
+     </div> <!-- col-md-6 -->
+    </div> <!-- row -->
    </div>
    <div class="modal-footer">
     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -271,11 +337,20 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
 
 
 function __dump_progress_element($current_num, $max_num) {
-        $__progress_factor = 100.0;
+    $__progress_factor = 100.0;
     if (!is_null($max_num) && $max_num)
         $__progress_factor = 100.0 * $current_num / $max_num;
-    $prcnt = ($__progress_factor < 100.001) ? $__progress_factor : 100;
-    $prcnt100 = ($current_num == $max_num) ? " progress-bar-success" : (($current_num > $max_num) ? " progress-bar-warning" : "");
+    $prcnt = round(($__progress_factor < 100.001) ? $__progress_factor : 100, 1);
+    $prcnt100 =
+        ($current_num == $max_num) ?
+	" progress-bar-success" :
+	(   ($current_num > $max_num) ?
+	    (   ($current_num > (2*$max_num)) ?
+	        " progress-bar-danger" :
+		" progress-bar-warning"
+	    ) :
+	    ""
+	);
     if ($max_num == $current_num) { ?>
         <strong><span class="text-warning"><?=number_format($current_num,0,'.',',')?></span></strong>
     <?php } else if ($current_num > $max_num) { ?>
@@ -312,12 +387,29 @@ function __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity
 $planetary_stock_header = 0;
 
 
-function __dump_planetary_stock_header($location_name) { global $planetary_stock_header; $planetary_stock_header++; ?>
+function __dump_planetary_stock_header($location_name, $calculated_requirements) {
+    global $planetary_stock_header;
+    $planetary_stock_header++;
+?>
 <div class="panel panel-default">
  <div class="panel-heading" role="tab" id="heading<?=$planetary_stock_header?>">
   <h3 class="panel-title">
    <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapse<?=$planetary_stock_header?>" aria-expanded="true" aria-controls="collapse<?=$planetary_stock_header?>"><?=$location_name?></a>
   </h3>
+<?php
+    if (!is_null($calculated_requirements)) {
+        $prcnt = round($calculated_requirements, 1);
+        $prcnt100 =
+	    ($calculated_requirements == 100.0) ?
+	    " progress-bar-success" :
+	    (   ($calculated_requirements > 100.0) ?
+	        " progress-bar-warning" :
+		""
+            );
+?>    
+<div class="progress" style="margin-bottom:0px"><div class="progress-bar<?=$prcnt100?>" role="progressbar"
+     aria-valuenow="<?=$prcnt?>" aria-valuemin="0" aria-valuemax="100" style="width: <?=$prcnt?>%;"><?=number_format($calculated_requirements,1,'.',',')?>%</div></div>
+<?php } ?>
  </div>
  <div id="collapse<?=$planetary_stock_header?>" class="panel-collapse collapse" role="tabpanel" aria-labelledby="heading<?=$planetary_stock_header?>">
   <div class="panel-body">
@@ -371,6 +463,35 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         $location_id == 1037088203784 ||
         $location_id == 1037175000957 ||
         $location_id == 1037111988366;
+    // выполняем предвариетьный расчёт достаточности материалов в коробке
+    $calculated_requirements = null;
+    if ($calculate_quantities)
+    {
+        $calculated_requirements = 100.0;
+	// перебор требований и проверка наличия, расчёт достаточности в %
+        $required_quantity = null;
+        foreach ($product_requirements as $r)
+        {
+	    $tid = intval($r['id']);
+            $required_quantity = $r['q'];
+            $quantity = 0;
+            foreach ($products_in_location as $l)
+            {
+                if ($l[0] != $tid) continue;
+                $quantity = $l[1];
+                break;
+            }
+	    if ($quantity == 0)
+	    {
+	        $calculated_requirements = 0;
+		break;
+	    }
+	    $percent = 100.0 * ($quantity / $required_quantity);
+	    if ($percent < $calculated_requirements)
+                $calculated_requirements = $percent;
+        }
+    }
+
     // поскольку на сервере пока нет сведений о названиях коробок (и они не актуализируются)
     // прописываем дальше их вручную
     $location_name = null;
@@ -389,7 +510,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
             $location_name = "Unknown ".$location_id.' '.$location_flag;
     }
 
-    __dump_planetary_stock_header($location_name);
+    __dump_planetary_stock_header($location_name, $calculated_requirements);
 
     // выделяем память для summary-расчётов
     $location_jita_sell = 0;
@@ -665,20 +786,21 @@ select
  -- o.ecor_issued::date as dt,
  o.ecor_type_id as id,
  o.ecor_price as p,
- sum(o.ecor_volume_remain) as r
- -- , o.ecor_history as history,
+ sum(o.ecor_volume_remain) as r,
+ -- o.ecor_history as history,
  -- o.ecor_order_id as order_id
+ ecor_is_buy_order as b
 from
  qi.eve_sde_type_ids tid,
  esi_corporation_orders o
 where
  tid.sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
  ecor_type_id = tid.sdet_type_id and
- ecor_is_buy_order and
+ -- ecor_is_buy_order and
  not ecor_history and
  ecor_issued >= '2021-08-30' and
  ecor_issued_by = 1077301319
-group by 1, 2
+group by 1, 2, 4
 order by 1, 2 desc;
 EOD;
     $active_orders_cursor = pg_query($conn, $query)
