@@ -118,17 +118,131 @@ function __dump_jita_prices(&$planetary, &$jita) { ?>
 }
 
 
-function __dump_wallet_journals(&$wallet_journals) { ?>
+function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
+    global $product_requirements;
+
+    $market_dates = array();
+
+    $prev_tid = null;
+    $required_quantity = null;
+    $current_cycle_quantity = null;
+    $current_cycle_payment = null;
+    $current_cycle_number = null;
+    if ($market_payments)
+        foreach ($market_payments as $payment)
+        {
+            $tid = intval($payment['id']);
+            $date = $payment['dt'];
+            $sum_buy = intval($payment['sb']);
+            $sum_quantity = intval($payment['sc']);
+
+            // определяем, каков план по закупке этого продукта?
+            if ($prev_tid != $tid)
+            {
+                $prev_tid = $tid;
+                $current_cycle_quantity = 0;
+                $rq_key = array_search($tid, array_column($product_requirements, 'id'));
+                if ($rq_key !== false)
+                {
+                    $required_quantity = $product_requirements[$rq_key]['q'];
+                    $current_cycle_quantity = $required_quantity;
+                    $current_cycle_payment = 0;
+                    $current_cycle_number = 0;
+                }
+                else
+                    $required_quantity = null;
+            }
+            // если нет планов по закупу текущего продукта - пропускаем расчёт по нему
+            if (is_null($required_quantity)) continue;
+
+            $avg_sum_buy = $sum_buy / $sum_quantity;
+
+            // суммируем количество закупленного продукта
+            // суммируем сумму закупа как усредённое за текущие сутки
+            do
+            {
+                if ($sum_quantity < $current_cycle_quantity)
+                {
+                    $current_cycle_quantity -= $sum_quantity;
+                    $current_cycle_payment += $avg_sum_buy * $sum_quantity;
+                    //debug : print('<small>'.$tid.' '.$date.' '.$sum_buy.' '.$sum_quantity.' ! '.$avg_sum_buy.' : '.$current_cycle_quantity.'/'.$required_quantity.' = '.$current_cycle_payment.'</small><br>');
+                    $sum_quantity = 0;
+                }
+                else
+                {
+                    $current_cycle_payment += $avg_sum_buy * $current_cycle_quantity;
+                    //debug : print('<small><b>'.$tid.' '.$date.' '.$sum_buy.' '.$sum_quantity.' ! '.$avg_sum_buy.' : '.($current_cycle_quantity-$sum_quantity).'/'.$required_quantity.' = '.$current_cycle_payment.'</b></small><br>');
+                    // сохраняем результат
+                    array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment))));
+                    $current_cycle_number++;
+                    // повторяем цикл
+                    $sum_quantity -= $current_cycle_quantity;
+                    // начинаем сначала
+                    $current_cycle_quantity = $required_quantity;
+                    $current_cycle_payment = 0;
+                }
+            } while($sum_quantity > 0);
+        }
+
+    //debug : print(var_dump($market_dates));
+
+    if ($market_dates)
+    {
+        $market_cycles = array();
+        $current_cycle_number = 0;
+        $current_cycle_finish = null;
+        do
+        {
+            $current_cycle_payment = 0;
+            $current_cycle_finished = true;
+            // для каждого нового цикла считаем его стоимость 
+            foreach ($product_requirements as $r)
+            {
+                $tid = $r['id'];
+                foreach($market_dates as $md)
+                {
+                    if ($tid == $md[0] && $current_cycle_number == $md[1])
+                    {
+                        //debug : print($tid.'/'.$current_cycle_number.' found at '.$md[2].' = '.$md[3].'<br>');
+                        $current_cycle_payment += $md[3];
+                        if ($current_cycle_finish < $md[2])
+                            $current_cycle_finish = $md[2];
+                        break;
+                    }
+                    if ($md[0] > $tid)
+                    {
+                        //debug : print($tid.'/'.$current_cycle_number.' NOT FOUND on '.$md[0].'<br>');
+                        $current_cycle_finished = false;
+                        break;
+                    }
+                }
+            }
+            // циклы закончились совсем - нет даже платежей по ним
+            if (!$current_cycle_payment) break;
+            // выводим результат по каждому из циклов
+            //debug : print('<b>cycle#'.$current_cycle_number.' '.number_format($current_cycle_payment,0,'.',',').' ISK at '.date("Y-m-d", $current_cycle_finish).'</b><br>');
+            // сохраняем результат
+            array_push($market_cycles, array(intval($current_cycle_number), intval($current_cycle_finish), intval($current_cycle_payment), $current_cycle_finished));
+            $current_cycle_number++;
+        } while(1);
+    }
+}
+
+
+function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
 <button class="btn btn-default" type="button" data-toggle="modal" data-target="#showWalletJournals">Бухгалтерия</button>
 <!-- Modal -->
 <div class="modal fade" id="showWalletJournals" tabindex="-1" role="dialog" aria-labelledby="showWalletJournalsLabel">
- <div class="modal-dialog" role="document">
+ <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
    <div class="modal-header">
      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
      <h4 class="modal-title" id="showWalletJournalsLabel">Финансовая отчётность</h4>
    </div>
    <div class="modal-body">
+    <div class="row">
+     <div class="col-md-6">
+<h3>Ежедневные финансовые операции</h3>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -140,6 +254,9 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
 </thead>
 <tbody>
 <?php
+    $market_cycles = null;
+    calculate_market_p2_payments($market_payments, $market_cycles);
+
     $prev_date = null;
     if ($wallet_journals)
         foreach ($wallet_journals as $event)
@@ -179,6 +296,44 @@ function __dump_wallet_journals(&$wallet_journals) { ?>
 ?>
 </tbody>
 </table>
+     </div> <!-- col-md-6 -->
+     <div class="col-md-6">
+<h3>Циклы закупки планетарки</h3>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Дата</th>
+  <th>Цикл</th>
+  <th style="text-align: right;">Стоимость закупки</th>
+ </tr>
+</thead>
+<tbody>
+<?php
+    if ($market_cycles)
+        foreach ($market_cycles as $cycle)
+        {
+            $cycle_num = $cycle[0];
+            $cycle_finished = $cycle[1];
+            $cycle_payments = $cycle[2];
+            $cycle_finished = $cycle[3];
+
+            $labels = '';
+            if ($cycle_finished)
+                $labels .= ' <span class="label label-success">finished</span>';
+?>
+<tr>
+ <td><?=date("Y-m-d", $cycle[1])?></td>
+ <td><?=$cycle[0].$labels?></td>
+ <td align="right"><?=number_format($cycle[2],0,'.',',')?></td>
+</tr>
+<?php
+        }
+?>
+</tbody>
+</table>
+<span class="text-warning">Комиссия в расчётах пока не учитывается!</span>
+     </div> <!-- col-md-6 -->
+    </div> <!-- row -->
    </div>
    <div class="modal-footer">
     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -807,11 +962,34 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $active_orders = pg_fetch_all($active_orders_cursor);
     //---
+    $query = <<<EOD
+select
+ ecwt_type_id as id,
+ ecwt_date::date as dt,
+ sum(ecwt_unit_price*ecwt_quantity) as sb, -- sum buy
+ sum(ecwt_quantity) as sc -- sum quantity
+from
+ qi.esi_corporation_wallet_transactions,
+ qi.eve_sde_type_ids
+where
+ ecwt_date >= '2021-08-30' and
+ ecwt_corporation_id = 98150545 and --  Just A Trade Corp
+ ecwt_division = 1 and
+ ecwt_is_buy and
+ sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
+ ecwt_type_id = sdet_type_id
+group by 1, 2
+order by 1, 2
+EOD;
+    $market_payments_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $market_payments = pg_fetch_all($market_payments_cursor);
+    //---
     pg_close($conn);
 ?>
 <div class="container">
  <?php __dump_jita_prices($planetary, $jita); ?>
- <?php __dump_wallet_journals($wallet_journals); ?>
+ <?php __dump_wallet_journals($wallet_journals, $market_payments); ?>
  <?php __dump_market_orders($active_orders, $planetary, $jita); ?>
  <div class="panel-group" id="accordionStock" role="tablist" aria-multiselectable="true">
  <?php __dump_planetary_stock($stock, $planetary, $jita, $active_orders); ?>
