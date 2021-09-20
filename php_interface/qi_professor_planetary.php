@@ -177,7 +177,8 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                     if ($show_debug) print('<small><b>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.($current_cycle_quantity-$sum_quantity).' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></b></small><br>');
                     // сохраняем результат
                     array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment)), 0));
-                    $current_cycle_number++;
+		    //debug : if ($show_debug) print(var_dump($market_dates[sizeof($market_dates)-1]).'<br>');
+		    $current_cycle_number++;
                     // повторяем цикл
                     $sum_quantity -= $current_cycle_quantity;
                     // начинаем сначала
@@ -214,7 +215,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
 	    }
         }
 
-//debug : print(var_dump($market_dates));
+    //debug : if ($show_debug) print('<small><small>'.var_dump($market_dates).'</small></small><br>');
 
     if ($market_dates)
     {
@@ -228,10 +229,12 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
 	    $current_cycle_fee = 0;
             $current_cycle_finished = true;
             // для каждого нового цикла считаем его стоимость 
-            foreach ($product_requirements as $r)
+            foreach ($product_requirements as &$r)
             {
                 $tid = $r['id'];
-                foreach($market_dates as $md)
+		//debug : if ($show_debug) print($tid.'?<br>');
+		$found = false;
+                foreach($market_dates as &$md)
                 {
                     if ($tid == $md[0] && $current_cycle_number == $md[1])
                     {
@@ -240,15 +243,16 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                         if ($current_cycle_finish < $md[2])
                             $current_cycle_finish = $md[2];
 		        if ($show_debug) print('<small><small>'.$tid.' '.date("Y-m-d", $md[2]).' = '.$md[3].' / '.number_format($md[4],2,'.','').' = <span class="text-danger">'.$current_cycle_payment.' / '.number_format($current_cycle_fee,2,'.','').'</span></small></small><br>');
-                        break;
+                        $found = true;
+			break;
                     }
-                    if ($md[0] > $tid)
-                    {
-                        if ($show_debug) print('<small>'.$tid.' NOT FOUND on '.$md[0].'</small><br>');
-                        $current_cycle_finished = false;
-                        break;
-                    }
+                    if ($md[0] > $tid) break;
                 }
+		if (!$found)
+		{
+		    if ($show_debug) print('<small>'.$tid.' NOT FOUND</small><br>');
+                    $current_cycle_finished = false;
+		}
             }
             // циклы закончились совсем - нет даже платежей по ним
             if (!$current_cycle_payment) break;
