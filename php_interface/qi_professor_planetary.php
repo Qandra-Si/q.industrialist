@@ -176,7 +176,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                     $current_cycle_payment += $avg_sum_buy * $current_cycle_quantity;
                     if ($show_debug) print('<small><b>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.($current_cycle_quantity-$sum_quantity).' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></b></small><br>');
                     // сохраняем результат
-                    array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment))));
+                    array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment)), 0));
                     $current_cycle_number++;
                     // повторяем цикл
                     $sum_quantity -= $current_cycle_quantity;
@@ -197,7 +197,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
 
             $date_num = strtotime($date);
 	    $payments_per_date = 0;
-	    foreach ($market_dates as $md)
+	    foreach ($market_dates as &$md)
 	    {
 	        if ($md[2] != $date_num) continue;
                 $payments_per_date += $md[3];
@@ -206,10 +206,11 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
             if ($show_debug)  print('<hr><small>'.$date.' комиссия '.number_format(-$amount,2,'.','').' по платежам '.$payments_per_date.'</small><br>');
 
             $fee_per_date = -$amount / $payments_per_date;
-            foreach ($market_dates as $md)
+            foreach ($market_dates as &$md)
 	    {
 	        if ($md[2] != $date_num) continue;
-		if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($fee_per_date*$md[3],2,'.','').'</small><br>');
+		$md[4] = $fee_per_date * $md[3];
+		if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($md[4],2,'.','').'</small><br>');
 	    }
         }
 
@@ -224,6 +225,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
         {
 	    if ($show_debug) print('<hr><small>Поиск платежей по циклу '.$current_cycle_number.'</small><br>');
             $current_cycle_payment = 0;
+	    $current_cycle_fee = 0;
             $current_cycle_finished = true;
             // для каждого нового цикла считаем его стоимость 
             foreach ($product_requirements as $r)
@@ -234,9 +236,10 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                     if ($tid == $md[0] && $current_cycle_number == $md[1])
                     {
                         $current_cycle_payment += $md[3];
+			$current_cycle_fee += $md[4];
                         if ($current_cycle_finish < $md[2])
                             $current_cycle_finish = $md[2];
-		        if ($show_debug) print('<small>'.$tid.' found at '.date("Y-m-d", $md[2]).' = '.$md[3].' = <span class="text-danger">'.$current_cycle_payment.'</span></small><br>');
+		        if ($show_debug) print('<small><small>'.$tid.' '.date("Y-m-d", $md[2]).' = '.$md[3].' / '.number_format($md[4],2,'.','').' = <span class="text-danger">'.$current_cycle_payment.' / '.number_format($current_cycle_fee,2,'.','').'</span></small></small><br>');
                         break;
                     }
                     if ($md[0] > $tid)
@@ -250,9 +253,9 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
             // циклы закончились совсем - нет даже платежей по ним
             if (!$current_cycle_payment) break;
             // выводим результат по каждому из циклов
-            if ($show_debug)  print('<small><b>cycle#'.$current_cycle_number.' '.number_format($current_cycle_payment,0,'.','').' ISK at '.date("Y-m-d", $current_cycle_finish).'</b></small><br>');
+            if ($show_debug)  print('<small><b>cycle#'.$current_cycle_number.' buy='.number_format($current_cycle_payment,0,'.','').' fee='.number_format($current_cycle_fee,0,'.','').' at '.date("Y-m-d", $current_cycle_finish).'</b></small><br>');
             // сохраняем результат
-            array_push($market_cycles, array(intval($current_cycle_number), intval($current_cycle_finish), intval($current_cycle_payment), $current_cycle_finished));
+            array_push($market_cycles, array(intval($current_cycle_number), intval($current_cycle_finish), intval($current_cycle_payment), $current_cycle_finished, $current_cycle_fee));
             $current_cycle_number++;
         } while(1);
     }
@@ -332,6 +335,7 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
   <th>Дата</th>
   <th>Цикл</th>
   <th style="text-align: right;">Стоимость закупки</th>
+  <th style="text-align: right;">Комиссия</th>
  </tr>
 </thead>
 <tbody>
@@ -343,25 +347,26 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
         foreach ($market_cycles as $cycle)
         {
             $cycle_num = $cycle[0];
-            $cycle_finished = $cycle[1];
+            $cycle_finish = $cycle[1];
             $cycle_payments = $cycle[2];
             $cycle_finished = $cycle[3];
+	    $cycle_fee = $cycle[4];
 
             $labels = '';
             if ($cycle_finished)
                 $labels .= ' <span class="label label-success">finished</span>';
 ?>
 <tr>
- <td><?=date("Y-m-d", $cycle[1])?></td>
- <td><?=$cycle[0].$labels?></td>
- <td align="right"><?=number_format($cycle[2],0,'.',',')?></td>
+ <td><?=date("Y-m-d", $cycle_finish)?></td>
+ <td><?=$cycle_num.$labels?></td>
+ <td align="right"><?=number_format($cycle_payments,0,'.',',')?></td>
+ <td align="right"><?=number_format($cycle_fee,0,'.',',')?></td>
 </tr>
 <?php
         }
 ?>
 </tbody>
 </table>
-<span class="text-warning">Комиссия в расчётах пока не учитывается!</span>
      </div> <!-- col-md-6 -->
     </div> <!-- row -->
    </div>
