@@ -29,6 +29,7 @@ $product_requirements = array(
     array( 'id' =>  3645, 'q' => 79680 ), // Water
     array( 'id' =>  2328, 'q' => 62280 ), // Water-Cooled CPU
 );
+$show_debug = 0;
 
 
 function get_clipboard_copy_button($data_copy) {
@@ -118,8 +119,9 @@ function __dump_jita_prices(&$planetary, &$jita) { ?>
 }
 
 
-function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
+function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$market_cycles) {
     global $product_requirements;
+    global $show_debug;
 
     $market_dates = array();
 
@@ -148,6 +150,7 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
                     $current_cycle_quantity = $required_quantity;
                     $current_cycle_payment = 0;
                     $current_cycle_number = 0;
+		    if ($show_debug) print('<hr><small>Поиск данных по продукту '.$tid.' с требуемым кол-вом '.$required_quantity.'</small><br>');
                 }
                 else
                     $required_quantity = null;
@@ -165,13 +168,13 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
                 {
                     $current_cycle_quantity -= $sum_quantity;
                     $current_cycle_payment += $avg_sum_buy * $sum_quantity;
-                    //debug : print('<small>'.$tid.' '.$date.' '.$sum_buy.' '.$sum_quantity.' ! '.$avg_sum_buy.' : '.$current_cycle_quantity.'/'.$required_quantity.' = '.$current_cycle_payment.'</small><br>');
+		    if ($show_debug) print('<small>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.$current_cycle_quantity.' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></small><br>');
                     $sum_quantity = 0;
                 }
                 else
                 {
                     $current_cycle_payment += $avg_sum_buy * $current_cycle_quantity;
-                    //debug : print('<small><b>'.$tid.' '.$date.' '.$sum_buy.' '.$sum_quantity.' ! '.$avg_sum_buy.' : '.($current_cycle_quantity-$sum_quantity).'/'.$required_quantity.' = '.$current_cycle_payment.'</b></small><br>');
+                    if ($show_debug) print('<small><b>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.($current_cycle_quantity-$sum_quantity).' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></b></small><br>');
                     // сохраняем результат
                     array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment))));
                     $current_cycle_number++;
@@ -184,7 +187,33 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
             } while($sum_quantity > 0);
         }
 
-    //debug : print(var_dump($market_dates));
+    if ($wallet_journals && $market_dates)
+        foreach ($wallet_journals as $event)
+        {
+            $type = $event['tp'];
+            if ($type != 'f') continue; // комиссия
+            $date = $event['dt'];
+            $amount = $event['isk'];
+
+            $date_num = strtotime($date);
+	    $payments_per_date = 0;
+	    foreach ($market_dates as $md)
+	    {
+	        if ($md[2] != $date_num) continue;
+                $payments_per_date += $md[3];
+	    }
+
+            if ($show_debug)  print('<hr><small>'.$date.' комиссия '.number_format(-$amount,2,'.','').' по платежам '.$payments_per_date.'</small><br>');
+
+            $fee_per_date = -$amount / $payments_per_date;
+            foreach ($market_dates as $md)
+	    {
+	        if ($md[2] != $date_num) continue;
+		if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($fee_per_date*$md[3],2,'.','').'</small><br>');
+	    }
+        }
+
+//debug : print(var_dump($market_dates));
 
     if ($market_dates)
     {
@@ -193,6 +222,7 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
         $current_cycle_finish = null;
         do
         {
+	    if ($show_debug) print('<hr><small>Поиск платежей по циклу '.$current_cycle_number.'</small><br>');
             $current_cycle_payment = 0;
             $current_cycle_finished = true;
             // для каждого нового цикла считаем его стоимость 
@@ -203,15 +233,15 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
                 {
                     if ($tid == $md[0] && $current_cycle_number == $md[1])
                     {
-                        //debug : print($tid.'/'.$current_cycle_number.' found at '.$md[2].' = '.$md[3].'<br>');
                         $current_cycle_payment += $md[3];
                         if ($current_cycle_finish < $md[2])
                             $current_cycle_finish = $md[2];
+		        if ($show_debug) print('<small>'.$tid.' found at '.date("Y-m-d", $md[2]).' = '.$md[3].' = <span class="text-danger">'.$current_cycle_payment.'</span></small><br>');
                         break;
                     }
                     if ($md[0] > $tid)
                     {
-                        //debug : print($tid.'/'.$current_cycle_number.' NOT FOUND on '.$md[0].'<br>');
+                        if ($show_debug) print('<small>'.$tid.' NOT FOUND on '.$md[0].'</small><br>');
                         $current_cycle_finished = false;
                         break;
                     }
@@ -220,7 +250,7 @@ function calculate_market_p2_payments(&$market_payments, &$market_cycles) {
             // циклы закончились совсем - нет даже платежей по ним
             if (!$current_cycle_payment) break;
             // выводим результат по каждому из циклов
-            //debug : print('<b>cycle#'.$current_cycle_number.' '.number_format($current_cycle_payment,0,'.',',').' ISK at '.date("Y-m-d", $current_cycle_finish).'</b><br>');
+            if ($show_debug)  print('<small><b>cycle#'.$current_cycle_number.' '.number_format($current_cycle_payment,0,'.','').' ISK at '.date("Y-m-d", $current_cycle_finish).'</b></small><br>');
             // сохраняем результат
             array_push($market_cycles, array(intval($current_cycle_number), intval($current_cycle_finish), intval($current_cycle_payment), $current_cycle_finished));
             $current_cycle_number++;
@@ -254,9 +284,6 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
 </thead>
 <tbody>
 <?php
-    $market_cycles = null;
-    calculate_market_p2_payments($market_payments, $market_cycles);
-
     $prev_date = null;
     if ($wallet_journals)
         foreach ($wallet_journals as $event)
@@ -309,6 +336,9 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
 </thead>
 <tbody>
 <?php
+    $market_cycles = null;
+    calculate_market_p2_payments($wallet_journals, $market_payments, $market_cycles);
+
     if ($market_cycles)
         foreach ($market_cycles as $cycle)
         {
@@ -812,6 +842,16 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
 }
 
 
+
+    function get_numeric($val) {
+        return is_numeric($val) ? ($val + 0) : 0;
+    }
+
+    if (isset($_GET['debug'])) {
+        $_get_debug = htmlentities($_GET['debug']);
+        if (is_numeric($_get_debug))
+            $show_debug = get_numeric($_get_debug) ? 1 : 0;
+    }
 
     __dump_header("Professor' Planetary", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
