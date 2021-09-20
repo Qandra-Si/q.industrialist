@@ -617,7 +617,8 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         $location_id == 1037161379493 ||
         $location_id == 1037088203784 ||
         $location_id == 1037175000957 ||
-        $location_id == 1037111988366;
+        $location_id == 1037111988366 ||
+        $location_id == 1037199511547;
     // выполняем предвариетьный расчёт достаточности материалов в коробке
     $calculated_requirements = null;
     if ($calculate_quantities)
@@ -656,6 +657,7 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
     case 1037161379493: $location_name = "Stock planet 2"; break;
     case 1037088203784: $location_name = "Stock planet 3"; break;
     case 1037175000957: $location_name = "Stock planet 4"; break;
+    case 1037199511547: $location_name = "Stock planet 5"; break;
     case 1037111988366: $location_name = "Stock"; break;
     case 1030492564838: $location_name = "Ангар №".substr($location_flag, -1)." корпоративного офиса"; break;
     default:
