@@ -300,10 +300,12 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
             $amount = $event['isk'];
             $type = $event['tp'];
 
-            if ($type == 't')
+            if ($type == 'd')
                 $type = 'перевод';
             else if ($type == 'f')
                 $type = 'комиссия';
+            else if ($type == 't')
+                $type = 'налог';
             else if ($type == 'e')
                 $type = 'эскроу';
             else if ($type == 's')
@@ -932,7 +934,7 @@ from (
   ecwj_date,
   ecwj_corporation_id as c,
   ecwj_amount as isk,
-  't'::char as tp
+  'd'::char as tp
  from qi.esi_corporation_wallet_journals
  where
   ecwj_date >= '2021-08-30' and
@@ -956,13 +958,16 @@ from (
   ecwj_date::date,
   98150545,
   sum(ecwj_amount),
-  'f'::char -- fee
+  case when left(ecwj_ref_type,1)='b' then 'f'::char else 't'::char end -- fee, tax
  from qi.esi_corporation_wallet_journals
  where
   ecwj_date >= '2021-08-30' and
   ecwj_corporation_id = 98150545 and --  Just A Trade Corp
   ecwj_division = 1 and
-  ecwj_context_id_type is null and ecwj_context_id is null and ecwj_ref_type = 'brokers_fee' -- комиссия брокера за market-операцию
+  ecwj_context_id_type is null and ecwj_context_id is null and (
+    ecwj_ref_type = 'brokers_fee' or -- комиссия брокера за market buy-операцию
+    ecwj_ref_type = 'transaction_tax' -- налог уплаченный CCP за market sell-операцию
+  )
  group by 1, 4
  union
   select
