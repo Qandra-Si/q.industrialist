@@ -1898,3 +1898,79 @@ class QSwaggerInterface:
             type_id
         )
 
+    # -------------------------------------------------------------------------
+    # /universe/types/{type_id}/
+    # -------------------------------------------------------------------------
+
+    def select_unknown_type_ids(self):
+        rows = self.db.select_all_rows(
+            "SELECT DISTINCT eca_type_id "
+            "FROM esi_corporation_assets "
+            "WHERE eca_type_id NOT IN (SELECT sdet_type_id FROM eve_sde_type_ids);"
+        )
+        if rows is None:
+            return None
+        return rows
+
+    def insert_or_update_type_id(self, type_id: int, data):
+        """ inserts type_id' data into database
+
+        :param data: region market history data
+        """
+        # { "capacity": 0,
+        #   "description": "Contains stylish 'Imperial Loyalist' pants for both men and women to celebrate Foundation Day YC123.",
+        #   "group_id": 1194,
+        #   "icon_id": 24297,
+        #   "mass": 0,
+        #   "name": "Amarr Foundation Day Pants Crate",
+        #   "packaged_volume": 0.1,
+        #   "portion_size": 1,
+        #   "published": true,
+        #   "radius": 1,
+        #   "type_id": 59978,
+        #   "volume": 0.1
+        # }
+        self.db.execute(
+            "INSERT INTO eve_sde_type_ids("
+            " sdet_type_id,"
+            " sdet_type_name,"
+            " sdet_volume,"
+            " sdet_capacity,"
+            # не передаётся: " sdet_base_price,"
+            " sdet_published,"
+            " sdet_market_group_id,"
+            " sdet_meta_group_id,"
+            " sdet_icon_id,"
+            " sdet_packaged_volume) "
+            "VALUES ("
+            " %(t)s,"
+            " %(nm)s,"
+            " %(v)s,"
+            " %(c)s,"
+            # не передаётся: " %(bp)s,"
+            " %(p)s,"
+            " %(mkg)s,"
+            " %(mtg)s,"
+            " %(i)s,"
+            " %(pv)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdet DO UPDATE SET"
+            " sdet_type_name=%(nm)s,"
+            " sdet_volume=%(v)s,"
+            " sdet_capacity=%(c)s,"
+            " sdet_published=%(p)s,"
+            " sdet_market_group_id=%(mkg)s,"
+            " sdet_meta_group_id=%(mtg)s,"
+            " sdet_icon_id=%(i)s,"
+            " sdet_packaged_volume=%(pv)s;",
+            {'t': type_id,
+             'nm': data['name'],
+             'v': data.get('volume', None),
+             'c': data.get('capacity', None),
+             # не передаётся: 'bp': None,
+             'p': data['published'],
+             'mkg': data.get('market_group_id', None),
+             'mtg': next(x['value'] for x in data.get('dogma_attributes') if x['attribute_id'] == 422) if 'dogma_attributes' in data else None,
+             'i': data.get('icon_id', None),
+             'pv': data.get('packaged_volume', None),
+             }
+        )

@@ -164,6 +164,16 @@ def main():
         print("'{}' corporation link blueprints and jobs completed\n".
               format(corporation_name))
 
+    # Public information about type_id
+    actualized_type_ids = dbtools.actualize_type_ids()
+    if actualized_type_ids is None:
+        print("No new items found in the University\n")
+    else:
+        print("{} new items found in the University and actualized:\n".format(len(actualized_type_ids)))
+        for item in actualized_type_ids:
+            print(" * {} with type_id={}\n".format(item['name'], item['type_id']))
+    sys.stdout.flush()
+
     del dbtools
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
@@ -174,3 +184,4 @@ if __name__ == "__main__":
     # mem = memory_usage(main, max_usage=True)
     # print("Memory used: {}Mb".format(mem))
     main()  # 121.4Mb
+

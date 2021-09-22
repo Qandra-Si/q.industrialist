@@ -1660,3 +1660,58 @@ class QDatabaseTools:
             self.dbswagger.db.enable_debug()
 
         return found_market_orders
+
+    # -------------------------------------------------------------------------
+    # /universe/types/{type_id}/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_type_id_url(type_id: int):
+        # Requires: access token
+        return "universe/types/{type_id}/".format(type_id=type_id)
+
+    def actualize_type_id(self, type_id: int):
+        url: str = self.get_type_id_url(type_id)
+        try:
+            data, updated_at, is_updated = self.load_from_esi(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:
+                # это странно, но часть item_types может быть Not Found, хотя они есть в ассетах
+                return None
+            else:
+                # print(sys.exc_info())
+                # raise
+                return None  # продолжить загрузку очень важно!
+        except:
+            # print(sys.exc_info())
+            # raise
+            return None  # продолжить загрузку очень важно!
+
+        if data is None:
+            return None
+
+        # добавляем данные по новому предмету в БД
+        self.dbswagger.db.insert_or_update_type_id(type_id, data)
+
+        return data
+
+    def actualize_type_ids(self):
+        # выбираем отсутствющие в БД типы элементов, например подарочные наборы, которые внезапно появились в ассетах
+        unknown_type_ids = self.dbswagger.select_unknown_type_ids()  # 59978 = 'Amarr Foundation Day Pants Crate'
+        if unknown_type_ids is None:
+            return None
+
+        actualized_type_ids = []
+        for type_id in unknown_type_ids:
+            data = self.actualize_type_id(type_id[0])
+            if data is not None:
+                actualized_type_ids.append(data)
+                del data
+
+        if not actualized_type_ids:
+            return None
+
+        self.qidb.commit()
+
+        return actualized_type_ids
