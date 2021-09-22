@@ -1899,18 +1899,45 @@ class QSwaggerInterface:
         )
 
     # -------------------------------------------------------------------------
+    # /universe/types/
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
 
+    def is_any_type_id_packed_volume_known(self):
+        # данные о packed volume нельзя получить из Static Data Interface, приходится загружать по ESI, а это значит,
+        # что если в БД нет этих данных то данные в БД были добавлены из SDI с полной очисткой накопленного... проверяем
+        row = self.db.select_one_row(
+            "SELECT COUNT(1) FROM eve_sde_type_ids WHERE sdet_packaged_volume IS NOT NULL;"
+        )
+        if row is None:
+            return None
+        return row[0] > 0
+
     def select_unknown_type_ids(self):
         rows = self.db.select_all_rows(
-            "SELECT DISTINCT eca_type_id "
-            "FROM esi_corporation_assets "
-            "WHERE eca_type_id NOT IN (SELECT sdet_type_id FROM eve_sde_type_ids);"
+            "SELECT DISTINCT t.id "
+            "FROM ("
+            " SELECT eca_type_id AS id FROM esi_corporation_assets"
+            " union"
+            " SELECT ecb_type_id FROM esi_corporation_blueprints"
+            " union"
+            " SELECT ecj_blueprint_type_id FROM esi_corporation_industry_jobs"
+            " union"
+            " SELECT ecj_product_type_id FROM esi_corporation_industry_jobs"
+            " union"
+            " SELECT ecwt_type_id FROM esi_corporation_wallet_transactions"
+            " union"
+            " SELECT ecor_type_id FROM esi_corporation_orders"
+            " union"
+            " SELECT emp_type_id FROM esi_markets_prices"
+            " union"
+            " SELECT ethp_type_id FROM esi_trade_hub_prices"
+            ") t "
+            "WHERE t.id NOT IN (SELECT sdet_type_id FROM eve_sde_type_ids);"
         )
         if rows is None:
             return None
-        return rows
+        return [r[0] for r in rows]
 
     def insert_or_update_type_id(self, type_id: int, data):
         """ inserts type_id' data into database

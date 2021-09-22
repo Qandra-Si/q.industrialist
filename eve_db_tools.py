@@ -1662,12 +1662,18 @@ class QDatabaseTools:
         return found_market_orders
 
     # -------------------------------------------------------------------------
+    # /universe/types/
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
 
     @staticmethod
+    def get_types_url():
+        # Requires: piblic access
+        return "universe/types/"
+
+    @staticmethod
     def get_type_id_url(type_id: int):
-        # Requires: access token
+        # Requires: piblic access
         return "universe/types/{type_id}/".format(type_id=type_id)
 
     def actualize_type_id(self, type_id: int):
@@ -1697,14 +1703,26 @@ class QDatabaseTools:
         return data
 
     def actualize_type_ids(self):
-        # выбираем отсутствющие в БД типы элементов, например подарочные наборы, которые внезапно появились в ассетах
-        unknown_type_ids = self.dbswagger.select_unknown_type_ids()  # 59978 = 'Amarr Foundation Day Pants Crate'
-        if unknown_type_ids is None:
-            return None
+        if self.dbswagger.is_any_type_id_packed_volume_known():
+            # выбираем отсутствющие в БД типы элементов, например подарочные наборы,
+            # которые внезапно появились в ассетах
+            type_ids_to_renew = self.dbswagger.select_unknown_type_ids()  # 59978 = 'Amarr Foundation Day Pants Crate'
+            if type_ids_to_renew is None:
+                return None
+        else:
+            url: str = self.get_types_url()
+            type_ids_to_renew, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+            if type_ids_to_renew is None:
+                return None
+            if self.esiswagger.offline_mode:
+                pass
+            elif not is_updated:
+                return None
 
         actualized_type_ids = []
-        for type_id in unknown_type_ids:
-            data = self.actualize_type_id(type_id[0])
+        for type_id in type_ids_to_renew:
+            data = self.actualize_type_id(type_id)
             if data is not None:
                 actualized_type_ids.append(data)
                 del data
