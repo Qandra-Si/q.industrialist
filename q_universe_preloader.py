@@ -47,7 +47,7 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
-    for pilot_name in argv_prms["character_names"]:
+    for pilot_num, pilot_name in enumerate(argv_prms["character_names"]):
         # настройка Eve Online ESI Swagger interface
         authz = dbtools.auth_pilot_by_name(
             pilot_name,
@@ -164,14 +164,19 @@ def main():
         print("'{}' corporation link blueprints and jobs completed\n".
               format(corporation_name))
 
-    # Public information about type_id
-    actualized_type_ids = dbtools.actualize_type_ids()
-    if actualized_type_ids is None:
-        print("No new items found in the University")
-    else:
-        print("{} new items found in the University and actualized:".format(len(actualized_type_ids)))
-        for item in actualized_type_ids:
-            print(" * {} with type_id={}".format(item['name'], item['type_id']))
+        last_time = pilot_num == len(argv_prms["character_names"])-1
+        if last_time:
+            # Public information about type_id
+            actualized_type_ids = dbtools.actualize_type_ids()
+            if actualized_type_ids is None:
+                print("No new items found in the Universe")
+            else:
+                print("{} Universe' items actualized in database:".format(len(actualized_type_ids)))
+                if len(actualized_type_ids) < 100:  # в случае массового обновления, названия не показываем
+                    for item in actualized_type_ids:
+                        print(" * {} with type_id={}".format(item['name'], item['type_id']))
+                del actualized_type_ids
+
     sys.stdout.flush()
 
     del dbtools

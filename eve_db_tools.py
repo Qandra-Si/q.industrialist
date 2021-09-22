@@ -1724,8 +1724,10 @@ class QDatabaseTools:
         for type_id in type_ids_to_renew:
             data = self.actualize_type_id(type_id)
             if data is not None:
-                actualized_type_ids.append(data)
+                actualized_type_ids.append({'type_id': data['type_id'], 'name': data['name']})
                 del data
+
+        del type_ids_to_renew
 
         if not actualized_type_ids:
             return None

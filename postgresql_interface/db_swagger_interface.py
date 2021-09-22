@@ -1996,7 +1996,7 @@ class QSwaggerInterface:
              # не передаётся: 'bp': None,
              'p': data['published'],
              'mkg': data.get('market_group_id', None),
-             'mtg': next(x['value'] for x in data.get('dogma_attributes') if x['attribute_id'] == 422) if 'dogma_attributes' in data else None,
+             'mtg': next((x['value'] for x in data.get('dogma_attributes', []) if x['attribute_id'] == 422), None),
              'i': data.get('icon_id', None),
              'pv': data.get('packaged_volume', None),
              }
