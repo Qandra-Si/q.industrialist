@@ -167,11 +167,11 @@ def main():
     # Public information about type_id
     actualized_type_ids = dbtools.actualize_type_ids()
     if actualized_type_ids is None:
-        print("No new items found in the University\n")
+        print("No new items found in the University")
     else:
-        print("{} new items found in the University and actualized:\n".format(len(actualized_type_ids)))
+        print("{} new items found in the University and actualized:".format(len(actualized_type_ids)))
         for item in actualized_type_ids:
-            print(" * {} with type_id={}\n".format(item['name'], item['type_id']))
+            print(" * {} with type_id={}".format(item['name'], item['type_id']))
     sys.stdout.flush()
 
     del dbtools

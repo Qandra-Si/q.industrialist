@@ -1692,7 +1692,7 @@ class QDatabaseTools:
             return None
 
         # добавляем данные по новому предмету в БД
-        self.dbswagger.db.insert_or_update_type_id(type_id, data)
+        self.dbswagger.insert_or_update_type_id(type_id, data)
 
         return data
 
