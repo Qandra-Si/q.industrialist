@@ -49,7 +49,7 @@ function __dump_querious_market($market, $storage) { ?>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita +10%<br>Price / Markup</th>
   <th style="text-align: right;">+10%<br>Profit</th>
-  <th style="text-align: right;">P-ZMZV Sell<br><mark>Volume</mark></th>
+  <th style="text-align: right;">P-ZMZV Sell<br><mark>Quantity</mark></th>
  </tr>
 </thead>
 <tbody>
@@ -231,9 +231,9 @@ function __dump_querious_storage($storage) { ?>
  <tr>
   <th></th>
   <th>Items</th>
-  <th style="text-align: right;">Volume<br>Hangar 4</th>
+  <th style="text-align: right;">Quantity<br>in Storage</th>
   <th style="text-align: right;">RI4<br>Sell</th>
-  <th style="text-align: right;">P-ZMZV Sell<br><mark>Volume</mark></th>
+  <th style="text-align: right;">P-ZMZV Sell<br><mark>Quantity</mark></th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -310,7 +310,7 @@ select
   round(transactions_stat.avg_volume, 1) as ov, -- order volume
   transactions_stat.sum_last_day as dv, -- day volume
   orders_stat.volume_remain as mv, -- RI4 volume
-  tid.sdet_volume as pv, -- packaged volume
+  coalesce(tid.sdet_packaged_volume, 0) as pv, -- packaged volume
   jita.sell as js, -- jita sell
   jita.buy as jb, -- jita buy
   amarr.sell as as, -- amarr sell
@@ -458,7 +458,7 @@ select
   ri4_orders.volume as rsv, -- ri4 sell volume : to_char(ri4_orders.avg_price, 'FM999G999G999G999.90') || ' (x' || to_char(ri4_orders.volume, 'FM999999999999999999') || ')'
   sbsq_hub.ethp_sell as ps, -- p-zmzv sell
   sbsq_hub.ethp_sell_volume as psv, -- p-zmzv sell volume
-  tid.sdet_volume as pv, -- packaged volume
+  coalesce(tid.sdet_packaged_volume, 0) as pv, -- packaged volume
   jita.sell as js, -- jita sell : to_char(jita.sell, 'FM999G999G999G999G999.90')
   jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
   amarr.sell as as, -- amarr sell : to_char(amarr.sell, 'FM999G999G999G999G999.90')
@@ -467,7 +467,7 @@ select
   --  when (ceil(abs(universe.price - jita.sell)) - ceil(abs(universe.price - amarr.sell))) < 0 then 'jita'
   --  else 'amarr'
   -- end as "proper hub",
-  round(tid.sdet_volume::numeric * 866.0, 2) as "jita import price", -- заменить на packaged_volume, считать по ESI
+  round(coalesce(tid.sdet_packaged_volume, 0)::numeric * 866.0, 2) as "jita import price", -- заменить на packaged_volume, считать по ESI
   hangar.eca_created_at::date as since,
   date_trunc('minutes', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hangar.eca_updated_at)::interval as last_changed
 from

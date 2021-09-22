@@ -761,17 +761,17 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
         {
             if ($p['id'] != $tid) continue;
             $nm = $p['name'];
-            $volume = $p['v'];
+            $packed_volume = $p['pv'];
             break;
         }
-        $location_volume += $volume * $quantity;
+        $location_volume += $packed_volume * $quantity;
 
         if ($prev_market_group_id == 0 || $prev_market_group_id != $market_group_id)
         {
             $prev_market_group_id = $market_group_id;
             __dump_planetary_market_group($market_group_id, $calculate_quantities);
         }
-        __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $volume*$quantity, $we_buy_it);
+        __dump_planetary_stock_item($tid, $nm, $calculate_quantities, $quantity, $required_quantity, $packed_volume*$quantity, $we_buy_it);
 
         // поиск сведений о ценах на продукт
         $found = false;
@@ -911,7 +911,7 @@ EOD;
 select
  sdet_type_id as id,
  sdet_type_name as name,
- sdet_volume as v,
+ coalesce(sdet_packaged_volume, 0) as pv,
  sdet_market_group_id as mgid
 from eve_sde_type_ids
 where sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) -- планетарка
