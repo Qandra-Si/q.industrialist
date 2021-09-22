@@ -1,9 +1,8 @@
 ﻿<?php
 include 'qi_render_html.php';
 include_once '.settings.php';
-?>
 
-<?php
+
 function eve_ceiling($isk) {
     if ($isk < 100.0) ;
     else if ($isk < 1000.0) $isk = ceil($isk * 10.0) / 10.0;
@@ -18,18 +17,27 @@ function eve_ceiling($isk) {
     else $isk = null;
     return $isk;
 }
-?>
 
-<?php function __dump_querious_market($market, $storage) { ?>
+
+function get_clipboard_copy_button($data_copy) {
+    return ' <a data-target="#" role="button" data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip" data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></a>';
+}
+
+
+function __dump_querious_market($market, $storage) { ?>
 <h2>Keepstar Market</h2>
 <style>
 .label-noordersreal { color: #fff; background-color: #d9534f; }
 .label-noorders { color: #fff; background-color: #eebbb9; }
 .label-interrupt { color: #8e8e8e; background-color: #e8ce43; }
+.label-dontbuy { color: #e8ce43; background-color: #337ab7; }
 .label-needdelivery { color: #fff; background-color: #5bc0de; }
 .label-placeanorder { color: #fff; background-color: #d973e8; }
+.label-lowprice { color: #fff; background-color: #f0ad4e; }
+.label-highprice { color: #fff; background-color: #777; }
+.label-veryfew { color: #fff; background-color: #337ab7; }
 </style>
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblMarket">
 <thead>
  <tr>
   <th></th>
@@ -49,7 +57,7 @@ function eve_ceiling($isk) {
     $min_profit = 0.05; // 3%
     $profit = 0.1; // 10%
     $max_profit = 0.25; // 25%
-    $taxfee = 0.02 + 0.0113;
+    $taxfee = 0.03 + 0.0113;
 
     $summary_market_price = 0;
     $summary_market_volume = 0;
@@ -107,21 +115,29 @@ function eve_ceiling($isk) {
                 if ($storage_quantity && ($weekly_volume >= $market_quantity))
                     $warnings .= '<span class="label label-placeanorder">place an order</span>&nbsp;';
             }
-            if (!is_null($market_quantity) && ($order_volume >= $market_quantity)) $problems .= '<span class="label label-primary">very few</span>&nbsp;';
+            if (!is_null($market_quantity) && ($order_volume >= $market_quantity)) $problems .= '<span class="label label-veryfew">very few</span>&nbsp;';
             if (!is_null($market_price)) {
                 if ($market_price > 100000 || $packaged_volume < 5) {
                     $min_jita_price = $jita_sell * (1.0+$min_profit+$taxfee);
                     $min_amarr_price = $amarr_sell * (1.0+$min_profit+$taxfee);
                     if (($market_price < $min_jita_price) && ($market_price < $min_amarr_price))
-                        $warnings .= '<span class="label label-warning" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
+                        $warnings .= '<span class="label label-lowprice" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
                 }
                 $max_jita_price = $jita_sell * (1.0+$max_profit+$taxfee);
                 $max_amarr_price = $amarr_sell * (1.0+$max_profit+$taxfee);
                 if (($market_price > $max_jita_price) && ($market_price > $max_amarr_price))
-                    $warnings .= '<span class="label label-default" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
+                    $warnings .= '<span class="label label-highprice" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
                 if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price) && ($pzmzv_sell_volume > $market_quantity)) {
                     $interrupt_detected = true;
                     $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
+                    // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
+                    $min_buy_price = $pzmzv_sell / (1.0+$taxfee+$min_profit);
+                    if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
+                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
+                    else if ($amarr_sell > $min_buy_price)
+                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Amarr</span>&nbsp;';
+                    else if ($jita_sell > $min_buy_price)
+                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
                 }
             }
 
@@ -143,14 +159,14 @@ function eve_ceiling($isk) {
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+ <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
  <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_quantity,0,'.',',')?></mark><?=$storage_quantity?'&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ '.number_format($storage_quantity,0,'.',',').'&nbsp;</span></small>':''?></td>
  <?php } ?>
- <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
+ <td align="right"><small><span class="text-muted"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
  <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
  <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
@@ -205,12 +221,12 @@ function eve_ceiling($isk) {
 </div>
 
 <?php
-} ?>
+}
 
 
-<?php function __dump_querious_storage($storage) { ?>
+function __dump_querious_storage($storage) { ?>
 <h2>Keepstar Storage</h2>
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
  <tr>
   <th></th>
@@ -272,11 +288,10 @@ function eve_ceiling($isk) {
 </tbody>
 </table>
 <?php
-} ?>
+}
 
 
 
-<?php
     __dump_header("Querious Market", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
@@ -528,8 +543,171 @@ EOD;
     //---
     pg_close($conn);
 ?>
+
 <div class="container-fluid">
+<div class="btn-group btn-group-toggle" data-toggle="buttons">
+ <label class="btn btn-default qind-btn-market active" group="all"><input type="radio" name="options" autocomplete="off" checked>Все</label>
+ <label class="btn btn-default qind-btn-market" group="sold"><input type="radio" name="options" autocomplete="off">Всё продано</label>
+ <label class="btn btn-default qind-btn-market" group="very-few"><input type="radio" name="options" autocomplete="off">Товар заканчивается</label>
+ <label class="btn btn-default qind-btn-market" group="need-delivery"><input type="radio" name="options" autocomplete="off">Требуется доставка</label>
+ <label class="btn btn-default qind-btn-market" group="place-an-order"><input type="radio" name="options" autocomplete="off">Выставить на продажу</label>
+ <label class="btn btn-default qind-btn-market" group="low-price"><input type="radio" name="options" autocomplete="off">Цена занижена</label>
+ <label class="btn btn-default qind-btn-market" group="high-price"><input type="radio" name="options" autocomplete="off">Цена завышена</label>
+ <label class="btn btn-default qind-btn-market" group="interrupt"><input type="radio" name="options" autocomplete="off">Конкуренты</label>
+</div>
 <?php __dump_querious_market($market, $storage); ?>
+<!-- --- --- --- -->
+<hr>
+<!-- --- --- --- -->
+<div class="btn-group btn-group-toggle" data-toggle="buttons">
+ <label class="btn btn-default qind-btn-stock" group="all"><input type="radio" name="options" autocomplete="off" checked>Показать</label>
+ <label class="btn btn-default qind-btn-stock active" group="hide"><input type="radio" name="options" autocomplete="off">Скрыть</label>
+</div>
 <?php __dump_querious_storage($storage); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
+
+<script>
+  function rebuildMarket(show_group) {
+    $('#tblMarket').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = false;
+      if (show_group == 'all')
+        show = true;
+      else if (show_group == 'sold')
+        show = tr.find('td').eq(1).find('span.label-noordersreal').length ||
+               tr.find('td').eq(1).find('span.label-noorders').length;
+      else if (show_group == 'low-price')
+        show = tr.find('td').eq(1).find('span.label-lowprice').length;
+      else if (show_group == 'high-price')
+        show = tr.find('td').eq(1).find('span.label-highprice').length;
+      else if (show_group == 'very-few')
+        show = tr.find('td').eq(1).find('span.label-veryfew').length;
+      else if (show_group == 'need-delivery')
+        show = tr.find('td').eq(1).find('span.label-needdelivery').length;
+      else if (show_group == 'place-an-order')
+        show = tr.find('td').eq(1).find('span.label-placeanorder').length;
+      else if (show_group == 'interrupt')
+        show = tr.find('td').eq(1).find('span.label-interrupt').length;
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  function rebuildStock(show_group) {
+    $('#tblStock').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = false;
+      if (show_group == 'all')
+        show = true;
+      else if (show_group == 'hide')
+        show = false;
+      if (show)
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  $(document).ready(function(){
+    $('label.qind-btn-market').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildMarket($(this).attr('group'));
+    });
+    $('label.qind-btn-stock').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildStock($(this).attr('group'));
+    });
+    // Initialization
+    rebuildStock('hide');
+    // Working with clipboard
+    $('a.qind-copy-btn').each(function() {
+      $(this).tooltip();
+    })
+    $('a.qind-copy-btn').bind('click', function () {
+      var data_copy = $(this).attr('data-copy');
+      if (data_copy === undefined) {
+        var data_source = $(this).attr('data-source');
+        if (data_source == 'table') {
+          var tr = $(this).parent().parent();
+          var tbody = tr.parent();
+          var rows = tbody.children('tr');
+          var start_row = rows.index(tr);
+          data_copy = '';
+          rows.each( function(idx) {
+            if (!(start_row === undefined) && (idx > start_row)) {
+              var td0 = $(this).find('td').eq(0); // ищём <td#0 class='active'>
+              if (!(td0.attr('class') === undefined))
+                start_row = undefined;
+              else {
+                //ищём <tr>...<td#1><a data-copy='?'>...
+                var td1a = $(this).find('td').eq(1).find('a');
+                if (!(td1a === undefined)) {
+                  var nm = td1a.attr('data-copy');
+                  if (!(nm === undefined)) {
+                    var td2q = $(this).find('td').eq(2).attr('quantity');
+                    if (!(td2q === undefined) && (td2q > 0)) {
+                      if (data_copy) data_copy += "\n"; 
+                      data_copy += nm + "\t" + td2q;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        } else if (data_source == 'span') {
+          var div = $(this).parent();
+          var spans = div.children('span');
+          data_copy = '';
+          spans.each( function(idx) {
+            var span = $(this);
+            if (data_copy) data_copy += "\n";
+            var txt = span.text();
+            data_copy += txt.substring(txt.indexOf(' x ')+3) + "\t" + span.attr('quantity');
+          });
+        }
+      }
+      if (data_copy) {
+        if (window.isSecureContext && navigator.clipboard) {
+          navigator.clipboard.writeText(data_copy).then(() => {
+            $(this).trigger('copied', ['Copied!']);
+          }, (e) => {
+            $(this).trigger('copied', ['Data not copied!']);
+          });
+          document.execCommand("copy");
+        }
+        else {
+          var $temp = $("<textarea>");
+          $("body").append($temp);
+          $temp.val(data_copy).select();
+          try {
+            success = document.execCommand("copy");
+            if (success)
+              $(this).trigger('copied', ['Copied!']);
+            else
+              $(this).trigger('copied', ['Data not copied!']);
+          } finally {
+            $temp.remove();
+          }
+        }
+      }
+      else {
+        $(this).trigger('copied', ['Nothing no copy!']);
+      }
+    });
+    $('a.qind-copy-btn').bind('copied', function(event, message) {
+      $(this).attr('title', message)
+        .tooltip('fixTitle')
+        .tooltip('show')
+        .attr('title', "Copy to clipboard")
+        .tooltip('fixTitle');
+    });
+    if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+      // какой-то код ...
+      $('a.qind-copy-btn').each(function() {
+        $(this).addClass('hidden');
+      })
+    }
+  });
+</script>
+
