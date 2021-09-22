@@ -353,7 +353,7 @@ class EveESIClient:
         print("\nSSO response code is: {}".format(sso_response.status_code))
         print("\nSSO response JSON is: {}".format(sso_response.json()))
 
-    def auth(self, client_scopes, client_id=""):
+    def auth(self, client_scopes, client_id=None):
         print("Follow the prompts and enter the info asked for.")
 
         # Generate the PKCE code challenge

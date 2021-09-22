@@ -306,14 +306,18 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
                 $type = 'комиссия';
             else if ($type == 't')
                 $type = 'налог';
-            else if ($type == 'e')
-                $type = 'эскроу';
             else if ($type == 's')
                 $type = 'продажа';
             else if ($type == 'b') {
                 $type = 'закупка';
                 $amount = -$amount;
             }
+            else if ($type == 'i')
+                $type = 'импорт';
+            else if ($type == 'e')
+                $type = 'экспорт';
+            else if ($type == 'c')
+                $type = 'строительство';
 ?>
 <tr>
  <td><?=($prev_date==$date)?'':$date?></td>
@@ -921,6 +925,14 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $planetary = pg_fetch_all($planetary_cursor);
     //---
+    // d - donation
+    // f - fee
+    // t - tax
+    // b - buy
+    // s - sell
+    // i - import
+    // e - export
+    // c - construction
     $query = <<<EOD
 select
   -- ecwj_reference_id,
@@ -970,7 +982,7 @@ from (
   )
  group by 1, 4
  union
-  select
+ select
   ecwt_date::date,
   98150545,
   sum(ecwt_unit_price * ecwt_quantity),
@@ -984,6 +996,17 @@ from (
   ecwt_division = 1 and
   sdet_market_group_id in (1333, 1334, 1335, 1336, 1337) and -- планетарка
   ecwt_type_id = sdet_type_id
+ group by 1, 4
+ union
+ select
+   epwj_date::date,
+   2053528477,
+   sum(epwj_amount),
+   substring(epwj_ref_type from 11 for 1)::char
+ from qi.esi_pilot_wallet_journals
+ where
+   epwj_character_id in (233088639, 1503543426, 364693619, 2115210624, 1359439269, 1504326530) and
+   epwj_ref_type in ('planetary_construction', 'planetary_import_tax', 'planetary_export_tax')
  group by 1, 4
  ) j
 order by dt desc;

@@ -17,6 +17,22 @@ DROP TABLE IF EXISTS qi.esi_markets_region_history;
 DROP INDEX IF EXISTS qi.idx_emp_pk;
 DROP TABLE IF EXISTS qi.esi_markets_prices;
 
+---
+DROP INDEX IF EXISTS qi.idx_epwt_date;
+DROP INDEX IF EXISTS qi.idx_epwt_journal_ref_id;
+DROP INDEX IF EXISTS qi.idx_epwt_transaction_id;
+DROP INDEX IF EXISTS qi.idx_epwt_character_id;
+DROP INDEX IF EXISTS qi.idx_epwt_pk;
+DROP TABLE IF EXISTS qi.esi_pilot_wallet_transactions;
+
+DROP INDEX IF EXISTS qi.idx_epwj_date;
+DROP INDEX IF EXISTS qi.idx_epwj_context_id;
+DROP INDEX IF EXISTS qi.idx_epwj_reference_id;
+DROP INDEX IF EXISTS qi.idx_epwj_character_id;
+DROP INDEX IF EXISTS qi.idx_epwj_pk;
+DROP TABLE IF EXISTS qi.esi_pilot_wallet_journals;
+
+---
 DROP INDEX IF EXISTS qi.idx_ecor_history;
 DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
 DROP INDEX IF EXISTS qi.idx_ecor_issued;
@@ -807,6 +823,117 @@ CREATE INDEX idx_ecor_history
     (ecor_history ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
+
+
+
+
+--------------------------------------------------------------------------------
+-- character_wallet_journals
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_pilot_wallet_journals
+(
+    epwj_character_id BIGINT NOT NULL,
+    epwj_reference_id BIGINT NOT NULL,
+    epwj_date TIMESTAMP NOT NULL,
+    epwj_ref_type CHARACTER VARYING(255) NOT NULL,
+    epwj_first_party_id BIGINT,
+    epwj_second_party_id BIGINT,
+    epwj_amount DOUBLE PRECISION,
+    epwj_balance DOUBLE PRECISION,
+    epwj_reason TEXT,
+    epwj_tax_receiver_id BIGINT,
+    epwj_tax DOUBLE PRECISION,
+    epwj_context_id BIGINT,
+    epwj_context_id_type CHARACTER VARYING(255),
+    epwj_description CHARACTER VARYING(255) NOT NULL,
+    epwj_created_at TIMESTAMP,
+    CONSTRAINT pk_epwj PRIMARY KEY (epwj_character_id, epwj_reference_id),
+    CONSTRAINT fk_epwj_character_id FOREIGN KEY (epwj_character_id)
+        REFERENCES qi.esi_characters(ech_character_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_epwj_pk
+    ON qi.esi_pilot_wallet_journals USING btree
+    (epwj_character_id ASC NULLS LAST, epwj_reference_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwj_character_id
+    ON qi.esi_pilot_wallet_journals USING btree
+    (epwj_character_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwj_reference_id
+    ON qi.esi_pilot_wallet_journals USING btree
+    (epwj_reference_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwj_context_id
+    ON qi.esi_pilot_wallet_journals USING btree
+    (epwj_context_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwj_date
+    ON qi.esi_pilot_wallet_journals USING btree
+    (epwj_date ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- character_wallet_transactions
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_pilot_wallet_transactions
+(
+    epwt_character_id BIGINT NOT NULL,
+    epwt_transaction_id BIGINT NOT NULL,
+    epwt_date TIMESTAMP NOT NULL,
+    epwt_type_id INTEGER NOT NULL,
+    epwt_location_id BIGINT NOT NULL,
+    epwt_unit_price DOUBLE PRECISION NOT NULL,
+    epwt_quantity INTEGER NOT NULL,
+    epwt_client_id INTEGER NOT NULL,
+    epwt_is_buy BOOLEAN NOT NULL,
+    epwt_is_personal BOOLEAN NOT NULL,
+    epwt_journal_ref_id BIGINT NOT NULL,
+    epwt_created_at TIMESTAMP,
+    CONSTRAINT pk_epwt PRIMARY KEY (epwt_character_id, epwt_transaction_id),
+    CONSTRAINT fk_epwt_character_id FOREIGN KEY (epwt_character_id)
+        REFERENCES qi.esi_characters(ech_character_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_epwt_pk
+    ON qi.esi_pilot_wallet_transactions USING btree
+    (epwt_character_id ASC NULLS LAST, epwt_transaction_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwt_character_id
+    ON qi.esi_pilot_wallet_transactions USING btree
+    (epwt_character_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwt_transaction_id
+    ON qi.esi_pilot_wallet_transactions USING btree
+    (epwt_transaction_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwt_journal_ref_id
+    ON qi.esi_pilot_wallet_transactions USING btree
+    (epwt_journal_ref_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_epwt_date
+    ON qi.esi_pilot_wallet_transactions USING btree
+    (epwt_date ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
 
 
 --------------------------------------------------------------------------------

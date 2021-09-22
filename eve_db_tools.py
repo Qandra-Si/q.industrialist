@@ -13,8 +13,6 @@ import pytz
 import eve_esi_interface as esi
 import postgresql_interface as db
 
-import q_industrialist_settings
-
 from __init__ import __version__
 
 
@@ -99,19 +97,21 @@ class QDatabaseTools:
     corporation_industry_job_diff = ['status']
     corporation_industry_order_diff = ['price', 'volume_remain']
 
-    def __init__(self, module_name, debug):
+    def __init__(self, module_name, client_scope, database_prms, debug):
         """ constructor
 
         :param module_name: name of Q.Industrialist' module
         :param debug: debug mode to show SQL queries
         """
         self.qidb = db.QIndustrialistDatabase(module_name, debug=debug)
-        self.qidb.connect(q_industrialist_settings.g_database)
+        self.qidb.connect(database_prms)
 
         self.dbswagger = db.QSwaggerInterface(self.qidb)
 
         self.esiswagger = None
         self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
+
+        self.__client_scope = client_scope
 
         self.__cached_characters: typing.Dict[int, QEntity] = {}
         self.__cached_corporations: typing.Dict[int, QEntity] = {}
@@ -151,7 +151,7 @@ class QDatabaseTools:
         self.qidb.disconnect()
         del self.qidb
 
-    def auth_pilot_by_name(self, pilot_name, offline_mode, cache_files_dir):
+    def auth_pilot_by_name(self, pilot_name, offline_mode, cache_files_dir, client_id=None):
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
             '{}/auth_cache'.format(cache_files_dir),
@@ -163,11 +163,11 @@ class QDatabaseTools:
             user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
         self.esiswagger = esi.EveOnlineInterface(
             client,
-            q_industrialist_settings.g_client_scope,
+            self.__client_scope,
             cache_dir='{}/esi_cache'.format(cache_files_dir),
             offline_mode=offline_mode)
 
-        authz = self.esiswagger.authenticate(pilot_name)
+        authz = self.esiswagger.authenticate(pilot_name, client_id)
         # character_id = authz["character_id"]
         # character_name = authz["character_name"]
         return authz
@@ -1124,6 +1124,71 @@ class QDatabaseTools:
         return corp_made_new_payments
 
     # -------------------------------------------------------------------------
+    # /characters/{character_id}/wallet/journal/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_character_wallet_journal_url(character_id: int):
+        # Requires: access token
+        return "characters/{character_id}/wallet/journal/".format(
+            character_id=character_id
+        )
+
+    def actualize_character_wallet_journal_item_details(self, journal_data, need_data=False):
+        context_id_type = journal_data.get('context_id_type')
+        if context_id_type and (context_id_type == 'market_transaction_id'):
+            # идентификатор пилота, который осуществляет торговые операции на рынке
+            second_party_id = journal_data['second_party_id']
+            if second_party_id:
+                self.actualize_character(journal_data['second_party_id'], need_data=need_data)
+
+    def actualize_character_wallet_journals(self, _character_id):
+        character_id: int = int(_character_id)
+        made_new_payments: int = 0
+
+        # Requires role(s): access token
+        url: str = self.get_character_wallet_journal_url(character_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if data is None:
+            return None
+        elif self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # загрузка данных из БД
+        last_known_id = self.dbswagger.get_last_known_character_wallet_journal_id(character_id)
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # важно убедиться, что перед добавлением данных в БД, в связанной таблице есть пилот
+        self.actualize_character(character_id, need_data=True)
+
+        # актуализация (добавление) операций в корпоративном кошельке
+        for journal_data in data:
+            if last_known_id is None or (journal_data['id'] > last_known_id):
+                made_new_payments += 1
+                self.actualize_character_wallet_journal_item_details(journal_data, False)
+                self.dbswagger.insert_character_wallet_journals(
+                    journal_data,
+                    character_id,
+                    updated_at
+                )
+
+        del data
+
+        # если отладвка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        self.qidb.commit()
+
+        return made_new_payments
+
+    # -------------------------------------------------------------------------
     # /corporations/{corporation_id}/wallets/{division}/transactions/
     # -------------------------------------------------------------------------
 
@@ -1188,6 +1253,67 @@ class QDatabaseTools:
             del dbdivisions
 
         return corp_made_new_transactions
+
+    # -------------------------------------------------------------------------
+    # /characters/{character_id}/wallet/transactions/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_character_wallet_transactions_url(character_id: int):
+        # Requires: access token
+        return "characters/{character_id}/wallet/transactions/".format(
+            character_id=character_id
+        )
+
+    def actualize_character_wallet_transaction_details(self, transaction_data, need_data=False):
+        location_id: int = int(transaction_data['location_id'])
+        self.actualize_station_or_structure(location_id, need_data=need_data)
+
+    def actualize_character_wallet_transactions(self, _character_id):
+        character_id: int = int(_character_id)
+        made_new_transactions: int = 0
+
+        # Requires: access token
+        url: str = self.get_character_wallet_transactions_url(character_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # загрузка данных из БД
+        last_known_id = self.dbswagger.get_last_known_character_wallet_transaction_id(character_id)
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # важно убедиться, что перед добавлением данных в БД, в связанной таблице есть пилот
+        self.actualize_character(character_id, need_data=True)
+
+        # актуализация (добавление) операций в корпоративном кошельке
+        for transactions_data in data:
+            if last_known_id is None or (transactions_data['transaction_id'] > last_known_id):
+                made_new_transactions += 1
+                self.actualize_character_wallet_transaction_details(transactions_data, False)
+                self.dbswagger.insert_character_wallet_transactions(
+                    transactions_data,
+                    character_id,
+                    updated_at
+                )
+
+        del data
+
+        # если отладвка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        self.qidb.commit()
+
+        return made_new_transactions
 
     # -------------------------------------------------------------------------
     # /corporations/{corporation_id}/orders/

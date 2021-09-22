@@ -40,7 +40,12 @@ import q_industrialist_settings
 
 def main():
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
-    dbtools = eve_db_tools.QDatabaseTools("universe_structures", debug=False)
+    dbtools = eve_db_tools.QDatabaseTools(
+        "universe_structures",
+        q_industrialist_settings.g_client_scope,
+        q_industrialist_settings.g_database,
+        debug=False
+    )
     first_time = True
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
@@ -52,7 +57,9 @@ def main():
         authz = dbtools.auth_pilot_by_name(
             pilot_name,
             argv_prms["offline_mode"],
-            argv_prms["workspace_cache_files_dir"])
+            argv_prms["workspace_cache_files_dir"],
+            "022ea197e3f2414f913b789e016990c8",  # токен приложения Q.Industrialist
+        )
         character_id = authz["character_id"]
         character_name = authz["character_name"]
 

@@ -1456,6 +1456,88 @@ class QSwaggerInterface:
         )
 
     # -------------------------------------------------------------------------
+    # /characters/{character_id}/wallet/journal/
+    # -------------------------------------------------------------------------
+
+    def get_last_known_character_wallet_journal_id(self, character_id: int):
+        row = self.db.select_one_row(
+            "SELECT MAX(epwj_reference_id) "
+            "FROM esi_pilot_wallet_journals "
+            "WHERE epwj_character_id=%s;",
+            int(character_id),
+        )
+        if row is None:
+            return None
+        return row[0]
+
+    def insert_character_wallet_journals(self, data, character_id: int, updated_at):
+        """ inserts character wallet journal data into database
+
+        :param data: character wallet journal data
+        """
+        # { "amount": -150000.0,
+        #   "balance": 4504038849.3722,
+        #   "date": "2021-09-21T17:50:57Z",
+        #   "description": "Market order commission to broker authorized by: Qandra Si",
+        #   "first_party_id": 2116129465,
+        #   "id": 19690193063,
+        #   "reason": "",
+        #   "ref_type": "brokers_fee",
+        #   "second_party_id": 98551088
+        # }
+        self.db.execute(
+            "INSERT INTO esi_pilot_wallet_journals("
+            " epwj_character_id,"
+            " epwj_reference_id,"
+            " epwj_date,"
+            " epwj_ref_type,"
+            " epwj_first_party_id,"
+            " epwj_second_party_id,"
+            " epwj_amount,"
+            " epwj_balance,"
+            " epwj_reason,"
+            " epwj_tax_receiver_id,"
+            " epwj_tax,"
+            " epwj_context_id,"
+            " epwj_context_id_type,"
+            " epwj_description,"
+            " epwj_created_at) "
+            "VALUES("
+            " %(ch)s,"
+            " %(id)s,"
+            " %(dt)s,"
+            " %(rt)s,"
+            " %(fp)s,"
+            " %(sp)s,"
+            " %(a)s,"
+            " %(b)s,"
+            " %(r)s,"
+            " %(tr)s,"
+            " %(t)s,"
+            " %(c)s,"
+            " %(ct)s,"
+            " %(txt)s,"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_epwj DO NOTHING;",
+            {'ch': character_id,
+             'id': data['id'],
+             'dt': data['date'],
+             'rt': data['ref_type'],
+             'fp': data.get('first_party_id', None),
+             'sp': data.get('second_party_id', None),
+             'a': data.get('amount', None),
+             'b': data.get('balance', None),
+             'r': data.get('reason', None),
+             'tr': data.get('tax_receiver_id', None),
+             't': data.get('tax', None),
+             'c': data.get('context_id', None),
+             'ct': data.get('context_id_type', None),
+             'txt': data['description'],
+             'at': updated_at,
+             }
+        )
+
+    # -------------------------------------------------------------------------
     # /corporations/{corporation_id}/wallets/{division}/transactions/
     # -------------------------------------------------------------------------
 
@@ -1524,6 +1606,80 @@ class QSwaggerInterface:
              'q': data['quantity'],
              'cl': data['client_id'],
              'b': data['is_buy'],
+             'jr': data['journal_ref_id'],
+             'at': updated_at,
+             }
+        )
+
+    # -------------------------------------------------------------------------
+    # /characters/{character_id}/wallet/transactions/
+    # -------------------------------------------------------------------------
+
+    def get_last_known_character_wallet_transaction_id(self, character_id: int):
+        row = self.db.select_one_row(
+            "SELECT MAX(epwt_transaction_id) "
+            "FROM esi_pilot_wallet_transactions "
+            "WHERE epwt_character_id=%s;",
+            int(character_id),
+        )
+        if row is None:
+            return None
+        return row[0]
+
+    def insert_character_wallet_transactions(self, data, character_id: int, updated_at):
+        """ inserts character wallet transactions data into database
+
+        :param data: character wallet transactions data
+        """
+        # { "client_id": 2114844860,
+        #   "date": "2021-09-22T18:30:48Z",
+        #   "is_buy": false,
+        #   "is_personal": false,
+        #   "journal_ref_id": 19693288379,
+        #   "location_id": 1034323745897,
+        #   "quantity": 1,
+        #   "transaction_id": 5697070564,
+        #   "type_id": 2032,
+        #   "unit_price": 853000.0
+        #  }
+        self.db.execute(
+            "INSERT INTO esi_pilot_wallet_transactions("
+            " epwt_character_id,"
+            " epwt_transaction_id,"
+            " epwt_date,"
+            " epwt_type_id,"
+            " epwt_location_id,"
+            " epwt_unit_price,"
+            " epwt_quantity,"
+            " epwt_client_id,"
+            " epwt_is_buy,"
+            " epwt_is_personal,"
+            " epwt_journal_ref_id,"
+            " epwt_created_at) "
+            "VALUES("
+            " %(ch)s,"
+            " %(id)s,"
+            " %(dt)s,"
+            " %(ty)s,"
+            " %(loc)s,"
+            " %(pr)s,"
+            " %(q)s,"
+            " %(cl)s,"
+            " %(b)s,"
+            " %(p)s,"
+            " %(jr)s,"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_epwt DO NOTHING;",
+            {'ch': character_id,
+             'id': data['transaction_id'],
+             'dt': data['date'],
+             'ty': data['type_id'],
+             'loc': data['location_id'],
+             'pr': data['unit_price'],
+             'q': data['quantity'],
+             'cl': data['client_id'],
+             'b': data['is_buy'],
+             'p': data['is_personal'],
              'jr': data['journal_ref_id'],
              'at': updated_at,
              }

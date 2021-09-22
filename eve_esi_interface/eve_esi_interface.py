@@ -434,7 +434,7 @@ class EveOnlineInterface:
                 raise
         return piece_data
 
-    def authenticate(self, character_name=None):
+    def authenticate(self, character_name=None, client_id=None):
         """ Main authenticate method to login character into system
 
         :param character_name: pilot' name for signin, or None value for signup new pilot into system
@@ -442,7 +442,7 @@ class EveOnlineInterface:
         authz = {} if character_name is None else self.__client.auth_cache.read_cache(character_name)
         if not self.__offline_mode:
             if not ('access_token' in authz) or not ('refresh_token' in authz) or not ('expired' in authz):
-                authz = self.__client.auth(self.__scopes)
+                authz = self.__client.auth(self.__scopes, client_id)
             elif not ('scope' in authz) or not self.__client.auth_cache.verify_auth_scope(authz, self.__scopes):
                 authz = self.__client.auth(self.__scopes, authz["client_id"])
             elif self.__client.auth_cache.is_timestamp_expired(int(authz["expired"])):
