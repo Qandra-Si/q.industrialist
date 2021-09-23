@@ -86,6 +86,8 @@ function __dump_querious_market($market, $storage) { ?>
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
+            $jita_price_lower = $jita_sell < $amarr_sell;
+            $amarr_price_lower = $amarr_sell < $jita_sell;
             $universe_price = $product['up'];
             $market_price = $product['mp'];
             $markup = $jita_sell * 0.0313;
@@ -169,8 +171,8 @@ function __dump_querious_market($market, $storage) { ?>
  <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_quantity,0,'.',',')?></mark><?=$storage_quantity?'&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ '.number_format($storage_quantity,0,'.',',').'&nbsp;</span></small>':''?></td>
  <?php } ?>
- <td align="right"><small><span class="text-muted"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
- <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
+ <td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><br><mark><small><?=number_format($jita_import_price,2,'.',',')?></small></mark></td>
+ <td align="right"><?=$jita_price_lower?'<span class="text-muted-much">':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</class>':''?></td>
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
  <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($jita_10_price,2,'.',',')?><br><mark><?=number_format($markup,2,'.',',')?></mark></td>
