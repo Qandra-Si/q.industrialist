@@ -36,6 +36,7 @@ function __dump_querious_market($market, $storage) { ?>
 .label-lowprice { color: #fff; background-color: #f0ad4e; }
 .label-highprice { color: #fff; background-color: #777; }
 .label-veryfew { color: #fff; background-color: #337ab7; }
+.text-muted-much { color: #bbb; }
 </style>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblMarket">
 <thead>
@@ -130,15 +131,17 @@ function __dump_querious_market($market, $storage) { ?>
                 if (!is_null($pzmzv_sell) && ($pzmzv_sell < $market_price) && ($pzmzv_sell_volume > $market_quantity)) {
                     $interrupt_detected = true;
                     $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
-                    // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
-                    $min_buy_price = $pzmzv_sell / (1.0+$taxfee+$min_profit);
-                    if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
-                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
-                    else if ($amarr_sell > $min_buy_price)
-                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Amarr</span>&nbsp;';
-                    else if ($jita_sell > $min_buy_price)
-                        $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
                 }
+            }
+            if ($pzmzv_sell_volume) {
+                // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
+                $min_buy_price = $pzmzv_sell / (1.0+$taxfee+$min_profit);
+                if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
+                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
+                else if ($amarr_sell > $min_buy_price)
+                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Amarr</span>&nbsp;';
+                else if ($jita_sell > $min_buy_price)
+                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
             }
 
             if (!is_null($market_quantity)&&!is_null($market_price)) $summary_market_price += $market_quantity * $market_price;
@@ -179,7 +182,7 @@ function __dump_querious_market($market, $storage) { ?>
   <?php if ($interrupt_detected) { ?>
   <td align="right" bgcolor="#e8c8c8"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
   <?php } else { ?>
-  <td align="right"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
+  <td align="right"><?=($pzmzv_sell_volume==$market_quantity)?'<small><span class="text-muted-much">':''?><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark><?=($pzmzv_sell_volume==$market_quantity)?'</span></small>':''?></td>
   <?php } ?>
  <?php } ?>
 </tr>
