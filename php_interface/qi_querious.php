@@ -19,18 +19,18 @@ function eve_ceiling($isk) {
 }
 
 
-function get_clipboard_copy_button($data_copy) {
+function get_clipboard_copy_button(&$data_copy) {
     return ' <a data-target="#" role="button" data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip" data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></a>';
 }
 
 
-function __dump_querious_market($market, $storage) { ?>
+function __dump_querious_market(&$market, &$storage) { ?>
 <h2>Keepstar Market</h2>
 <style>
 .label-noordersreal { color: #fff; background-color: #d9534f; }
 .label-noorders { color: #fff; background-color: #eebbb9; }
 .label-interrupt { color: #8e8e8e; background-color: #e8ce43; }
-.label-dontbuy { color: #e8ce43; background-color: #337ab7; }
+.label-dontbuy { color: #e8ce43; background-color: #b74c33; }
 .label-needdelivery { color: #fff; background-color: #5bc0de; }
 .label-placeanorder { color: #fff; background-color: #d973e8; }
 .label-lowprice { color: #fff; background-color: #f0ad4e; }
@@ -44,13 +44,12 @@ function __dump_querious_market($market, $storage) { ?>
   <th></th>
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">RI4 Price<br>Quantity</th>
+  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;P-ZMZV Sell<br>Quantity</th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: right;">Jita +10%<br>Price / Markup</th>
   <th style="text-align: right;">+10%<br>Profit</th>
-  <th style="text-align: right;">P-ZMZV Sell<br><mark>Quantity</mark></th>
  </tr>
 </thead>
 <tbody>
@@ -69,7 +68,7 @@ function __dump_querious_market($market, $storage) { ?>
     $amarr_buy_price = 0.0;
     $jita_buy_price = 0.0;
     if ($market)
-        foreach ($market as $product)
+        foreach ($market as &$product)
         {
             $problems = '';
             $warnings = '';
@@ -98,7 +97,7 @@ function __dump_querious_market($market, $storage) { ?>
 
             $storage_quantity = 0;
             if ($storage)
-                foreach ($storage as $stock)
+                foreach ($storage as &$stock)
                 {
                     $sid = $stock['id'];
                     if ($sid != $tid) continue;
@@ -135,7 +134,7 @@ function __dump_querious_market($market, $storage) { ?>
                     $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
                 }
             }
-            if ($pzmzv_sell_volume) {
+            if ($pzmzv_sell_volume > $market_quantity) {
                 // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
                 $min_buy_price = $pzmzv_sell / (1.0+$taxfee+$min_profit);
                 if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
@@ -164,28 +163,58 @@ function __dump_querious_market($market, $storage) { ?>
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
+
  <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
- <?php if (is_null($market_price)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($market_price,2,'.',',')?><br><mark><?=number_format($market_quantity,0,'.',',')?></mark><?=$storage_quantity?'&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ '.number_format($storage_quantity,0,'.',',').'&nbsp;</span></small>':''?></td>
- <?php } ?>
+
+<?php
+    if (is_null($pzmzv_sell) && is_null($market_price))
+    {
+        ?><td></td><?php
+    }
+    else
+    {
+        if ($interrupt_detected) { ?><td align="right" bgcolor="#e8c8c8"><?php } else { ?><td align="right"><?php }
+
+        if (!is_null($market_price))
+        {
+            ?><?=number_format($market_price,2,'.',',')?>&nbsp;<mark><?=number_format($market_quantity,0,'.',',')?></mark><?php
+        }
+        if ($storage_quantity)
+        {
+            ?>&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ <?=number_format($storage_quantity,0,'.',',')?>&nbsp;</span></small><?php
+        }
+        if (!is_null($pzmzv_sell))
+        {
+            if (!is_null($market_price) && ($market_price == $pzmzv_sell) && ($market_quantity == $pzmzv_sell_volume))
+            {
+            }
+            else
+            {
+                if ($market_price == $pzmzv_sell) { ?><span class="text-muted-much"><?php }
+                ?><br><?=number_format($pzmzv_sell,2,'.',',')?>&nbsp;<mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark><?php
+                if ($market_price == $pzmzv_sell) { ?></span><?php }
+            }
+        }
+
+        ?></td><?php
+    }
+?>
+
  <td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><br><mark><small><?=number_format($jita_import_price,2,'.',',')?></small></mark></td>
+
  <td align="right"><?=$jita_price_lower?'<span class="text-muted-much">':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</class>':''?></td>
+
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
+
  <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($jita_10_price,2,'.',',')?><br><mark><?=number_format($markup,2,'.',',')?></mark></td>
  <?php } ?>
  <?php if (is_null($jita_10_profit)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($jita_10_profit,2,'.',',')?></td>
- <?php } ?>
- <?php if (is_null($pzmzv_sell)) { ?><td></td><?php } else { ?>
-  <?php if ($interrupt_detected) { ?>
-  <td align="right" bgcolor="#e8c8c8"><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark></td>
-  <?php } else { ?>
-  <td align="right"><?=($pzmzv_sell_volume==$market_quantity)?'<small><span class="text-muted-much">':''?><?=number_format($pzmzv_sell,2,'.',',')?><br><mark><?=number_format($pzmzv_sell_volume,0,'.',',')?></mark><?=($pzmzv_sell_volume==$market_quantity)?'</span></small>':''?></td>
-  <?php } ?>
  <?php } ?>
 </tr>
 <?php
@@ -229,7 +258,7 @@ function __dump_querious_market($market, $storage) { ?>
 }
 
 
-function __dump_querious_storage($storage) { ?>
+function __dump_querious_storage(&$storage) { ?>
 <h2>Keepstar Storage</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
@@ -249,7 +278,7 @@ function __dump_querious_storage($storage) { ?>
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
     if ($storage)
-        foreach ($storage as $product)
+        foreach ($storage as &$product)
         {
             $tid = $product['id'];
             $nm = $product['name'];
@@ -441,7 +470,8 @@ from
     ) sbsq_hub on (market.type_id = sbsq_hub.ethp_type_id)
 where
   not (tid.sdet_market_group_id = 1857) and -- исключая руду
-  tid.sdet_type_id not in (17715,2998) -- случайно выставил от корпы
+  tid.sdet_market_group_id not in (1333, 1334, 1335, 1336, 1337) and -- исключая планетарку
+  tid.sdet_market_group_id not in (802, 803, 1888, 1889) -- исключая компоненты
 order by 7 desc;
 EOD;
     $market_cursor = pg_query($conn, $query)
