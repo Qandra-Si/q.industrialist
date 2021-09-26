@@ -10,7 +10,17 @@ def __dump_index(glf):
 <div class="well center-block" style="max-width: 400px;">
   <a href="accounting.html" class="btn btn-primary btn-lg btn-block" role="button">Accounting</a>
   <a href="blueprints.html" class="btn btn-primary btn-lg btn-block" role="button">Blueprints</a>
-  <a href="conveyor.html" class="btn btn-primary btn-lg btn-block" role="button">Conveyor</a>
+  <div class="btn-group btn-block">
+    <a href="conveyor.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Conveyor</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left:201px;">
+      <li><a href="conveyor.html">Malpais</a></li>
+      <li><a href="conveyor-querious.html">Querious</a></li>
+    </ul>
+  </div>
   <a href="cynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
   <div class="btn-group btn-block">
     <a href="industry.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Industry</a>
