@@ -56,8 +56,6 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: center;">Details</th>
-  <th style="text-align: right;">Jita +10%<br>Price / Markup</th>
-  <th style="text-align: right;">+10%<br>Profit</th>
  </tr>
 </thead>
 <tbody>
@@ -92,9 +90,9 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             $amarr_price_lower = $amarr_sell < $jita_sell;
             $universe_price = $product['up'];
             $ri4_price = $product['mp'];
-            $markup = $jita_sell * TAX_AND_FEE;
-            $jita_10_price = eve_ceiling($jita_sell * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
-            $jita_10_profit = $jita_10_price - $jita_sell - $markup;
+            //$markup = $jita_sell * TAX_AND_FEE;
+            //$jita_10_price = eve_ceiling($jita_sell * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
+            //$jita_10_profit = $jita_10_price - $jita_sell - $markup;
             $pzmzv_sell = $product['ps'];
             $pzmzv_sell_volume = $product['psv'];
 
@@ -218,11 +216,19 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
         ?></td><?php
     }
+
+  if (is_null($amarr_sell)) { ?><td></td><?php }
+  else
+  {
+    ?><td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><br><mark><small><?=number_format($jita_import_price,2,'.',',')?></small></mark></td><?php
+  }
+
+  if (is_null($amarr_sell)) { ?><td></td><?php }
+  else
+  {
+      ?><td align="right"><?=$jita_price_lower?'<span class="text-muted-much">':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</class>':''?></td><?php
+  }
 ?>
-
- <td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><br><mark><small><?=number_format($jita_import_price,2,'.',',')?></small></mark></td>
-
- <td align="right"><?=$jita_price_lower?'<span class="text-muted-much">':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</class>':''?></td>
 
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
 
@@ -230,20 +236,13 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
     // поле с кнопкой details
     if (!$we_bought_it)
     {
-        ?><td></td><?php
+        ?><td align="center"><button type="button" class="btn btn-default btn-xs qind-btn-details" type_id="<?=$tid?>">details…</button></td><?php
     }
     else
     {
         ?><td align="center"><button type="button" class="btn btn-primary btn-xs qind-btn-details" type_id="<?=$tid?>">details…</button></td><?php
     }
 ?>
-
- <?php if (is_null($jita_10_price)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($jita_10_price,2,'.',',')?><br><mark><?=number_format($markup,2,'.',',')?></mark></td>
- <?php } ?>
- <?php if (is_null($jita_10_profit)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($jita_10_profit,2,'.',',')?></td>
- <?php } ?>
 </tr>
 <?php
     }
@@ -252,7 +251,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
  <td colspan="3" align="right">Summary</td>
  <td align="right"><?=number_format($summary_market_price,0,'.',',').'<br>'.number_format($summary_market_volume,0,'.',',')?>m³</td>
  <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
- <td colspan="5"></td>
+ <td colspan="4"></td>
 </tr>
 </tbody>
 </table>
@@ -620,7 +619,7 @@ from (
     esi_corporation_wallet_journals j
       left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
   where
-    (ecwj_date > (now() - '30 days'::interval)::date) and
+    (ecwj_date > (now() - '14 days'::interval)::date) and
     (ecwj_context_id_type = 'market_transaction_id') and
     ecwt_is_buy and
     ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
@@ -678,7 +677,7 @@ EOD;
  <table class="table table-condensed" style="padding:1px;font-size:small;" id="tblPurchase">
   <thead>
    <tr>
-    <th>Даты закупки</th>
+    <th>Даты закупки (посл. 2 нед)</th>
     <th style="text-align:right;">Кол-во</th>
     <th style="text-align:right; width:120px;">Усредн. цена,&nbsp;ISK</th>
    </tr>
@@ -718,10 +717,11 @@ EOD;
 </div>
 <hr>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" packed_volume="" id="dtlsCalc">
- <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.5" import="1" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.15" import="1" caption="Jita Sell +15%" id="dtlsCalcJS15"><input type="radio" name="options" autocomplete="off">Jita +15%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="0" caption="Amarr Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="от цены закупа +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=DEFAULT_PROFIT*100?>%</label>
 </div>
 <div class="row">
   <div class="col-md-8">Цена закупа</mark></div>
@@ -782,14 +782,14 @@ var g_market_types = [<?php
             //$amarr_price_lower = $amarr_sell < $jita_sell;
             $universe_price = $product['up'];
             //$ri4_price = $product['mp'];
-            $jita_purchase_and_import_price = $jita_sell + $jita_import_price; // то, за сколько будем продавать: закуп + импорт
-            $markup = $jita_purchase_and_import_price * TAX_AND_FEE; // комиссия считается от суммы закупа и транспортировки
-            $jita_10_price = eve_ceiling($jita_purchase_and_import_price * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
-            $jita_10_profit = $jita_10_price - $jita_purchase_and_import_price - $markup;
+            //$jita_purchase_and_import_price = $jita_sell + $jita_import_price; // то, за сколько будем продавать: закуп + импорт
+            //$markup = $jita_purchase_and_import_price * TAX_AND_FEE; // комиссия считается от суммы закупа и транспортировки
+            //$jita_10_price = eve_ceiling($jita_purchase_and_import_price * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
+            //$jita_10_profit = $jita_10_price - $jita_purchase_and_import_price - $markup;
             //$pzmzv_sell = $product['ps'];
             //$pzmzv_sell_volume = $product['psv'];
 
-            print('['.$tid.',"'.$nm.'",'.$packaged_volume.','.$jita_sell.','.$jita_buy.','.$amarr_sell.','.$universe_price."],\n");
+            print('['.$tid.',"'.$nm.'",'.$packaged_volume.','.(is_null($jita_sell)?'0':$jita_sell).','.(is_null($jita_buy)?'0':$jita_buy).','.(is_null($amarr_sell)?'0':$amarr_sell).','.(is_null($universe_price)?'0':$universe_price)."],\n");
         }
 ?>];
 var g_purchase_types = [<?php
@@ -952,11 +952,36 @@ var g_purchase_types = [<?php
       $('#modalDetailsLabel').html('<span class="text-primary">Подробности о товаре</span> '+market_type[1]);
       $('#dtlsPackedVolume').html(numLikeEve(market_type[2]));
       $('#dtlsImportPrice').html(numLikeEve(Math.ceil10(market_type[2]*g_jita_import_price, -2).toFixed(2)));
-      $('#dtlsJitaSell').html(numLikeEve(market_type[3].toFixed(2)));
-      $('#dtlsJitaBuy').html(numLikeEve(market_type[4].toFixed(2)));
-      $('#dtlsAmarrSell').html(numLikeEve(market_type[5].toFixed(2)));
+      if (market_type[3]) {
+        $('#dtlsJitaSell')
+         .html(numLikeEve(market_type[3].toFixed(2)))
+         .parent().removeClass('hidden');
+      } else {
+        $('#dtlsJitaSell')
+         .html(numLikeEve(market_type[3].toFixed(2)))
+         .parent().addClass('hidden');
+      }
+      if (market_type[4]) {
+        $('#dtlsJitaBuy')
+         .html(numLikeEve(market_type[4].toFixed(2)))
+         .parent().removeClass('hidden');
+      } else {
+        $('#dtlsJitaBuy')
+         .html(numLikeEve(market_type[4].toFixed(2)))
+         .parent().addClass('hidden');
+      }
+      if (market_type[5]) {
+        $('#dtlsAmarrSell')
+         .html(numLikeEve(market_type[5].toFixed(2)))
+         .parent().removeClass('hidden');
+      } else {
+        $('#dtlsAmarrSell')
+         .html(numLikeEve(market_type[5].toFixed(2)))
+         .parent().addClass('hidden');
+      }
       $('#dtlsUniversePrice').html(numLikeEve(market_type[6].toFixed(2)));
       var span_last_ri4_buy = $('#dtlsLastBuyPrice');
+      $('#dtlsCalcUP10').attr('price', '');
       //- формирование таблицы
       $('#tblPurchase tbody tr').remove();
       var tbdy = $('#tblPurchase').find('tbody');
@@ -980,14 +1005,14 @@ var g_purchase_types = [<?php
         )
         if (span_last_ri4_buy) {
           span_last_ri4_buy.html(avg_buy_price);
+          $('#dtlsCalcUP10').attr('price', g_purchase_types[i][2]);
           span_last_ri4_buy = null;
         }
       }
       //- автоматические расчёты +10% jita sell,...
       $('#dtlsCalc').attr('packed_volume', market_type[2]);
       $('#dtlsCalcJS10')
-       .attr('price', market_type[3])
-       .addClass('active');
+       .attr('price', market_type[3]);
       $('#dtlsCalcJS5')
        .attr('price', market_type[3])
        .removeClass('active');
@@ -997,7 +1022,21 @@ var g_purchase_types = [<?php
       $('#dtlsCalcAS10')
        .attr('price', market_type[5])
        .removeClass('active');
-      recalcDetails($('#dtlsCalcJS10'));
+      if (1 * $('#dtlsCalcUP10').attr('price')) {
+        $('#dtlsCalcJS10')
+         .removeClass('active');
+        $('#dtlsCalcUP10')
+         .removeClass('hidden')
+         .addClass('active');
+        recalcDetails($('#dtlsCalcUP10'));
+      } else {
+        $('#dtlsCalcJS10')
+         .addClass('active');
+        $('#dtlsCalcUP10')
+         .addClass('hidden')
+         .removeClass('active');
+        recalcDetails($('#dtlsCalcJS10'));
+      }
       modal.modal('show');
     });
     $('label.qind-btn-calc').on('click', function () {
