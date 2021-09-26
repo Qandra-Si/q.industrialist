@@ -907,7 +907,8 @@ var g_purchase_types = [<?php
     });
   }
   function recalcDetails(btn) {
-    var import_price = g_jita_import_price * $('#dtlsCalc').attr('packed_volume');
+    var take_import = 1 * btn.attr('import');
+    var import_price = take_import * g_jita_import_price * $('#dtlsCalc').attr('packed_volume');
     var price_purchase = 1.0 * btn.attr('price');
     var price_profit = price_purchase * (1.0+1.0*btn.attr('profit'));
     var price_profit_import = price_profit + import_price;
@@ -923,6 +924,10 @@ var g_purchase_types = [<?php
     $('#dtlsSellVar_order').html(numLikeEve(price_order.toFixed(2)));
     $('#dtlsSellVar_profit').html(numLikeEve(profit_order.toFixed(2)));
     $('#dtlsSellVar_order_copy').attr('data-copy', numLikeEve(price_order.toFixed(2)));
+    if (take_import)
+      $('#dtlsSellVar_import').parent().removeClass('hidden');
+    else
+      $('#dtlsSellVar_import').parent().addClass('hidden');
   }
   $(document).ready(function(){
     $('label.qind-btn-market').on('click', function () {
@@ -945,7 +950,6 @@ var g_purchase_types = [<?php
       if (market_type === null) return;
       var modal = $("#modalDetails");
       $('#modalDetailsLabel').html('<span class="text-primary">Подробности о товаре</span> '+market_type[1]);
-      alert(market_type[2]);
       $('#dtlsPackedVolume').html(numLikeEve(market_type[2]));
       $('#dtlsImportPrice').html(numLikeEve(Math.ceil10(market_type[2]*g_jita_import_price, -2).toFixed(2)));
       $('#dtlsJitaSell').html(numLikeEve(market_type[3].toFixed(2)));
