@@ -264,7 +264,7 @@ class EveESIClient:
                             log_line += " " + url_time[17:-4]
                         if 'Etag' in res.headers:
                             etag = str(res.headers['Etag'])
-                            log_line += " " + etag[:17] + '"'
+                            log_line += " " + etag[:9] + '"'
                         if requests_get_times > 1:
                             log_line += " (" + str(requests_get_times) + ")"
                         print(log_line)
