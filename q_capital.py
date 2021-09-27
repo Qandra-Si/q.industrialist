@@ -80,6 +80,8 @@ def main():
         character_data = interface.get_esi_data(
             "characters/{}/".format(character_id),
             fully_trust_cache=True)
+        if not character_data:
+            continue
         # Public information about a corporation
         corporation_data = interface.get_esi_data(
             "corporations/{}/".format(character_data["corporation_id"]),
@@ -109,19 +111,19 @@ def main():
         # Requires role(s): Director
         corp_assets_data = interface.get_esi_paged_data(
             "corporations/{}/assets/".format(corporation_id))
-        print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data)))
+        print("\n'{}' corporation has {} assets".format(corporation_name, len(corp_assets_data) if corp_assets_data else "no"))
         sys.stdout.flush()
 
         # Requires role(s): Director
         corp_blueprints_data = interface.get_esi_paged_data(
             "corporations/{}/blueprints/".format(corporation_id))
-        print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+        print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data) if corp_blueprints_data else "no"))
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager
         corp_industry_jobs_data = interface.get_esi_paged_data(
             "corporations/{}/industry/jobs/".format(corporation_id))
-        print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data)))
+        print("\n'{}' corporation has {} industry jobs".format(corporation_name, len(corp_industry_jobs_data) if corp_industry_jobs_data else "no"))
         sys.stdout.flush()
 
         # Получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
@@ -130,14 +132,18 @@ def main():
         corp_ass_names_data = interface.get_esi_piece_data(
             "corporations/{}/assets/names/".format(corporation_id),
             corp_ass_named_ids)
-        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
+        print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data) if corp_ass_names_data else "no"))
         sys.stdout.flush()
         del corp_ass_named_ids
 
-        total_assets_data.extend(corp_assets_data)
-        total_blueprints_data.extend(corp_blueprints_data)
-        total_industry_jobs_data.extend(corp_industry_jobs_data)
-        total_ass_names_data.extend(corp_ass_names_data)
+        if corp_assets_data:
+            total_assets_data.extend(corp_assets_data)
+        if corp_blueprints_data:
+            total_blueprints_data.extend(corp_blueprints_data)
+        if corp_industry_jobs_data:
+            total_industry_jobs_data.extend(corp_industry_jobs_data)
+        if corp_ass_names_data:
+            total_ass_names_data.extend(corp_ass_names_data)
 
     # находим контейнеры по заданным названиям
     for ro in q_capital_settings.g_report_options:
