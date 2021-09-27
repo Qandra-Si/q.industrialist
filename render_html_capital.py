@@ -93,8 +93,19 @@ def __dump_blueprint_materials(
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
         # поиск чертежа для этого типа продукта (которого может и не быть, например если возможен только закуп)
-        bpmm1_blueprint_type_id, bpmm1_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
-        bpmm1_product_quantity = None if bpmm1_blueprint_type_id is None else bpmm1_blueprint_materials['activities']['manufacturing']['products'][0]['quantity']
+        bpmm1_blueprint_type_id, bpmm1_blueprint_data = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
+        bpmm1_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
+        if bpmm1_blueprint_type_id is None:
+            bpmm1_product_quantity = None
+            bpmm1_blueprint_materials = None
+        else:
+            activity: str = 'reaction' if bpmm1_is_reaction_formula else 'manufacturing'
+            bpmm1_blueprint_materials = bpmm1_blueprint_data["activities"][activity]["materials"]
+            bpmm1_blueprint_products = bpmm1_blueprint_data["activities"][activity]["products"]
+            if len(bpmm1_blueprint_products) == 1:
+                bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
+            else:
+                bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
         # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough)
@@ -198,8 +209,7 @@ def __dump_blueprint_materials(
         del __summary_dict
 
         # вывод списка материалов для постройки по чертежу (следующий уровень)
-        bpmm1_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
-        bpmm2_bp_runs = 1 if bpmm1_product_quantity is None or bpmm1_product_quantity == 1 else math.ceil(bpmm1_not_enough / bpmm1_product_quantity)
+        bpmm2_bp_runs = bpmm1_not_enough if bpmm1_product_quantity is None else math.ceil(bpmm1_not_enough / bpmm1_product_quantity)
         # debug : print(bpmm1_tnm, bpmm1_not_enough, bpmm1_product_quantity, bpmm2_bp_runs)
         # ...
         row2_levels = row0_levels[:]
@@ -210,7 +220,7 @@ def __dump_blueprint_materials(
             row2_levels,
             # сведения о чертеже, его материалах, эффективности и т.п.
             bpmm2_bp_runs,
-            bpmm1_blueprint_materials["activities"]["manufacturing"]["materials"],
+            bpmm1_blueprint_materials,
             report_options["missing_blueprints"]["material_efficiency"],
             bpmm1_is_reaction_formula,
             # ...
