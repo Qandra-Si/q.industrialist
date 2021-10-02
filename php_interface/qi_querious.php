@@ -394,9 +394,10 @@ from
         (ecwj_date > '2021-08-15') and
         (ecwj_context_id_type = 'market_transaction_id') and
         ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
-            ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
-            ( ecwt_location_id in (1036927076065,1034323745897) and not ecwt_is_buy or
-              ecwt_location_id not in (1036927076065,1034323745897) and ecwt_is_buy) and -- станка рынка
+            ecwj_second_party_id in (2116129465,2116746261,2116156168,2119173458) and -- Qandra Si, Kekuit Void, Qunibbra Do, Zenorti Void
+            ( ecwt_location_id in (1036927076065,1034323745897) and not ecwt_is_buy or -- станка рынка
+              ecwt_location_id not in (1036927076065,1034323745897) and ecwt_is_buy
+            ) and
             ecwj_division = 1) or
           ( ecwj_corporation_id in (98553333) and -- R Strike
             ecwj_second_party_id in (95858524) and -- Xatul' Madan
@@ -608,7 +609,7 @@ from (
     (ecwj_context_id_type = 'market_transaction_id') and
     ecwt_is_buy and
     ( ( ecwj_corporation_id in (98615601) and -- R Initiative 4
-        ecwj_second_party_id in (2116129465,2116746261,2116156168) and -- Qandra Si, Kekuit Void, Qunibbra Do
+        ecwj_second_party_id in (2116129465,2116746261,2116156168,2119173458) and -- Qandra Si, Kekuit Void, Qunibbra Do, Zenorti Void
         ecwt_location_id not in (1036927076065,1034323745897) and -- станка рынка
         ecwj_division = 1) or
       ( ecwj_corporation_id in (98553333) and -- R Strike
