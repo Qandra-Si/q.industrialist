@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+﻿# -*- encoding: utf-8 -*-
 import json
 import os.path
 from pathlib import Path
@@ -201,8 +201,12 @@ class EveOnlineInterface:
             data_path = ("{srv}{url}".format(srv=self.server_url, url=url))
             # см. рекомендации по программированию тут
             # https://developers.eveonline.com/blog/article/esi-etag-best-practices
-            etag = cached_data["headers"]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
-                    "etag" in cached_data["headers"]) else None
+            if not (cached_data is None) and \
+                    ("headers" in cached_data) and \
+                    (type(cached_data["headers"]) is dict):
+                etag = cached_data["headers"].get("etag")
+            else:
+                etag = None
             try:
                 data = self.__client.send_esi_request_http(data_path, etag, body)
                 if data.status_code == 304:
@@ -290,6 +294,7 @@ class EveOnlineInterface:
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
                 if not (cached_data is None) and \
                    ("headers" in cached_data) and \
+                   (type(cached_data["headers"]) is list) and \
                    (len(cached_data["headers"]) >= page) and \
                    ("etag" in cached_data["headers"][page-1]):
                     etag = cached_data["headers"][page-1]["etag"]
