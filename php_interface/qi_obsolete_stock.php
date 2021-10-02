@@ -1,10 +1,7 @@
 ﻿<?php
 include 'qi_render_html.php';
+include 'qi_tools_and_utils.php';
 include_once '.settings.php';
-
-function get_numeric($val) {
-    return is_numeric($val) ? ($val + 0) : 0;
-}
 ?>
 
 <?php function __dump_obsolete_stock($stock) { ?>

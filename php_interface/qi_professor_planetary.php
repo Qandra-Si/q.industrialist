@@ -1,5 +1,6 @@
 ﻿<?php
 include 'qi_render_html.php';
+include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 
 
@@ -30,11 +31,6 @@ $product_requirements = array(
     array( 'id' =>  2328, 'q' => 62280 ), // Water-Cooled CPU
 );
 $show_debug = 0;
-
-
-function get_clipboard_copy_button($data_copy) {
-    return ' <a data-target="#" role="button" data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip" data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></a>';
-}
 
 
 function get_market_group_id_name($market_group_id) {

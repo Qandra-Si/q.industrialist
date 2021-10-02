@@ -1,9 +1,10 @@
 ﻿<?php
 include 'qi_render_html.php';
+include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 ?>
 
-<?php function __dump_market_orders($market_orders, $is_buy_orders) { ?>
+<?php function __dump_market_orders(&$market_orders, $is_buy_orders) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -21,7 +22,7 @@ include_once '.settings.php';
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
     if ($market_orders)
-        foreach ($market_orders as $product)
+        foreach ($market_orders as &$product)
         {
             $buy = $product['buy'];
             if ($is_buy_orders != $buy) continue;
@@ -66,10 +67,6 @@ include_once '.settings.php';
 
 
 <?php
-    function get_numeric($val) {
-        return is_numeric($val) ? ($val + 0) : 0;
-    }
-
     $show_querious_sales = 0;
     if (isset($_GET['querious_sales'])) {
         $_get_querious_sales = htmlentities($_GET['querious_sales']);

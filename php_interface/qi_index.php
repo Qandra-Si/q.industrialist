@@ -54,5 +54,11 @@ include_once '.settings.php';
  Профессор вернулся и сразу ворвался в планетарку. Учёт наличия материалов в коробках для запуска процессов на планетах.
  <br><a class="btn btn-success" href="/qi_professor_planetary.php" role="button">Professor' Planetary</a>
  </p>
+
+<h2>Мониторинг состояния рынка</h2>
+ <p>
+ Вам скучно и нечем заняться? Есть торговец в Jita или в Amarr, есть фура или простаивает jump-фура? Ознакомьтесь со списком выгодных ордеров в разных солнечных системах.
+ <br><a class="btn btn-success" href="/qi_irmaline.php" role="button">Irmaline</a>
+ </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
