@@ -380,20 +380,6 @@ select
     else universe.emp_average_price
   end as up, -- universe price
   round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
-  -- round(jita.sell::numeric*0.0313, 2) as markup,
-  -- case
-  --   when jita.sell::numeric*1.1313 < 100.0 then round(ceil(jita.sell::numeric*113.13)/100.0, 2)
-  --   when jita.sell::numeric*1.1313 < 1000.0 then round(ceil(jita.sell::numeric*11.313)/10.0, 2)
-  --   when jita.sell::numeric*1.1313 < 10000.0 then ceil(jita.sell::numeric*1.1313)
-  --   when jita.sell::numeric*1.1313 < 100000.0 then round(jita.sell::numeric*1.1313+5, -1)
-  --   when jita.sell::numeric*1.1313 < 1000000.0 then round(jita.sell::numeric*1.1313+50, -2)
-  --   when jita.sell::numeric*1.1313 < 10000000.0 then round(jita.sell::numeric*1.1313+500, -3)
-  --   when jita.sell::numeric*1.1313 < 100000000.0 then round(jita.sell::numeric*1.1313+5000, -4)
-  --   when jita.sell::numeric*1.1313 < 1000000000.0 then round(jita.sell::numeric*1.1313+50000, -5)
-  --   when jita.sell::numeric*1.1313 < 10000000000.0 then round(jita.sell::numeric*1.1313+500000, -6)
-  --   else null
-  -- end as j10p, -- jita +10% price
-  -- round(jita.sell::numeric*0.1, 2) as "+10% profit",
   sbsq_hub.ethp_sell as ps, -- p-zmzv sell
   sbsq_hub.ethp_sell_volume as psv -- p-zmzv sell volume
 from
@@ -497,8 +483,14 @@ from
     ) sbsq_hub on (market.type_id = sbsq_hub.ethp_type_id)
 where
   not (tid.sdet_market_group_id = 1857) and -- исключая руду
-  tid.sdet_market_group_id not in (1333, 1334, 1335, 1336, 1337) and -- исключая планетарку
-  tid.sdet_market_group_id not in (802, 803, 1888, 1889) -- исключая компоненты
+  tid.sdet_market_group_id not in (
+    1333,1334,1335,1336,1337, -- исключая планетарку
+    802,803,1888,1889, 1862,1863, -- исключая компоненты
+    20, 65,781,1021,1147,1865,1870,1883,1908,2768, -- исключая промышленные комплектующие и компоненты
+    1873,1880,1907,1909, -- исключая исследовательское оборудование
+    499,500,501,1858,1860,2767,-- материалы реакций
+    54,1855,1856,2395,2479 -- сырьевые материалы
+  )
 order by 7 desc;
 EOD;
     $market_cursor = pg_query($conn, $query)
@@ -525,13 +517,6 @@ select
   jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
   amarr.sell as as, -- amarr sell : to_char(amarr.sell, 'FM999G999G999G999G999.90')
   universe.price as up -- universe price : to_char(universe.price, 'FM999G999G999G999G999.90')
-  -- case
-  --  when (ceil(abs(universe.price - jita.sell)) - ceil(abs(universe.price - amarr.sell))) < 0 then 'jita'
-  --  else 'amarr'
-  -- end as "proper hub",
-  -- round(coalesce(tid.sdet_packaged_volume, 0)::numeric * 866.0, 2) as "jita import price", -- заменить на packaged_volume, считать по ESI
-  -- hangar.eca_created_at::date as since,
-  -- date_trunc('minutes', CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - hangar.eca_updated_at)::interval as last_changed
 from
   -- предметы на продажу в ангаре
   qi.esi_corporation_assets hangar
