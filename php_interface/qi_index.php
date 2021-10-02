@@ -57,8 +57,10 @@ include_once '.settings.php';
 
 <h2>Мониторинг состояния рынка</h2>
  <p>
- Вам скучно и нечем заняться? Есть торговец в Jita или в Amarr, есть фура или простаивает jump-фура? Ознакомьтесь со списком выгодных ордеров в разных солнечных системах.
- <br><a class="btn btn-success" href="/qi_irmaline.php" role="button">Irmaline</a>
+ Вам скучно и нечем заняться? Есть торговец в Jita или в Amarr, есть фура или простаивает jump-фура? Ознакомьтесь со списком выгодных ордеров в разных солнечных системах.<br>
+ <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60013945" role="button">Irmaline</a>
+ <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60013990" role="button">Gehi</a>
+ <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60008494" role="button">Amarr</a>
  </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>

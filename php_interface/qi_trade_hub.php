@@ -2,9 +2,9 @@
 include 'qi_render_html.php';
 include 'qi_tools_and_utils.php';
 include_once '.settings.php';
-?>
 
-<?php function __dump_trade_hub_orders(&$trade_hub_orders) { ?>
+
+function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -12,7 +12,7 @@ include_once '.settings.php';
   <th width="100%">Items</th>
   <th style="text-align: center;">Profit,&nbsp;ISK/m³<br><small>Jita&nbsp;Buy&nbsp;-7.5%</small></th>
   <th style="text-align: right;">Packaged,&nbsp;m³</th>
-  <th style="text-align: right;" class="text-info">Irmaline Sell<br><br>Volume</th>
+  <th style="text-align: right;" class="text-info"><?=$trade_hub_system?> Sell<br><br>Volume</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy<br>Volume</th>
   <th style="text-align: right;">Querious Sell<br><span class="text-success">Sell&nbsp;-4.13%</span><br>Volume</th>
  </tr>
@@ -77,16 +77,58 @@ include_once '.settings.php';
 </tbody>
 </table>
 <?php
-} ?>
+}
+
+    // если что-то пойдёт не так, то данные будут показаны по Irmaline
+    const DEFAULT_TRADE_HUB_ID = 60013945;
+    const DEFAULT_TRADE_HUB_SYSTEM = 'Irmaline';
 
 
+    $trade_hub_id = DEFAULT_TRADE_HUB_ID; // Irmaline по умолчанию
+    $trade_hub_system = DEFAULT_TRADE_HUB_SYSTEM;
+    if (isset($_GET['trade_hub_id'])) {
+        $_get_trade_hub_id = htmlentities($_GET['trade_hub_id']);
+        if (is_numeric($_get_trade_hub_id))
+            $trade_hub_id = get_numeric($_get_trade_hub_id);
+    }
 
-<?php
-    __dump_header("Irmaline", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
+    //---
+    $query = <<<EOD
+select
+ name,
+ solar_system_name as ssn,
+ prc.up as up
+from
+ qi.esi_known_stations
+  left outer join (
+   select ethp_location_id, max(ethp_updated_at) as up
+   from qi.esi_trade_hub_prices
+   group by 1
+  ) prc on (prc.ethp_location_id = location_id)
+where location_id = $1;
+EOD;
+    $params = array($trade_hub_id);
+    $trade_hub_status_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query err: '.pg_last_error());
+    $trade_hub_status = pg_fetch_all($trade_hub_status_cursor);
+    if ($trade_hub_status)
+    {
+        $trade_hub_system = $trade_hub_status[0]['ssn'];
+    }
+    else
+    {
+        $trade_hub_id = DEFAULT_TRADE_HUB_ID;
+        unset($trade_hub_status);
+        $trade_hub_status = null;
+    }
+    //---
+
+    __dump_header($trade_hub_system, FS_RESOURCES);
+
     //---
     $query = <<<EOD
 select 
@@ -104,7 +146,7 @@ select
 from
  (select * from qi.esi_trade_hub_prices where ethp_location_id = 60003760) as jita
   left outer join qi.eve_sde_type_ids tid on (jita.ethp_type_id = tid.sdet_type_id),
- (select * from qi.esi_trade_hub_prices where ethp_location_id = 60013945) as irmalin
+ (select * from qi.esi_trade_hub_prices where ethp_location_id = $1) as irmalin
   left outer join (
     select ethp_type_id, ethp_sell, ethp_sell_volume
     from qi.esi_trade_hub_prices
@@ -115,7 +157,8 @@ where
  irmalin.ethp_sell < jita.ethp_buy
 order by 9 desc;
 EOD;
-    $trade_hub_orders_cursor = pg_query($conn, $query)
+    $params = array($trade_hub_id);
+    $trade_hub_orders_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $trade_hub_orders = pg_fetch_all($trade_hub_orders_cursor);
     //---
@@ -123,10 +166,16 @@ EOD;
 ?>
 <div class="container-fluid">
 <h2>Profitable Orders</h2>
-<p>Ниже перечислены товары, продающиеся в <strong>Irmaline</strong> по цене ниже Jita Buy. Параметр <strong>Profit</strong> рассчитывается:<br>
+<p>Ниже перечислены товары, продающиеся в <strong><?=$trade_hub_system?></strong> по цене ниже Jita Buy. Параметр <strong>Profit</strong> рассчитывается:<br>
 <em>Profit = (Jita Buy - 7.5%) / Packaged Volume,</em><br>
 таким образом, этот параметр измеряется в ISK/m³ для того, чтобы наиболее эффективно заполнить карго jump-фуры.</p>
-<?php __dump_trade_hub_orders($trade_hub_orders); ?>
+<?php
+  if ($trade_hub_status)
+  {
+      ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации данных: <span class="text-primary"><?=is_null($trade_hub_status[0]['up'])?'нет данных':$trade_hub_status[0]['up'].' ET'?></span></p><?php
+  }
+?>
+<?php __dump_trade_hub_orders($trade_hub_orders, $trade_hub_system); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 <?php __dump_copy_to_clipboard_javascript() ?>

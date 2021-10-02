@@ -62,11 +62,10 @@ include_once '.settings.php';
 </tbody>
 </table>
 <?php
-} ?>
+}
 
 
 
-<?php
     $show_querious_sales = 0;
     if (isset($_GET['querious_sales'])) {
         $_get_querious_sales = htmlentities($_GET['querious_sales']);
