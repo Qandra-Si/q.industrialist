@@ -704,7 +704,7 @@ EOD;
 <hr>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" packed_volume="" id="dtlsCalc">
  <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
- <label class="btn btn-default qind-btn-calc" price="" profit="0.5" import="1" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="0.05" import="1" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.15" import="1" caption="Jita Sell +15%" id="dtlsCalcJS15"><input type="radio" name="options" autocomplete="off">Jita +15%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="0" caption="Amarr Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=DEFAULT_PROFIT*100?>%</label>
  <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="от цены закупа +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=DEFAULT_PROFIT*100?>%</label>
