@@ -703,11 +703,11 @@ EOD;
 </div>
 <hr>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" packed_volume="" id="dtlsCalc">
- <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
- <label class="btn btn-default qind-btn-calc" price="" profit="0.05" import="1" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
- <label class="btn btn-default qind-btn-calc" price="" profit="0.15" import="1" caption="Jita Sell +15%" id="dtlsCalcJS15"><input type="radio" name="options" autocomplete="off">Jita +15%</label>
- <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" import="0" caption="Amarr Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=DEFAULT_PROFIT*100?>%</label>
- <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" import="1" caption="от цены закупа +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="0.05" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="0.15" caption="Jita Sell +15%" id="dtlsCalcJS15"><input type="radio" name="options" autocomplete="off">Jita +15%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" caption="Amarr Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" caption="от цены закупа +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=DEFAULT_PROFIT*100?>%</label>
 </div>
 <div class="row">
   <div class="col-md-8">Цена закупа</mark></div>
@@ -720,7 +720,7 @@ EOD;
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-7">плюс стоимость импорта</div>
+  <div class="col-md-7"><input type="checkbox" value="" checked="true" id="dtlsSellVar_import_check"> плюс стоимость импорта</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_import"></mark> ISK</div>
 </div>
 <div class="row">
@@ -893,7 +893,7 @@ var g_purchase_types = [<?php
     });
   }
   function recalcDetails(btn) {
-    var take_import = 1 * btn.attr('import');
+    var take_import = 1 * $('#dtlsSellVar_import_check').is(':checked');
     var import_price = take_import * g_jita_import_price * $('#dtlsCalc').attr('packed_volume');
     var price_purchase = 1.0 * btn.attr('price');
     var price_profit = price_purchase * (1.0+1.0*btn.attr('profit'));
@@ -1030,6 +1030,11 @@ var g_purchase_types = [<?php
       if (!btn.hasClass('active')) { // включается
         recalcDetails(btn);
       }
+    });
+    $('#dtlsSellVar_import_check').on('click', function () {
+      $('label.qind-btn-calc.active').each(function() {
+        recalcDetails($(this));
+      });
     });
     // Initialization
     rebuildStock('hide');
