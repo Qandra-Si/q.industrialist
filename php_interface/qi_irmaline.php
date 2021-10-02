@@ -10,9 +10,9 @@ include_once '.settings.php';
  <tr>
   <th></th>
   <th width="100%">Items</th>
-  <th style="text-align: center;" class="text-primary">Profit,&nbsp;ISK/m³<br><span style="font-size: 66%">Jita&nbsp;Buy&nbsp;-7.5%</span></th>
+  <th style="text-align: center;">Profit,&nbsp;ISK/m³<br><small>Jita&nbsp;Buy&nbsp;-7.5%</small></th>
   <th style="text-align: right;">Packaged,&nbsp;m³</th>
-  <th style="text-align: right;" class="text-danger">Irmaline Sell<br><br>Volume</th>
+  <th style="text-align: right;" class="text-info">Irmaline Sell<br><br>Volume</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy<br>Volume</th>
   <th style="text-align: right;">Querious Sell<br><span class="text-success">Sell&nbsp;-4.13%</span><br>Volume</th>
  </tr>
@@ -37,9 +37,18 @@ include_once '.settings.php';
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><?=$nm?><?=get_clipboard_copy_button($nm)?><br><span class="text-muted"><?=$tid?></span></td>
- <td align="right"><?=number_format($profit,2,'.',',')?></td>
+<?php
+  if ($profit <= 0.0)
+  {
+      ?><td align="right" class="text-warning"><?=number_format($profit,2,'.',',')?></td><?php
+  }
+  else
+  {
+      ?><td align="right"><?=number_format($profit,2,'.',',')?></td><?php
+  }
+?>
  <td align="right"><?=$packaged_volume?></td>
- <td align="right" class="text-danger"><?=number_format($irmaline_sell,2,'.',',')?><br><br><?=number_format($irmaline_volume,0,'.',',')?></td>
+ <td align="right" class="text-info"><?=number_format($irmaline_sell,2,'.',',')?><br><br><?=number_format($irmaline_volume,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><?=number_format($jita_buy,2,'.',',')?><br><?=number_format($jita_volume,0,'.',',')?></td>
 <?php
     if (is_null($querious_sell))
@@ -56,7 +65,7 @@ include_once '.settings.php';
         }
         else
         {
-            ?><span class="text-muted"><?=number_format($querious_non_profitable,2,'.',',')?></span><?php
+            ?><span class="text-danger"><?=number_format($querious_non_profitable,2,'.',',')?></span><?php
         }
         ?><br><?=number_format($querious_volume,0,'.',',')?></td><?php
     }
