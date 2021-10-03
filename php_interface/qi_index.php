@@ -31,6 +31,12 @@ include_once '.settings.php';
  <br><a class="btn btn-info" href="/qi_lifetime.php" role="button">Lifetime</a>
  </p>
 
+<h2>Производство</h2>
+ <p>
+ Производство и всё что с ним связано.<br>
+ <a class="btn btn-success" href="/qi_industry_cost.php" role="button">Industry Cost</a>
+ </p>
+
 <h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
  Текущее состояние рынка в <strong>Querious</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.
