@@ -5,7 +5,12 @@ include_once '.settings.php';
 ?>
 
 <?php function __dump_industry_cost(&$industry_cost) { ?>
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<style>
+.label-t1 { color: #fff; background-color: #777; }
+.label-t2 { color: #fff; background-color: #337ab7; }
+.text-muted-much { color: #bbb; }
+</style>
+<table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblIndustry">
 <thead>
  <tr>
   <th></th>
@@ -24,10 +29,13 @@ include_once '.settings.php';
     if ($industry_cost)
         foreach ($industry_cost as &$product)
         {
+            $warnings = '';
+
             $tid = $product['id'];
             $blueprint_tid = $product['bp_id'];
             $market_group = $product['grp'];
             $nm = $product['name'];
+            $meta = $product['meta'];
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
@@ -38,6 +46,11 @@ include_once '.settings.php';
             $ri4_market_quantity = $product['mv'];
             $ri4_price = $product['mp'];
 
+            if ($meta == 1)
+                $warnings .= '&nbsp;<span class="label label-t1">T1</span>';
+            else if ($meta == 2)
+                $warnings .= '&nbsp;<span class="label label-t2">T2</span>';
+
             if ($prev_market_group != $market_group)
             {
                 $prev_market_group = $market_group;
@@ -46,7 +59,7 @@ include_once '.settings.php';
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm?><?=get_clipboard_copy_button($nm)?><br><span class="text-muted"><?=$tid?> / <?=$blueprint_tid?></span></td>
+ <td><?=$nm?><?=get_clipboard_copy_button($nm)?><br><span class="text-muted"><?=$tid?> / <?=$blueprint_tid.$warnings?></span></td>
 <?php
     if (is_null($weekly_volume))
     {
@@ -126,6 +139,7 @@ select
   cost.sdebm_blueprint_type_id as bp_id,
   market_group.name as grp,
   tid.sdet_type_name as name,
+  tid.sdet_meta_group_id as meta,
   round((cost.jsmp/product.sdebp_quantity)::numeric, 2) as jsmp,
   round((cost.asmp/product.sdebp_quantity)::numeric, 2) as asmp,
   jita.ethp_sell as js,
@@ -275,6 +289,39 @@ EOD;
 ?>
 
 <div class="container-fluid">
+<div class="btn-group btn-group-toggle" data-toggle="buttons">
+ <label class="btn btn-default qind-btn-industry active" group="all"><input type="radio" name="options" autocomplete="off" checked>Все</label>
+ <label class="btn btn-default qind-btn-industry" group="meta-t1"><input type="radio" name="options" autocomplete="off">T1</label>
+ <label class="btn btn-default qind-btn-industry" group="meta-t2"><input type="radio" name="options" autocomplete="off">T2</label>
+</div>
 <?php __dump_industry_cost($industry_cost); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
+
+<script>
+  function rebuildIndustry(show_group) {
+    $('#tblIndustry').find('tbody').find('tr').each(function() {
+      var tr = $(this);
+      var show = false;
+      if (show_group == 'all')
+        show = true;
+      else if (show_group == 'meta-t1')
+        show = tr.find('td').eq(1).find('span.label-t1').length;
+      else if (show_group == 'meta-t2')
+        show = tr.find('td').eq(1).find('span.label-t2').length;
+      if (show)
+        tr.removeClass('hidden');
+      else if (tr.find('td').eq(0).hasClass('active'))
+        tr.removeClass('hidden');
+      else
+        tr.addClass('hidden');
+    });
+  }
+  $(document).ready(function(){
+    $('label.qind-btn-industry').on('click', function () {
+      if (!$(this).hasClass('active')) // включается
+        rebuildIndustry($(this).attr('group'));
+    });
+  });
+</script>
+<?php __dump_copy_to_clipboard_javascript() ?>
