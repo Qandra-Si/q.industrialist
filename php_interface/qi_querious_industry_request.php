@@ -101,28 +101,7 @@ include_once '.settings.php';
 
 
 
-    $show_querious_sales = 0;
-    if (isset($_GET['querious_sales'])) {
-        $_get_querious_sales = htmlentities($_GET['querious_sales']);
-        if (is_numeric($_get_querious_sales))
-            $show_querious_sales = get_numeric($_get_querious_sales) ? 1 : 0;
-    }
-
-    $buy_only = 0;
-    if (isset($_GET['buy_only'])) {
-        $_get_buy_only = htmlentities($_GET['buy_only']);
-        if (is_numeric($_get_buy_only))
-            $buy_only = get_numeric($_get_buy_only) ? 1 : 0;
-    }
-
-    $sell_only = 0;
-    if (isset($_GET['sell_only'])) {
-        $_get_sell_only = htmlentities($_GET['sell_only']);
-        if (is_numeric($_get_sell_only))
-            $sell_only = get_numeric($_get_sell_only) ? 1 : 0;
-    }
-
-    __dump_header("Industry Cost", FS_RESOURCES);
+    __dump_header("Querious Industry Request", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
