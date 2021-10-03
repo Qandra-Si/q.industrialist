@@ -7,7 +7,10 @@ include_once '.settings.php';
 <?php function __dump_industry_cost(&$industry_cost) { ?>
 <style>
 .label-t1 { color: #fff; background-color: #777; }
-.label-t2 { color: #fff; background-color: #337ab7; }
+.label-t2 { color: #fff; background-color: #ceb056; }
+.label-noordersreal { color: #fff; background-color: #d9534f; }
+.label-noorders { color: #fff; background-color: #eebbb9; }
+.label-veryfew { color: #fff; background-color: #337ab7; }
 .text-muted-much { color: #bbb; }
 </style>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblIndustry">
@@ -29,6 +32,7 @@ include_once '.settings.php';
     if ($industry_cost)
         foreach ($industry_cost as &$product)
         {
+            $problems = '';
             $warnings = '';
 
             $tid = $product['id'];
@@ -51,6 +55,12 @@ include_once '.settings.php';
             else if ($meta == 2)
                 $warnings .= '&nbsp;<span class="label label-t2">T2</span>';
 
+            $too_few = (($ri4_market_quantity+0) <= ($weekly_volume+0)) ? 1 : 0;
+            if (is_null($ri4_market_quantity) || ($ri4_market_quantity == 0))
+                $problems .= '&nbsp;<span class="label label-noordersreal">no orders</span>';
+            else if ($too_few)
+                $problems .= '&nbsp;<span class="label label-veryfew">very few</span>';
+
             if ($prev_market_group != $market_group)
             {
                 $prev_market_group = $market_group;
@@ -59,7 +69,7 @@ include_once '.settings.php';
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm?><?=get_clipboard_copy_button($nm)?><br><span class="text-muted"><?=$tid?> / <?=$blueprint_tid.$warnings?></span></td>
+ <td><?=$nm?><?=get_clipboard_copy_button($nm)?><br><span class="text-muted"><?=$tid?> / <?=$blueprint_tid.$problems.$warnings?></span></td>
 <?php
     if (is_null($weekly_volume))
     {
@@ -76,7 +86,6 @@ include_once '.settings.php';
     }
     else
     {
-        $too_few = (($ri4_market_quantity+0) <= ($weekly_volume+0)) ? 1 : 0;
         ?><td align="right"<?=$too_few?(' bgcolor="#e8c8c8"'):''?>><?=number_format($ri4_price,2,'.',',')?><br><?=number_format($ri4_market_quantity,0,'.',',')?></td><?php
     }
 
@@ -293,6 +302,8 @@ EOD;
  <label class="btn btn-default qind-btn-industry active" group="all"><input type="radio" name="options" autocomplete="off" checked>Все</label>
  <label class="btn btn-default qind-btn-industry" group="meta-t1"><input type="radio" name="options" autocomplete="off">T1</label>
  <label class="btn btn-default qind-btn-industry" group="meta-t2"><input type="radio" name="options" autocomplete="off">T2</label>
+ <label class="btn btn-default qind-btn-industry" group="sold"><input type="radio" name="options" autocomplete="off">Всё продано</label>
+ <label class="btn btn-default qind-btn-industry" group="very-few"><input type="radio" name="options" autocomplete="off">Товар заканчивается</label>
 </div>
 <?php __dump_industry_cost($industry_cost); ?>
 </div> <!--container-fluid-->
@@ -309,6 +320,10 @@ EOD;
         show = tr.find('td').eq(1).find('span.label-t1').length;
       else if (show_group == 'meta-t2')
         show = tr.find('td').eq(1).find('span.label-t2').length;
+      else if (show_group == 'sold')
+        show = tr.find('td').eq(1).find('span.label-noordersreal').length;
+      else if (show_group == 'very-few')
+        show = tr.find('td').eq(1).find('span.label-veryfew').length;
       if (show)
         tr.removeClass('hidden');
       else if (tr.find('td').eq(0).hasClass('active'))
