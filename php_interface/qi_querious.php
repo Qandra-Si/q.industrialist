@@ -489,15 +489,20 @@ from
     ) sbsq_hub on (market.type_id = sbsq_hub.ethp_type_id)
 where
   market_group.id = tid.sdet_market_group_id and
-  tid.sdet_market_group_id not in (
-    1857, -- исключая руду
-    1333,1334,1335,1336,1337, -- исключая планетарку
-    802,803,1888,1889, 1862,1863, -- исключая компоненты
-    20, 65,781,1021,1147,1865,1870,1883,1908,2768, -- исключая промышленные комплектующие и компоненты
-    1873,1880,1907,1909, -- исключая исследовательское оборудование
-    499,500,501,1858,1860,2767,-- материалы реакций
-    54,1855,1856,2395,2479, -- сырьевые материалы
-    512,514,515,516,517,518,519,521,522,523,525,526,527,528,529,530,2538,2539,2540 -- руды
+  market_group.semantic_id not in (
+    19, -- Trade Goods
+    499, -- Advanced Moon Materials
+    500, -- Processed Moon Materials
+    501, -- Raw Moon Materials
+    1031, -- Raw Materials
+    1035, -- Components
+    1332, -- Planetary Materials
+    1857, -- Minerals
+    1858, -- Booster Materials
+    1860, -- Polymer Materials
+    1861, -- Salvage Materials
+    1872, -- Research Equipment
+    2767 -- Molecular-Forged Materials
   )
 -- order by tid.sdet_packaged_volume desc
 order by market_group.name, tid.sdet_type_name;

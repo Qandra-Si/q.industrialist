@@ -159,6 +159,7 @@ create or replace view qi.eve_sde_market_groups_tree_sorted as
 create or replace view qi.eve_sde_market_groups_semantic as
   select
     g.sdeg_group_id as id,
+    sg.sdeg_group_id as semantic_id,
     sg.sdeg_group_name as name
   from
     qi.eve_sde_market_groups g
