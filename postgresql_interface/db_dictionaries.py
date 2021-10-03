@@ -235,3 +235,38 @@ class QDictionaries:
             if ("name" in type_dict) and ("en" in type_dict["name"]):
                 type_name = type_dict["name"]["en"]
             self.insert_type_id(type_id, type_name, type_dict)
+
+    def clean_market_groups(self):
+        self.db.execute("DELETE FROM eve_sde_market_groups;")
+
+    def insert_market_group(self, market_group_id: int, market_group_dict):
+        self.db.execute(
+            "INSERT INTO eve_sde_market_groups("
+            " sdeg_group_id,"
+            " sdeg_parent_id,"
+            " sdeg_semantic_id,"
+            " sdeg_group_name,"
+            " sdeg_icon_id) "
+            "VALUES (%s,%s,%s,%s,%s);",
+            market_group_id,
+            market_group_dict.get('parentGroupID', None),
+            market_group_dict.get('semanticGroupID', None),
+            market_group_dict['nameID']['en'],
+            market_group_dict.get('iconID', None)
+        )
+
+    def actualize_market_groups(self, sde_market_groups):
+        # "1031": {
+        #   "iconID": 1277,
+        #   "nameID": {
+        #    "en": "Raw Materials"
+        #   },
+        #   "parentGroupID": 533,
+        #   "semanticGroupID": 533  <--- добавляется индивидуально вызывающим алгоритмом
+        #  },
+        sde_market_groups_keys = sde_market_groups.keys()
+        for group_id in sde_market_groups_keys:
+            mg = sde_market_groups[str(group_id)]
+            group_id: int = int(group_id)
+            self.insert_market_group(group_id, mg)
+

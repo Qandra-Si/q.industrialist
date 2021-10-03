@@ -16,7 +16,7 @@ To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_individualist
->>> python q_dictionaries.py --cache_dir=~/.q_individualist
+>>> python q_dictionaries.py --category=all --cache_dir=~/.q_individualist
 >>> python q_wallet_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_individualist
 
 Required application scopes:

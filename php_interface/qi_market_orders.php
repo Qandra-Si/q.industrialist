@@ -21,12 +21,14 @@ include_once '.settings.php';
 <?php
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
+    $prev_market_group = null;
     if ($market_orders)
         foreach ($market_orders as &$product)
         {
             $buy = $product['buy'];
             if ($is_buy_orders != $buy) continue;
             $tid = $product['id'];
+            $market_group = $product['grp'];
             $nm = $product['name'];
             $corp_name = $product['cn'];
             //$region = $product['rn'];
@@ -40,6 +42,12 @@ include_once '.settings.php';
 
             $summary_jita_sell += $jita_sell * $remain_quantity;
             $summary_jita_buy += $jita_buy * $remain_quantity;
+
+            if ($prev_market_group != $market_group)
+            {
+                $prev_market_group = $market_group;
+                ?><tr><td class="active" colspan="7"><strong><?=$market_group?></strong></td></tr><?php
+            }
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -95,22 +103,24 @@ include_once '.settings.php';
     //---
     $query = <<<EOD
 select
-  o.is_buy as buy,
-  o.type_id as id,
-  tid.sdet_type_name as name,
-  c.eco_name as cn,
-  -- rgn.sden_name as rn,
-  hub.solar_system_name as ssn,
-  -- hub.name,
-  -- hub.station_type_name,
-  o.orders as oq,
-  o.min_price as minp,
-  o.max_price as maxp,
-  o.remain as r,
-  jita.ethp_sell as js,
-  jita.ethp_buy as jb
-from (
-  select
+ o.is_buy as buy,
+ o.type_id as id,
+ market_group.name as grp,
+ tid.sdet_type_name as name,
+ c.eco_name as cn,
+ -- rgn.sden_name as rn,
+ hub.solar_system_name as ssn,
+ -- hub.name,
+ -- hub.station_type_name,
+ o.orders as oq,
+ o.min_price as minp,
+ o.max_price as maxp,
+ o.remain as r,
+ jita.ethp_sell as js,
+ jita.ethp_buy as jb
+from
+ qi.eve_sde_market_groups_semantic as market_group,
+ ( select
     ecor_is_buy_order as is_buy,
     ecor_corporation_id as corporation_id,
     ecor_type_id as type_id,
@@ -120,21 +130,23 @@ from (
     min(ecor_price) as min_price,
     max(ecor_price) as max_price,
     sum(ecor_volume_remain) as remain
-  from qi.esi_corporation_orders
-  where
+   from qi.esi_corporation_orders
+   where
     ecor_corporation_id in (98553333, 98677876, 98615601) and -- R Strike, R Industry, R Initiative 4
     not ecor_history and
     ( $3=0 and ecor_is_buy_order or
       $2=0 and ($1=1 or not ecor_is_buy_order and not (ecor_region_id = 10000050))
     )
-  group by 1, 2, 3, 4, 5
-) o
+   group by 1, 2, 3, 4, 5
+ ) o
   left outer join qi.esi_corporations c on (o.corporation_id = c.eco_corporation_id)
   left outer join qi.eve_sde_type_ids tid on (o.type_id = tid.sdet_type_id)
   -- left outer join qi.eve_sde_names rgn on (o.region_id = rgn.sden_id and rgn.sden_category = 3)
   left outer join qi.esi_known_stations hub on (o.trade_hub_id = hub.location_id )
   left outer join qi.esi_trade_hub_prices jita on (o.type_id = jita.ethp_type_id and jita.ethp_location_id = 60003760)
-order by tid.sdet_market_group_id, tid.sdet_type_name, c.eco_name; -- , rgn.sden_name;
+where
+ tid.sdet_market_group_id = market_group.id
+order by market_group.name, tid.sdet_type_name, c.eco_name; -- , rgn.sden_name;
 EOD;
     $params = array($show_querious_sales, $buy_only, $sell_only);
     $market_cursor = pg_query_params($conn, $query, $params)

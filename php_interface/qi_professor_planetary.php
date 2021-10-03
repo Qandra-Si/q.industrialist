@@ -854,10 +854,6 @@ function __dump_planetary_stock(&$stock, &$planetary, &$jita, &$active_orders) {
 
 
 
-    function get_numeric($val) {
-        return is_numeric($val) ? ($val + 0) : 0;
-    }
-
     if (isset($_GET['debug'])) {
         $_get_debug = htmlentities($_GET['debug']);
         if (is_numeric($_get_debug))

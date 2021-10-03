@@ -3,7 +3,7 @@
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --cache_dir=~/.q_industrialist
+>>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 """
 import sys
 import os
@@ -261,10 +261,7 @@ def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     return groups_chain[0]
 
 
-def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
-    if group_id is None:
-        return None
+def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
     __group_id = group_id
     while True:
         if __group_id in [# 475,  # Manufacture & Research
@@ -288,7 +285,13 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
             __group_id = __parent_group_id
         else:
             return __group_id
-    return group_id
+
+
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+    if group_id is None:
+        return None
+    return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
 
 
 def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):

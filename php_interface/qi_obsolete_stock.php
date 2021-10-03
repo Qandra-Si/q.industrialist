@@ -64,6 +64,8 @@ include_once '.settings.php';
         show = tr.find('td').eq(1).find('span.label-success').length;
       if (show)
         tr.removeClass('hidden');
+      else if (tr.find('td').eq(0).hasClass('active'))
+        tr.removeClass('hidden');
       else
         tr.addClass('hidden');
     });
@@ -116,11 +118,13 @@ include_once '.settings.php';
     $summary_stock_price = 0;
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
+    $prev_market_group = null;
     foreach ($stock as $material)
     {
         $warnings = '';
 
         $tid = $material['id'];
+        $market_group = $material['grp'];
         $nm = $material['name'];
         $quantity = $material['q'];
         $universe_avg_price = $material['uap'];
@@ -166,6 +170,12 @@ include_once '.settings.php';
         $summary_stock_price += $universe_avg_price;
         $summary_jita_sell += $jita_sell;
         $summary_jita_buy += $jita_buy;
+
+        if ($prev_market_group != $market_group)
+        {
+            $prev_market_group = $market_group;
+            ?><tr><td class="active" colspan="11"><strong><?=$market_group?></strong></td></tr><?php
+        }
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -232,6 +242,7 @@ include_once '.settings.php';
     $query = <<<EOD
 select
   stock.type_id as id,
+  market_group.name as grp,
   tid.sdet_type_name as name,
   stock.quantity as q, -- quantity
   ceil(universe.price * stock.quantity) as uap, -- universe avg price
@@ -251,6 +262,7 @@ select
   o.sum_remain_volume as orv,
   where_else.sum_quantity as weq
 from
+  qi.eve_sde_market_groups_semantic as market_group,
   -- список материалов, которые должны попасть в отчёт
   ( -- содержимое коробки ..stock ALL на Сотие
     select
@@ -350,8 +362,10 @@ from
       group by 1
       -- order by 1
     ) materials_using on (stock.type_id = materials_using.material_id)
--- where tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
-order by tid.sdet_market_group_id, tid.sdet_type_name;
+where
+  market_group.id = tid.sdet_market_group_id
+  -- and tid.sdet_market_group_id in (1334,1333,1335,1336,1337) -- планетарка в стоке
+order by market_group.name, tid.sdet_type_name;
 EOD;
     $params = array($stock_location_id, $show_absent);
     $stock_cursor = pg_query_params($conn, $query, $params)

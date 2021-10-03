@@ -18,7 +18,7 @@ To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --cache_dir=~/.q_industrialist
+>>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 >>> python q_universe_preloader.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:

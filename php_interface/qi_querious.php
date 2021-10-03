@@ -63,6 +63,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
     $jita_buy_order = '';
     $amarr_buy_price = 0.0;
     $jita_buy_price = 0.0;
+    $prev_market_group = null;
     if ($market)
         foreach ($market as &$product)
         {
@@ -71,6 +72,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             $interrupt_detected = false;
 
             $tid = $product['id'];
+            $market_group = $product['grp'];
             $nm = $product['name'];
             $weekly_volume = $product['wv'];
             $order_volume = $product['ov'];
@@ -168,6 +170,12 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                     $we_bought_it = true;
                     break;
                 }
+
+            if ($prev_market_group != $market_group)
+            {
+                $prev_market_group = $market_group;
+                ?><tr><td class="active" colspan="8"><strong><?=$market_group?></strong></td></tr><?php
+            }
 ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -357,6 +365,7 @@ function __dump_querious_storage(&$storage) { ?>
     $query = <<<EOD
 select
   market.type_id as id,
+  market_group.name as grp,
   tid.sdet_type_name as name,
   case
     when (weeks_passed.volume_sell=0) or (weeks_passed.diff<0.14) then null
@@ -378,6 +387,7 @@ select
   sbsq_hub.ethp_sell as ps, -- p-zmzv sell
   sbsq_hub.ethp_sell_volume as psv -- p-zmzv sell volume
 from
+  qi.eve_sde_market_groups_semantic as market_group,
   ( select distinct type_id
     from (
       -- список транзакций по покупке/продаже избранными персонажами от имени 2х корпораций
@@ -478,6 +488,7 @@ from
       where ethp_location_id = 1034323745897
     ) sbsq_hub on (market.type_id = sbsq_hub.ethp_type_id)
 where
+  market_group.id = tid.sdet_market_group_id and
   not (tid.sdet_market_group_id = 1857) and -- исключая руду
   tid.sdet_market_group_id not in (
     1333,1334,1335,1336,1337, -- исключая планетарку
@@ -488,7 +499,8 @@ where
     54,1855,1856,2395,2479, -- сырьевые материалы
     512,514,515,516,517,518,519,521,522,523,525,526,527,528,529,530,2538,2539,2540 -- руды
   )
-order by 7 desc;
+-- order by tid.sdet_packaged_volume desc
+order by market_group.name, tid.sdet_type_name;
 EOD;
     $market_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
@@ -869,6 +881,8 @@ var g_purchase_types = [<?php
       else if (show_group == 'interrupt')
         show = tr.find('td').eq(1).find('span.label-interrupt').length;
       if (show)
+        tr.removeClass('hidden');
+      else if (tr.find('td').eq(0).hasClass('active'))
         tr.removeClass('hidden');
       else
         tr.addClass('hidden');

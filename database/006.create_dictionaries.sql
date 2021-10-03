@@ -15,6 +15,14 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+DROP VIEW IF EXISTS  qi.eve_sde_market_groups_semantic;
+DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree_sorted;
+DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree;
+DROP INDEX IF EXISTS qi.idx_sdeg_group_semantic_ids;
+DROP INDEX IF EXISTS qi.idx_sdeg_group_parent_ids;
+DROP INDEX IF EXISTS qi.idx_sdeg_pk;
+DROP TABLE IF EXISTS qi.eve_sde_market_groups;
+
 DROP INDEX IF EXISTS qi.idx_sdet_market_group_id;
 DROP INDEX IF EXISTS qi.idx_sdet_pk;
 DROP TABLE IF EXISTS qi.eve_sde_type_ids;
@@ -171,6 +179,82 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdet_market_group_id
     ON qi.eve_sde_type_ids USING btree
     (sdet_market_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (marketGroups)
+-- сведения о рыночных группых присутствующих в игре, из marketGroups.yaml
+--
+-- Например:
+--  group_id  parent_id  semantic_id  group_name
+--  955            NULL          955   Ship and Module Modifications
+--    1111          955          955   Rigs
+--      ...                        ?
+---   2436          955          955   Mutaplasmids
+--      ...                        ?
+--    1112          955         1112   Subsystems
+--      1610       1112         1112   Amarr Subsystems
+--        1122     1610         1112   Amarr Core Subsystems
+--        1126     1610         1112   Amarr Defensive Subsystems
+--        1130     1610         1112   Amarr Offensive Subsystems
+--        1134     1610         1112   Amarr Propulsion Subsystems
+--      1625       1112         1112   Caldari Subsystems
+--        ...                   1112
+--      1626       1112         1112   Minmatar Subsystems
+--        ...                   1112
+--      1627       1112         1112   Gallente Subsystems
+--        ...                   1112
+--
+-- Например:
+--  group_id  parent_id  semantic_id  group_name
+--  475            NULL          475  Manufacture & Research
+--    533           475          533  Materials
+--      1031        533          533  Raw Materials
+--        54       1031          533  Standard Ores
+--          512      54          533  Arkonor
+--          ...      54          533  Bistot, Pyroxeres, ...
+--        ...      1031          533  Ice Ores, Moon Ores, Alloys & Compounds, ...
+--      ...         533          533  Gas Clouds Materials, Ice Products, ...
+--    1035          475            ?  Components
+--      ...                        ?  Advanced Components, Standard Capital Ship Components, Outpost Components, ...
+--    1872          475            ?  Research Equipment
+--      1873       1872         1872  Decryptors
+--      1880       1872         1872  Datacores
+--      1807       1872         1872  R.Db
+--      1909       1872         1872  Ancient Relics
+--
+-- То есть используется "семантическое" деление на группы метариалов и
+-- компонентов, которые используются в производстве. Например, все варианты
+-- патронов будут относиться к патронам, а все Materials будут относиться к
+-- Materials, а все варианты подсистем будут относиться к подсистемам.
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_market_groups
+(
+    sdeg_group_id INTEGER NOT NULL,    -- идентификатор market группы
+    sdeg_parent_id INTEGER,            -- идентификатор родительской market группы
+    sdeg_semantic_id INTEGER NOT NULL, -- идентификатор родительской "смысловой" market группы
+    sdeg_group_name CHARACTER VARYING(100),
+    sdeg_icon_id INTEGER,
+    CONSTRAINT pk_sdeg PRIMARY KEY (sdeg_group_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_market_groups OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdeg_pk
+    ON qi.eve_sde_market_groups USING btree
+    (sdeg_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeg_group_parent_ids
+    ON qi.eve_sde_market_groups USING btree
+    (sdeg_group_id ASC NULLS LAST, sdeg_parent_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeg_group_semantic_ids
+    ON qi.eve_sde_market_groups USING btree
+    (sdeg_group_id ASC NULLS LAST, sdeg_semantic_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
