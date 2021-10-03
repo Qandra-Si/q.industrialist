@@ -489,8 +489,8 @@ from
     ) sbsq_hub on (market.type_id = sbsq_hub.ethp_type_id)
 where
   market_group.id = tid.sdet_market_group_id and
-  not (tid.sdet_market_group_id = 1857) and -- исключая руду
   tid.sdet_market_group_id not in (
+    1857, -- исключая руду
     1333,1334,1335,1336,1337, -- исключая планетарку
     802,803,1888,1889, 1862,1863, -- исключая компоненты
     20, 65,781,1021,1147,1865,1870,1883,1908,2768, -- исключая промышленные комплектующие и компоненты
