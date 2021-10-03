@@ -462,7 +462,7 @@ from
         (ecwt_location_id in (1036927076065,1034323745897)) -- станка рынка
       group by 1
     ) transactions_stat on (market.type_id = transactions_stat.ecwt_type_id)
-    -- сведения об sell-ордерах, активных прямо сейчас
+    -- сведения о sell-ордерах, активных прямо сейчас
     left outer join (
       select
         ecor_type_id,

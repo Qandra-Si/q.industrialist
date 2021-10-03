@@ -10,7 +10,8 @@ include_once '.settings.php';
  <tr>
   <th></th>
   <th width="100%">Items</th>
-  <th style="text-align: right;">Weekly<br>Volume</th>
+  <th style="text-align: right;">Weekly<br>Quantity</th>
+  <th style="text-align: right;">RI4 Price<br>Quantity</th>
   <th style="text-align: right;">Jita Materials<br>Cost</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
   <th style="text-align: right;">Amarr Materials<br>Cost</th>
@@ -27,18 +28,20 @@ include_once '.settings.php';
             $blueprint_tid = $product['bp_id'];
             $market_group = $product['grp'];
             $nm = $product['name'];
-            $weekly_volume = $product['wv'];
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
             $amarr_buy = $product['ab'];
             $jita_materials_cost = $product['jsmp'];
             $amarr_materials_cost = $product['asmp'];
+            $weekly_volume = $product['wv'];
+            $ri4_market_quantity = $product['mv'];
+            $ri4_price = $product['mp'];
 
             if ($prev_market_group != $market_group)
             {
                 $prev_market_group = $market_group;
-                ?><tr><td class="active" colspan="7"><strong><?=$market_group?></strong></td></tr><?php
+                ?><tr><td class="active" colspan="8"><strong><?=$market_group?></strong></td></tr><?php
             }
 ?>
 <tr>
@@ -51,7 +54,17 @@ include_once '.settings.php';
     }
     else
     {
-        ?><td align="right"><?=number_format($weekly_volume,1,'.',',')?></td><?php
+        ?><td align="right"><br><?=number_format($weekly_volume,1,'.',',')?></td><?php
+    }
+
+    if (is_null($ri4_price))
+    {
+        ?><td bgcolor="#e8c8c8"></td><?php
+    }
+    else
+    {
+        $too_few = (($ri4_market_quantity+0) <= ($weekly_volume+0)) ? 1 : 0;
+        ?><td align="right"<?=$too_few?(' bgcolor="#e8c8c8"'):''?>><?=number_format($ri4_price,2,'.',',')?><br><?=number_format($ri4_market_quantity,0,'.',',')?></td><?php
     }
 
     if (is_null($jita_materials_cost))
@@ -123,7 +136,9 @@ select
     when (weeks_passed.volume_sell=0) or (weeks_passed.diff<0.14) then null
     when (weeks_passed.diff < 1.14) then weeks_passed.volume_sell
     else round(weeks_passed.volume_sell/weeks_passed.diff,1)
-  end as wv -- weekly volume
+  end as wv, -- weekly volume
+  round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
+  orders_stat.volume_remain as mv -- RI4 volume
 from
   -- продукты производства
   qi.eve_sde_blueprint_products as product
@@ -214,6 +229,21 @@ from
         (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
       group by ecor_type_id
     ) weeks_passed on (querious.type_id = weeks_passed.ecor_type_id)
+    -- сведения о sell-ордерах, активных прямо сейчас
+    left outer join (
+      select
+        ecor_type_id,
+        sum(ecor_volume_remain) as volume_remain,
+        min(ecor_price) as ri4_price
+      from esi_corporation_orders
+      where
+        not ecor_is_buy_order and
+        (ecor_volume_remain > 0) and
+        not ecor_history and
+        (ecor_corporation_id=98615601) and  -- R Initiative 4
+        (ecor_location_id in (1036927076065,1034323745897))  -- станка рынка
+      group by 1
+    ) orders_stat on (querious.type_id = orders_stat.ecor_type_id)
 where
   querious.type_id = product.sdebp_product_id and
   product.sdebp_blueprint_type_id = cost.sdebm_blueprint_type_id and
