@@ -126,28 +126,33 @@ create or replace view qi.eve_sde_market_groups_tree as
 -- max length of sort_str=43*5=215
 --------------------------------------------------------------------------------
 create or replace view qi.eve_sde_market_groups_tree_sorted as
-  with recursive r as (
-    select
-      sdeg_group_id as id,
-      sdeg_parent_id as parent,
-      sdeg_group_name as name,
-      1 as depth,
-      sdeg_group_name::varchar(255) as sort_str
-    from qi.eve_sde_market_groups
-    where sdeg_parent_id is null
-    union all
-    select
-      branch.sdeg_group_id,
-      branch.sdeg_parent_id,
-      branch.sdeg_group_name,
-      r.depth+1,
-      (r.sort_str || '|' || branch.sdeg_group_name)::varchar(255)
-    from qi.eve_sde_market_groups as branch
-      join r on branch.sdeg_parent_id = r.id
-  )
-  select r.id, r.parent, r.name, r.depth from r
-  --select r.* from r
-  order by r.sort_str;
+  select
+    rr.*,
+    row_number() OVER () as rnum
+  from (
+    with recursive r as (
+      select
+        sdeg_group_id as id,
+        sdeg_parent_id as parent,
+        sdeg_group_name as name,
+        1 as depth,
+        sdeg_group_name::varchar(255) as sort_str
+      from qi.eve_sde_market_groups
+      where sdeg_parent_id is null
+      union all
+      select
+        branch.sdeg_group_id,
+        branch.sdeg_parent_id,
+        branch.sdeg_group_name,
+        r.depth+1,
+        (r.sort_str || '|' || branch.sdeg_group_name)::varchar(255)
+      from qi.eve_sde_market_groups as branch
+        join r on branch.sdeg_parent_id = r.id
+    )
+    select r.id, r.parent, r.name, r.depth from r
+    --select r.* from r
+    order by r.sort_str
+  ) rr;
 --------------------------------------------------------------------------------
 
 
