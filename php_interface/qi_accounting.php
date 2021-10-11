@@ -4,7 +4,7 @@ include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 ?>
 
-<?php function __dump_market_orders(&$market, $is_buy_orders) { ?>
+<?php function __dump_market_orders(&$market_orders, $is_buy_orders) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -16,24 +16,24 @@ include_once '.settings.php';
 <?php
     $summary_order_prices = 0;
     if ($market_orders)
-        foreach ($market_orders as &$product)
+        foreach ($market_orders as &$orders)
         {
-            $buy = $product['buy'];
+            $buy = $orders['buy'];
             if ($is_buy_orders != $buy) continue;
-            $corporation_name = $product['corp'];
-            $sum_price = $product['price'];
+            $corporation_name = $orders['corp'];
+            $sum_price = $orders['price'];
 
             $summary_order_prices += $sum_price;
 ?>
 <tr>
  <td align="right"><?=$corporation_name?></td>
- <td align="right"><?=number_format($summary_order_prices,0,'.',',')?></td>
+ <td align="right"><?=number_format($sum_price,0,'.',',')?> <?=get_clipboard_copy_button($sum_price)?></td>
+</tr>
 <?php
         }
 ?>
 <tr style="font-weight:bold;">
- <td colspan="6" align="right">Summary</td>
- <td align="right"><?=number_format($summary_order_prices,0,'.',',')?></td>
+ <td colspan="2" align="right">Summary: <?=number_format($summary_order_prices,0,'.',',')?> <?=get_clipboard_copy_button($summary_order_prices)?></td>
 </tr>
 </tbody>
 </table>
@@ -72,8 +72,9 @@ EOD;
 ?>
 <div class="container-fluid">
 <h2>Sell Market Orders</h2>
-<?php __dump_market_orders($market, 'f'); ?>
+<?php  __dump_market_orders($market, 'f'); ?>
 <h2>Sell Market Orders</h2>
 <?php __dump_market_orders($market, 't'); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
+<?php __dump_copy_to_clipboard_javascript() ?>
