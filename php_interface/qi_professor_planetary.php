@@ -146,7 +146,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                     $current_cycle_quantity = $required_quantity;
                     $current_cycle_payment = 0;
                     $current_cycle_number = 0;
-		    if ($show_debug) print('<hr><small>Поиск данных по продукту '.$tid.' с требуемым кол-вом '.$required_quantity.'</small><br>');
+                    if ($show_debug) print('<hr><small>Поиск данных по продукту '.$tid.' с требуемым кол-вом '.$required_quantity.'</small><br>');
                 }
                 else
                     $required_quantity = null;
@@ -164,7 +164,7 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                 {
                     $current_cycle_quantity -= $sum_quantity;
                     $current_cycle_payment += $avg_sum_buy * $sum_quantity;
-		    if ($show_debug) print('<small>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.$current_cycle_quantity.' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></small><br>');
+                    if ($show_debug) print('<small>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.$current_cycle_quantity.' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></small><br>');
                     $sum_quantity = 0;
                 }
                 else
@@ -173,8 +173,8 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
                     if ($show_debug) print('<small><b>'.$date.' '.$sum_buy.' '.$sum_quantity.' = <mark>'.number_format($avg_sum_buy,2,'.','').'</mark> '.($current_cycle_quantity-$sum_quantity).' = <span class="text-danger">'.number_format($current_cycle_payment,2,'.','').'</span></b></small><br>');
                     // сохраняем результат
                     array_push($market_dates, array(intval($tid), intval($current_cycle_number), strtotime($date), intval(ceil($current_cycle_payment)), 0));
-		    //debug : if ($show_debug) print(var_dump($market_dates[sizeof($market_dates)-1]).'<br>');
-		    $current_cycle_number++;
+            //debug : if ($show_debug) print(var_dump($market_dates[sizeof($market_dates)-1]).'<br>');
+            $current_cycle_number++;
                     // повторяем цикл
                     $sum_quantity -= $current_cycle_quantity;
                     // начинаем сначала
@@ -193,22 +193,22 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
             $amount = $event['isk'];
 
             $date_num = strtotime($date);
-	    $payments_per_date = 0;
-	    foreach ($market_dates as &$md)
-	    {
-	        if ($md[2] != $date_num) continue;
-                $payments_per_date += $md[3];
-	    }
+            $payments_per_date = 0;
+            foreach ($market_dates as &$md)
+            {
+                if ($md[2] != $date_num) continue;
+                    $payments_per_date += $md[3];
+            }
 
             if ($show_debug)  print('<hr><small>'.$date.' комиссия '.number_format(-$amount,2,'.','').' по платежам '.$payments_per_date.'</small><br>');
 
             $fee_per_date = -$amount / $payments_per_date;
             foreach ($market_dates as &$md)
-	    {
-	        if ($md[2] != $date_num) continue;
-		$md[4] = $fee_per_date * $md[3];
-		if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($md[4],2,'.','').'</small><br>');
-	    }
+            {
+                if ($md[2] != $date_num) continue;
+                $md[4] = $fee_per_date * $md[3];
+                if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($md[4],2,'.','').'</small><br>');
+            }
         }
 
     //debug : if ($show_debug) print('<small><small>'.var_dump($market_dates).'</small></small><br>');
@@ -220,35 +220,35 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
         $current_cycle_finish = null;
         do
         {
-	    if ($show_debug) print('<hr><small>Поиск платежей по циклу '.$current_cycle_number.'</small><br>');
+        if ($show_debug) print('<hr><small>Поиск платежей по циклу '.$current_cycle_number.'</small><br>');
             $current_cycle_payment = 0;
-	    $current_cycle_fee = 0;
+        $current_cycle_fee = 0;
             $current_cycle_finished = true;
             // для каждого нового цикла считаем его стоимость 
             foreach ($product_requirements as &$r)
             {
                 $tid = $r['id'];
-		//debug : if ($show_debug) print($tid.'?<br>');
-		$found = false;
+                //debug : if ($show_debug) print($tid.'?<br>');
+                $found = false;
                 foreach($market_dates as &$md)
                 {
                     if ($tid == $md[0] && $current_cycle_number == $md[1])
                     {
                         $current_cycle_payment += $md[3];
-			$current_cycle_fee += $md[4];
+                        $current_cycle_fee += $md[4];
                         if ($current_cycle_finish < $md[2])
                             $current_cycle_finish = $md[2];
-		        if ($show_debug) print('<small><small>'.$tid.' '.date("Y-m-d", $md[2]).' = '.$md[3].' / '.number_format($md[4],2,'.','').' = <span class="text-danger">'.$current_cycle_payment.' / '.number_format($current_cycle_fee,2,'.','').'</span></small></small><br>');
+                        if ($show_debug) print('<small><small>'.$tid.' '.date("Y-m-d", $md[2]).' = '.$md[3].' / '.number_format($md[4],2,'.','').' = <span class="text-danger">'.$current_cycle_payment.' / '.number_format($current_cycle_fee,2,'.','').'</span></small></small><br>');
                         $found = true;
-			break;
+                        break;
                     }
                     if ($md[0] > $tid) break;
                 }
-		if (!$found)
-		{
-		    if ($show_debug) print('<small>'.$tid.' NOT FOUND</small><br>');
-                    $current_cycle_finished = false;
-		}
+                if (!$found)
+                {
+                    if ($show_debug) print('<small>'.$tid.' NOT FOUND</small><br>');
+                            $current_cycle_finished = false;
+                }
             }
             // циклы закончились совсем - нет даже платежей по ним
             if (!$current_cycle_payment) break;
@@ -356,7 +356,7 @@ function __dump_wallet_journals(&$wallet_journals, &$market_payments) { ?>
             $cycle_finish = $cycle[1];
             $cycle_payments = $cycle[2];
             $cycle_finished = $cycle[3];
-	    $cycle_fee = $cycle[4];
+            $cycle_fee = $cycle[4];
 
             $labels = '';
             if ($cycle_finished)
@@ -417,8 +417,8 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
     if ($active_orders)
         foreach ($active_orders as $order)
         {
-	    $is_buy = $order['b'] == 't';
-	    if ($is_buy == false) continue;
+        $is_buy = $order['b'] == 't';
+        if ($is_buy == false) continue;
             $tid = intval($order['id']);
             $price = $order['p'];
             $remaining = $order['r'];
@@ -477,8 +477,8 @@ function __dump_market_orders(&$active_orders, &$planetary, &$jita) { ?>
     if ($active_orders)
         foreach ($active_orders as $order)
         {
-	    $is_buy = $order['b'] == 't';
-	    if ($is_buy == true) continue;
+        $is_buy = $order['b'] == 't';
+        if ($is_buy == true) continue;
             $tid = intval($order['id']);
             $price = $order['p'];
             $remaining = $order['r'];
@@ -539,14 +539,14 @@ function __dump_progress_element($current_num, $max_num) {
     $prcnt = round(($__progress_factor < 100.001) ? $__progress_factor : 100, 1);
     $prcnt100 =
         ($current_num == $max_num) ?
-	" progress-bar-success" :
-	(   ($current_num > $max_num) ?
-	    (   ($current_num > (2*$max_num)) ?
-	        " progress-bar-danger" :
-		" progress-bar-warning"
-	    ) :
-	    ""
-	);
+    " progress-bar-success" :
+    (   ($current_num > $max_num) ?
+        (   ($current_num > (2*$max_num)) ?
+            " progress-bar-danger" :
+        " progress-bar-warning"
+        ) :
+        ""
+    );
     if ($max_num == $current_num) { ?>
         <strong><span class="text-warning"><?=number_format($current_num,0,'.',',')?></span></strong>
     <?php } else if ($current_num > $max_num) { ?>
@@ -596,11 +596,11 @@ function __dump_planetary_stock_header($location_name, $calculated_requirements)
     if (!is_null($calculated_requirements)) {
         $prcnt = round($calculated_requirements, 1);
         $prcnt100 =
-	    ($calculated_requirements == 100.0) ?
-	    " progress-bar-success" :
-	    (   ($calculated_requirements > 100.0) ?
-	        " progress-bar-warning" :
-		""
+        ($calculated_requirements == 100.0) ?
+        " progress-bar-success" :
+        (   ($calculated_requirements > 100.0) ?
+            " progress-bar-warning" :
+        ""
             );
 ?>    
 <div class="progress" style="margin-bottom:0px"><div class="progress-bar<?=$prcnt100?>" role="progressbar"
@@ -665,11 +665,11 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
     if ($calculate_quantities)
     {
         $calculated_requirements = 100.0;
-	// перебор требований и проверка наличия, расчёт достаточности в %
+    // перебор требований и проверка наличия, расчёт достаточности в %
         $required_quantity = null;
         foreach ($product_requirements as $r)
         {
-	    $tid = intval($r['id']);
+        $tid = intval($r['id']);
             $required_quantity = $r['q'];
             $quantity = 0;
             foreach ($products_in_location as $l)
@@ -678,13 +678,13 @@ function __dump_planetary_stock_location($location_id, &$location_flag, &$produc
                 $quantity = $l[1];
                 break;
             }
-	    if ($quantity == 0)
-	    {
-	        $calculated_requirements = 0;
-		break;
-	    }
-	    $percent = 100.0 * ($quantity / $required_quantity);
-	    if ($percent < $calculated_requirements)
+        if ($quantity == 0)
+        {
+            $calculated_requirements = 0;
+        break;
+        }
+        $percent = 100.0 * ($quantity / $required_quantity);
+        if ($percent < $calculated_requirements)
                 $calculated_requirements = $percent;
         }
     }
