@@ -9,17 +9,29 @@ function __dump_assets_group_begin(&$market_group) {
 <tr><td><?=$market_group?>
 <?php
 }
-function __dump_assets_group_end($sum_price) {
+function __dump_assets_group_end($sum_price, $sum_warnings) {
+    $warnings = '';
+    if ($sum_warnings & 2)
+        $warnings .= '&nbsp;<span class="label label-warning">jita sell used</span>';
+    if ($sum_warnings & 4)
+        $warnings .= '&nbsp;<span class="label label-warning">jita buy used</span>';
+    if ($sum_warnings & 8)
+        $warnings .= '&nbsp;<span class="label label-warning">base price used</span>';
+    if ($sum_warnings & 16)
+        $warnings .= '&nbsp;<span class="label label-danger">NO PRICE</span>';
 ?>
-</td><td><?=number_format($sum_price,0,'.',',')?> <?=get_clipboard_copy_button($sum_price)?></td></tr>
+<?=$warnings?></td><td align="right"><?=number_format($sum_price,0,'.',',')?></td></tr>
 <?php
+}
+function __dump_assets_corp_end($corp_name, $sum_price) {
+    ?><tr><td colspan="2" align="right"><strong><?=$corp_name?> Summary: <?=number_format($sum_price,0,'.',',')?> <?=get_clipboard_copy_button($sum_price)?></strong></tr><?php
 }
 
 function __dump_assets(&$assets) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
-  <th style="text-align: right;">Market Group</th>
+  <th style="text-align: left;">Market Group</th>
   <th style="text-align: right;">Assets Price</th>
  </tr>
 </thead>
@@ -27,7 +39,9 @@ function __dump_assets(&$assets) { ?>
 <?php
     $last_corporation_name = null;
     $last_market_group = null;
+    $summary_corp_price = 0;
     $summary_group_price = 0;
+    $summary_group_warnings = 0;
     if ($assets)
     {
         foreach ($assets as &$items)
@@ -39,34 +53,72 @@ function __dump_assets(&$assets) { ?>
             $jita_sell = $items['js'];
             $jita_buy = $items['jb'];
 
-            $summary_order_prices += $universe_price;
+            if (!is_null($universe_price))
+            {
+                $summary_group_price += $universe_price;
+                $summary_corp_price += $universe_price;
+            }
+            else
+            {
+                $summary_group_warnings |= 1;
+                if (!is_null($jita_sell))
+                {
+                    $summary_group_price += $jita_sell;
+                    $summary_corp_price += $jita_sell;
+                    $summary_group_warnings |= 2;
+                }
+                else if (!is_null($jita_buy))
+                {
+                    $summary_group_price += $jita_buy;
+                    $summary_corp_price += $jita_buy;
+                    $summary_group_warnings |= 4;
+                }
+                else if (!is_null($base_price))
+                {
+                    $summary_group_price += $base_price;
+                    $summary_corp_price += $base_price;
+                    $summary_group_warnings |= 8;
+                }
+                else
+                {
+                    $summary_group_warnings |= 16;
+                }
+            }
 
             if ($last_corporation_name != $corporation_name)
             {
                 if (!is_null($last_market_group))
                 {
-                    __dump_assets_group_end($summary_group_price);
+                    __dump_assets_group_end($summary_group_price, $summary_group_warnings);
                     $last_market_group = null;
-                    $summary_order_prices = 0;
+                    $summary_group_price = 0;
+                    $summary_group_warnings = 0;
+                }
+                if (!is_null($last_corporation_name))
+                {
+                    __dump_assets_corp_end($last_corporation_name, $summary_corp_price);
                 }
                 $last_corporation_name = $corporation_name;
+                $summary_corp_price = 0;
                 ?><tr><td class="active" colspan="2"><strong><?=$corporation_name?></strong></tr><?php
             }
             if ($last_market_group != $market_group)
             {
                 if (!is_null($last_market_group))
                 {
-                    __dump_assets_group_end($summary_group_price);
+                    __dump_assets_group_end($summary_group_price, $summary_group_warnings);
                 }
                 __dump_assets_group_begin($market_group);
                 $last_market_group = $market_group;
-                $summary_order_prices = 0;
+                $summary_group_price = 0;
+                $summary_group_warnings = 0;
             }
         }
         if (!is_null($last_market_group))
         {
-            __dump_assets_group_end($summary_group_price);
+            __dump_assets_group_end($summary_group_price, $summary_group_warnings);
         }
+        __dump_assets_corp_end($last_corporation_name, $summary_corp_price);
     }
 ?>
 </tbody>
