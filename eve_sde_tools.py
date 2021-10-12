@@ -266,10 +266,10 @@ def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
     while True:
         if __group_id in [# 475,  # Manufacture & Research
                           # 533,  # Materials (parent:475, см. ниже)
-                          1035,  # Components (parent:475)
-                          1872,  # Research Equipment (parent:475)
-                          955,  # Ship and Module Modifications
-                          1112,  # Subsystems (parent:955)
+                          # 1035, # Components (parent:475)
+                          1872,   # Research Equipment (parent:475)
+                          955,    # Ship and Module Modifications
+                          1112,   # Subsystems (parent:955)
                          ]:
             return __group_id
         __grp1 = sde_market_groups[str(__group_id)]
@@ -278,8 +278,9 @@ def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
             # группа материалов для целей производства должна делиться на подгруппы (производство и заказы
             # в каждой из них решается индивидуально)
             if __parent_group_id in [533,  # Materials
-                                     1034,  # Reaction Materials
+                                     1034, # Reaction Materials
                                      477,  # Structures (чтобы было понятнее содержимое accounting-отчётов)
+                                     1035, # Components (parent:475)
                                      ]:
                 return __group_id
             __group_id = __parent_group_id
