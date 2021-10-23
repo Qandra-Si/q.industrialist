@@ -7,7 +7,7 @@ const JITA_IMPORT_PRICE = 866.0; // цена импорта 1куб.м. из Jit
 const MIN_PROFIT = 0.05; // 5%
 const DEFAULT_PROFIT = 0.1; // 10%
 const MAX_PROFIT = 0.25; // 25%
-const TAX_AND_FEE = 0.03 + 0.0113; // налог на структуре и брокерская комиссия
+const TAX_AND_FEE = 0.02 + 0.036; // налог на структуре и брокерская комиссия
 
 
 function eve_ceiling($isk) {
