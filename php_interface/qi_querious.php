@@ -739,7 +739,7 @@ EOD;
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-7">плюс 3% налог и 1.13% комиссия</div>
+  <div class="col-md-7">плюс 2% налог и 3.6% комиссия</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_tax"></mark> ISK</div>
 </div>
 <div class="row">
