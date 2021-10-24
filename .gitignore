@@ -146,8 +146,10 @@ dmypy.json
 /*_cache
 /debug
 /.q_industrialist
+/.q_individualist
 /*.~json
 /*.html
 /*.csv
 /database/*.dmp
 /database/*.dump
+/*.bak

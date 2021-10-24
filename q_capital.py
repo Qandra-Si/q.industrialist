@@ -147,10 +147,9 @@ def main():
 
     # находим контейнеры по заданным названиям
     for ro in q_capital_settings.g_report_options:
-        containers = []
         if "bp_cont_templates" in ro:
             for tmplt in ro["bp_cont_templates"]:
-                containers.extend([n["item_id"] for n in total_ass_names_data if re.search(tmplt, n['name'])])
+                containers = [n["item_id"] for n in total_ass_names_data if re.search(tmplt, n['name'])]
                 for id in containers:
                     ro["blueprints"].append(
                         {"id": id, "name": next((n["name"] for n in total_ass_names_data if n['item_id'] == id), None)})
@@ -158,9 +157,9 @@ def main():
         # перечисляем станции и контейнеры, которые были найдены
         print('\nFound report containters and station ids for {}...'.format(ro["product"]))
         for bpl in ro["blueprints"]:
-            print('  {} = {}'.format(bpl["id"], bpl["name"]))
+            print('  {} = {} (blueprints)'.format(bpl["id"], bpl["name"]))
         for stk in ro["stock"]:
-            print('  {} = {}'.format(stk["id"], stk.get("name", stk.get("flag"))))
+            print('  {} = {} (stock)'.format(stk["id"], stk.get("name", stk.get("flag"))))
 
         print("\nBuilding report...")
         sys.stdout.flush()

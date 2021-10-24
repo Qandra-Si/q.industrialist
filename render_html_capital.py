@@ -458,8 +458,16 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
   </div>
   <div class="media-body">
    <h4 class="media-heading">Summary raw materials</h4>
-<p>The number of Minerals and Components is counted for <mark>all assets</mark> owned by the corporation.</p>
 """)
+    str_stock_cont_names = ""
+    for st in report_options["stock"]:
+        if str_stock_cont_names:
+            str_stock_cont_names = str_stock_cont_names + ', '
+        str_stock_cont_names += '<mark>' + st.get('name', st.get('flag')) + '</mark>'
+    if not str_stock_cont_names:
+        str_stock_cont_names = '<mark></mark>'
+    glf.write('<p>The number of Minerals and Components is considered based on the presence of aseets in container(s) {}.</p>\n'.
+              format(str_stock_cont_names))  # Materials
     str_bp_cont_names = ""
     for bp in report_options["blueprints"]:
         if str_bp_cont_names:
