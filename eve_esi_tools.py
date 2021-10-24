@@ -198,6 +198,8 @@ def fill_ass_tree_with_sde_data(location_id, ass_tree, sde_inv_items):
         ass_tree[str(location_id)]["location_id"] = new_location_id
         if not (str(new_location_id) in ass_tree):
             ass_tree.update({str(new_location_id): {"items": [location_id]}})
+        else:
+            ass_tree[str(new_location_id)]["items"].append(location_id)
     if type_id == 5:  # останавливаемся а глубине Solar System
         return
     fill_ass_tree_with_sde_data(new_location_id, ass_tree, sde_inv_items)
