@@ -315,24 +315,38 @@ def __dump_not_available_materials_list(
     not_enough_materials = calc_materials_availability(
         materials_summary,
         stock_resources,
-        check_absolutely_not_available=False
-    )
+        check_absolutely_not_available=False)
     if not not_enough_materials:
         return
     # сохранение информации в ГЛОБАЛЬНОМ списка недостающих материалов
     calc_materials_summary(not_enough_materials, stock_not_enough_materials)
+
+    # формируем новый список ресурсов (материалов) которые будут локально дополнены материалами с предыдущих
+    # уровней вложенности
+    materials_summary_with_ntier = materials_summary[:]
+
     # расчёт списка материалов, предыдущего уровня вложенности
     # (по информации о ресурсах, которых не хватает)
-    if not_enough_materials:
-        not_enough_materials_list_with_efficiency = get_ntier_materials_list_of_not_available(
-            not_enough_materials,
-            sde_type_ids,
-            sde_bp_materials,
-            products_for_bps,
-            reaction_products_for_bps)
-        if not_enough_materials_list_with_efficiency:
-            calc_materials_summary(not_enough_materials_list_with_efficiency, not_enough_materials)
-        del not_enough_materials_list_with_efficiency
+    not_enough_materials_list_with_efficiency = get_ntier_materials_list_of_not_available(
+        not_enough_materials,
+        sde_type_ids,
+        sde_bp_materials,
+        products_for_bps,
+        reaction_products_for_bps)
+    if not_enough_materials_list_with_efficiency:
+        nemlwe_na = calc_materials_availability(
+            not_enough_materials_list_with_efficiency,
+            stock_resources,
+            check_absolutely_not_available=False)
+        if nemlwe_na:
+            calc_materials_summary(nemlwe_na, materials_summary_with_ntier)
+            # ПОВТОРНАЯ проверка наличия имеющихся ресурсов с учётом запаса в стоке
+            not_enough_materials = calc_materials_availability(
+                materials_summary_with_ntier,
+                stock_resources,
+                check_absolutely_not_available=False)
+        del nemlwe_na
+    del not_enough_materials_list_with_efficiency
 
     # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
     # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
@@ -450,7 +464,7 @@ def __dump_not_available_materials_list(
                        q=not_available,
                        inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
                        nm=ms_item_name,
-                       ins='' if not ms_in_stock else ms_in_stock,
+                       ins='' if not ms_in_stock else "{:,d}".format(ms_in_stock),
                        clbrd=__copy2clpbrd,
                        original=vacant_originals_tag,
                        copy=vacant_copies_tag,
