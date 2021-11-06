@@ -381,6 +381,25 @@ def get_research_materials_for_blueprints(sde_bp_materials):
     return research_materials_for_bps
 
 
+def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
+    """
+    Построение списка продуктов, которые появляются в результате производства
+    """
+    products_for_bps = []
+    for bp in sde_bp_materials:
+        __bpm2 = sde_bp_materials[bp]["activities"].get(activity)
+        if not __bpm2:
+            continue
+        __bpm3 = __bpm2.get("products")
+        if not __bpm3:
+            continue
+        for m in __bpm3:
+            type_id: int = m.get("typeID")
+            if 0 == products_for_bps.count(type_id):
+                products_for_bps.append(type_id)
+    return products_for_bps
+
+
 def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing"):
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта

@@ -2,6 +2,7 @@
 import getopt
 
 import q_capital_settings
+import q_market_analyzer_settings
 import render_html
 
 
@@ -22,6 +23,22 @@ def __dump_index(glf):
     </ul>
   </div>
   <a href="cynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
+  <div class="btn-group btn-block">
+""")
+    glf.write("<a href='{rfn}.html'".format(rfn=q_market_analyzer_settings.g_report_filename))
+    glf.write(""" class="btn btn-primary btn-lg" role="button" style="width:320px;">Markets</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left:201px;">
+""")
+    for rg in q_market_analyzer_settings.g_regions:
+        glf.write("<li><a href='{rfn}-{fnm}.html'>{nm}</a></li>\n".
+                  format(rfn=q_market_analyzer_settings.g_report_filename, fnm=render_html.__camel_to_snake(rg, True), nm=rg))
+    glf.write("""
+    </ul>
+  </div>
   <div class="btn-group btn-block">
     <a href="industry.html" class="btn btn-primary btn-lg" role="button" style="width:320px;">Industry</a>
     <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
