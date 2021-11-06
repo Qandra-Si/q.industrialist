@@ -38,6 +38,7 @@ import eve_esi_tools
 import eve_sde_tools
 import console_app
 import q_industrialist_settings
+import q_market_analyzer_settings
 
 from __init__ import __version__
 
@@ -58,6 +59,7 @@ def main():
         eve_market_prices_data = None
         various_characters_data = []
         various_corporations_data = []
+        markets_analyzer_first_time = True
         for pilot_name in argv_prms["character_names"]:
             # настройка Eve Online ESI Swagger interface
             auth = esi.EveESIAuth(
@@ -331,6 +333,33 @@ def main():
             if len(corp_contract_items_not_found) > 0:
                 print("'{}' corporation has {} contracts without details : {}\n".format(corporation_name, len(corp_contract_items_not_found), corp_contract_items_not_found))
             sys.stdout.flush()
+
+            # Requires: public access
+            if markets_analyzer_first_time:
+                markets_analyzer_first_time = False
+                sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+                market_regions = [(int(id), sde_inv_names[id]) for id in sde_inv_names if
+                                  sde_inv_names[id] in q_market_analyzer_settings.g_regions]
+                del sde_inv_names
+                try:
+                    # Public information about market prices
+                    for (region_id, region_name) in market_regions:
+                        markets_region_orders = interface.get_esi_paged_data(
+                            "markets/{}/orders/".format(region_id))
+                        print("\n{} market has {} orders".format(
+                            region_name, len(markets_region_orders) if markets_region_orders else 0))
+                        sys.stdout.flush()
+                        del markets_region_orders
+                except requests.exceptions.HTTPError as err:
+                    status_code = err.response.status_code
+                    if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+                        pass
+                    else:
+                        raise
+                except:
+                    print(sys.exc_info())
+                    raise
+                del market_regions
 
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)
 
