@@ -381,20 +381,22 @@ def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
     return products_for_bps
 
 
-def get_blueprint_type_id_by_product_id(product_id, sde_bp_materials):
+def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activity: str = "manufacturing"):
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
     """
-    for bp in sde_bp_materials:
-        __bpm1 = sde_bp_materials[bp]["activities"]
-        if "manufacturing" in __bpm1:
-            __bpm2 = __bpm1["manufacturing"]
-            if "products" in __bpm2:
-                __bpm3 = __bpm2["products"]
-                for m in __bpm3:
-                    type_id = int(m["typeID"])
-                    if product_id == type_id:
-                        return int(bp), sde_bp_materials[bp]
+    for blueprint_type_id in sde_bp_materials:
+        __bpm1 = sde_bp_materials[blueprint_type_id]["activities"]
+        __bpm2 = __bpm1.get(activity)
+        if not __bpm2:
+            continue
+        __bpm3 = __bpm2.get("products")
+        if not __bpm3:
+            continue
+        for m in __bpm3:
+            type_id: int = m["typeID"]
+            if product_id == type_id:
+                return int(blueprint_type_id), sde_bp_materials[blueprint_type_id]
     return None, None
 
 

@@ -26,7 +26,6 @@ Requires application scopes:
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
-import json
 import requests
 import re
 
@@ -53,9 +52,12 @@ def main():
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
-    # Построение списка модулей и ресурсов, которые используются в производстве
-    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
-    research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
+    # индексация списка модулей и ресурсов, которые используются в производстве
+    materials_for_bps = set(eve_sde_tools.get_materials_for_blueprints(sde_bp_materials))
+    research_materials_for_bps = set(eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials))
+    # индексация списка продуктов, которые появляются в результате производства
+    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials))
+    reaction_products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="reaction"))
 
     conveyor_data = []
     for pilot_name in argv_prms["character_names"]:
@@ -280,6 +282,8 @@ def main():
         sde_market_groups,
         materials_for_bps,
         research_materials_for_bps,
+        products_for_bps,
+        reaction_products_for_bps,
         # настройки генерации отчёта
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
