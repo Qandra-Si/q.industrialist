@@ -1,0 +1,18 @@
+﻿# индивидуальные настройки для работы скрипта q_market_analyzer.py
+# содержит настройки анализа маркетов в регионах:
+
+g_regions = [
+    "The Forge",
+    "Metropolis",
+]
+
+
+g_skip_non_manufacturing_products = True
+g_do_not_display_orders_less_often_than = None
+
+g_popular_region_groups = 15
+g_popular_region_groups_captions = True
+g_popular_system_groups = 5
+g_popular_system_groups_captions = False
+g_popular_trade_hub_groups = 10
+g_popular_trade_hub_groups_captions = False
