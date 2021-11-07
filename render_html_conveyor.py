@@ -1,6 +1,7 @@
 ﻿import render_html
 import eve_sde_tools
 import eve_esi_tools
+import eve_efficiency
 from math import ceil
 
 import q_conveyor_settings
@@ -146,7 +147,7 @@ def get_materials_list_for_set_of_blueprints(
                 if fixed_number_of_runs:
                     quantity_or_runs = quantity_or_runs * fixed_number_of_runs
             # расчёт кол-ва материала с учётом эффективности производства
-            __need = eve_sde_tools.get_industry_material_efficiency(
+            __need = eve_efficiency.get_industry_material_efficiency(
                 manufacturing_activity,
                 quantity_or_runs,
                 m["quantity"],  # сведения из чертежа
@@ -225,6 +226,7 @@ def calc_materials_availability(
         materials_list_with_efficiency,
         ntier_used_and_exist_materials,
         stock_resources,
+        scattered_stock_resources,
         check_absolutely_not_available=True):
     # выполнение расчётов достаточности метариала и добавление его количества в summary-списки
     used_and_exist_materials = []
@@ -238,22 +240,32 @@ def calc_materials_availability(
         bpmm_tnm: str = m_me["nm"]
         # проверка наличия имеющихся ресурсов для постройки по этому БП
         not_available = bp_manuf_need_all
+        in_general_stock = stock_resources.get(bpmm_tid, 0)
+        in_scattered_stock = scattered_stock_resources.get(bpmm_tid, 0)
+        in_stock_remained = (in_general_stock + in_scattered_stock) - bp_manuf_used
+        # получаем признак того, что материалов недостаточно даже для одного рана (сток на др.станке не смотрим)
         not_available_absolutely = True
-        in_stock = stock_resources.get(bpmm_tid, 0) - bp_manuf_used
-        not_available = 0 if in_stock >= not_available else not_available - in_stock
-        available = bp_manuf_need_all if in_stock >= bp_manuf_need_all else in_stock
         if check_absolutely_not_available:
-            not_available_absolutely = in_stock < bp_manuf_need_min
+            not_available_absolutely = in_general_stock < bp_manuf_need_min
+        # считаем сколько материала нехватает с учётом того количества, что находится в стоке (стоках)
+        not_available = 0 if in_stock_remained >= not_available else not_available - in_stock_remained
+        available = bp_manuf_need_all if in_stock_remained >= bp_manuf_need_all else in_stock_remained
         # сохраняем использованное из стока кол-во материалов для производства по этому чертежу
         if available > 0:
             used_and_exist_materials.append({"id": bpmm_tid, "q": available, "nm": bpmm_tnm})
         # сохраняем недостающее кол-во материалов для производства по этому чертежу
+        not_available_dict = None
         if not_available > 0:
             not_available_dict = {"id": bpmm_tid, "q": not_available, "nm": bpmm_tnm}
+        elif in_scattered_stock and ((available + bp_manuf_used) > in_general_stock):
+            not_available_dict = {"id": bpmm_tid, "q": 0, "nm": bpmm_tnm}
+        # ---
+        if not_available_dict:
             if check_absolutely_not_available:
                 not_available_dict.update({"absol": not_available_absolutely})
             not_enough_materials.append(not_available_dict)
             del not_available_dict
+
     return used_and_exist_materials, not_enough_materials
 
 
@@ -359,8 +371,10 @@ def __dump_not_available_materials_list_rows(
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
+        scattered_stock_all_loc_ids,
         # список ресурсов, которые используются в производстве
         stock_resources,
+        scattered_stock_resources,
         # настройки
         with_copy_to_clipboard):
     # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
@@ -389,7 +403,9 @@ def __dump_not_available_materials_list_rows(
             not_available = __material_dict["q"]
             ms_item_name = __material_dict["nm"]
             # получаем кол-во материалов этого типа, находящихся в стоке
-            ms_in_stock = stock_resources.get(ms_type_id)
+            ms_in_stock = stock_resources.get(ms_type_id, None)
+            # получаем кол-во метариалов этого типа, находящихся в стоке на других станциях
+            m_in_scattered_stock = scattered_stock_resources.get(ms_type_id, None)
             # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
             if not group_diplayed:
                 __grp_name = sde_market_groups[ms_group_id]["nameID"]["en"]
@@ -414,7 +430,15 @@ def __dump_not_available_materials_list_rows(
                     (j['output_location_id'] in stock_all_loc_ids)]
             in_progress = 0
             for j in jobs:
-                in_progress = in_progress + j["runs"]
+                in_progress += j["runs"]
+            del jobs
+            # получаем список работ, которые ведутся с этим материалов, а результаты сбрасываются в scattered stock
+            jobs = [j for j in corp_industry_jobs_data if
+                    (j["product_type_id"] == ms_type_id) and
+                    (j['output_location_id'] in scattered_stock_all_loc_ids)]
+            for j in jobs:
+                in_progress += j["runs"]
+            del jobs
             # умножаем на кол-во производимых материалов на один run
             __stub01, __bp_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(ms_type_id, sde_bp_materials)
             if not (__bp_dict is None):
@@ -444,6 +468,12 @@ def __dump_not_available_materials_list_rows(
                 '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                 '  aria-hidden="true"></span></a>'. \
                 format(nm=ms_item_name)
+            # конструируем строку со сведениями о стоках (стоке конвейера, и стоке на других станциях)
+            __instock = ''
+            if ms_in_stock:
+                __instock = "{:,d}".format(ms_in_stock)
+            if m_in_scattered_stock:
+                __instock += "{}<mark>+ {:,d}</mark>".format(' ' if __instock else '', m_in_scattered_stock)
             # вывод сведений в отчёт
             glf.write(
                 '<tr>\n'
@@ -458,7 +488,7 @@ def __dump_not_available_materials_list_rows(
                        q=not_available,
                        inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
                        nm=ms_item_name,
-                       ins='' if not ms_in_stock else "{:,d}".format(ms_in_stock),
+                       ins=__instock,
                        clbrd=__copy2clpbrd,
                        original=vacant_originals_tag,
                        copy=vacant_copies_tag,
@@ -483,10 +513,12 @@ def __dump_not_available_materials_list(
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
+        scattered_stock_all_loc_ids,
         # списком материалов, которых не хватает в производстве
         stock_not_enough_materials,
         # список ресурсов, которые используются в производстве
         stock_resources,
+        scattered_stock_resources,
         materials_summary,
         # настройки
         with_copy_to_clipboard):
@@ -498,6 +530,7 @@ def __dump_not_available_materials_list(
         materials_summary,
         [],
         stock_resources,
+        scattered_stock_resources,
         check_absolutely_not_available=False)
     if not not_enough_materials__initial:
         return
@@ -532,6 +565,7 @@ def __dump_not_available_materials_list(
             ntier_materials_list_for_next_itr,
             used_and_exist_materials,
             stock_resources,
+            scattered_stock_resources,
             check_absolutely_not_available=False)
         if uaem:
             calc_materials_summary(uaem, used_and_exist_materials)
@@ -567,7 +601,7 @@ def __dump_not_available_materials_list(
          <th style="width:40px;">#</th>
          <td>Materials</th>
          <td>Not available</th>
-         <td class="qind-materials-exist">Exist in stock</th>
+         <td class="qind-materials-exist">Stock</th>
          <td>In progress</th>
         </tr>
        </thead>
@@ -591,8 +625,10 @@ def __dump_not_available_materials_list(
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
+        scattered_stock_all_loc_ids,
         # список ресурсов, которые используются в производстве
         stock_resources,
+        scattered_stock_resources,
         # настройки
         with_copy_to_clipboard)
 
@@ -610,7 +646,7 @@ def __dump_not_available_materials_list(
          <th style="width:40px;">#</th>
          <td>Materials</th>
          <td>Not available</th>
-         <td class="qind-materials-exist">Exist in stock</th>
+         <td class="qind-materials-exist">Stock</th>
          <td>In progress</th>
         </tr>
        </thead>
@@ -634,8 +670,10 @@ def __dump_not_available_materials_list(
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
+        scattered_stock_all_loc_ids,
         # список ресурсов, которые используются в производстве
         stock_resources,
+        scattered_stock_resources,
         # настройки
         with_copy_to_clipboard)
 
@@ -649,6 +687,23 @@ def __dump_not_available_materials_list(
      </div> <!--media-body-->
     </div> <!--media-->
     """)
+
+
+def get_stock_resources(stock_loc_ids, corp_ass_loc_data):
+    stock_resources = {}
+    if not (stock_loc_ids is None):
+        for loc_id in stock_loc_ids:
+            loc_flags = corp_ass_loc_data.keys()
+            for loc_flag in loc_flags:
+                __a1 = corp_ass_loc_data[loc_flag]
+                if str(loc_id) in __a1:
+                    __a2 = __a1[str(loc_id)]
+                    for itm in __a2:
+                        if str(itm) in stock_resources:
+                            stock_resources[itm] = stock_resources[itm] + __a2[itm]
+                        else:
+                            stock_resources.update({itm: __a2[itm]})
+    return stock_resources
 
 
 def __dump_blueprints_list_with_materials(
@@ -667,26 +722,17 @@ def __dump_blueprints_list_with_materials(
         global_materials_used,
         enable_copy_to_clipboard=False):
     # получение списков контейнеров и станок из экземпляра контейнера
-    stock_all_loc_ids = [int(ces["id"]) for ces in conveyor_entity["stock"]]
-    exclude_loc_ids = [int(cee["id"]) for cee in conveyor_entity["exclude"]]
+    stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["stock"]])
+    exclude_loc_ids = set([int(cee["id"]) for cee in conveyor_entity["exclude"]])
     blueprint_loc_ids = conveyor_entity["containers"]
     blueprint_station_ids = [conveyor_entity["station_id"]]
+    scattered_stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["scattered_stock"]])
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
-    stock_resources = {}
-    if not (stock_all_loc_ids is None):
-        for loc_id in stock_all_loc_ids:
-            loc_flags = corp_ass_loc_data.keys()
-            for loc_flag in loc_flags:
-                __a1 = corp_ass_loc_data[loc_flag]
-                if str(loc_id) in __a1:
-                    __a2 = __a1[str(loc_id)]
-                    for itm in __a2:
-                        if str(itm) in stock_resources:
-                            stock_resources[itm] = stock_resources[itm] + __a2[itm]
-                        else:
-                            stock_resources.update({itm: __a2[itm]})
+    stock_resources = get_stock_resources(stock_all_loc_ids, corp_ass_loc_data)
+    # формирование списка ресурсов, которые используются в производстве (лежат на других станциях, но тоже учитываются)
+    scattered_stock_resources = get_stock_resources(scattered_stock_all_loc_ids, corp_ass_loc_data)
 
     # сортировка контейнеров по названиям
     loc_ids = corp_bp_loc_data.keys()
@@ -926,7 +972,8 @@ def __dump_blueprints_list_with_materials(
                     (used_and_exist_materials, not_enough_materials) = calc_materials_availability(
                         materials_list_with_efficiency,
                         [],
-                        stock_resources)
+                        stock_resources,
+                        {})
 
                     # вывод наименования ресурсов (материалов)
                     glf.write('<div class="qind-materials-used"><small>\n')  # div(materials)
@@ -1013,6 +1060,7 @@ def __dump_blueprints_list_with_materials(
                                 ntier_materials_list_for_next_itr,
                                 used_and_exist_materials,
                                 stock_resources,
+                                {},
                                 check_absolutely_not_available=False)
                             if uaem:
                                 calc_materials_summary(uaem, used_and_exist_materials)
@@ -1068,10 +1116,12 @@ def __dump_blueprints_list_with_materials(
             stock_all_loc_ids,
             exclude_loc_ids,
             blueprint_station_ids,
+            scattered_stock_all_loc_ids,
             # списком материалов, которых не хватает в производстве
             stock_not_enough_materials,
             # список ресурсов, которые используются в производстве
             stock_resources,
+            scattered_stock_resources,
             materials_summary,
             # настройки
             enable_copy_to_clipboard)
@@ -1450,6 +1500,7 @@ def __dump_corp_conveyors(
             # получение списков контейнеров и станок из экземпляра контейнера
             global_stock_all_loc_ids = []
             global_exclude_loc_ids = []
+            global_scattered_stock_all_loc_ids = []
             # global_blueprint_loc_ids = []
             global_blueprint_station_ids = []
             for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
@@ -1459,25 +1510,23 @@ def __dump_corp_conveyors(
                 for id in [int(cee["id"]) for cee in conveyor_entity["exclude"]]:
                     if not (id in global_exclude_loc_ids):
                         global_exclude_loc_ids.append(id)
+                for id in [int(cess["id"]) for cess in conveyor_entity["scattered_stock"]]:
+                    if not (id in global_scattered_stock_all_loc_ids):
+                        global_scattered_stock_all_loc_ids.append(id)
                 # for id in conveyor_entity["containers"]:
                 #     if not (id in global_blueprint_loc_ids):
                 #         global_blueprint_loc_ids.append(id)
                 if not (conveyor_entity["station_id"] in global_blueprint_station_ids):
                     global_blueprint_station_ids.append(conveyor_entity["station_id"])
+            # переводим списки в множества для ускорения работы программы
+            global_stock_all_loc_ids = set(global_stock_all_loc_ids)
+            global_exclude_loc_ids = set(global_exclude_loc_ids)
+            global_scattered_stock_all_loc_ids = set(global_scattered_stock_all_loc_ids)
             # формирование списка ресурсов, которые используются в производстве
-            global_stock_resources = {}
-            if not (global_stock_all_loc_ids is None):
-                for loc_id in global_stock_all_loc_ids:
-                    loc_flags = corp_conveyors["corp_ass_loc_data"].keys()
-                    for loc_flag in loc_flags:
-                        __a1 = corp_conveyors["corp_ass_loc_data"][loc_flag]
-                        if str(loc_id) in __a1:
-                            __a2 = __a1[str(loc_id)]
-                            for itm in __a2:
-                                if str(itm) in global_stock_resources:
-                                    global_stock_resources[itm] = global_stock_resources[itm] + __a2[itm]
-                                else:
-                                    global_stock_resources.update({itm: __a2[itm]})
+            global_stock_resources = get_stock_resources(global_stock_all_loc_ids, corp_conveyors["corp_ass_loc_data"])
+            # формирование списка ресурсов, которые используются в производстве (но лежат на других станциях)
+            global_scattered_stock_resources = get_stock_resources(global_scattered_stock_all_loc_ids, corp_conveyors["corp_ass_loc_data"])
+
             __dump_not_available_materials_list(
                 glf,
                 # esi данные, загруженные с серверов CCP
@@ -1494,10 +1543,12 @@ def __dump_corp_conveyors(
                 global_stock_all_loc_ids,
                 global_exclude_loc_ids,
                 global_blueprint_station_ids,
+                global_scattered_stock_all_loc_ids,
                 # списком материалов, которых не хватает в производстве
                 stock_not_enough_materials,
                 # список ресурсов, которые используются в производстве
                 global_stock_resources,
+                global_scattered_stock_resources,
                 global_materials_summary,
                 # настройки
                 True)
