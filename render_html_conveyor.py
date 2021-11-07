@@ -561,8 +561,7 @@ def __dump_not_available_materials_list(
 <div class="row">
  <div class="col-md-6">
       <h4 class="text-primary">End-level manufacturing, entry-level purchasing</h4>
-      <div class="table-responsive">
-       <table class="table table-condensed table-hover">
+       <table class="table table-condensed table-hover table-responsive">
        <thead>
         <tr>
          <th style="width:40px;">#</th>
@@ -602,12 +601,10 @@ def __dump_not_available_materials_list(
     glf.write("""
        </tbody>
        </table>
-      </div> <!--table-responsive-->
  </div> <!--col-md-6-->
  <div class="col-md-6">
       <h4 class="text-primary">Intermediate manufacturing</h4>
-      <div class="table-responsive">
-       <table class="table table-condensed table-hover">
+       <table class="table table-condensed table-hover table-responsive">
        <thead>
         <tr>
          <th style="width:40px;">#</th>
@@ -647,7 +644,6 @@ def __dump_not_available_materials_list(
     glf.write("""
        </tbody>
        </table>
-      </div> <!--table-responsive-->
  </div> <!--col-md-6-->
 </div> <!--row-->
      </div> <!--media-body-->
@@ -735,8 +731,7 @@ def __dump_blueprints_list_with_materials(
         type_keys.sort(key=lambda bp: bp["name"])
         # инициализация скрытой таблицы, которая предназначена для сортировки чертежей по различным критериям
         glf.write("""
-<div class="table-responsive">
- <table class="table table-condensed qind-blueprints-tbl">
+ <table class="table table-condensed table-responsive qind-blueprints-tbl">
   <tbody>
 """)
         # вывод в отчёт инфорации о чертежах
@@ -1052,7 +1047,6 @@ def __dump_blueprints_list_with_materials(
         glf.write("""
   </tbody>
  </table>
-</div> <!--table-responsive-->
 """)
 
         # отображение в отчёте summary-информации по недостающим материалам
@@ -1264,8 +1258,7 @@ def __dump_corp_conveyors_stock_all(
 .text-material-buy-ntier { color: #a67877; }
 </style>
 
-<div class="table-responsive">
- <table id="tblStock" class="table table-condensed table-hover">
+ <table id="tblStock" class="table table-condensed table-hover table-responsive">
 <thead>
  <tr>
   <th class="hidden"></th>
@@ -1326,7 +1319,6 @@ def __dump_corp_conveyors_stock_all(
     glf.write("""
 </tbody>     
  </table>     
-</div>     
 """)
 
 
@@ -1395,6 +1387,25 @@ def __dump_corp_conveyors(
  </div>
 </nav>
 """)
+
+    for corp_conveyors in conveyor_data:
+        corp_blueprints_data_len = corp_conveyors["corp_bp_quantity"]
+        if corp_blueprints_data_len >= 22500:  # 10%
+            overflow = corp_blueprints_data_len >= 23750  # 5%
+            glf.write(
+                '<div class="alert alert-{alc}" role="alert">'
+                '<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>'
+                '<span class="sr-only">{ew}:</span> The number of corporate blueprints should not exceed 25,000 pieces.'
+                ' Otherwise, they cannot be found in the industry control window. Also, the correctness of the'
+                ' calculations of industry processes will suffer. <b>{cnm}</b> now has <b>{q:,d}</b> blueprints in'
+                ' assets.'
+                '</div>'.
+                format(
+                    alc='danger' if overflow else 'warning',
+                    ew='Error' if overflow else 'Warning',
+                    cnm=corp_conveyors["corporation_name"],
+                    q=corp_blueprints_data_len,
+                ))
 
     # инициализация списка материалов, требуемых (и уже используемых) в производстве
     global_materials_summary = []

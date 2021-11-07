@@ -103,7 +103,8 @@ def main():
         # Requires role(s): Director
         corp_blueprints_data = interface.get_esi_paged_data(
             "corporations/{}/blueprints/".format(corporation_id))
-        print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+        corp_blueprints_data_len = len(corp_blueprints_data)
+        print("\n'{}' corporation has {} blueprints".format(corporation_name, corp_blueprints_data_len))
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager
@@ -125,6 +126,8 @@ def main():
         # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
         corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
+
+        del corp_blueprints_data
 
         # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
         # которые предназначены для использования в чертежах
@@ -241,6 +244,7 @@ def main():
             # esi данные, загруженные с серверов CCP
             "corp_industry_jobs_data": corp_industry_jobs_data,
             "corp_assets_data": corp_assets_data,
+            "corp_bp_quantity": corp_blueprints_data_len,
             # данные, полученные в результате анализа и перекомпоновки входных списков
             "corp_ass_loc_data": corp_ass_loc_data,
             "corp_bp_loc_data": corp_bp_loc_data,
