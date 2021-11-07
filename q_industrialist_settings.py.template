@@ -14,6 +14,8 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-corporations.read_starbases.v1",  # Requires one of the following EVE corporation role(s): Director
                   "esi-corporations.read_facilities.v1",  # Requires one of the following EVE corporation role(s): Factory_Manager
                   "esi-planets.read_customs_offices.v1",  # Requires one of the following EVE corporation role(s): Director
+                  "esi-markets.read_corporation_orders.v1",  # Requires one of the following EVE corporation role(s): Accountant, Trader
+                  "esi-markets.structure_markets.v1",  # Requires one of the following EVE corporation role(s): Accountant, Trader
                  ]
 g_database = {
     "host":     "127.0.0.1",
@@ -22,3 +24,22 @@ g_database = {
     "user":     "qi_user",
     "password": "qi_LAZ7dBLmSJb9"  # <-- this is the value you probably need to edit
 }
+g_market_regions = {
+    "The Forge",
+}
+g_market_hubs = [
+    { "region": "The Forge",
+      "trade_hubs": ["Jita IV - Moon 4 - Caldari Navy Assembly Plant"],
+    },
+    # { "region": "Domain",
+    #   "trade_hubs": ["Amarr VIII (Oris) - Emperor Family Academy"],
+    # },
+]
+g_market_structures = [
+    { "structure_id": 1028858195912 },  # Perimeter - Tranquility Trading Tower (Keepstar)
+    # { "structure_id": 1023968078820 },  # Ashab - Tranquility Trade & Prod Center (Sotiyo)
+
+    { "structure_id": 1034323745897,  # P-ZMZV - SUSLIK Q STAR (Keepstar)
+      "corporation_name": "R Initiative 4",  # название корпорации, от имени которой считывать market-данные (д.б. доступ)
+    },
+]

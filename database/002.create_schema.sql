@@ -4,6 +4,10 @@
 
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
+DROP INDEX IF EXISTS qi.idx_cnr_pk;
+DROP TABLE IF EXISTS qi.cyno_network_routes;
+DROP SEQUENCE IF EXISTS qi.seq_cnr;
+
 DROP INDEX IF EXISTS qi.idx_rs_pk;
 DROP TABLE IF EXISTS qi.regroup_stock;
 DROP SEQUENCE IF EXISTS qi.seq_rs;
@@ -228,6 +232,36 @@ ALTER TABLE qi.regroup_stock OWNER TO qi_user;
 CREATE UNIQUE INDEX idx_rs_pk
     ON qi.regroup_stock USING btree
     (rs_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- cyno_network_routes
+-- список маршрутов циносети
+--------------------------------------------------------------------------------
+CREATE SEQUENCE qi.seq_cnr
+    INCREMENT 1
+    START 1000
+    MINVALUE 1
+    MAXVALUE 2147483647
+    CACHE 1;
+
+ALTER SEQUENCE qi.seq_cnr OWNER TO qi_user;
+
+CREATE TABLE qi.cyno_network_routes
+(
+    cnr_route_id INTEGER NOT NULL DEFAULT NEXTVAL('qi.seq_cnr'::regclass), -- идентификатор маршрута циносети
+    cnr_description CHARACTER VARYING(100), -- пояснение к маршруту, заметка на память
+    cnr_path BIGINT[], -- упорядоченный список идентификаторов 
+    CONSTRAINT pk_cnr PRIMARY KEY (cnr_route_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.cyno_network_routes OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_cnr_pk
+    ON qi.cyno_network_routes USING btree
+    (cnr_route_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

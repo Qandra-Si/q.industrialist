@@ -3,6 +3,8 @@ import json
 import os.path
 from pathlib import Path
 import requests
+#import datetime
+from dateutil.parser import parse as parsedate
 
 from .error import EveOnlineClientError
 from .eve_esi_client import EveESIClient
@@ -24,6 +26,9 @@ class EveOnlineInterface:
         if not isinstance(client, EveESIClient):
             raise EveOnlineClientError("You should use EveESIClient to configure interface")
         self.__client = client
+
+        self.__is_last_data_updated = False
+        self.__last_modified = None
 
     @property
     def client(self):
@@ -69,6 +74,19 @@ class EveOnlineInterface:
         """ flag which says that we are working offline, so eve_esi_interface will download & save data from CCP servers
         """
         return not self.__offline_mode
+
+    @property
+    def is_last_data_updated(self):
+        """ flag which says that we are not fetch data from CCP server because cached data used
+        """
+        return self.__is_last_data_updated
+
+    @property
+    def last_modified(self):
+        """ Last-Modified property from http header
+        :returns: :class:`datetime.datetime`
+        """
+        return self.__last_modified
 
     def __get_f_name(self, url):
         """ converts urls to filename to store it in filesystem, for example:
@@ -158,11 +176,16 @@ class EveOnlineInterface:
         :param fully_trust_cache: if cache exists, trust it! (filesystem cache priority)
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = False
+        self.__last_modified = None
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # иногда возникает ситуация, когда данные по указанному url не закачались (упали с ошибкой), и так
             # и будут вечно восстанавливаться из кеша, - все ошибки обновляем в online-режиме!
             if not ("Http-Error" in cached_data["headers"]):
-                return cached_data["json"] if "json" in cached_data else None
+                url_time = cached_data["headers"].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
+                return cached_data.get("json", None)
         if self.__offline_mode:
             if cached_data is None:
                 return None
@@ -172,20 +195,29 @@ class EveOnlineInterface:
                 self.__esi_raise_for_status(
                     code,
                     '{} Client Error: Offline-cache for url: {}'.format(code, url))
-            return cached_data["json"] if "json" in cached_data else None
+            return cached_data.get("json", None)
         else:
             # Online mode (отправляем запрос, сохраняем кеш данных, перепроверяем по ETag обновления)
             data_path = ("{srv}{url}".format(srv=self.server_url, url=url))
             # см. рекомендации по программированию тут
             # https://developers.eveonline.com/blog/article/esi-etag-best-practices
-            etag = cached_data["headers"]["etag"] if not (cached_data is None) and ("headers" in cached_data) and (
-                    "etag" in cached_data["headers"]) else None
+            if not (cached_data is None) and \
+                    ("headers" in cached_data) and \
+                    (type(cached_data["headers"]) is dict):
+                etag = cached_data["headers"].get("etag")
+            else:
+                etag = None
             try:
                 data = self.__client.send_esi_request_http(data_path, etag, body)
                 if data.status_code == 304:
-                    return cached_data["json"] if "json" in cached_data else None
+                    url_time = cached_data["headers"].get("last-modified", None)
+                    if not (url_time is None):
+                        self.__last_modified = parsedate(url_time)
+                    return cached_data.get("json", None)
                 else:
                     self.__dump_cache_into_file(url, self.__get_cached_headers(data), data.json())
+                    self.__is_last_data_updated = True
+                    self.__last_modified = self.__client.last_modified
                     return data.json()
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
@@ -205,9 +237,14 @@ class EveOnlineInterface:
         or returns early retrieved paginated data when working on offline mode
         """
         cached_data = self.__take_cache_from_file(url)
+        self.__is_last_data_updated = False
+        self.__last_modified = None
         if not self.__offline_mode and fully_trust_cache and not (cached_data is None) and ("json" in cached_data):
             # аналогично методу get_esi_data, хотя вроде в этом методе HttpError-ы не ожидаются?!
             if not ("Http-Error" in cached_data["headers"][0]):
+                url_time = cached_data["headers"][0].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
                 return self.__get_merged_pages(cached_data)
         if self.__offline_mode:
             if cached_data is None:
@@ -243,14 +280,21 @@ class EveOnlineInterface:
                     if restart_cache:
                         cached_data = None
                     restart = False
-                data_path = ("{srv}{url}?page={page}".format(
-                    srv=self.server_url,
-                    url=url,
-                    page=page))  # noqa
+                if url.find('?') == -1:
+                    data_path = ("{srv}{url}?page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
+                else:
+                    data_path = ("{srv}{url}&page={page}".format(
+                        srv=self.server_url,
+                        url=url,
+                        page=page))  # noqa
                 # см. рекомендации по программированию тут
                 #  https://developers.eveonline.com/blog/article/esi-etag-best-practices
                 if not (cached_data is None) and \
                    ("headers" in cached_data) and \
+                   (type(cached_data["headers"]) is list) and \
                    (len(cached_data["headers"]) >= page) and \
                    ("etag" in cached_data["headers"][page-1]):
                     etag = cached_data["headers"][page-1]["etag"]
@@ -274,6 +318,10 @@ class EveOnlineInterface:
                 except:
                     raise
                 if page_data.status_code == 304:
+                    url_time = cached_data["headers"][0].get("last-modified", None)
+                    if not (url_time is None):
+                        self.__last_modified = parsedate(url_time)
+
                     # возможна ситуация, когда etag у первых 3х страниц не меняется несколько суток подряд, тогда
                     # как страницы с 4й по ...20ю (например) меняются часто; такое поведение нередко наблюдается
                     # у corporation/blueprints отчёта, где первые страницы хранят младшие идентификаторы и долгое
@@ -314,11 +362,16 @@ class EveOnlineInterface:
                 page = page + 1
             if (diff_pages > 0) or (match_pages == 0):
                 self.__dump_cache_into_file(url, data_headers, data_pages)
+                self.__is_last_data_updated = True
+                self.__last_modified = self.__client.last_modified
                 merged = []
                 for p in data_pages:
                     merged += p
                 return merged
             elif len(cached_data["headers"]) == match_pages:
+                url_time = cached_data["headers"][0].get("last-modified", None)
+                if not (url_time is None):
+                    self.__last_modified = parsedate(url_time)
                 return self.__get_merged_pages(cached_data)
             else:
                 print("ERROR! : ", match_pages, diff_pages)
@@ -331,7 +384,7 @@ class EveOnlineInterface:
         problem_ids = []
         if body:
             try:
-                # Requires role(s): Director
+                # Requires role(s): ???
                 piece_data = self.get_esi_data(
                     url,
                     json.dumps(body, indent=0, sort_keys=False),
@@ -386,7 +439,7 @@ class EveOnlineInterface:
                 raise
         return piece_data
 
-    def authenticate(self, character_name=None):
+    def authenticate(self, character_name=None, client_id=None):
         """ Main authenticate method to login character into system
 
         :param character_name: pilot' name for signin, or None value for signup new pilot into system
@@ -394,7 +447,7 @@ class EveOnlineInterface:
         authz = {} if character_name is None else self.__client.auth_cache.read_cache(character_name)
         if not self.__offline_mode:
             if not ('access_token' in authz) or not ('refresh_token' in authz) or not ('expired' in authz):
-                authz = self.__client.auth(self.__scopes)
+                authz = self.__client.auth(self.__scopes, client_id)
             elif not ('scope' in authz) or not self.__client.auth_cache.verify_auth_scope(authz, self.__scopes):
                 authz = self.__client.auth(self.__scopes, authz["client_id"])
             elif self.__client.auth_cache.is_timestamp_expired(int(authz["expired"])):

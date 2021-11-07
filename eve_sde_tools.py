@@ -3,7 +3,7 @@
 run the following command from this directory as the root:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --cache_dir=~/.q_industrialist
+>>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 """
 import sys
 import os
@@ -11,6 +11,7 @@ import getopt
 import yaml
 import json
 from yaml import SafeLoader
+from pathlib import Path
 
 import pyfa_conversions as conversions
 
@@ -112,6 +113,8 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
                     if deleted1:
                         continue
                     break
+            # mkdir
+            Path('{dir}/sde_cache'.format(dir=ws_dir)).mkdir(parents=True, exist_ok=True)
             # json
             s = json.dumps(yaml_data, indent=1, sort_keys=False)
             f = open(f_name_json, "wt+", encoding='utf8')
@@ -223,6 +226,18 @@ def get_market_group_by_type_id(sde_type_ids, type_id):
     return None
 
 
+def get_market_group_by_name(sde_market_groups, name):
+    for grp in sde_market_groups.items():
+        if name == grp[1]["nameID"]["en"]:
+            return grp  # id=grp[0], dict=grp[1]
+    return None
+
+
+def get_market_group_id_by_name(sde_market_groups, name):
+    grp = get_market_group_by_name(sde_market_groups, name)
+    return None if grp is None else grp[0]
+
+
 def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
     group_id = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
@@ -246,10 +261,7 @@ def get_root_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     return groups_chain[0]
 
 
-def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
-    if group_id is None:
-        return None
+def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
     __group_id = group_id
     while True:
         if __group_id in [# 475,  # Manufacture & Research
@@ -274,7 +286,13 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
             __group_id = __parent_group_id
         else:
             return __group_id
-    return group_id
+
+
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
+    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+    if group_id is None:
+        return None
+    return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
 
 
 def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
@@ -401,6 +419,16 @@ def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activ
     return None, None
 
 
+def get_blueprint_type_id_by_manufacturing_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing")
+    return a, b
+
+
+def get_blueprint_type_id_by_invention_product_id(product_id, sde_bp_materials):
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="invention")
+    return a, b
+
+
 def get_product_by_blueprint_type_id(blueprint_type_id, activity_id, sde_bp_materials):
     """
     Поиск идентификатора manufacturing/reaction-продукта по известному идентификатору чертежа
@@ -446,55 +474,6 @@ def get_manufacturing_product_by_blueprint_type_id(blueprint_type_id, sde_bp_mat
                     quantity = int(m["quantity"])
                     return product_id, quantity, __bpm2["materials"]
     return None, None, None
-
-
-def get_industry_material_efficiency(
-        # тип производства - это чертёж или формула, или реакция?
-        manufacturing_activity: str,
-        # кол-во run-ов
-        runs_quantity: int,
-        # кол-во из исходного чертежа (до учёта всех бонусов)
-        __bpo_materials_quantity: int,
-        # me-параметр чертежа
-        material_efficiency: int):
-    if __bpo_materials_quantity == 1:
-        # не может быть потрачено материалов меньше, чем 1 штука на 1 ран,
-        # это значит, что 1шт*11run*(100-1-4.2-4)/100=9.988 => всё равно 11шт
-        __need = runs_quantity
-    else:
-        if manufacturing_activity == 'reaction':
-            # TODO: хардкодим -2.2% structure role bonus
-            __stage1 = runs_quantity * __bpo_materials_quantity
-            # учитываем бонус профиля сооружения
-            __stage2 = float(__stage1 * (100.0 - 2.2) / 100.0)
-            # округляем вещественное число до старшего целого
-            __stage3 = int(float(__stage2 + 0.99))
-            # ---
-            __need = __stage3
-        elif manufacturing_activity == 'manufacturing':
-            # TODO: хардкодим -1% structure role bonus, -4.2% installed rig
-            # см. 1 x run: http://prntscr.com/u0g07w
-            # см. 4 x run: http://prntscr.com/u0g0cd
-            # см.11 x run: https://prnt.sc/v3mk1m
-            # см. экономия материалов: http://prntscr.com/u0g11u
-            # ---
-            # считаем бонус чертежа (накладываем ME чертежа на БПЦ)
-            __stage1 = float(__bpo_materials_quantity * runs_quantity * (100 - material_efficiency) / 100.0)
-            # учитываем бонус профиля сооружения
-            __stage2 = float(__stage1 * (100.0 - 1.0) / 100.0)
-            # учитываем бонус установленного модификатора
-            __stage3 = float(__stage2 * (100.0 - 4.2) / 100.0)
-            # округляем вещественное число до старшего целого
-            __stage4 = int(float(__stage3 + 0.99))
-            # ---
-            __need = __stage4
-        elif manufacturing_activity == 'invention':
-            # TODO: не используется structure role bonus
-            __need = runs_quantity * __bpo_materials_quantity
-        else:
-            # TODO: не поддерживается расчёт... доделать
-            __need = runs_quantity * __bpo_materials_quantity
-    return __need
 
 
 def get_market_groups_tree_root(groups_tree, group_id):

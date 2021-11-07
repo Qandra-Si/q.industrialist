@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Backup files
+*.*#
+*.bak
+*.save
+
 # C extensions
 *.so
 
@@ -152,4 +157,3 @@ dmypy.json
 /*.csv
 /database/*.dmp
 /database/*.dump
-/*.bak

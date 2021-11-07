@@ -9,9 +9,9 @@ function __get_img_src($tp, $sz, $use_filesystem_resources)
     else
         return 'http://imageserver.eveonline.com/Type/'.$tp.'_'.$sz.'.png';
 }
-?>
 
-<?php
+
+
 // --------------------------------------------------------------------------------------------------------------
 // __dump_header
 // --------------------------------------------------------------------------------------------------------------
@@ -92,10 +92,11 @@ function __dump_header($header_name, $use_filesystem_resources)
  <div class="page-header"><h1>Q.Industrialist <small><?=$header_name?></small></h1></div>
  <script src="<?=$jq_js?>"></script>
  <script src="<?=$bs_js?>"></script>
-<?php } ?>
+<?php }
 
 
-<?php
+
+
 // --------------------------------------------------------------------------------------------------------------
 // __dump_footer
 // --------------------------------------------------------------------------------------------------------------
@@ -110,10 +111,11 @@ function __dump_footer()
 <small>EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.</small>
 </small></p>
 </body></html>
-<?php } ?>
+<?php }
 
 
-<?php
+
+
 // --------------------------------------------------------------------------------------------------------------
 // __dump_any_into_modal_header_wo_button
 // --------------------------------------------------------------------------------------------------------------
@@ -131,10 +133,11 @@ function __dump_any_into_modal_header_wo_button($name, $unique_id=NULL, $modal_s
     <h4 class="modal-title" id="modal<?=$name_merged?>Label"><?=$name?></h4>
    </div>
    <div class="modal-body">
-<?php } ?>
+<?php }
 
 
-<?php
+
+
 // --------------------------------------------------------------------------------------------------------------
 // __dump_any_into_modal_header
 // --------------------------------------------------------------------------------------------------------------
@@ -148,10 +151,10 @@ function __dump_any_into_modal_header($name, $unique_id=NULL, $btn_size="btn-lg"
 <?php
     __dump_any_into_modal_header_wo_button($name, $unique_id, $modal_size);
 }
-?>
 
 
-<?php
+
+
 // --------------------------------------------------------------------------------------------------------------
 // __dump_any_into_modal_footer
 // --------------------------------------------------------------------------------------------------------------
@@ -164,4 +167,116 @@ function __dump_any_into_modal_footer() { ?>
   </div>
  </div>
 </div>
-<?php } ?>
+<?php
+}
+
+
+
+
+// --------------------------------------------------------------------------------------------------------------
+// get_clipboard_copy_button
+// --------------------------------------------------------------------------------------------------------------
+function get_clipboard_copy_button(&$data_copy) {
+    return ' <a data-target="#" role="button" data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip" data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></a>';
+}
+
+
+
+
+// --------------------------------------------------------------------------------------------------------------
+// __dump_copy_to_clipboard_javascript
+// --------------------------------------------------------------------------------------------------------------
+function __dump_copy_to_clipboard_javascript() {
+?><script>
+$(document).ready(function(){
+ // Working with clipboard
+ $('a.qind-copy-btn').each(function() {
+  $(this).tooltip();
+ })
+ $('a.qind-copy-btn').bind('click', function () {
+  var data_copy = $(this).attr('data-copy');
+  if (data_copy === undefined) {
+   var data_source = $(this).attr('data-source');
+   if (data_source == 'table') {
+    var tr = $(this).parent().parent();
+    var tbody = tr.parent();
+    var rows = tbody.children('tr');
+    var start_row = rows.index(tr);
+    data_copy = '';
+    rows.each( function(idx) {
+     if (!(start_row === undefined) && (idx > start_row)) {
+      var td0 = $(this).find('td').eq(0); // ищём <td#0 class='active'>
+      if (!(td0.attr('class') === undefined))
+       start_row = undefined;
+      else {
+       //ищём <tr>...<td#1><a data-copy='?'>...
+       var td1a = $(this).find('td').eq(1).find('a');
+       if (!(td1a === undefined)) {
+        var nm = td1a.attr('data-copy');
+        if (!(nm === undefined)) {
+         var td2q = $(this).find('td').eq(2).attr('quantity');
+         if (!(td2q === undefined) && (td2q > 0)) {
+          if (data_copy) data_copy += "\n"; 
+          data_copy += nm + "\t" + td2q;
+         }
+        }
+       }
+      }
+     }
+    });
+   } else if (data_source == 'span') {
+    var div = $(this).parent();
+    var spans = div.children('span');
+    data_copy = '';
+    spans.each( function(idx) {
+     var span = $(this);
+     if (data_copy) data_copy += "\n";
+     var txt = span.text();
+     data_copy += txt.substring(txt.indexOf(' x ')+3) + "\t" + span.attr('quantity');
+    });
+   }
+  }
+  if (data_copy) {
+   if (window.isSecureContext && navigator.clipboard) {
+    navigator.clipboard.writeText(data_copy).then(() => {
+     $(this).trigger('copied', ['Copied!']);
+    }, (e) => {
+     $(this).trigger('copied', ['Data not copied!']);
+    });
+    document.execCommand("copy");
+   }
+   else {
+    var $temp = $("<textarea>");
+    $("body").append($temp);
+    $temp.val(data_copy).select();
+    try {
+     success = document.execCommand("copy");
+     if (success)
+      $(this).trigger('copied', ['Copied!']);
+     else
+      $(this).trigger('copied', ['Data not copied!']);
+    } finally {
+     $temp.remove();
+    }
+   }
+  }
+  else {
+   $(this).trigger('copied', ['Nothing no copy!']);
+  }
+ });
+ $('a.qind-copy-btn').bind('copied', function(event, message) {
+   $(this).attr('title', message)
+     .tooltip('fixTitle')
+     .tooltip('show')
+     .attr('title', "Copy to clipboard")
+     .tooltip('fixTitle');
+ });
+ if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+   // какой-то код ...
+   $('a.qind-copy-btn').each(function() {
+     $(this).addClass('hidden');
+   })
+ }
+});
+</script><?php }
+?>

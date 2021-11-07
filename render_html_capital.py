@@ -2,6 +2,7 @@
 import typing
 import render_html
 import eve_sde_tools
+import eve_efficiency
 
 
 def get_pseudographics_prefix(levels, is_last):
@@ -83,7 +84,7 @@ def __dump_blueprint_materials(
             industry_jobs_cache[bpmm1_tid] = bpmm1_in_progress
         # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
         # например с использованием BPO)
-        bpmm1_quantity_with_efficiency = eve_sde_tools.get_industry_material_efficiency(
+        bpmm1_quantity_with_efficiency = eve_efficiency.get_industry_material_efficiency(
             'reaction' if bpmm0_is_reaction_formula else 'manufacturing',
             bpmm0_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
             bpmm1_quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
@@ -109,6 +110,7 @@ def __dump_blueprint_materials(
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
         # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough)
+        # debug: print(row0_prefix + str(row1_num), bpmm1_tnm, bpmm1_not_enough, "= n{} - a{} - j{}".format(bpmm1_quantity_with_efficiency, bpmm1_available, bpmm1_in_progress))
         # вывод наименования ресурса
         glf.write(
             '<tr{tr_class}>\n'
@@ -476,7 +478,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     if not str_bp_cont_names:
         str_bp_cont_names = '<mark></mark>'
     glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container(s) {}.</p>\n'.
-              format(str_bp_cont_names))  # Materials
+              format(str_bp_cont_names))  # Blueprints
     glf.write("""
 <div class="table-responsive">
  <table class="table table-condensed" style="font-size:small">

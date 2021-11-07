@@ -6,4 +6,6 @@ psql --file=003.create_dictionaries.sql --echo-errors --log-file=003.create_dict
 
 psql --file=004.load_test_data.sql --echo-errors --log-file=004.load_test_data.log qi_db qi_user
 
+pg_restore --exit-on-error --clean --if-exists --no-owner --verbose --format=c --dbname=qi_db --username=qi_user postgres-20201029-TRANQUILITY-schema.dmp
+
 pause

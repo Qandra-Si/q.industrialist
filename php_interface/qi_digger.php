@@ -1,14 +1,12 @@
 ﻿<?php header("Location: " . $_SERVER['HTTP_REFERER']); ?>
 
 <?php
+include 'qi_tools_and_utils.php';
+
 if (!extension_loaded('pgsql')) return;
 
 include_once '.settings.php';
 
-
-function get_numeric($val) {
-    return is_numeric($val) ? ($val + 0) : 0;
-}
 
 function get_conn() {
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)

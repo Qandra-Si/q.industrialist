@@ -6,6 +6,7 @@ from datetime import datetime
 import q_industrialist_settings
 
 __g_local_timezone = tzlocal.get_localzone()
+__g_render_datetime = None
 __g_pattern_c2s1 = re.compile(r'(.)([A-Z][a-z]+)')
 __g_pattern_c2s2 = re.compile(r'([a-z0-9])([A-Z])')
 __g_bootstrap_css_local = 'bootstrap/3.4.1/css/bootstrap.min.css'
@@ -24,6 +25,14 @@ def __camel_to_snake(name, trim_spaces=False):  # https://stackoverflow.com/a/11
   if trim_spaces:
       name = name.replace(" ", "")
   return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
+
+
+def __get_render_datetime():
+    global __g_render_datetime
+    global __g_local_timezone
+    if __g_render_datetime is None:
+        __g_render_datetime = datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')
+    return __g_render_datetime
 
 
 def __get_img_src(tp, sz):
@@ -135,8 +144,7 @@ def __dump_header(glf, header_name):
 
 def __dump_footer(glf, show_generated_datetime=True):
     if show_generated_datetime:
-        glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(
-            dt=datetime.fromtimestamp(time.time(), __g_local_timezone).strftime('%a, %d %b %Y %H:%M:%S %z')))
+        glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(dt=__get_render_datetime()))
     # Don't remove line below !
     glf.write("""</br>
 &copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
@@ -184,6 +192,29 @@ def __dump_any_into_modal_footer(glf):
   </div>
  </div>
 </div>
+""")
+
+
+def __dump_sde_type_ids_to_js(glf, sde_type_ids):
+    type_id_keys = sde_type_ids.keys()
+    sorted_type_id_keys = sorted(type_id_keys, key=lambda x: int(x))
+    glf.write('<script>\nvar g_sde_max_type_id={max};\nvar g_sde_type_ids=['.format(max=sorted_type_id_keys[-1]))
+    for type_id in sorted_type_id_keys:
+        # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
+        glf.write('{end}[{id},"{nm}"]'.format(
+            id=type_id,
+            nm=sde_type_ids[str(type_id)]["name"]["en"].replace('"', '\\\"'),
+            end="\n" if type_id == "0" else ","))
+    glf.write("""
+];
+function getSdeItemName(id) {
+ if ((id < 0) || (id > g_sde_max_type_id)) return null;
+ for (var i=0; i<=g_sde_max_type_id; ++i)
+  if (id == g_sde_type_ids[i][0])
+   return g_sde_type_ids[i][1];
+ return null;
+};
+</script>
 """)
 
 

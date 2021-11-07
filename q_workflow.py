@@ -48,7 +48,7 @@ g_module_default_settings = {
     "factory:blueprints_hangars": [1],
 
     # номера контейнеров, в которых располагаются чертежи для конвейера
-    "industry:conveyor_boxes": [],
+    # устарело, не используется: "industry:conveyor_boxes": [],
 }
 g_module_default_types = {
     "factory:station_id2": int,
@@ -104,7 +104,8 @@ def __get_blueprints_containers(
         sde_inv_names,
         corp_assets_data,
         foreign_structures_data,
-        corp_ass_names_data
+        corp_ass_names_data,
+        throw_when_not_found=False
     )
     return factories_containers
 
@@ -288,11 +289,9 @@ def __get_monthly_manufacturing_scheduler(
             sde_market_groups,
             __product_type_id)
         __market_groups = set(__market_groups_chain)
-        # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана
-        __blueprint_copy_runs = 1
-        if bool(__market_groups & {9, 157, 11}):  # Ship Equipment, Drones, Ammunition & Charges
-            __blueprint_copy_runs = 10
-        elif 4 in __market_groups:  # Ships
+        # в расчётах учитывается правило: Т2 модули - 10 ранов, все хулы - 4 рана, все риги - 3 рана (см. 1_industry.py)
+        __blueprint_copy_runs = 10  # Ship Equipment, Drones, Ammunition & Charges, ...
+        if 4 in __market_groups:  # Ships
             __blueprint_copy_runs = 4
         elif 955 in __market_groups:  # Ship and Module Modifications
             __blueprint_copy_runs = 3
@@ -554,20 +553,23 @@ def __build_industry(
         db_workflow_industry_jobs = qidb.select_all_rows(
             "SELECT ptid,SUM(cst),SUM(prdcts),mnth "
             "FROM (SELECT "
-            "  wij_product_tid AS ptid,"
-            "  wij_cost AS cst,"
-            "  wij_quantity AS prdcts,"
-            "  EXTRACT(MONTH FROM wij_end_date) AS mnth"
-            " FROM qi.workflow_industry_jobs"
-            " WHERE wij_activity_id=1 AND"
-            "  wij_bp_lid=ANY(%s) AND"
-            "  wij_product_tid=ANY(%s) AND"
-            "  wij_end_date > (current_date - interval '93' day)"
+            "  ecj.ecj_product_type_id AS ptid,"
+            "  ecj.ecj_cost AS cst,"
+            "  ecj.ecj_runs*coalesce(pi.sdebp_quantity,1) AS prdcts,"
+            "  EXTRACT(MONTH FROM ecj.ecj_end_date) AS mnth"
+            " FROM qi.esi_corporation_industry_jobs ecj"
+            "   LEFT OUTER JOIN qi.eve_sde_blueprint_products pi ON ("
+            "     pi.sdebp_activity=1 AND"
+            "     pi.sdebp_blueprint_type_id=ecj.ecj_blueprint_type_id AND"
+            "     pi.sdebp_product_id=ecj.ecj_product_type_id"
+            "   )"
+            " WHERE ecj.ecj_activity_id=1 AND"
+            "  ecj.ecj_product_type_id=ANY(%s) AND"
+            "  ecj.ecj_end_date > (current_date - interval '93' day)"
             ") AS a "
             "WHERE mnth=%s OR mnth=%s OR mnth=%s "
             "GROUP BY 1,4 "
             "ORDER BY 1;",
-            module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids,
             int(db_current_month[0]),  # january=1, december=12
             int((db_current_month[0]-2+12)%12+1),
@@ -583,14 +585,19 @@ def __build_industry(
 
         # выбираем накопленные данные по производству из БД (за последние 30 дней)
         db_workflow_last_industry_jobs = qidb.select_all_rows(
-            "SELECT wij_product_tid,SUM(wij_quantity) "
-            "FROM qi.workflow_industry_jobs "
-            "WHERE wij_activity_id=1 AND"
-            " wij_bp_lid=ANY(%s) AND"
-            " wij_product_tid=ANY(%s) AND"
-            " wij_end_date > (current_date - interval '30' day) "
+            "SELECT"
+            " ecj.ecj_product_type_id,"
+            " SUM(ecj.ecj_runs*coalesce(pi.sdebp_quantity,1)) "
+            "FROM qi.esi_corporation_industry_jobs ecj"
+            " LEFT OUTER JOIN qi.eve_sde_blueprint_products pi ON ("
+            "  pi.sdebp_activity=1 AND"
+            "  pi.sdebp_blueprint_type_id=ecj.ecj_blueprint_type_id AND"
+            "  pi.sdebp_product_id=ecj.ecj_product_type_id"
+            " )"
+            "WHERE ecj.ecj_activity_id=1 AND"
+            " ecj.ecj_product_type_id=ANY(%s) AND"
+            " ecj.ecj_end_date > (current_date - interval '30' day) "
             "GROUP BY 1;",
-            module_settings["industry:conveyor_boxes"],
             conveyor_product_type_ids)
         corp_industry_stat["workflow_last_industry_jobs"] = [{
             "ptid": wij[0],
