@@ -59,3 +59,6 @@ g_manufacturing = [
         # "manufacturing_activity": "reaction",
     }
 ]
+
+# отладочный (или подробный) режим вывода информации о преобразовании одним материвалов в другие
+g_generate_with_show_details = False

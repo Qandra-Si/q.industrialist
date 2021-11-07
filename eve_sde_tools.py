@@ -254,7 +254,7 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     while True:
         if __group_id in [# 475,  # Manufacture & Research
                           # 533,  # Materials (parent:475, см. ниже)
-                          1035,  # Components (parent:475)
+                          # 1035,  # Components (parent:475, см. ниже)
                           1872,  # Research Equipment (parent:475)
                           955,  # Ship and Module Modifications
                           1112,  # Subsystems (parent:955)
@@ -268,6 +268,7 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
             if __parent_group_id in [533,  # Materials
                                      1034,  # Reaction Materials
                                      477,  # Structures (чтобы было понятнее содержимое accounting-отчётов)
+                                     1035,  # Components
                                      ]:
                 return __group_id
             __group_id = __parent_group_id
