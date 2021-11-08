@@ -279,7 +279,7 @@ where
     500, -- Processed Moon Materials
     501, -- Raw Moon Materials
     1031, -- Raw Materials
-    1035, -- Components
+    1035,65,781,1021,1147,1865,1870,1883,1908,2768, -- Components
     1332, -- Planetary Materials
     1857, -- Minerals
     1858, -- Booster Materials

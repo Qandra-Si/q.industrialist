@@ -7,7 +7,7 @@ const JITA_IMPORT_PRICE = 866.0; // цена импорта 1куб.м. из Jit
 const MIN_PROFIT = 0.05; // 5%
 const DEFAULT_PROFIT = 0.1; // 10%
 const MAX_PROFIT = 0.25; // 25%
-const TAX_AND_FEE = 0.03 + 0.0113; // налог на структуре и брокерская комиссия
+const TAX_AND_FEE = 0.02 + 0.036; // налог на структуре и брокерская комиссия
 
 
 function eve_ceiling($isk) {
@@ -24,6 +24,15 @@ function eve_ceiling($isk) {
     else $isk = null;
     return $isk;
 }
+
+function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell, $jita_buy) { ?>
+<tr style="font-weight:bold;">
+ <td colspan="3" align="right"><?=$market_group?> Summary</td>
+ <td align="right"><?=number_format($price,0,'.',',').'<br>'.number_format($volume,0,'.',',')?>m³</td>
+ <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
+ <td colspan="4"></td>
+</tr>
+<?php }
 
 
 function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
@@ -64,6 +73,10 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
     $amarr_buy_price = 0.0;
     $jita_buy_price = 0.0;
     $prev_market_group = null;
+    $summary_market_group_price = 0;
+    $summary_market_group_volume = 0;
+    $summary_market_group_jita_sell = 0;
+    $summary_market_group_jita_buy = 0;
     if ($market)
         foreach ($market as &$product)
         {
@@ -143,10 +156,21 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                     $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
             }
 
-            if (!is_null($ri4_market_quantity)&&!is_null($ri4_price)) $summary_market_price += $ri4_market_quantity * $ri4_price;
-            if (!is_null($packaged_volume)) $summary_market_volume += $ri4_market_quantity * $packaged_volume;
-            $summary_jita_sell += $ri4_market_quantity * $jita_sell;
+            if (!is_null($ri4_market_quantity)&&!is_null($ri4_price))
+	    {
+	        $summary_market_price += $ri4_market_quantity * $ri4_price;
+	        $market_group_summary_market_price += $ri4_market_quantity * $ri4_price;
+            }
+            if (!is_null($packaged_volume))
+	    {
+	        $summary_market_volume += $ri4_market_quantity * $packaged_volume;
+	        $market_group_summary_market_volume += $ri4_market_quantity * $packaged_volume;
+            }
+	    $summary_jita_sell += $ri4_market_quantity * $jita_sell;
             $summary_jita_buy += $ri4_market_quantity * $jita_buy;
+
+            $market_group_summary_jita_sell += $ri4_market_quantity * $jita_sell;
+            $market_group_summary_jita_buy += $ri4_market_quantity * $jita_buy;
 
             if (!empty($problems)) {
                 if ($amarr_sell <= $jita_sell) {
@@ -173,7 +197,21 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
             if ($prev_market_group != $market_group)
             {
+	        if (!is_null($prev_market_group))
+		{
+		    __dump_market_group_summary(
+		        $prev_market_group,
+			$market_group_summary_market_price,
+			$market_group_summary_market_volume,
+			$market_group_summary_jita_sell,
+			$market_group_summary_jita_buy
+		    );
+		}
                 $prev_market_group = $market_group;
+		$market_group_summary_market_price = 0;
+		$market_group_summary_market_volume = 0;
+		$market_group_summary_jita_sell = 0;
+		$market_group_summary_jita_buy = 0;
                 ?><tr><td class="active" colspan="8"><strong><?=$market_group?></strong></td></tr><?php
             }
 ?>
@@ -248,6 +286,16 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 ?>
 </tr>
 <?php
+    }
+    if (!is_null($prev_market_group))
+    {
+        __dump_market_group_summary(
+            $prev_market_group,
+            $market_group_summary_market_price,
+            $market_group_summary_market_volume,
+            $market_group_summary_jita_sell,
+            $market_group_summary_jita_buy
+        );
     }
 ?>
 <tr style="font-weight:bold;">
@@ -496,7 +544,7 @@ where
     500, -- Processed Moon Materials
     501, -- Raw Moon Materials
     1031, -- Raw Materials
-    1035, -- Components
+    1035,65,781,1021,1147,1865,1870,1883,1908,2768, -- Components
     1332, -- Planetary Materials
     1857, -- Minerals
     1858, -- Booster Materials
@@ -739,7 +787,7 @@ EOD;
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-7">плюс 3% налог и 1.13% комиссия</div>
+  <div class="col-md-7">плюс 2% налог и 3.6% комиссия</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_tax"></mark> ISK</div>
 </div>
 <div class="row">

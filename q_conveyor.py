@@ -26,7 +26,6 @@ Requires application scopes:
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
-import json
 import requests
 import re
 
@@ -53,9 +52,12 @@ def main():
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
-    # Построение списка модулей и ресурсов, которые используются в производстве
-    materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
-    research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
+    # индексация списка модулей и ресурсов, которые используются в производстве
+    materials_for_bps = set(eve_sde_tools.get_materials_for_blueprints(sde_bp_materials))
+    research_materials_for_bps = set(eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials))
+    # индексация списка продуктов, которые появляются в результате производства
+    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials))
+    reaction_products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="reaction"))
 
     conveyor_data = []
     for pilot_name in argv_prms["character_names"]:
@@ -101,7 +103,8 @@ def main():
         # Requires role(s): Director
         corp_blueprints_data = interface.get_esi_paged_data(
             "corporations/{}/blueprints/".format(corporation_id))
-        print("\n'{}' corporation has {} blueprints".format(corporation_name, len(corp_blueprints_data)))
+        corp_blueprints_data_len = len(corp_blueprints_data)
+        print("\n'{}' corporation has {} blueprints".format(corporation_name, corp_blueprints_data_len))
         sys.stdout.flush()
 
         # Requires role(s): Factory_Manager
@@ -123,6 +126,8 @@ def main():
         # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
         corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
+
+        del corp_blueprints_data
 
         # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
         # которые предназначены для использования в чертежах
@@ -164,16 +169,15 @@ def main():
 
         # Поиск контейнеров, которые участвуют в производстве
         corp_conveyour_entities = []
-        for __manuf_dict in enumerate(q_conveyor_settings.g_manufacturing):
-            __manuf_dict_num = __manuf_dict[0]
+        for (__manuf_dict_num, __manuf_dict) in enumerate(q_conveyor_settings.g_manufacturing):
             # находим контейнеры по заданным названиям
             blueprint_loc_ids = []
-            for tmplt in __manuf_dict[1]["conveyor_container_names"]:
+            for tmplt in __manuf_dict["conveyor_container_names"]:
                 blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
             # кешируем признак того, что контейнеры являются стоком материалов
-            same_stock_container = ("same_stock_container" in __manuf_dict[1]) and bool(__manuf_dict[1]["same_stock_container"])
-            fixed_number_of_runs = __manuf_dict[1]["fixed_number_of_runs"] if "fixed_number_of_runs" in __manuf_dict[1] else None
-            manufacturing_activity = __manuf_dict[1]["manufacturing_activity"] if "manufacturing_activity" in __manuf_dict[1] else "manufacturing"
+            same_stock_container = __manuf_dict.get("same_stock_container", False)
+            fixed_number_of_runs = __manuf_dict.get("fixed_number_of_runs", None)
+            manufacturing_activity = __manuf_dict.get("manufacturing_activity", "manufacturing")
             # находим станцию, где расположены найденные контейнеры
             for id in blueprint_loc_ids:
                 __loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -190,13 +194,19 @@ def main():
                 __conveyor_entity = next((id for id in corp_conveyour_entities if (id["station_id"] == __station_id) and (id["num"] == __manuf_dict_num)), None)
                 if __conveyor_entity is None:
                     __conveyor_entity = __loc_dict
-                    __conveyor_entity.update({"containers": [], "stock": [], "exclude": [], "num": __manuf_dict_num})
+                    __conveyor_entity.update({
+                        "containers": [],
+                        "stock": [],
+                        "scattered_stock": [],
+                        "exclude": [],
+                        "num": __manuf_dict_num,
+                    })
                     corp_conveyour_entities.append(__conveyor_entity)
                     # на этой же станции находим контейнер со стоком материалов
                     if same_stock_container:
                         __conveyor_entity["stock"].append({"id": id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None)})
                     else:
-                        for tmplt in __manuf_dict[1]["stock_container_names"]:
+                        for tmplt in __manuf_dict["stock_container_names"]:
                             __stock_ids = [n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])]
                             for __stock_id in __stock_ids:
                                 __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -210,7 +220,7 @@ def main():
                                 if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
                                     __conveyor_entity["stock"].append({"id": __stock_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __stock_id), None)})
                     # на этой же станции находим контейнеры, из которых нельзя доставать чертежи для производства материалов
-                    for tmplt in __manuf_dict[1]["exclude_container_names"]:
+                    for tmplt in __manuf_dict["exclude_container_names"]:
                         __exclude_ids = [n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])]
                         for __exclude_id in __exclude_ids:
                             __stock_loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -223,6 +233,22 @@ def main():
                             )
                             if ("station_id" in __stock_loc_dict) and (__station_id == __stock_loc_dict["station_id"]):
                                 __conveyor_entity["exclude"].append({"id": __exclude_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __exclude_id), None)})
+                    # на любой другой станции находим контейнер, в котором находится сток для нужд конвейера, но пока
+                    # ещё на нужную станцию (например с Татары на Сотию)
+                    for tmplt in __manuf_dict.get("scattered_stock_containers", []):
+                        ss_ids = [(n["item_id"], n['name']) for n in corp_ass_names_data if re.search(tmplt, n['name'])]
+                        for (ss_id, ss_name) in ss_ids:
+                            ss_loc_dict = eve_esi_tools.get_universe_location_by_item(
+                                ss_id,
+                                sde_inv_names,
+                                sde_inv_items,
+                                corp_assets_tree,
+                                corp_ass_names_data,
+                                foreign_structures_data
+                            )
+                            if "station_id" in ss_loc_dict:
+                                __conveyor_entity["scattered_stock"].append({"id": ss_id, "name": ss_name, "loc": ss_loc_dict})
+                        del ss_ids
                 # добавляем к текущей станции контейнер с чертежами
                 # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
                 __conveyor_entity["containers"].append({
@@ -239,6 +265,7 @@ def main():
             # esi данные, загруженные с серверов CCP
             "corp_industry_jobs_data": corp_industry_jobs_data,
             "corp_assets_data": corp_assets_data,
+            "corp_bp_quantity": corp_blueprints_data_len,
             # данные, полученные в результате анализа и перекомпоновки входных списков
             "corp_ass_loc_data": corp_ass_loc_data,
             "corp_bp_loc_data": corp_bp_loc_data,
@@ -257,12 +284,20 @@ def main():
         print(' corporation = {}'.format(cd["corporation_name"]))
         for ce in cd["corp_conveyour_entities"]:
             print('   {} = {}'.format(ce["station_id"], ce["station"]))
+            print('     containers with blueprints:')
             for cec in ce["containers"]:
-                print('     {} = {}'.format(cec["id"], cec["name"]))
+                print('       {} = {}'.format(cec["id"], cec["name"]))
+            print('     stock containers:')
             for ces in ce["stock"]:
-                print('     {} = {}'.format(ces["id"], ces["name"]))
-            for cee in ce["exclude"]:
-                print('     {} = {}'.format(cee["id"], cee["name"]))
+                print('       {} = {}'.format(ces["id"], ces["name"]))
+            if ce["scattered_stock"]:
+                print('     scattered stock containers:')
+                for cess in ce["scattered_stock"]:
+                    print('       {} = {} : {}'.format(cess["id"], cess["loc"]["station"], cess["name"]))
+            if ce["containers"]:
+                print('     exclude containers:')
+                for cee in ce["exclude"]:
+                    print('       {} = {}'.format(cee["id"], cee["name"]))
     sys.stdout.flush()
 
     print("\nBuilding report...")
@@ -280,6 +315,8 @@ def main():
         sde_market_groups,
         materials_for_bps,
         research_materials_for_bps,
+        products_for_bps,
+        reaction_products_for_bps,
         # настройки генерации отчёта
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
