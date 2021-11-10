@@ -325,7 +325,7 @@ def get_ntier_materials_list_of_not_available(
         # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
         # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
         if is_reaction_blueprint:
-            __blueprints = ceil(m["q"] / quantity_of_single_run)
+            __blueprints = ceil(m["q"] / (quantity_of_single_run * 50))
             ntier_set_of_blueprints = [{"r": -1, "q": __blueprints}]
             m.update({"bps": __blueprints, "runs": 50})
         else:
@@ -697,54 +697,59 @@ def __dump_not_available_materials_list(
     glf.write("""
        </tbody>
        </table>
-
-      <h4 class="text-primary">Intermediate manufacturing</h4>
-       <table class="table table-condensed table-hover table-responsive">
-       <thead>
-        <tr>
-         <th style="width:40px;">#</th>
-         <td>Materials</th>
-         <td>Not available</th>
-         <td class="qind-materials-runs hidden">Runs</th>
-         <td class="qind-materials-planned hidden">Planned</th>
-         <td class="qind-materials-exist hidden">Stock</th>
-         <td class="qind-materials-exist hidden">React</th>
-         <td>In progress</th>
-        </tr>
-       </thead>
-       <tbody>
 """)
 
-    # поиск в вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
-    # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
-    __dump_not_available_materials_list_rows(
-        glf,
-        not_enough_materials__intermediate,
-        # esi данные, загруженные с серверов CCP
-        corp_bp_loc_data,
-        corp_industry_jobs_data,
-        corp_assets_tree,
-        # sde данные, загруженные из .converted_xxx.json файлов
-        sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
-        # списки контейнеров и станок из экземпляра контейнера
-        stock_all_loc_ids,
-        exclude_loc_ids,
-        blueprint_station_ids,
-        refine_stock_all_loc_ids,
-        # список ресурсов, которые используются в производстве
-        stock_resources,
-        refine_stock_resources,
-        materials_summary,
-        # настройки
-        with_copy_to_clipboard)
+    if not_enough_materials__intermediate:
+        glf.write("""
+<h4 class="text-primary">Intermediate manufacturing</h4>
+<table class="table table-condensed table-hover table-responsive">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <td>Materials</th>
+  <td>Not available</th>
+  <td class="qind-materials-runs hidden">Runs</th>
+  <td class="qind-materials-planned hidden">Planned</th>
+  <td class="qind-materials-exist hidden">Stock</th>
+  <td class="qind-materials-exist hidden">React</th>
+  <td>In progress</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        # поиск в вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+        # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
+        __dump_not_available_materials_list_rows(
+            glf,
+            not_enough_materials__intermediate,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_assets_tree,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            # списки контейнеров и станок из экземпляра контейнера
+            stock_all_loc_ids,
+            exclude_loc_ids,
+            blueprint_station_ids,
+            refine_stock_all_loc_ids,
+            # список ресурсов, которые используются в производстве
+            stock_resources,
+            refine_stock_resources,
+            materials_summary,
+            # настройки
+            with_copy_to_clipboard)
+
+    glf.write("""
+</tbody>
+</table>
+    """)
 
     del not_enough_materials__intermediate
 
     glf.write("""
-       </tbody>
-       </table>
      </div> <!--media-body-->
     </div> <!--media-->
     """)
