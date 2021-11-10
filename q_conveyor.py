@@ -197,7 +197,7 @@ def main():
                     __conveyor_entity.update({
                         "containers": [],
                         "stock": [],
-                        "scattered_stock": [],
+                        "refine_stock": [],
                         "exclude": [],
                         "num": __manuf_dict_num,
                     })
@@ -235,20 +235,20 @@ def main():
                                 __conveyor_entity["exclude"].append({"id": __exclude_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __exclude_id), None)})
                     # на любой другой станции находим контейнер, в котором находится сток для нужд конвейера, но пока
                     # ещё на нужную станцию (например с Татары на Сотию)
-                    for tmplt in __manuf_dict.get("scattered_stock_containers", []):
-                        ss_ids = [(n["item_id"], n['name']) for n in corp_ass_names_data if re.search(tmplt, n['name'])]
-                        for (ss_id, ss_name) in ss_ids:
-                            ss_loc_dict = eve_esi_tools.get_universe_location_by_item(
-                                ss_id,
+                    for tmplt in __manuf_dict.get("refine_stock_containers", []):
+                        rs_ids = [(n["item_id"], n['name']) for n in corp_ass_names_data if re.search(tmplt, n['name'])]
+                        for (rs_id, rs_name) in rs_ids:
+                            rs_loc_dict = eve_esi_tools.get_universe_location_by_item(
+                                rs_id,
                                 sde_inv_names,
                                 sde_inv_items,
                                 corp_assets_tree,
                                 corp_ass_names_data,
                                 foreign_structures_data
                             )
-                            if "station_id" in ss_loc_dict:
-                                __conveyor_entity["scattered_stock"].append({"id": ss_id, "name": ss_name, "loc": ss_loc_dict})
-                        del ss_ids
+                            if "station_id" in rs_loc_dict:
+                                __conveyor_entity["refine_stock"].append({"id": rs_id, "name": rs_name, "loc": rs_loc_dict})
+                        del rs_ids
                 # добавляем к текущей станции контейнер с чертежами
                 # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
                 __conveyor_entity["containers"].append({
@@ -290,9 +290,9 @@ def main():
             print('     stock containers:')
             for ces in ce["stock"]:
                 print('       {} = {}'.format(ces["id"], ces["name"]))
-            if ce["scattered_stock"]:
-                print('     scattered stock containers:')
-                for cess in ce["scattered_stock"]:
+            if ce["refine_stock"]:
+                print('     refine stock containers:')
+                for cess in ce["refine_stock"]:
                     print('       {} = {} : {}'.format(cess["id"], cess["loc"]["station"], cess["name"]))
             if ce["containers"]:
                 print('     exclude containers:')
