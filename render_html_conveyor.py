@@ -634,8 +634,7 @@ def __dump_not_available_materials_list(
     del not_enough_materials__cycled
 
     # добавляем в список изначально отсутствующих материалов те, что надо приобрести
-    calc_materials_summary(not_enough_materials__market, not_enough_materials__initial)
-    del not_enough_materials__market
+    # ошибка: calc_materials_summary(not_enough_materials__market, not_enough_materials__initial)
 
     # вывод сведений в отчёт
     glf.write("""
@@ -650,7 +649,7 @@ def __dump_not_available_materials_list(
  <div class="media-body">
   <h4 class="media-heading">Not available materials</h4>
 
-      <h4 class="text-primary">End-level manufacturing, entry-level purchasing</h4>
+      <h4 class="text-primary">End-level manufacturing</h4>
        <table class="table table-condensed table-hover table-responsive">
        <thead>
         <tr>
@@ -699,6 +698,53 @@ def __dump_not_available_materials_list(
        </table>
 """)
 
+    if not_enough_materials__market:
+        glf.write("""
+<h4 class="text-primary">Entry-level purchasing</h4>
+<table class="table table-condensed table-hover table-responsive">
+<thead>
+ <tr>
+  <th style="width:40px;">#</th>
+  <td>Materials</th>
+  <td>Not available</th>
+  <td class="qind-materials-runs hidden">Runs</th>
+  <td class="qind-materials-planned hidden">Planned</th>
+  <td class="qind-materials-exist hidden">Stock</th>
+  <td class="qind-materials-exist hidden">React</th>
+  <td>In progress</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        __dump_not_available_materials_list_rows(
+            glf,
+            not_enough_materials__market,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_industry_jobs_data,
+            corp_assets_tree,
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            # списки контейнеров и станок из экземпляра контейнера
+            stock_all_loc_ids,
+            exclude_loc_ids,
+            blueprint_station_ids,
+            refine_stock_all_loc_ids,
+            # список ресурсов, которые используются в производстве
+            stock_resources,
+            refine_stock_resources,
+            materials_summary,
+            # настройки
+            with_copy_to_clipboard)
+        glf.write("""
+</tbody>
+</table>
+""")
+
+    del not_enough_materials__market
+
     if not_enough_materials__intermediate:
         glf.write("""
 <h4 class="text-primary">Intermediate manufacturing</h4>
@@ -717,7 +763,7 @@ def __dump_not_available_materials_list(
 </thead>
 <tbody>
 """)
-        # поиск в вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
+        # поиск и вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
         # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
         __dump_not_available_materials_list_rows(
             glf,
