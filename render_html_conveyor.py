@@ -463,7 +463,13 @@ def __dump_not_available_materials_list_rows(
                     '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
                 glf.write(
                     '<tr>\n'
-                    ' <td class="active" colspan="8"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
+                    ' <td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
+                    ' <td class="active"><b>Not available</b></th>'
+                    ' <td class="active qind-materials-runs hidden"><b>Runs</b></th>'
+                    ' <td class="active qind-materials-planned hidden"><b>Planned</b></th>'
+                    ' <td class="active qind-materials-exist hidden"><b>Stock</b></th>'
+                    ' <td class="active qind-materials-exist hidden"><b>React</b></th>'
+                    ' <td class="active"><b>In progress</b></th>'
                     '</tr>'.
                     format(nm=__grp_name,
                            id=ms_group_id,
@@ -651,18 +657,6 @@ def __dump_not_available_materials_list(
 
       <h4 class="text-primary">End-level manufacturing</h4>
        <table class="table table-condensed table-hover table-responsive">
-       <thead>
-        <tr>
-         <th style="width:40px;">#</th>
-         <td>Materials</th>
-         <td>Not available</th>
-         <td class="qind-materials-runs hidden">Runs</th>
-         <td class="qind-materials-planned hidden">Planned</th>
-         <td class="qind-materials-exist hidden">Stock</th>
-         <td class="qind-materials-exist hidden">React</th>
-         <td>In progress</th>
-        </tr>
-       </thead>
        <tbody>
 """)
 
@@ -702,18 +696,6 @@ def __dump_not_available_materials_list(
         glf.write("""
 <h4 class="text-primary">Entry-level purchasing</h4>
 <table class="table table-condensed table-hover table-responsive">
-<thead>
- <tr>
-  <th style="width:40px;">#</th>
-  <td>Materials</th>
-  <td>Not available</th>
-  <td class="qind-materials-runs hidden">Runs</th>
-  <td class="qind-materials-planned hidden">Planned</th>
-  <td class="qind-materials-exist hidden">Stock</th>
-  <td class="qind-materials-exist hidden">React</th>
-  <td>In progress</th>
- </tr>
-</thead>
 <tbody>
 """)
         __dump_not_available_materials_list_rows(
@@ -749,18 +731,6 @@ def __dump_not_available_materials_list(
         glf.write("""
 <h4 class="text-primary">Intermediate manufacturing</h4>
 <table class="table table-condensed table-hover table-responsive">
-<thead>
- <tr>
-  <th style="width:40px;">#</th>
-  <td>Materials</th>
-  <td>Not available</th>
-  <td class="qind-materials-runs hidden">Runs</th>
-  <td class="qind-materials-planned hidden">Planned</th>
-  <td class="qind-materials-exist hidden">Stock</th>
-  <td class="qind-materials-exist hidden">React</th>
-  <td>In progress</th>
- </tr>
-</thead>
 <tbody>
 """)
         # поиск и вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
