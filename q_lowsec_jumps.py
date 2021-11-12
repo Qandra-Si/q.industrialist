@@ -130,15 +130,16 @@ def main():
 
         low_sec_systems.sort(key=lambda s: s['ship_jumps'], reverse=False)
 
-        print("Region\tSystem\tJumps\tGates")
+        print("Region\tSystem\tJumps\tGates\sSecurity")
         for system_desc in low_sec_systems:
             if system_desc["ship_jumps"] >= 10:
                 break
-            print("{}\t{}\t{}\t{}".format(
+            print("{}\t{}\t{}\t{}\t{:.1f}".format(
                 system_desc["region"],
                 system_desc["name"],
                 system_desc["ship_jumps"],
-                len(system_desc["stargates"])))
+                len(system_desc["stargates"]),
+                system_desc["security_status"]))
 
         break
 
