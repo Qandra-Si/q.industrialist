@@ -17,7 +17,6 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_lowsec_jumps.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
@@ -43,10 +42,6 @@ def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
-
-    # sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
-    # sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
-    # sde_inv_positions = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invPositions")
 
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
