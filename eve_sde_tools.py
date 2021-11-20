@@ -322,6 +322,8 @@ def get_blueprint_any_activity(blueprints, activity: str, type_id: int):
                 return None
             bp3 = bp2.get('materials')
             if bp3 is None:
+                if activity in ['copying', 'research_material', 'research_time']:
+                    return bp2
                 return None
             return bp2
     else:

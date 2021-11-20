@@ -177,7 +177,7 @@ def main():
             # кешируем признак того, что контейнеры являются стоком материалов
             same_stock_container = __manuf_dict.get("same_stock_container", False)
             fixed_number_of_runs = __manuf_dict.get("fixed_number_of_runs", None)
-            manufacturing_activity = __manuf_dict.get("manufacturing_activity", "manufacturing")
+            manufacturing_activities = __manuf_dict.get("manufacturing_activities", ["manufacturing"])
             # находим станцию, где расположены найденные контейнеры
             for id in blueprint_loc_ids:
                 __loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -255,7 +255,7 @@ def main():
                     "id": id,
                     "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == id), None),
                     "fixed_number_of_runs": fixed_number_of_runs,
-                    "manufacturing_activity": manufacturing_activity,
+                    "manufacturing_activities": manufacturing_activities,
                 })
 
         conveyor_data.append({

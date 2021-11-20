@@ -128,7 +128,7 @@ def get_materials_list_for_set_of_blueprints(
         sde_type_ids,
         blueprint_materials,
         blueprints_details,  # при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
-        manufacturing_activity,  # тип индустрии: manufacturing, research_material, ...
+        activity,  # тип индустрии: manufacturing, research_material, ...
         material_efficiency,  # параметр чертежа (набора чертежей)
         is_blueprint_copy=True,  # при is_blueprint_copy=True, в списке blueprints_details анализиуется только "r"
         fixed_number_of_runs=None):  # учитывается только для оригиналов, т.е. для is_blueprint_copy=False
@@ -149,7 +149,7 @@ def get_materials_list_for_set_of_blueprints(
                 # умножение на количество оригиналов будет выполнено позже...
             # расчёт кол-ва материала с учётом эффективности производства
             __industry_input = eve_efficiency.get_industry_material_efficiency(
-                manufacturing_activity,
+                activity,
                 quantity_of_runs,
                 m["quantity"],  # сведения из чертежа
                 material_efficiency)
@@ -465,11 +465,11 @@ def __dump_not_available_materials_list_rows(
                     '<tr>\n'
                     ' <td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
                     ' <td class="active"><b>Not available</b></th>'
-                    ' <td class="active qind-materials-runs hidden"><b>Runs</b></th>'
+                    ' <td class="active qind-materials-runs hidden"><b>To launch</b></th>'
                     ' <td class="active qind-materials-planned hidden"><b>Planned</b></th>'
-                    ' <td class="active qind-materials-exist hidden"><b>Stock</b></th>'
-                    ' <td class="active qind-materials-exist hidden"><b>React</b></th>'
-                    ' <td class="active"><b>In progress</b></th>'
+                    ' <td class="active qind-materials-exist hidden"><b>Sotiyo</b></th>'
+                    ' <td class="active qind-materials-exist hidden"><b>Tatara</b></th>'
+                    ' <td class="active qind-materials-progress hidden"><b>In progress</b></th>'
                     '</tr>'.
                     format(nm=__grp_name,
                            id=ms_group_id,
@@ -540,7 +540,7 @@ def __dump_not_available_materials_list_rows(
                 ' <td class="qind-materials-planned hidden">{p}</td>\n'
                 ' <td class="qind-materials-exist hidden">{ins}</td>\n'
                 ' <td class="qind-materials-exist hidden">{inr}</td>\n'
-                ' <td>{inp}</td>\n'
+                ' <td class="qind-materials-progress hidden">{inp}</td>\n'
                 '</tr>'.
                 format(num=not_available_row_num,
                        src=render_html.__get_img_src(ms_type_id, 32),
@@ -833,13 +833,16 @@ def __dump_blueprints_list_with_materials(
         loc_id = int(loc["id"])
         loc_name = loc["nm"]
         fixed_number_of_runs = loc["box"]["fixed_number_of_runs"]
-        manufacturing_activity = loc["box"]["manufacturing_activity"]
+        manufacturing_activities = loc["box"]["manufacturing_activities"]
+        __bp2 = corp_bp_loc_data[str(loc_id)]
+        runnable_blueprints = 0
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
             '   <h4 class="panel-title">\n'
             '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
-            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>\n'
+            '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>'
+            '    <span class="badge"><span id="rnblB{id}">0</span> of {bps}</span>\n'
             '   </h4>\n'
             '  </div>\n'
             '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
@@ -847,10 +850,10 @@ def __dump_blueprints_list_with_materials(
             '   <div class="panel-body">\n'.format(
                 id=loc_id,
                 station=conveyor_entity["station"],
-                nm=loc_name
+                nm=loc_name,
+                bps=len(__bp2)
             )
         )
-        __bp2 = corp_bp_loc_data[str(loc_id)]
         __type_keys = __bp2.keys()
         # сортировка чертежей по их названиям
         type_keys = []
@@ -871,11 +874,13 @@ def __dump_blueprints_list_with_materials(
             # ---
             (activity_time, activity_blueprint_materials) = get_industry_activity_details(
                 type_id,
-                manufacturing_activity,
+                manufacturing_activities[0],
                 sde_type_ids,
                 sde_market_groups,
                 sde_bp_materials)
-            show_me_te = manufacturing_activity in ['manufacturing', 'research_material', 'research_time']
+            show_me_te = 'manufacturing' in manufacturing_activities or \
+                         'research_material' in manufacturing_activities or \
+                         'research_time' in manufacturing_activities
             # ---
             max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
@@ -924,7 +929,7 @@ def __dump_blueprints_list_with_materials(
                         __runs = itm["r"] if itm["q"] == -2 else (1 if fixed_number_of_runs is None else fixed_number_of_runs)
                         __time = __runs * activity_time
                         # TODO: хардкодим тут бонусы риг станций, когда же руки дойдут сделать нормально?!
-                        if manufacturing_activity in ['manufacturing']:
+                        if 'manufacturing' in manufacturing_activities:
                             # считаем бонус чертежа (накладываем TE чертежа на БП)
                             __stage1 = float(__time * (100 - time_efficiency) / 100.0)
                             # учитываем бонус профиля сооружения
@@ -935,7 +940,7 @@ def __dump_blueprints_list_with_materials(
                             __stage4 = int(float(__stage2 + 0.99))
                             # ---
                             __time = __stage4
-                        elif manufacturing_activity in ['reaction']:
+                        elif 'reaction' in manufacturing_activities:
                             # учитываем бонус профиля сооружения
                             __stage2 = float(__time * (100.0 - 25.0) / 100.0)
                             # учитываем бонус установленного модификатора
@@ -944,7 +949,7 @@ def __dump_blueprints_list_with_materials(
                             __stage4 = int(float(__stage3 + 0.99))
                             # ---
                             __time = __stage4
-                        elif manufacturing_activity in ['invention']:
+                        elif 'invention' in manufacturing_activities:
                             # учитываем бонус профиля сооружения
                             __stage2 = float(__time * (100.0 - 20.0) / 100.0)
                             # # учитываем бонус установленного модификатора
@@ -1011,7 +1016,7 @@ def __dump_blueprints_list_with_materials(
                             sde_type_ids,
                             activity_blueprint_materials,
                             [{"r": quantity_or_runs}],
-                            manufacturing_activity,
+                            manufacturing_activities[0],
                             material_efficiency)
                         # сохраняем материалы для производства в список их суммарного кол-ва
                         calc_materials_summary(materials_list_with_efficiency, materials_used)
@@ -1021,7 +1026,22 @@ def __dump_blueprints_list_with_materials(
                     # ---
                     glf.write('</br></span>')  # qind-blueprints-?
                 elif activity_blueprint_materials is None:
-                    glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(manufacturing_activity))
+                    something_else: bool = False
+                    for ma in manufacturing_activities:
+                        if ma not in ['copying', 'research_material', 'research_time']:
+                            something_else = True
+                            break
+                    if something_else:
+                        glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(",".join(manufacturing_activities)))
+                    else:
+                        runnable_blueprints += 1
+                        if enable_copy_to_clipboard:
+                            glf.write(
+                                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
+                                ' data-source="table" data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
+                                ' aria-hidden="true"></span></a>'.
+                                format(nm=blueprint_name)
+                            )
                     glf.write('</br></span>')  # qind-blueprints-?
                 else:
                     # подготовка элементов управления копирования данных в clipboard
@@ -1039,7 +1059,7 @@ def __dump_blueprints_list_with_materials(
                         sde_type_ids,
                         activity_blueprint_materials,
                         bp["itm"],
-                        manufacturing_activity,
+                        manufacturing_activities[0],
                         material_efficiency,
                         is_blueprint_copy=is_blueprint_copy,
                         fixed_number_of_runs=fixed_number_of_runs)
@@ -1056,6 +1076,8 @@ def __dump_blueprints_list_with_materials(
                         [],
                         stock_resources,
                         {})
+                    if not not_enough_materials:
+                        runnable_blueprints += 1
 
                     # вывод наименования ресурсов (материалов)
                     glf.write('<div class="qind-materials-used hidden"><small>\n')  # div(materials)
@@ -1213,6 +1235,10 @@ def __dump_blueprints_list_with_materials(
   </div> <!--panel-collapse-->
  </div> <!--panel-->
 """)
+        glf.write(
+            "<script> $(document).ready(function(){{ $('#rnblB{id}').html('{bps}'); }});</script>".
+            format(id=loc_id, bps=runnable_blueprints)
+        )
 
     return stock_not_enough_materials
 
@@ -1503,6 +1529,7 @@ def __dump_corp_conveyors(
        <li><a id="btnToggleRecommendedRuns" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowRecommendedRuns"></span> Show recommended runs</a></li>
        <li><a id="btnTogglePlannedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlannedMaterials"></span> Show planned materials</a></li>
        <li><a id="btnToggleExistInStock" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowExistInStock"></span> Show exist in stock</a></li>
+       <li><a id="btnToggleInProgress" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowInProgress"></span> Show in progress</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleLegend" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowLegend"></span> Show legend</a></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Reset options</a></li>
@@ -1699,83 +1726,43 @@ def __dump_corp_conveyors(
   // Conveyor Options storage (prepare)
   ls = window.localStorage;
 
+  function resetOptionToDefault(opt, def) {
+    if (!ls.getItem(opt)) ls.setItem(opt, def);
+  }
+  function displayOptionInMenu(opt, img) {
+    show = ls.getItem(opt);
+    if (show == 1)
+      img.removeClass('hidden');
+    else
+      img.addClass('hidden');
+  }
+
   // Conveyor Options storage (init)
   function resetOptionsMenuToDefault() {
-    if (!ls.getItem('Show Legend')) {
-      ls.setItem('Show Legend', 1);
-    }
-    if (!ls.getItem('Show Summary')) {
-      ls.setItem('Show Summary', 0);
-    }
-    if (!ls.getItem('Show Not Available')) {
-      ls.setItem('Show Not Available', 0);
-    }
-    if (!ls.getItem('Show Impossible')) {
-      ls.setItem('Show Impossible', 1);
-    }
-    if (!ls.getItem('Show Active')) {
-      ls.setItem('Show Active', 1);
-    }
-    if (!ls.getItem('Show Used Materials')) {
-      ls.setItem('Show Used Materials', 1);
-    }
-    if (!ls.getItem('Show Exist In Stock')) {
-      ls.setItem('Show Exist In Stock', 1);
-    }
-    if (!ls.getItem('Show Planned Materials')) {
-      ls.setItem('Show Planned Materials', 0);
-    }
-    if (!ls.getItem('Show Recommended Runs')) {
-      ls.setItem('Show Recommended Runs', 1);
-    }
+    resetOptionToDefault('Show Legend', 1);
+    resetOptionToDefault('Show Summary', 0);
+    resetOptionToDefault('Show Not Available', 0);
+    resetOptionToDefault('Show Impossible', 1);
+    resetOptionToDefault('Show Active', 1);
+    resetOptionToDefault('Show Used Materials', 1);
+    resetOptionToDefault('Show Exist In Stock', 0);
+    resetOptionToDefault('Show In Progress', 0);
+    resetOptionToDefault('Show Planned Materials', 0);
+    resetOptionToDefault('Show Recommended Runs', 1);
   }
   // Conveyor Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
-    show = ls.getItem('Show Legend');
-    if (show == 1)
-      $('#imgShowLegend').removeClass('hidden');
-    else
-      $('#imgShowLegend').addClass('hidden');
-    show = ls.getItem('Show Summary');
-    if (show == 1)
-      $('#imgShowSummary').removeClass('hidden');
-    else
-      $('#imgShowSummary').addClass('hidden');
-    show = ls.getItem('Show Not Available');
-    if (show == 1)
-      $('#imgShowNotAvailable').removeClass('hidden');
-    else
-      $('#imgShowNotAvailable').addClass('hidden');
-    show = ls.getItem('Show Impossible');
-    if (show == 1)
-      $('#imgShowImpossible').removeClass('hidden');
-    else
-      $('#imgShowImpossible').addClass('hidden');
-    show = ls.getItem('Show Active');
-    if (show == 1)
-      $('#imgShowActive').removeClass('hidden');
-    else
-      $('#imgShowActive').addClass('hidden');
-    show = ls.getItem('Show Used Materials');
-    if (show == 1)
-      $('#imgShowUsedMaterials').removeClass('hidden');
-    else
-      $('#imgShowUsedMaterials').addClass('hidden');
-    show = ls.getItem('Show Exist In Stock');
-    if (show == 1)
-      $('#imgShowExistInStock').removeClass('hidden');
-    else
-      $('#imgShowExistInStock').addClass('hidden');
-    show = ls.getItem('Show Planned Materials');
-    if (show == 1)
-      $('#imgShowPlannedMaterials').removeClass('hidden');
-    else
-      $('#imgShowPlannedMaterials').addClass('hidden');
-    show = ls.getItem('Show Recommended Runs');
-    if (show == 1)
-      $('#imgShowRecommendedRuns').removeClass('hidden');
-    else
-      $('#imgShowRecommendedRuns').addClass('hidden');
+    displayOptionInMenu('Show Legend', $('#imgShowLegend'));
+    displayOptionInMenu('Show Summary', $('#imgShowSummary'));
+    displayOptionInMenu('Show Not Available', $('#imgShowNotAvailable'));
+    displayOptionInMenu('Show Impossible', $('#imgShowImpossible'));
+    displayOptionInMenu('Show Active', $('#imgShowActive'));
+    displayOptionInMenu('Show Used Materials', $('#imgShowUsedMaterials'));
+    displayOptionInMenu('Show Exist In Stock', $('#imgShowExistInStock'));
+    displayOptionInMenu('Show Planned Materials', $('#imgShowPlannedMaterials'));
+    displayOptionInMenu('Show Recommended Runs', $('#imgShowRecommendedRuns'));
+    displayOptionInMenu('Show In Progress', $('#imgShowInProgress'));
+    show = ls.getItem('Show ');
     sort_by = ls.getItem('Sort By');
     if ((sort_by === null) || (sort_by == 0)) {
       $('#btnSortByName').addClass('active');
@@ -1909,6 +1896,13 @@ def __dump_corp_conveyors(
       else
         $(this).addClass('hidden');
     })
+    show = ls.getItem('Show In Progress');
+    $('.qind-materials-progress').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     sort_by = ls.getItem('Sort By');
     sort_by = (sort_by === null) ? 0 : sort_by;
     $('table.qind-blueprints-tbl').each(function() {
@@ -1960,6 +1954,7 @@ def __dump_corp_conveyors(
     $('#btnToggleExistInStock').on('click', function () { toggleMenuOption('Show Exist In Stock'); });
     $('#btnTogglePlannedMaterials').on('click', function () { toggleMenuOption('Show Planned Materials'); });
     $('#btnToggleRecommendedRuns').on('click', function () { toggleMenuOption('Show Recommended Runs'); });
+    $('#btnToggleInProgress').on('click', function () { toggleMenuOption('Show In Progress'); });
     $('#btnResetOptions').on('click', function () {
       ls.clear();
       resetOptionsMenuToDefault();
