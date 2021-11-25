@@ -1,4 +1,9 @@
 # Q.Industrialist
+[![GitHub issues](https://img.shields.io/github/issues/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/issues)
+[![GitHub forks](https://img.shields.io/github/forks/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/network)
+[![GitHub stars](https://img.shields.io/github/stars/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/stargazers)
+[![GitHub license](https://img.shields.io/github/license/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/blob/master/LICENSE)
+
 Инструмент для планирования перевозок, построения планов изготовления модулей, кораблей, отслеживания процесса выполнения контрактов.
 
 <img src="https://qandra-si.github.io/q.industrialist/004-conveyor_v0.7.1.png" height="80%" width="80%">
