@@ -105,7 +105,7 @@ def __dump_blueprint_materials(
             bpmm1_blueprint_products = bpmm1_blueprint_data["activities"][activity]["products"]
             if len(bpmm1_blueprint_products) == 1:
                 bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
-            else:
+            else:  # здесь непонятно что делать, т.к. явно надо выбрать правильный продукт? с иным кол-вом на выходе?
                 bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
         # генерация символов для рисования псевдографикой
         nm_prfx: str = get_pseudographics_prefix(row0_levels, row1_num == len(bpmm0_materials))
@@ -198,22 +198,23 @@ def __dump_blueprint_materials(
         # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
         # проверяем, что для текущего материала существуют чертежи для производства
 
-        # добавление в список материалов чертежей с известным кол-вом run-ов
-        __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm1_blueprint_type_id), None)
-        if __summary_dict is None:
-            materials_summary.append({"id": bpmm1_blueprint_type_id,
-                                      "q": bpmm1_quantity_with_efficiency,
-                                      "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
-                                      "b": bpmm1_blueprints,
-                                      "ajp": bpmm1_in_progress + bpmm1_available})
-        else:
-            __summary_dict["q"] += bpmm1_quantity_with_efficiency
-        del __summary_dict
-
         # вывод списка материалов для постройки по чертежу (следующий уровень)
         bpmm2_bp_runs = bpmm1_not_enough if bpmm1_product_quantity is None else math.ceil(bpmm1_not_enough / bpmm1_product_quantity)
         # debug : print(bpmm1_tnm, bpmm1_not_enough, bpmm1_product_quantity, bpmm2_bp_runs)
         # ...
+
+        # добавление в список материалов чертежей с известным кол-вом run-ов
+        __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm1_blueprint_type_id), None)
+        if __summary_dict is None:
+            materials_summary.append({"id": bpmm1_blueprint_type_id,
+                                      "q": bpmm2_bp_runs,
+                                      "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, bpmm1_blueprint_type_id),
+                                      "b": bpmm1_blueprints,
+                                      "ajp": bpmm1_in_progress + bpmm1_available})
+        else:
+            __summary_dict["q"] += bpmm2_bp_runs
+        del __summary_dict
+
         row2_levels = row0_levels[:]
         row2_levels.append(row1_num == len(bpmm0_materials))
         __dump_blueprint_materials(
