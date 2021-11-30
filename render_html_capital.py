@@ -94,8 +94,13 @@ def __dump_blueprint_materials(
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
         # поиск чертежа для этого типа продукта (которого может и не быть, например если возможен только закуп)
-        bpmm1_blueprint_type_id, bpmm1_blueprint_data = eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials)
-        bpmm1_is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(bpmm1_tid, [1849], sde_type_ids, sde_market_groups)
+        bpmm1_blueprint_type_id, bpmm1_blueprint_data = \
+            eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "manufacturing")
+        bpmm1_is_reaction_formula = False
+        if bpmm1_blueprint_type_id is None:
+            bpmm1_blueprint_type_id, bpmm1_blueprint_data = \
+                eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "reaction")
+            bpmm1_is_reaction_formula = bpmm1_blueprint_type_id is not None
         if bpmm1_blueprint_type_id is None:
             bpmm1_product_quantity = None
             bpmm1_blueprint_materials = None
