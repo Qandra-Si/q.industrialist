@@ -469,7 +469,7 @@ def __dump_not_available_materials_list_rows(
                     ' <td class="active qind-materials-planned hidden"><b>Planned</b></th>'
                     ' <td class="active qind-materials-exist hidden"><b>Sotiyo</b></th>'
                     ' <td class="active qind-materials-exist hidden"><b>Tatara</b></th>'
-                    ' <td class="active qind-materials-progress hidden"><b>In progress</b></th>'
+                    ' <td class="active qind-materials-progress hidden"><b>In progress (runs)</b></th>'
                     '</tr>'.
                     format(nm=__grp_name,
                            id=ms_group_id,
@@ -1424,7 +1424,7 @@ def __dump_corp_conveyors_stock_all(
   <th>Item</th>
   <th>In stock</th>
   <th>Not available</th>
-  <th>In progress</th>
+  <th>In progress (runs)</th>
  </tr>
 </thead>
 <tbody>""")
