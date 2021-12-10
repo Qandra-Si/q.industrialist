@@ -983,7 +983,7 @@ def __dump_blueprints_list_with_materials(
                 # ---
                 # вывод строки с пареметрами чертежа: [copy] [2:4] (10) [13:06]
                 glf.write(
-                    '<div class="qind-bp-block hidden"><span class="qind-blueprints-{status}">'
+                    '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
                     '&nbsp;<span class="badge">{qr}{fnr}</span>'
                     '{time}\n'.format(
