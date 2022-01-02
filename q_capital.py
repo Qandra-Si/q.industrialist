@@ -147,11 +147,13 @@ def main():
 
     # находим контейнеры по заданным названиям
     for ro in q_capital_settings.g_report_options:
-        if "bp_cont_templates" in ro:
-            for tmplt in ro["bp_cont_templates"]:
+        if "container_templates" in ro:
+            for tmplt in ro["container_templates"]:
                 containers = [n["item_id"] for n in total_ass_names_data if re.search(tmplt, n['name'])]
                 for id in containers:
                     ro["blueprints"].append(
+                        {"id": id, "name": next((n["name"] for n in total_ass_names_data if n['item_id'] == id), None)})
+                    ro["stock"].append(
                         {"id": id, "name": next((n["name"] for n in total_ass_names_data if n['item_id'] == id), None)})
 
         # перечисляем станции и контейнеры, которые были найдены
