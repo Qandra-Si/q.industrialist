@@ -39,9 +39,11 @@ include_once '.settings.php';
 
 <h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
- Текущее состояние рынка в <strong>Querious</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.<br>
+ Текущее состояние рынка в <strong>Querious</strong> и <strong>Nisuwa</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.<br>
  <a class="btn btn-success" href="/qi_querious.php" role="button">Querious Market</a>
- <a class="btn btn-success" href="/qi_querious_industry_request.php" role="button">Querious Industry</a>
+ <a class="btn btn-success" href="/qi_querious_industry_request.php" role="button">Querious Industry</a><br>
+ <br>
+ <a class="btn btn-success" href="/qi_nisuwa.php" role="button">Nisuwa Market</a>
  </p>
 
  <p>
