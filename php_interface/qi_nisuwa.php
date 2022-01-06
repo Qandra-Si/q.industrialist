@@ -36,7 +36,7 @@ function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell
 
 
 function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
-<h2>Keepstar Market</h2>
+<h2>Nisuwa Market</h2>
 <style>
 .label-noordersreal { color: #fff; background-color: #d9534f; }
 .label-noorders { color: #fff; background-color: #eebbb9; }
@@ -337,7 +337,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
 
 function __dump_querious_storage(&$storage) { ?>
-<h2>Keepstar Storage</h2>
+<h2>Nisuwa Storage</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
  <tr>
