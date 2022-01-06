@@ -44,6 +44,7 @@ include_once '.settings.php';
  <a class="btn btn-success" href="/qi_querious_industry_request.php" role="button">Querious Industry</a><br>
  <br>
  <a class="btn btn-success" href="/qi_nisuwa.php" role="button">Nisuwa Market</a>
+ <a class="btn btn-success" href="/qi_4hwwf.php" role="button">Fraternity Market</a>
  </p>
 
  <p>
