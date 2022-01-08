@@ -7,7 +7,7 @@ include_once '.settings.php';
 $SHOW_ONLY_RI4_SALES = 1; // признак отображения информации по ордерам, которые выставлены не нами
 $IMPORT_PRICE_TO_TRADE_HUB = 53; // null; // например, цена импорта 1куб.м. из Jita в Querious была 866 ISK
 $MIN_PROFIT = 0.05; // 5%
-$DEFAULT_PROFIT = 0.1; // 10%
+$DEFAULT_PROFIT = 0.15; // 10% для нулей очень гуманно, практически за "спасибо"
 $MAX_PROFIT = 0.25; // 25%
 $BROKERS_FEE = 0.025; // брокерская комиссия
 $TRADE_HUB_TAX = 0.036; // sales tax, налог на структуре
