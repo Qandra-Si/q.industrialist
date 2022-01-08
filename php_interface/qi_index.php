@@ -40,11 +40,12 @@ include_once '.settings.php';
 <h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
  Текущее состояние рынка в <strong>Querious</strong> и <strong>Nisuwa</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.<br>
- <a class="btn btn-success" href="/qi_querious.php" role="button">Querious Market</a>
+ <a class="btn btn-success" href="/qi_market_querious.php" role="button">Querious Market</a>
  <a class="btn btn-success" href="/qi_querious_industry_request.php" role="button">Querious Industry</a><br>
  <br>
- <a class="btn btn-success" href="/qi_nisuwa.php" role="button">Nisuwa Market</a>
- <a class="btn btn-success" href="/qi_4hwwf.php" role="button">Fraternity Market</a>
+ <a class="btn btn-success" href="/qi_market_nisuwa.php" role="button">Nisuwa Market</a>
+ <a class="btn btn-success" href="/qi_market_4hwwf.php" role="button">Fraternity Market</a>
+ <a class="btn btn-success" href="/qi_market_nsimw.php" role="button">Malpais Market</a>
  </p>
 
  <p>
@@ -73,9 +74,33 @@ include_once '.settings.php';
 <h2>Мониторинг состояния рынка</h2>
  <p>
  Вам скучно и нечем заняться? Есть торговец в Jita или в Amarr, есть фура или простаивает jump-фура? Ознакомьтесь со списком выгодных ордеров в разных солнечных системах.<br>
- <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60013945" role="button">Irmaline</a>
- <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60013990" role="button">Gehi</a>
- <a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=60008494" role="button">Amarr</a>
+<?php
+    if (!extension_loaded('pgsql')) return;
+    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+            or die('pg_connect err: '.pg_last_error());
+    pg_exec($conn, "SET search_path TO qi");
+    $query = <<<EOD
+select distinct th.ethp_location_id as id, nm.name as nm, nm.solar_system_name as sys
+from qi.esi_trade_hub_prices th
+  left outer join qi.esi_known_stations nm on (nm.location_id=th.ethp_location_id)
+where th.ethp_location_id<>60003760
+order by 2, 1;
+EOD;
+    $trade_hubs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $trade_hubs = pg_fetch_all($trade_hubs_cursor);
+    //---
+    if ($trade_hubs)
+        foreach ($trade_hubs as &$hub)
+        {
+            $location_id = $hub['id'];
+            $trade_hub_name = $hub['nm'];
+            $solar_system_name = $hub['sys'];
+            ?><a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
+        }
+    //---
+    pg_close($conn);
+?>
  </p>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>

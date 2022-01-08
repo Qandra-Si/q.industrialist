@@ -1580,6 +1580,8 @@ class QDatabaseTools:
     # /markets/{region_id}/orders/
     # -------------------------------------------------------------------------
     def actualize_trade_hub_market_orders(self, trade_hub_id: int, orders_data, updated_at):
+        # актуализируем станцию/структуру в БД
+        self.actualize_station_or_structure(trade_hub_id, need_data=False)
         # списки ордеров превращаем в сводные данные: buy price, avg price, sell price и т.п.
         __cached_trade_hub: typing.Dict[int, QEntity] = {}
 
