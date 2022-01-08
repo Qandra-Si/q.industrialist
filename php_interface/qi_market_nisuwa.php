@@ -592,7 +592,7 @@ from
       -- список того, что выставлено в маркете (не нами)
       select ethp_type_id, 2
       from qi.esi_trade_hub_prices
-      where $4=1 and ethp_location_id=$2  -- станка рынка
+      where $4=0 and ethp_location_id=$2  -- станка рынка
     ) m
     group by 1
   ) market
