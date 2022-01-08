@@ -456,12 +456,12 @@ from
       where
         (ecwj_date > '2021-01-03') and
         (ecwj_context_id_type = 'market_transaction_id') and
-        ( ecwj_corporation_id=98553333 and -- R Strike
-          ecwj_second_party_id=874053567 and -- DarkFman
-          ( ecwt_location_id=60015073 and not ecwt_is_buy or -- станка рынка
-            ecwt_location_id<>60015073 and ecwt_is_buy and ecwj_division=7
-          )
-        )
+        ( ( ecwj_corporation_id=98553333 and -- R Strike
+            ecwt_location_id=60015073 and not ecwt_is_buy ) or -- станка рынка
+          ( ecwj_second_party_id=874053567 and -- торговый персонаж,...
+            ecwt_location_id<>60015073 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
+        ) and
+        ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
       union
       -- список того, что корпорация продавала или продаёт
       select ecor_type_id --, 'o'::char
@@ -470,7 +470,12 @@ from
         not ecor_is_buy_order and
         (ecor_corporation_id=98553333) and  -- R Strike
         (ecor_location_id=60015073)  -- станка рынка
-      ) jto
+      union
+      -- список того, что выставлено в маркете (не нами)
+      select ethp_type_id
+      from qi.esi_trade_hub_prices
+      where ethp_location_id=60015073  -- станка рынка
+    ) jto
   ) market
     -- сведения о предмете
     left outer join eve_sde_type_ids tid on (market.type_id = tid.sdet_type_id)
@@ -673,10 +678,7 @@ from (
     (ecwj_date > (now() - '14 days'::interval)::date) and
     (ecwj_context_id_type = 'market_transaction_id') and
     ecwt_is_buy and
-    ( ecwj_corporation_id=98553333 and -- R Strike
-      ecwj_second_party_id=874053567 and -- DarkFman
-      ecwj_division = 7
-    )
+    ecwj_second_party_id=874053567 -- торговый персонаж, который что-то где-то покупал за последние 2 недели
   group by 1, 2
 ) buy
 order by 1, 2 desc;
