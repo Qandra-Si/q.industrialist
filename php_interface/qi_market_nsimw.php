@@ -36,7 +36,7 @@ function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell
 
 
 function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
-<h2>Fraternity Market</h2>
+<h2>Malpais Market</h2>
 <style>
 .label-noordersreal { color: #fff; background-color: #d9534f; }
 .label-noorders { color: #fff; background-color: #eebbb9; }
@@ -55,7 +55,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
   <th></th>
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;4-HWWF Sell<br>Quantity</th>
+  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;NSI-MW Sell<br>Quantity</th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -107,8 +107,8 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             //$markup = $jita_sell * TAX_AND_FEE;
             //$jita_10_price = eve_ceiling($jita_sell * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
             //$jita_10_profit = $jita_10_price - $jita_sell - $markup;
-            $hwwf_sell = $product['ps'];
-            $hwwf_sell_volume = $product['psv'];
+            $nsimw_sell = $product['ps'];
+            $nsimw_sell_volume = $product['psv'];
 
             $storage_quantity = 0;
             if ($storage)
@@ -121,7 +121,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                 }
 
             if (is_null($ri4_price)) {
-                if (is_null($hwwf_sell_volume) || !$hwwf_sell_volume)
+                if (is_null($nsimw_sell_volume) || !$nsimw_sell_volume)
                     $problems .= '<span class="label label-noordersreal">no orders</span>&nbsp;';
                 else
                     $problems .= '<span class="label label-noorders">no orders</span>&nbsp;';
@@ -144,14 +144,14 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                 $max_amarr_price = $amarr_sell * (1.0+MAX_PROFIT+TAX_AND_FEE);
                 if (($ri4_price > $max_jita_price) && ($ri4_price > $max_amarr_price))
                     $warnings .= '<span class="label label-highprice" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
-                if (!is_null($hwwf_sell) && ($hwwf_sell < $ri4_price) && ($hwwf_sell_volume > $ri4_market_quantity)) {
+                if (!is_null($nsimw_sell) && ($nsimw_sell < $ri4_price) && ($nsimw_sell_volume > $ri4_market_quantity)) {
                     $interrupt_detected = true;
                     $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
                 }
             }
-            if ($hwwf_sell_volume > $ri4_market_quantity) {
+            if ($nsimw_sell_volume > $ri4_market_quantity) {
                 // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
-                $min_buy_price = $hwwf_sell / (1.0+TAX_AND_FEE+MIN_PROFIT);
+                $min_buy_price = $nsimw_sell / (1.0+TAX_AND_FEE+MIN_PROFIT);
                 if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
                     $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
                 else if ($amarr_sell > $min_buy_price)
@@ -230,7 +230,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
 <?php
     // поле с информацией о наличии товара на рынке
-    if (is_null($hwwf_sell) && is_null($ri4_price))
+    if (is_null($nsimw_sell) && is_null($ri4_price))
     {
         ?><td></td><?php
     }
@@ -246,16 +246,16 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
         {
             ?>&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ <?=number_format($storage_quantity,0,'.',',')?>&nbsp;</span></small><?php
         }
-        if (!is_null($hwwf_sell))
+        if (!is_null($nsimw_sell))
         {
-            if (!is_null($ri4_price) && ($ri4_price == $hwwf_sell) && ($ri4_market_quantity == $hwwf_sell_volume))
+            if (!is_null($ri4_price) && ($ri4_price == $nsimw_sell) && ($ri4_market_quantity == $nsimw_sell_volume))
             {
             }
             else
             {
-                if ($ri4_price == $hwwf_sell) { ?><span class="text-muted-much"><?php }
-                ?><br><?=number_format($hwwf_sell,2,'.',',')?>&nbsp;<mark><?=number_format($hwwf_sell_volume,0,'.',',')?></mark><?php
-                if ($ri4_price == $hwwf_sell) { ?></span><?php }
+                if ($ri4_price == $nsimw_sell) { ?><span class="text-muted-much"><?php }
+                ?><br><?=number_format($nsimw_sell,2,'.',',')?>&nbsp;<mark><?=number_format($nsimw_sell_volume,0,'.',',')?></mark><?php
+                if ($ri4_price == $nsimw_sell) { ?></span><?php }
             }
         }
 
@@ -341,7 +341,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
 
 function __dump_querious_storage(&$storage) { ?>
-<h2>Fraternity Storage</h2>
+<h2>Malpais Storage</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
  <tr>
@@ -349,7 +349,7 @@ function __dump_querious_storage(&$storage) { ?>
   <th>Items</th>
   <th style="text-align: right;">Quantity<br>in Storage</th>
   <th style="text-align: right;">RI4<br>Sell</th>
-  <th style="text-align: right;">4-HWWF Sell<br><mark>Quantity</mark></th>
+  <th style="text-align: right;">NSI-MW Sell<br><mark>Quantity</mark></th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -367,8 +367,8 @@ function __dump_querious_storage(&$storage) { ?>
             $quantity = $product['q'];
             $ri4_sell = $product['rs'];
             $ri4_sell_volume = $product['rsv'];
-            $hwwf_sell = $product['ps'];
-            $hwwf_sell_volume = $product['psv'];
+            $nsimw_sell = $product['ps'];
+            $nsimw_sell_volume = $product['psv'];
             $packaged_volume = $product['pv'];
             $jita_import_price = $packaged_volume * JITA_IMPORT_PRICE;
             $jita_sell = $product['js'];
@@ -386,8 +386,8 @@ function __dump_querious_storage(&$storage) { ?>
  <?php if (is_null($ri4_sell)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($ri4_sell,2,'.',',')?><br><mark><?=number_format($ri4_sell_volume,0,'.',',')?></mark></td>
  <?php } ?>
- <?php if (is_null($hwwf_sell)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($hwwf_sell,2,'.',',')?><br><mark><?=number_format($hwwf_sell_volume,0,'.',',')?></mark></td>
+ <?php if (is_null($nsimw_sell)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($nsimw_sell,2,'.',',')?><br><mark><?=number_format($nsimw_sell_volume,0,'.',',')?></mark></td>
  <?php } ?>
  <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
  <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
@@ -408,7 +408,7 @@ function __dump_querious_storage(&$storage) { ?>
 
 
 
-    __dump_header("Fraternity Market", FS_RESOURCES);
+    __dump_header("Malpais Market", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
@@ -447,8 +447,8 @@ select
     else universe.emp_average_price
   end as up, -- universe price
   round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
-  hwwf_hub.ethp_sell as ps, -- 4-HWWF sell
-  hwwf_hub.ethp_sell_volume as psv -- 4-HWWF sell volume
+  nsimw_hub.ethp_sell as ps, -- NSI-MW sell
+  nsimw_hub.ethp_sell_volume as psv -- NSI-MW sell volume
 from
   qi.eve_sde_market_groups_semantic as market_group,
   ( select distinct type_id
@@ -549,7 +549,7 @@ from
         --, ethp_buy, ethp_buy_volume
       from qi.esi_trade_hub_prices
       where ethp_location_id=1022822609240  -- станка рынка
-    ) hwwf_hub on (market.type_id = hwwf_hub.ethp_type_id)
+    ) nsimw_hub on (market.type_id = nsimw_hub.ethp_type_id)
 where
   market_group.id = tid.sdet_market_group_id and
   market_group.semantic_id not in (
@@ -588,8 +588,8 @@ select
   hangar.eca_quantity as q,
   ri4_orders.avg_price as rs, -- ri4 sell
   ri4_orders.volume as rsv, -- ri4 sell volume : to_char(ri4_orders.avg_price, 'FM999G999G999G999.90') || ' (x' || to_char(ri4_orders.volume, 'FM999999999999999999') || ')'
-  hwwf_hub.ethp_sell as ps, -- 4-HWWF sell
-  hwwf_hub.ethp_sell_volume as psv, -- 4-HWWF sell volume
+  nsimw_hub.ethp_sell as ps, -- NSI-MW sell
+  nsimw_hub.ethp_sell_volume as psv, -- NSI-MW sell volume
   coalesce(tid.sdet_packaged_volume, 0) as pv, -- packaged volume
   jita.sell as js, -- jita sell : to_char(jita.sell, 'FM999G999G999G999G999.90')
   jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
@@ -631,7 +631,7 @@ from
         --, ethp_buy, ethp_buy_volume
       from qi.esi_trade_hub_prices
       where ethp_location_id=1022822609240  -- станка рынка
-    ) hwwf_hub on (hangar.eca_type_id = hwwf_hub.ethp_type_id)
+    ) nsimw_hub on (hangar.eca_type_id = nsimw_hub.ethp_type_id)
     -- сведения об sell-ордерах, активных прямо сейчас
     left outer join (
       select
@@ -843,8 +843,8 @@ var g_market_types = [<?php
             //$markup = $jita_purchase_and_import_price * TAX_AND_FEE; // комиссия считается от суммы закупа и транспортировки
             //$jita_10_price = eve_ceiling($jita_purchase_and_import_price * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
             //$jita_10_profit = $jita_10_price - $jita_purchase_and_import_price - $markup;
-            //$hwwf_sell = $product['ps'];
-            //$hwwf_sell_volume = $product['psv'];
+            //$nsimw_sell = $product['ps'];
+            //$nsimw_sell_volume = $product['psv'];
 
             print('['.$tid.',"'.$nm.'",'.$packaged_volume.','.(is_null($jita_sell)?'0':$jita_sell).','.(is_null($jita_buy)?'0':$jita_buy).','.(is_null($amarr_sell)?'0':$amarr_sell).','.(is_null($universe_price)?'0':$universe_price)."],\n");
         }
