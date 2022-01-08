@@ -25,10 +25,10 @@ function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
             $tid = $product['id'];
             $nm = $product['name'];
             $packaged_volume = $product['pv'];
-            $irmaline_sell = $product['is'];
+            $irmalin_sell = $product['is'];
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
-            $irmaline_volume = $product['iv'];
+            $irmalin_volume = $product['iv'];
             $jita_volume = $product['jv'];
             $profit = $product['p'];
             $querious_sell = $product['qs'];
@@ -48,7 +48,7 @@ function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
   }
 ?>
  <td align="right"><?=$packaged_volume?></td>
- <td align="right" class="text-info"><?=number_format($irmaline_sell,2,'.',',')?><br><br><?=number_format($irmaline_volume,0,'.',',')?></td>
+ <td align="right" class="text-info"><?=number_format($irmalin_sell,2,'.',',')?><br><br><?=number_format($irmalin_volume,0,'.',',')?></td>
  <td align="right"><?=number_format($jita_sell,2,'.',',')?><br><?=number_format($jita_buy,2,'.',',')?><br><?=number_format($jita_volume,0,'.',',')?></td>
 <?php
     if (is_null($querious_sell))
@@ -59,7 +59,7 @@ function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
     {
         $querious_non_profitable = $querious_sell * (1-0.03-0.0113);
         ?><td align="right"><?=number_format($querious_sell,2,'.',',')?><br><?php
-        if ($irmaline_sell < $querious_non_profitable)
+        if ($irmalin_sell < $querious_non_profitable)
         {
             ?><span class="text-success"><strong><?=number_format($querious_non_profitable,2,'.',',')?></strong></span><?php
         }
@@ -79,12 +79,12 @@ function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
 <?php
 }
 
-    // если что-то пойдёт не так, то данные будут показаны по Irmaline
+    // если что-то пойдёт не так, то данные будут показаны по Irmalin
     const DEFAULT_TRADE_HUB_ID = 60013945;
-    const DEFAULT_TRADE_HUB_SYSTEM = 'Irmaline';
+    const DEFAULT_TRADE_HUB_SYSTEM = 'Irmalin';
 
 
-    $trade_hub_id = DEFAULT_TRADE_HUB_ID; // Irmaline по умолчанию
+    $trade_hub_id = DEFAULT_TRADE_HUB_ID; // Irmalin по умолчанию
     $trade_hub_system = DEFAULT_TRADE_HUB_SYSTEM;
     if (isset($_GET['trade_hub_id'])) {
         $_get_trade_hub_id = htmlentities($_GET['trade_hub_id']);

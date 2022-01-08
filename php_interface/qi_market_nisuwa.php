@@ -1,13 +1,73 @@
 ﻿<?php
 include 'qi_render_html.php';
+include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 
 
-const JITA_IMPORT_PRICE = 866.0; // цена импорта 1куб.м. из Jita в Querious
-const MIN_PROFIT = 0.05; // 5%
-const DEFAULT_PROFIT = 0.1; // 10%
-const MAX_PROFIT = 0.25; // 25%
-const TAX_AND_FEE = 0.02 + 0.036; // налог на структуре и брокерская комиссия
+$SHOW_ONLY_RI4_SALES = 0; // признак отображения информации по ордерам, которые выставлены не нами
+$IMPORT_PRICE_TO_TRADE_HUB = null; // например, цена импорта 1куб.м. из Jita в Querious была 866 ISK
+$MIN_PROFIT = 0.05; // 5%
+$DEFAULT_PROFIT = 0.1; // 10%
+$MAX_PROFIT = 0.25; // 25%
+$TRADE_HUB_TAX = 0.0104; // налог на структуре (в Querious: 0.02, в Nisuwa: 0.0104)
+$BROKERS_FEE = 0.036; // брокерская комиссия, у прокачанных торговцев 3.6%
+$CORPORATION_ID = 98553333; // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
+$TRADE_HUB_ID = 60015073; // PZ: 1034323745897, Nisuwa: 60015073, 4-HWWF: 1035466617946, NSI-MW: 1022822609240
+$TRADER_ID = 874053567; // Xatul' Madan: 95858524, DarkFman: 874053567
+
+
+if (isset($_GET['only_ri4_sales'])) {
+    $_get_only_ri4_sales = htmlentities($_GET['only_ri4_sales']);
+    if (is_numeric($_get_only_ri4_sales))
+        $SHOW_ONLY_RI4_SALES = get_numeric($_get_only_ri4_sales) ? 1 : 0;
+}
+
+if (isset($_GET['import'])) {
+    $_get_import_price = htmlentities($_GET['import']);
+    if (is_numeric($_get_import_price))
+        $IMPORT_PRICE_TO_TRADE_HUB = get_numeric($_get_import_price);
+}
+
+if (isset($_GET['profit'])) {
+    $_get_default_profit = htmlentities($_GET['profit']);
+    if (is_numeric($_get_default_profit)) {
+        $DEFAULT_PROFIT = get_numeric($_get_default_profit) / 100.0;
+        if ($MIN_PROFIT > $DEFAULT_PROFIT)
+            $MIN_PROFIT = $DEFAULT_PROFIT;
+        if ($MAX_PROFIT < $DEFAULT_PROFIT)
+            $MAX_PROFIT = $DEFAULT_PROFIT;
+    }
+}
+
+if (isset($_GET['tax'])) {
+    $_get_tax = htmlentities($_GET['tax']);
+    if (is_numeric($_get_tax))
+        $TRADE_HUB_TAX = get_numeric($_get_tax);
+}
+
+if (isset($_GET['fee'])) {
+    $_get_fee = htmlentities($_GET['fee']);
+    if (is_numeric($_get_fee))
+        $BROKERS_FEE = get_numeric($_get_fee);
+}
+
+if (isset($_GET['corp'])) {
+    $_get_corporation_id = htmlentities($_GET['corp']);
+    if (is_numeric($_get_corporation_id))
+        $CORPORATION_ID = get_numeric($_get_corporation_id);
+}
+
+if (isset($_GET['hub'])) {
+    $_get_trade_hub_id = htmlentities($_GET['hub']);
+    if (is_numeric($_get_trade_hub_id))
+        $TRADE_HUB_ID = get_numeric($_get_trade_hub_id);
+}
+
+if (isset($_GET['trader'])) {
+    $_get_trader_id = htmlentities($_GET['trader']);
+    if (is_numeric($_get_trader_id))
+        $TRADER_ID = get_numeric($_get_trader_id);
+}
 
 
 function eve_ceiling($isk) {
@@ -35,8 +95,12 @@ function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell
 <?php }
 
 
-function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
-<h2>Nisuwa Market</h2>
+function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_system) {
+    global $IMPORT_PRICE_TO_TRADE_HUB, $MIN_PROFIT, $MAX_PROFIT;
+    global $TRADE_HUB_TAX, $BROKERS_FEE;
+    $TAX_AND_FEE = $TRADE_HUB_TAX + $BROKERS_FEE;
+?>
+<h2><?=$trade_hub_system?> Market</h2>
 <style>
 .label-noordersreal { color: #fff; background-color: #d9534f; }
 .label-noorders { color: #fff; background-color: #eebbb9; }
@@ -55,8 +119,8 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
   <th></th>
   <th>Items</th>
   <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;Nisuwa Sell<br>Quantity</th>
-  <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
+  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;<?=$trade_hub_system?> Sell<br>Quantity</th>
+  <th style="text-align: right;">Jita Buy..Sell<br><?php if (!is_null($IMPORT_PRICE_TO_TRADE_HUB)) { ?><mark>Import Price</mark><?php } ?></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
   <th style="text-align: center;">Details</th>
@@ -89,6 +153,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             $interrupt_detected = false;
 
             $tid = $product['id'];
+            $ri4_sell_lvl = $product['ri4s'];
             $market_group = $product['grp'];
             $nm = $product['name'];
             $weekly_volume = $product['wv'];
@@ -96,7 +161,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             $day_volume = $product['dv'];
             $ri4_market_quantity = $product['mv'];
             $packaged_volume = $product['pv'];
-            $jita_import_price = $packaged_volume * JITA_IMPORT_PRICE;
+            $trade_hub_import_price = is_null($IMPORT_PRICE_TO_TRADE_HUB) ? null : ($packaged_volume * $IMPORT_PRICE_TO_TRADE_HUB);
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
@@ -104,11 +169,11 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             $amarr_price_lower = $amarr_sell < $jita_sell;
             $universe_price = $product['up'];
             $ri4_price = $product['mp'];
-            //$markup = $jita_sell * TAX_AND_FEE;
-            //$jita_10_price = eve_ceiling($jita_sell * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
+            //$markup = $jita_sell * $TAX_AND_FEE;
+            //$jita_10_price = eve_ceiling($jita_sell * (1.0+$DEFAULT_PROFIT+$TAX_AND_FEE)); // Jita +10% Price
             //$jita_10_profit = $jita_10_price - $jita_sell - $markup;
-            $nisuwa_sell = $product['ps'];
-            $nisuwa_sell_volume = $product['psv'];
+            $trade_hub_sell = $product['ps'];
+            $trade_hub_sell_volume = $product['psv'];
 
             $storage_quantity = 0;
             if ($storage)
@@ -121,7 +186,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                 }
 
             if (is_null($ri4_price)) {
-                if (is_null($nisuwa_sell_volume) || !$nisuwa_sell_volume)
+                if (is_null($trade_hub_sell_volume) || !$trade_hub_sell_volume)
                     $problems .= '<span class="label label-noordersreal">no orders</span>&nbsp;';
                 else
                     $problems .= '<span class="label label-noorders">no orders</span>&nbsp;';
@@ -135,23 +200,23 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
             if (!is_null($ri4_market_quantity) && ($order_volume >= $ri4_market_quantity)) $problems .= '<span class="label label-veryfew">very few</span>&nbsp;';
             if (!is_null($ri4_price)) {
                 if ($ri4_price > 100000 || $packaged_volume < 5) {
-                    $min_jita_price = $jita_sell * (1.0+MIN_PROFIT+TAX_AND_FEE);
-                    $min_amarr_price = $amarr_sell * (1.0+MIN_PROFIT+TAX_AND_FEE);
+                    $min_jita_price = $jita_sell * (1.0+$MIN_PROFIT+$TAX_AND_FEE);
+                    $min_amarr_price = $amarr_sell * (1.0+$MIN_PROFIT+$TAX_AND_FEE);
                     if (($ri4_price < $min_jita_price) && ($ri4_price < $min_amarr_price))
                         $warnings .= '<span class="label label-lowprice" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
                 }
-                $max_jita_price = $jita_sell * (1.0+MAX_PROFIT+TAX_AND_FEE);
-                $max_amarr_price = $amarr_sell * (1.0+MAX_PROFIT+TAX_AND_FEE);
+                $max_jita_price = $jita_sell * (1.0+$MAX_PROFIT+$TAX_AND_FEE);
+                $max_amarr_price = $amarr_sell * (1.0+$MAX_PROFIT+$TAX_AND_FEE);
                 if (($ri4_price > $max_jita_price) && ($ri4_price > $max_amarr_price))
                     $warnings .= '<span class="label label-highprice" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
-                if (!is_null($nisuwa_sell) && ($nisuwa_sell < $ri4_price) && ($nisuwa_sell_volume > $ri4_market_quantity)) {
+                if (!is_null($trade_hub_sell) && ($trade_hub_sell < $ri4_price) && ($trade_hub_sell_volume > $ri4_market_quantity)) {
                     $interrupt_detected = true;
                     $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
                 }
             }
-            if ($nisuwa_sell_volume > $ri4_market_quantity) {
+            if ($trade_hub_sell_volume > $ri4_market_quantity) {
                 // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
-                $min_buy_price = $nisuwa_sell / (1.0+TAX_AND_FEE+MIN_PROFIT);
+                $min_buy_price = $trade_hub_sell / (1.0+$TAX_AND_FEE+$MIN_PROFIT);
                 if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
                     $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
                 else if ($amarr_sell > $min_buy_price)
@@ -219,7 +284,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
                 ?><tr><td class="active" colspan="8"><strong><?=$market_group?></strong></td></tr><?php
             }
 ?>
-<tr>
+<tr<?php if ($ri4_sell_lvl==2) { ?> style="background: #e8e8e8;"<?php } ?>>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
 
  <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
@@ -230,7 +295,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 
 <?php
     // поле с информацией о наличии товара на рынке
-    if (is_null($nisuwa_sell) && is_null($ri4_price))
+    if (is_null($trade_hub_sell) && is_null($ri4_price))
     {
         ?><td></td><?php
     }
@@ -246,16 +311,16 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
         {
             ?>&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ <?=number_format($storage_quantity,0,'.',',')?>&nbsp;</span></small><?php
         }
-        if (!is_null($nisuwa_sell))
+        if (!is_null($trade_hub_sell))
         {
-            if (!is_null($ri4_price) && ($ri4_price == $nisuwa_sell) && ($ri4_market_quantity == $nisuwa_sell_volume))
+            if (!is_null($ri4_price) && ($ri4_price == $trade_hub_sell) && ($ri4_market_quantity == $trade_hub_sell_volume))
             {
             }
             else
             {
-                if ($ri4_price == $nisuwa_sell) { ?><span class="text-muted-much"><?php }
-                ?><br><?=number_format($nisuwa_sell,2,'.',',')?>&nbsp;<mark><?=number_format($nisuwa_sell_volume,0,'.',',')?></mark><?php
-                if ($ri4_price == $nisuwa_sell) { ?></span><?php }
+                if ($ri4_price == $trade_hub_sell) { ?><span class="text-muted-much"><?php }
+                ?><br><?=number_format($trade_hub_sell,2,'.',',')?>&nbsp;<mark><?=number_format($trade_hub_sell_volume,0,'.',',')?></mark><?php
+                if ($ri4_price == $trade_hub_sell) { ?></span><?php }
             }
         }
 
@@ -265,7 +330,7 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
   if (is_null($amarr_sell)) { ?><td></td><?php }
   else
   {
-    ?><td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><br><mark><small><?=number_format($jita_import_price,2,'.',',')?></small></mark></td><?php
+    ?><td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><?php if (!is_null($trade_hub_import_price)) { ?><br><mark><small><?=number_format($trade_hub_import_price,2,'.',',')?></small></mark><?php } ?></td><?php
   }
 
   if (is_null($amarr_sell)) { ?><td></td><?php }
@@ -340,8 +405,8 @@ function __dump_querious_market(&$market, &$storage, &$purchase) { ?>
 }
 
 
-function __dump_querious_storage(&$storage) { ?>
-<h2>Nisuwa Storage</h2>
+function __dump_querious_storage(&$storage, $trade_hub_system) { ?>
+<h2><?=$trade_hub_system?> Storage</h2>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblStock">
 <thead>
  <tr>
@@ -349,7 +414,7 @@ function __dump_querious_storage(&$storage) { ?>
   <th>Items</th>
   <th style="text-align: right;">Quantity<br>in Storage</th>
   <th style="text-align: right;">RI4<br>Sell</th>
-  <th style="text-align: right;">Nisuwa Sell<br><mark>Quantity</mark></th>
+  <th style="text-align: right;"><?=$trade_hub_system?> Sell<br><mark>Quantity</mark></th>
   <th style="text-align: right;">Jita Buy..Sell<br><mark>Import Price</mark></th>
   <th style="text-align: right;">Amarr<br>Sell</th>
   <th style="text-align: right;">Universe<br>Price</th>
@@ -357,6 +422,8 @@ function __dump_querious_storage(&$storage) { ?>
 </thead>
 <tbody>
 <?php
+    global $IMPORT_PRICE_TO_TRADE_HUB;
+
     $summary_jita_sell = 0;
     $summary_jita_buy = 0;
     if ($storage)
@@ -367,10 +434,10 @@ function __dump_querious_storage(&$storage) { ?>
             $quantity = $product['q'];
             $ri4_sell = $product['rs'];
             $ri4_sell_volume = $product['rsv'];
-            $nisuwa_sell = $product['ps'];
-            $nisuwa_sell_volume = $product['psv'];
+            $trade_hub_sell = $product['ps'];
+            $trade_hub_sell_volume = $product['psv'];
             $packaged_volume = $product['pv'];
-            $jita_import_price = $packaged_volume * JITA_IMPORT_PRICE;
+            $trade_hub_import_price = is_null($IMPORT_PRICE_TO_TRADE_HUB) ? null : ($packaged_volume * $IMPORT_PRICE_TO_TRADE_HUB);
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
@@ -386,10 +453,10 @@ function __dump_querious_storage(&$storage) { ?>
  <?php if (is_null($ri4_sell)) { ?><td></td><?php } else { ?>
  <td align="right"><?=number_format($ri4_sell,2,'.',',')?><br><mark><?=number_format($ri4_sell_volume,0,'.',',')?></mark></td>
  <?php } ?>
- <?php if (is_null($nisuwa_sell)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($nisuwa_sell,2,'.',',')?><br><mark><?=number_format($nisuwa_sell_volume,0,'.',',')?></mark></td>
+ <?php if (is_null($trade_hub_sell)) { ?><td></td><?php } else { ?>
+ <td align="right"><?=number_format($trade_hub_sell,2,'.',',')?><br><mark><?=number_format($trade_hub_sell_volume,0,'.',',')?></mark></td>
  <?php } ?>
- <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><br><mark><?=number_format($jita_import_price,2,'.',',')?></mark></td>
+ <td align="right"><?=number_format($jita_buy,2,'.',',')?> .. <?=number_format($jita_sell,2,'.',',')?><?php if (!is_null($trade_hub_import_price)) { ?><br><mark><?=number_format($trade_hub_import_price,2,'.',',')?></mark><?php } ?></td>
  <td align="right"><?=number_format($amarr_sell,2,'.',',')?></td>
  <td align="right"><?=number_format($universe_price,2,'.',',')?></td>
 </tr>
@@ -408,21 +475,54 @@ function __dump_querious_storage(&$storage) { ?>
 
 
 
-    __dump_header("Nisuwa Market", FS_RESOURCES);
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
             or die('pg_connect err: '.pg_last_error());
     pg_exec($conn, "SET search_path TO qi");
     //---
-    // PZ: 1034323745897
-    // Nisuwa: 60015073
-    // R Initiative 4: 98615601
-    // R Strike: 98553333
-    // Xatul' Madan: 95858524
-    // DarkFman: 874053567
+    $query = <<<EOD
+select
+ name,
+ solar_system_name as ssn,
+ prc.up as prc,
+ ord.up as ord
+from
+ qi.esi_known_stations
+  left outer join (
+   select ethp_location_id, max(ethp_updated_at) as up
+   from qi.esi_trade_hub_prices
+   group by 1
+  ) prc on (prc.ethp_location_id = location_id)
+  left outer join (
+   select ecor_location_id, max(ecor_updated_at) as up
+   from qi.esi_corporation_orders
+   group by 1
+  ) ord on (ord.ecor_location_id = location_id)
+where location_id = $1;
+EOD;
+    $params = array($TRADE_HUB_ID);
+    $trade_hub_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query err: '.pg_last_error());
+    $trade_hub_status = pg_fetch_all($trade_hub_cursor);
+    if ($trade_hub_status)
+    {
+        $trade_hub_system = $trade_hub_status[0]['ssn'];
+    }
+    else
+    {
+        $trade_hub_system = 'Unknown';
+        unset($trade_hub_status);
+        $trade_hub_status = null;
+    }
+    //---
+
+    __dump_header($trade_hub_system." Market", FS_RESOURCES);
+
+    //---
     $query = <<<EOD
 select
   market.type_id as id,
+  market.lvl as ri4s, -- RI4 sell level
   market_group.name as grp,
   tid.sdet_type_name as name,
   case
@@ -442,40 +542,41 @@ select
     else universe.emp_average_price
   end as up, -- universe price
   round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
-  nisuwa_hub.ethp_sell as ps, -- Nisuwa sell
-  nisuwa_hub.ethp_sell_volume as psv -- Nisuwa sell volume
+  trade_hub.ethp_sell as ps, -- Nisuwa sell
+  trade_hub.ethp_sell_volume as psv -- Nisuwa sell volume
 from
   qi.eve_sde_market_groups_semantic as market_group,
-  ( select distinct type_id
+  ( select m.type_id, min(m.lvl) as lvl
     from (
-      -- список транзакций по покупке/продаже избранными персонажами от имени 2х корпораций
-      select ecwt_type_id as type_id --, 'j'::char as type
+      -- список транзакций по покупке/продаже имени корпораций или от имени избранных персонажей
+      select ecwt_type_id as type_id, 0 as lvl
       from
         esi_corporation_wallet_journals j
           left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
       where
         (ecwj_date > '2021-01-03') and
         (ecwj_context_id_type = 'market_transaction_id') and
-        ( ( ecwj_corporation_id=98553333 and -- R Strike
-            ecwt_location_id=60015073 and not ecwt_is_buy ) or -- станка рынка
-          ( ecwj_second_party_id=874053567 and -- торговый персонаж,...
-            ecwt_location_id<>60015073 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
+        ( ( ecwj_corporation_id=$1 and
+            ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
+          ( ecwj_second_party_id=$3 and -- торговый персонаж,...
+            ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
         ) and
         ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
       union
       -- список того, что корпорация продавала или продаёт
-      select ecor_type_id --, 'o'::char
+      select ecor_type_id, 1
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
-        (ecor_corporation_id=98553333) and  -- R Strike
-        (ecor_location_id=60015073)  -- станка рынка
+        (ecor_corporation_id=$1) and
+        (ecor_location_id=$2)  -- станка рынка
       union
       -- список того, что выставлено в маркете (не нами)
-      select ethp_type_id
+      select ethp_type_id, 2
       from qi.esi_trade_hub_prices
-      where ethp_location_id=60015073  -- станка рынка
-    ) jto
+      where $4=1 and ethp_location_id=$2  -- станка рынка
+    ) m
+    group by 1
   ) market
     -- сведения о предмете
     left outer join eve_sde_type_ids tid on (market.type_id = tid.sdet_type_id)
@@ -502,8 +603,8 @@ from
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
-        (ecor_corporation_id=98553333) and  -- R Strike
-        (ecor_location_id=60015073)  -- станка рынка
+        (ecor_corporation_id=$1) and
+        (ecor_location_id=$2)  -- станка рынка
       group by ecor_type_id
     ) weeks_passed on (market.type_id = weeks_passed.ecor_type_id)
     -- усреднённый (типовой) объём sell-ордера по продаже
@@ -516,8 +617,8 @@ from
       from esi_corporation_wallet_transactions
       where
         not ecwt_is_buy and
-        (ecwt_corporation_id=98553333) and  -- R Strike
-        (ecwt_location_id=60015073)  -- станка рынка
+        (ecwt_corporation_id=$1) and
+        (ecwt_location_id=$2)  -- станка рынка
       group by 1
     ) transactions_stat on (market.type_id = transactions_stat.ecwt_type_id)
     -- сведения о sell-ордерах, активных прямо сейчас
@@ -531,8 +632,8 @@ from
         not ecor_is_buy_order and
         (ecor_volume_remain > 0) and
         not ecor_history and
-        (ecor_corporation_id=98553333) and  -- R Strike
-        (ecor_location_id=60015073)  -- станка рынка
+        (ecor_corporation_id=$1) and
+        (ecor_location_id=$2)  -- станка рынка
       group by 1
     ) orders_stat on (market.type_id = orders_stat.ecor_type_id)
     -- ордера (в т.ч. и не наши) на данный товар на на нашей структуре
@@ -543,8 +644,8 @@ from
         ethp_sell, ethp_sell_volume
         --, ethp_buy, ethp_buy_volume
       from qi.esi_trade_hub_prices
-      where ethp_location_id=60015073  -- станка рынка
-    ) nisuwa_hub on (market.type_id = nisuwa_hub.ethp_type_id)
+      where ethp_location_id=$2  -- станка рынка
+    ) trade_hub on (market.type_id = trade_hub.ethp_type_id)
 where
   market_group.id = tid.sdet_market_group_id and
   market_group.semantic_id not in (
@@ -566,7 +667,8 @@ where
 -- order by tid.sdet_packaged_volume desc
 order by market_group.name, tid.sdet_type_name;
 EOD;
-    $market_cursor = pg_query($conn, $query)
+    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES);
+    $market_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $market = pg_fetch_all($market_cursor);
     //---
@@ -583,8 +685,8 @@ select
   hangar.eca_quantity as q,
   ri4_orders.avg_price as rs, -- ri4 sell
   ri4_orders.volume as rsv, -- ri4 sell volume : to_char(ri4_orders.avg_price, 'FM999G999G999G999.90') || ' (x' || to_char(ri4_orders.volume, 'FM999999999999999999') || ')'
-  nisuwa_hub.ethp_sell as ps, -- nisuwa sell
-  nisuwa_hub.ethp_sell_volume as psv, -- nisuwa sell volume
+  trade_hub.ethp_sell as ps, -- nisuwa sell
+  trade_hub.ethp_sell_volume as psv, -- nisuwa sell volume
   coalesce(tid.sdet_packaged_volume, 0) as pv, -- packaged volume
   jita.sell as js, -- jita sell : to_char(jita.sell, 'FM999G999G999G999G999.90')
   jita.buy as jb, -- jita buy : to_char(jita.buy, 'FM999G999G999G999G999.90')
@@ -625,8 +727,8 @@ from
         ethp_sell, ethp_sell_volume
         --, ethp_buy, ethp_buy_volume
       from qi.esi_trade_hub_prices
-      where ethp_location_id=60015073  -- станка рынка
-    ) nisuwa_hub on (hangar.eca_type_id = nisuwa_hub.ethp_type_id)
+      where ethp_location_id=$2  -- станка рынка
+    ) trade_hub on (hangar.eca_type_id = trade_hub.ethp_type_id)
     -- сведения об sell-ордерах, активных прямо сейчас
     left outer join (
       select
@@ -643,8 +745,8 @@ from
           not ecor_is_buy_order and
           (ecor_volume_remain > 0) and
           not ecor_history and
-          (ecor_corporation_id=98553333) and  -- R Strike
-          (ecor_location_id=60015073)  -- станка рынка
+          (ecor_corporation_id=$1) and
+          (ecor_location_id=$2)  -- станка рынка
         group by 1
       ) o
     ) ri4_orders on (hangar.eca_type_id = ri4_orders.ecor_type_id)
@@ -655,7 +757,8 @@ where
 -- order by universe.price desc
 order by tid.sdet_market_group_id, tid.sdet_type_name;
 EOD;
-    $storage_cursor = pg_query($conn, $query)
+    $params = array($CORPORATION_ID, $TRADE_HUB_ID);
+    $storage_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $storage = pg_fetch_all($storage_cursor);
     //---
@@ -678,12 +781,13 @@ from (
     (ecwj_date > (now() - '14 days'::interval)::date) and
     (ecwj_context_id_type = 'market_transaction_id') and
     ecwt_is_buy and
-    ecwj_second_party_id=874053567 -- торговый персонаж, который что-то где-то покупал за последние 2 недели
+    ecwj_second_party_id=$1 -- торговый персонаж, который что-то где-то покупал за последние 2 недели
   group by 1, 2
 ) buy
 order by 1, 2 desc;
 EOD;
-    $purchase_cursor = pg_query($conn, $query)
+    $params = array($TRADE_HUB_ID);
+    $purchase_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $purchase = pg_fetch_all($purchase_cursor);
     //---
@@ -691,6 +795,12 @@ EOD;
 ?>
 
 <div class="container-fluid">
+<?php
+    if ($trade_hub_status)
+    {
+      ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации цен: <span class="text-primary"><?=is_null($trade_hub_status[0]['prc'])?'нет данных':$trade_hub_status[0]['prc'].' ET'?></span><br>Время последней актуализации ордеров: <span class="text-primary"><?=is_null($trade_hub_status[0]['ord'])?'нет данных':$trade_hub_status[0]['ord'].' ET'?></span></p><?php
+    }
+?>
 <div class="btn-group btn-group-toggle" data-toggle="buttons">
  <label class="btn btn-default qind-btn-market active" group="all"><input type="radio" name="options" autocomplete="off" checked>Все</label>
  <label class="btn btn-default qind-btn-market" group="sold"><input type="radio" name="options" autocomplete="off">Всё продано</label>
@@ -701,7 +811,7 @@ EOD;
  <label class="btn btn-default qind-btn-market" group="high-price"><input type="radio" name="options" autocomplete="off">Цена завышена</label>
  <label class="btn btn-default qind-btn-market" group="interrupt"><input type="radio" name="options" autocomplete="off">Конкуренты</label>
 </div>
-<?php __dump_querious_market($market, $storage, $purchase); ?>
+<?php __dump_querious_market($market, $storage, $purchase, $trade_hub_system); ?>
 <!-- --- --- --- -->
 <hr>
 <!-- --- --- --- -->
@@ -709,7 +819,7 @@ EOD;
  <label class="btn btn-default qind-btn-stock" group="all"><input type="radio" name="options" autocomplete="off" checked>Показать</label>
  <label class="btn btn-default qind-btn-stock active" group="hide"><input type="radio" name="options" autocomplete="off">Скрыть</label>
 </div>
-<?php __dump_querious_storage($storage); ?>
+<?php __dump_querious_storage($storage, $trade_hub_system); ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 
@@ -741,7 +851,7 @@ EOD;
   <div class="col-md-4" align="right"><mark id="dtlsPackedVolume"></mark> m³</div>
 </div>
 <div class="row">
-  <div class="col-md-8">Стоимость доставки из Jita</div>
+  <div class="col-md-8">Стоимость доставки</div>
   <div class="col-md-4" align="right"><mark id="dtlsImportPrice"></mark> ISK</div>
 </div>
 <div class="row">
@@ -766,11 +876,11 @@ EOD;
 </div>
 <hr>
 <div class="btn-group btn-group-toggle" data-toggle="buttons" packed_volume="" id="dtlsCalc">
- <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" caption="Jita Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="<?=$DEFAULT_PROFIT?>" caption="Jita Sell +<?=$DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=$DEFAULT_PROFIT*100?>%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.05" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.15" caption="Jita Sell +15%" id="dtlsCalcJS15"><input type="radio" name="options" autocomplete="off">Jita +15%</label>
- <label class="btn btn-default qind-btn-calc" price="" profit="<?=DEFAULT_PROFIT?>" caption="Amarr Sell +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=DEFAULT_PROFIT*100?>%</label>
- <label class="btn btn-default qind-btn-calc active" price="" profit="<?=DEFAULT_PROFIT?>" caption="от цены закупа +<?=DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc" price="" profit="<?=$DEFAULT_PROFIT?>" caption="Amarr Sell +<?=$DEFAULT_PROFIT*100?>%" id="dtlsCalcAS10"><input type="radio" name="options" autocomplete="off">Amarr +<?=$DEFAULT_PROFIT*100?>%</label>
+ <label class="btn btn-default qind-btn-calc active" price="" profit="<?=$DEFAULT_PROFIT?>" caption="от цены закупа +<?=$DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=$DEFAULT_PROFIT*100?>%</label>
 </div>
 <div class="row">
   <div class="col-md-8">Цена закупа</mark></div>
@@ -788,7 +898,7 @@ EOD;
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-7">плюс 2% налог и 3.6% комиссия</div>
+  <div class="col-md-7">плюс <?=$TRADE_HUB_TAX*100.0?>% налог и <?=$BROKERS_FEE*100.0?>% комиссия</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_tax"></mark> ISK</div>
 </div>
 <div class="row">
@@ -811,7 +921,7 @@ EOD;
 </div>
 
 <script>
-var g_jita_import_price = <?=JITA_IMPORT_PRICE?>;
+var g_import_price_to_trade_hub = <?=is_null($IMPORT_PRICE_TO_TRADE_HUB)?0:$IMPORT_PRICE_TO_TRADE_HUB?>;
 var g_market_types = [<?php
     if ($market)
         foreach ($market as &$product)
@@ -823,7 +933,7 @@ var g_market_types = [<?php
             //$day_volume = $product['dv'];
             //$ri4_market_quantity = $product['mv'];
             $packaged_volume = $product['pv'];
-            $jita_import_price = $packaged_volume * JITA_IMPORT_PRICE;
+            //$import_price_to_trade_hub = is_null($IMPORT_PRICE_TO_TRADE_HUB) ? null : ($packaged_volume * $IMPORT_PRICE_TO_TRADE_HUB);
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $amarr_sell = $product['as'];
@@ -831,12 +941,12 @@ var g_market_types = [<?php
             //$amarr_price_lower = $amarr_sell < $jita_sell;
             $universe_price = $product['up'];
             //$ri4_price = $product['mp'];
-            //$jita_purchase_and_import_price = $jita_sell + $jita_import_price; // то, за сколько будем продавать: закуп + импорт
-            //$markup = $jita_purchase_and_import_price * TAX_AND_FEE; // комиссия считается от суммы закупа и транспортировки
-            //$jita_10_price = eve_ceiling($jita_purchase_and_import_price * (1.0+DEFAULT_PROFIT+TAX_AND_FEE)); // Jita +10% Price
+            //$jita_purchase_and_import_price = $jita_sell + $import_price_to_trade_hub; // то, за сколько будем продавать: закуп + импорт
+            //$markup = $jita_purchase_and_import_price * $TAX_AND_FEE; // комиссия считается от суммы закупа и транспортировки
+            //$jita_10_price = eve_ceiling($jita_purchase_and_import_price * (1.0+$DEFAULT_PROFIT+$TAX_AND_FEE)); // Jita +10% Price
             //$jita_10_profit = $jita_10_price - $jita_purchase_and_import_price - $markup;
-            //$nisuwa_sell = $product['ps'];
-            //$nisuwa_sell_volume = $product['psv'];
+            //$trade_hub_sell = $product['ps'];
+            //$trade_hub_sell_volume = $product['psv'];
 
             print('['.$tid.',"'.$nm.'",'.$packaged_volume.','.(is_null($jita_sell)?'0':$jita_sell).','.(is_null($jita_buy)?'0':$jita_buy).','.(is_null($amarr_sell)?'0':$amarr_sell).','.(is_null($universe_price)?'0':$universe_price)."],\n");
         }
@@ -959,11 +1069,11 @@ var g_purchase_types = [<?php
   }
   function recalcDetails(btn) {
     var take_import = 1 * $('#dtlsSellVar_import_check').is(':checked');
-    var import_price = take_import * g_jita_import_price * $('#dtlsCalc').attr('packed_volume');
+    var import_price = take_import * g_import_price_to_trade_hub * $('#dtlsCalc').attr('packed_volume');
     var price_purchase = 1.0 * btn.attr('price');
     var price_profit = price_purchase * (1.0+1.0*btn.attr('profit'));
     var price_profit_import = price_profit + import_price;
-    var price_profit_import_markup = price_profit_import * <?=TAX_AND_FEE?>;
+    var price_profit_import_markup = price_profit_import * <?=$TRADE_HUB_TAX+$BROKERS_FEE?>;
     var price_profit_import_tax = price_profit_import + price_profit_import_markup;
     var price_order = eveCeiling(price_profit_import_tax);
     var profit_order = price_order - price_profit_import_markup - price_purchase - import_price;
@@ -1002,7 +1112,11 @@ var g_purchase_types = [<?php
       var modal = $("#modalDetails");
       $('#modalDetailsLabel').html('<span class="text-primary">Подробности о товаре</span> '+market_type[1]);
       $('#dtlsPackedVolume').html(numLikeEve(market_type[2]));
-      $('#dtlsImportPrice').html(numLikeEve(Math.ceil10(market_type[2]*g_jita_import_price, -2).toFixed(2)));
+      if (g_import_price_to_trade_hub) {
+        $('#dtlsImportPrice').html(numLikeEve(Math.ceil10(market_type[2]*g_import_price_to_trade_hub, -2).toFixed(2)));
+      } else {
+        $('#dtlsImportPrice').html('');
+      }
       if (market_type[3]) {
         $('#dtlsJitaSell')
          .html(numLikeEve(market_type[3].toFixed(2)))
