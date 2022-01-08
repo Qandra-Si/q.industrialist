@@ -9,8 +9,8 @@ $IMPORT_PRICE_TO_TRADE_HUB = null; // например, цена импорта 
 $MIN_PROFIT = 0.05; // 5%
 $DEFAULT_PROFIT = 0.1; // 10%
 $MAX_PROFIT = 0.25; // 25%
-$TRADE_HUB_TAX = 0.0048; // налог на структуре (в Querious: 0.02, в Nisuwa: 0.0048)
-$BROKERS_FEE = 0.036; // брокерская комиссия, у прокачанных торговцев 3.6%
+$BROKERS_FEE = 0.0048; // брокерская комиссия
+$TRADE_HUB_TAX = 0.036; // sales tax, налог на структуре
 $CORPORATION_ID = 98553333; // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
 $TRADE_HUB_ID = 60015073; // PZ: 1034323745897, Nisuwa: 60015073, 4-HWWF: 1035466617946, NSI-MW: 1022822609240
 $TRADER_ID = 874053567; // Xatul' Madan: 95858524, DarkFman: 874053567
@@ -916,7 +916,7 @@ EOD;
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-7">плюс <?=$TRADE_HUB_TAX*100.0?>% налог и <?=$BROKERS_FEE*100.0?>% комиссия</div>
+  <div class="col-md-7">плюс <?=$BROKERS_FEE*100.0?>% комиссия и <?=$TRADE_HUB_TAX*100.0?>% налог</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_tax"></mark> ISK</div>
 </div>
 <div class="row">
