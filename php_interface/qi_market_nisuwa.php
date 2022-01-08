@@ -485,7 +485,8 @@ select
  name,
  solar_system_name as ssn,
  prc.up as prc,
- ord.up as ord
+ ord.up as ord,
+ tra.up as tra
 from
  qi.esi_known_stations
   left outer join (
@@ -498,9 +499,26 @@ from
    from qi.esi_corporation_orders
    group by 1
   ) ord on (ord.ecor_location_id = location_id)
-where location_id = $1;
+  left outer join (
+   -- список транзакций по покупке/продаже имени корпораций или от имени избранных персонажей
+   select t.ecwt_location_id, max(j.ecwj_date) as up
+   from
+    qi.esi_corporation_wallet_journals j
+     left outer join qi.esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
+   where
+    (ecwj_date > '2021-01-03') and
+    (ecwj_context_id_type = 'market_transaction_id') and
+    ( ( ecwj_corporation_id=$1 and
+        ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
+      ( ecwj_second_party_id=$3 and -- торговый персонаж,...
+        ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
+    ) and
+    ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
+   group by 1
+  ) tra on (tra.ecwt_location_id = location_id)
+where location_id = $2;
 EOD;
-    $params = array($TRADE_HUB_ID);
+    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID);
     $trade_hub_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $trade_hub_status = pg_fetch_all($trade_hub_cursor);
@@ -798,7 +816,7 @@ EOD;
 <?php
     if ($trade_hub_status)
     {
-      ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации цен: <span class="text-primary"><?=is_null($trade_hub_status[0]['prc'])?'нет данных':$trade_hub_status[0]['prc'].' ET'?></span><br>Время последней актуализации ордеров: <span class="text-primary"><?=is_null($trade_hub_status[0]['ord'])?'нет данных':$trade_hub_status[0]['ord'].' ET'?></span></p><?php
+      ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации цен: <span class="text-primary"><?=is_null($trade_hub_status[0]['prc'])?'нет данных':$trade_hub_status[0]['prc'].' ET'?></span><br>Время последней актуализации ордеров: <span class="text-primary"><?=is_null($trade_hub_status[0]['ord'])?'нет данных':$trade_hub_status[0]['ord'].' ET'?></span><br>Время последней сделки: <span class="text-primary"><?=is_null($trade_hub_status[0]['tra'])?'нет данных':$trade_hub_status[0]['tra'].' ET'?></span></p><?php
     }
 ?>
 <div class="btn-group btn-group-toggle" data-toggle="buttons">
