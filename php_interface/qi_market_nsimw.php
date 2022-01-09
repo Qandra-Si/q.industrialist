@@ -667,6 +667,7 @@ from
 where
   market_group.id = tid.sdet_market_group_id and
   market_group.semantic_id not in (
+    2, -- Blueprints & Reactions
     19, -- Trade Goods
     150, -- Skills
     499, -- Advanced Moon Materials
