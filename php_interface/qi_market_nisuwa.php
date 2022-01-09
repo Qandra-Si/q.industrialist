@@ -5,6 +5,7 @@ include_once '.settings.php';
 
 
 $SHOW_ONLY_RI4_SALES = 0; // признак отображения информации по ордерам, которые выставлены не нами
+$DO_NOT_SHOW_RAW_MATERIALS = 1; // не показывать метариалы, закуп которых выполняется для производственных работ (фильтрация спекуляции и закупа для производства, например минералов)
 $IMPORT_PRICE_TO_TRADE_HUB = 62; // null; // например, цена импорта 1куб.м. из Jita в Querious была 866 ISK
 $MIN_PROFIT = 0.05; // 5%
 $DEFAULT_PROFIT = 0.1; // 10%
@@ -20,6 +21,12 @@ if (isset($_GET['only_ri4_sales'])) {
     $_get_only_ri4_sales = htmlentities($_GET['only_ri4_sales']);
     if (is_numeric($_get_only_ri4_sales))
         $SHOW_ONLY_RI4_SALES = get_numeric($_get_only_ri4_sales) ? 1 : 0;
+}
+
+if (isset($_GET['raw_materials'])) {
+    $_get_raw_materials = htmlentities($_GET['raw_materials']);
+    if (is_numeric($_get_raw_materials))
+        $DO_NOT_SHOW_RAW_MATERIALS = get_numeric($_get_raw_materials) ? 0 : 1; // инверсия
 }
 
 if (isset($_GET['import'])) {
@@ -39,16 +46,16 @@ if (isset($_GET['profit'])) {
     }
 }
 
-if (isset($_GET['tax'])) {
-    $_get_tax = htmlentities($_GET['tax']);
-    if (is_numeric($_get_tax))
-        $TRADE_HUB_TAX = get_numeric($_get_tax);
-}
-
 if (isset($_GET['fee'])) {
     $_get_fee = htmlentities($_GET['fee']);
     if (is_numeric($_get_fee))
         $BROKERS_FEE = get_numeric($_get_fee);
+}
+
+if (isset($_GET['tax'])) {
+    $_get_tax = htmlentities($_GET['tax']);
+    if (is_numeric($_get_tax))
+        $TRADE_HUB_TAX = get_numeric($_get_tax);
 }
 
 if (isset($_GET['corp'])) {
@@ -666,7 +673,7 @@ from
     ) trade_hub on (market.type_id = trade_hub.ethp_type_id)
 where
   market_group.id = tid.sdet_market_group_id and
-  market_group.semantic_id not in (
+  ($5=0 or market_group.semantic_id not in (
     2, -- Blueprints & Reactions
     19, -- Trade Goods
     150, -- Skills
@@ -682,11 +689,11 @@ where
     1861, -- Salvage Materials
     1872, -- Research Equipment
     2767 -- Molecular-Forged Materials
-  )
+  ))
 -- order by tid.sdet_packaged_volume desc
 order by market_group.name, tid.sdet_type_name;
 EOD;
-    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES);
+    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS);
     $market_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $market = pg_fetch_all($market_cursor);
