@@ -42,8 +42,8 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
-    various_characters_data = []
-    various_corporations_data = []
+    various_characters_data = {}
+    various_corporations_data = {}
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -94,35 +94,47 @@ def main():
             print(sys.exc_info())
             raise
 
-        various_characters_data.append({str(character_id): character_data})
-        various_corporations_data.append({str(corporation_id): corporation_data})
+        various_characters_data.update({str(character_id): character_data})
+        various_corporations_data.update({str(corporation_id): corporation_data})
 
         for shareholder in corp_shareholders_data:
             # Получение сведений о пилотах, имеющих акции корпорации
             corp_id = None
             if shareholder['shareholder_type'] == 'character':
                 pilot_id = shareholder['shareholder_id']
-                __pilot_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(pilot_id)), None)
-                if __pilot_dict is None:
-                    # Public information about a character
-                    pilot_data = interface.get_esi_data(
-                        "characters/{}/".format(pilot_id),
-                        fully_trust_cache=True)
-                    corp_id = pilot_data["corporation_id"]
-                    various_characters_data.append({str(pilot_id): pilot_data})
+                if str(pilot_id) in various_characters_data:  # пилот м.б. быть в списке с dict=None
+                    __pilot_dict = various_characters_data.get(str(pilot_id))
+                    if __pilot_dict:
+                        corp_id = __pilot_dict.get("corporation_id")
                 else:
-                    corp_id = __pilot_dict[str(pilot_id)]["corporation_id"]
-                sys.stdout.flush()
+                    try:
+                        # Public information about a character
+                        pilot_data = interface.get_esi_data(
+                            "characters/{}/".format(pilot_id),
+                            fully_trust_cache=True)
+                        corp_id = pilot_data["corporation_id"]
+                        various_characters_data.update({str(pilot_id): pilot_data})
+                    except requests.exceptions.HTTPError as err:
+                        status_code = err.response.status_code
+                        if status_code == 404:  # 404 Client Error: Not Found ('Character has been deleted!')
+                            various_characters_data.update({str(pilot_id): None})
+                        else:
+                            print(sys.exc_info())
+                            raise
+                    except:
+                        print(sys.exc_info())
+                        raise
+                    sys.stdout.flush()
             elif shareholder['shareholder_type'] == 'corporation':
                 corp_id = shareholder['shareholder_id']
             # Получение сведений о корпорациях, которым принадлежат акции, либо в которых состоят пилоты
-            __corp_dict = next((i for i in various_corporations_data if int(list(i.keys())[0]) == int(corp_id)), None)
-            if __corp_dict is None:
-                # Public information about a character
-                corp_data = interface.get_esi_data(
-                    "corporations/{}/".format(corp_id),
-                    fully_trust_cache=True)
-                various_corporations_data.append({str(corp_id): corp_data})
+            if corp_id:
+                if str(corp_id) not in various_corporations_data:
+                    # Public information about a character
+                    corp_data = interface.get_esi_data(
+                        "corporations/{}/".format(corp_id),
+                        fully_trust_cache=True)
+                    various_corporations_data.update({str(corp_id): corp_data})
             sys.stdout.flush()
 
         shareholders_data = {

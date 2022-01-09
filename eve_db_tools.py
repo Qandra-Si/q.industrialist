@@ -348,6 +348,7 @@ class QDatabaseTools:
             except requests.exceptions.HTTPError as err:
                 status_code = err.response.status_code
                 if status_code == 404:
+                    # 404 Client Error: Not Found ('Character has been deleted!')
                     # это нормально, что часть пилотов со временем могут оказаться Not Found
                     return None
                 else:

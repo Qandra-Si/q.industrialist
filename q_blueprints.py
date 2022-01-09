@@ -399,6 +399,11 @@ def main():
                 # ищем публичные контракты типа "обмен предметами"
                 if (c["availability"] != "public") or (c["type"] != "item_exchange"):
                     continue
+                # пропускаем контракты на продажу, которые выставили не мы
+                # эту настройку лучше не трогать, т.к. во FRT например 12'000 контрактов, следовательно
+                # это повлечёт загрузку 12'000 items и 12'000 issuers
+                if c['issuer_corporation_id'] != corporation_id:
+                    continue
                 contract_id = c["contract_id"]
                 try:
                     __contract_items = interface.get_esi_data(

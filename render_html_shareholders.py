@@ -56,8 +56,8 @@ def __dump_corp_shareholders(
     for shareholder in shareholders:
         if shareholder['shareholder_type'] == 'corporation':
             corp_id = shareholder['shareholder_id']
-            corp_dict = next((i for i in corporations if int(list(i.keys())[0]) == int(corp_id)), None)
-            corp_name = corp_dict[str(corp_id)]['name']
+            corp_dict = corporations.get(str(corp_id))
+            corp_name = corp_dict['name']
             glf.write('<tr>\n'
                       ' <td scope="row">{num}</td>\n'
                       ' <td><span class="label label-info">corporation</span></td>'
@@ -71,11 +71,14 @@ def __dump_corp_shareholders(
                       ))
         elif shareholder['shareholder_type'] == 'character':
             pilot_id = shareholder['shareholder_id']
-            pilot_dict = next((i for i in characters if int(list(i.keys())[0]) == int(pilot_id)), None)
-            pilot_name = pilot_dict[str(pilot_id)]['name']
-            corp_id = pilot_dict[str(pilot_id)]['corporation_id']
-            corp_dict = next((i for i in corporations if int(list(i.keys())[0]) == int(corp_id)), None)
-            corp_name = corp_dict[str(corp_id)]['name']
+            pilot_dict = characters.get(str(pilot_id))  # пилот м.б. быть в списке с dict=None
+            pilot_name = pilot_dict["name"] if pilot_dict else "Deleted #"+str(pilot_id)
+            if pilot_dict:
+                corp_id = pilot_dict['corporation_id']
+                corp_dict = corporations.get(str(corp_id))
+                corp_name = corp_dict['name']
+            else:
+                corp_name = ''
             glf.write('<tr>\n'
                       ' <td scope="row">{num}</td>\n'
                       ' <td><mark>{nm}</mark></td>\n'

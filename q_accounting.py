@@ -24,6 +24,7 @@ Required application scopes:
     * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
     * esi-contracts.read_corporation_contracts.v1 - Requires: access token
+    * esi-corporations.read_corporation_membership.v1 - Requires: access token
 """
 import json
 import sys
@@ -571,7 +572,8 @@ def __build_contracts_stat(
                 __contract_dict = next((c for c in corp_contracts_data if c['contract_id'] == int(__contract_id)), None)
                 # добавляем контракт в список для формирование отчёта по балансу
                 __issuer_id = __contract_dict["issuer_id"]
-                __issuer_name = next((list(i.values())[0]["name"] for i in various_characters_data if int(list(i.keys())[0]) == int(__issuer_id)), None)
+                # пилот м.б. быть в списке с dict=None
+                __issuer_name = various_characters_data.get(str(__issuer_id), {"name": "Deleted #"+str(__issuer_id)}).get("name")
                 corp_sell_contracts.append({
                     "loc": __contract_dict["start_location_id"],
                     "ship_type_id": __is_it_ship["type_id"],
@@ -691,7 +693,7 @@ def main():
 
     corps_accounting = {}
     eve_market_prices_data = None
-    various_characters_data = []
+    various_characters_data = {}
     for pilot_name in argv_prms["character_names"]:
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
@@ -720,6 +722,10 @@ def main():
         corporation_data = interface.get_esi_data(
             "corporations/{}/".format(character_data["corporation_id"]),
             fully_trust_cache=True)
+        # The token’s character need to be a member of the corporation
+        # corporation_members_data = interface.get_esi_data(
+        #     "corporations/{}/members/".format(character_data["corporation_id"]),
+        #     fully_trust_cache=True)
 
         corporation_id = character_data["corporation_id"]
         corporation_name = corporation_data["name"]
@@ -853,6 +859,8 @@ def main():
                 if (c["status"] != "outstanding") and (c["status"] != "in_progress"):
                     continue
                 # пропускаем контракты на продажу, которые выставили не мы
+                # эту настройку лучше не трогать, т.к. во FRT например 12'000 контрактов, следовательно
+                # это повлечёт загрузку 12'000 items и 12'000 issuers
                 if c['issuer_corporation_id'] != corporation_id:
                     continue
                 contract_id = c["contract_id"]
@@ -879,13 +887,23 @@ def main():
                     raise
                 # Получение сведений о пилотах, вовлечённых в работу с контрактом
                 issuer_id = c["issuer_id"]
-                __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
-                if __issuer_dict is None:
-                    # Public information about a character
-                    issuer_data = interface.get_esi_data(
-                        "characters/{}/".format(issuer_id),
-                        fully_trust_cache=True)
-                    various_characters_data.append({str(issuer_id): issuer_data})
+                if str(issuer_id) not in various_characters_data:  # пилот м.б. быть в списке с dict=None
+                    try:
+                        # Public information about a character
+                        issuer_data = interface.get_esi_data(
+                            "characters/{}/".format(issuer_id),
+                            fully_trust_cache=True)
+                        various_characters_data.update({str(issuer_id): issuer_data})
+                    except requests.exceptions.HTTPError as err:
+                        status_code = err.response.status_code
+                        if status_code == 404:  # 404 Client Error: Not Found ('Character has been deleted!')
+                            various_characters_data.update({str(issuer_id): None})
+                        else:
+                            print(sys.exc_info())
+                            raise
+                    except:
+                        print(sys.exc_info())
+                        raise
                 sys.stdout.flush()
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
 
