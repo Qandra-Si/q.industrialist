@@ -178,27 +178,40 @@ def main():
                 corp_id = None
                 if shareholder['shareholder_type'] == 'character':
                     pilot_id = shareholder['shareholder_id']
-                    __pilot_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(pilot_id)), None)
-                    if __pilot_dict is None:
-                        # Public information about a character
-                        pilot_data = interface.get_esi_data(
-                            "characters/{}/".format(pilot_id),
-                            fully_trust_cache=True)
-                        corp_id = pilot_data["corporation_id"]
-                        various_characters_data.append({str(pilot_id): pilot_data})
+                    if str(pilot_id) in various_characters_data:  # пилот м.б. быть в списке с dict=None
+                        __pilot_dict = various_characters_data[str(pilot_id)]
+                        if __pilot_dict:
+                            corp_id = __pilot_dict.get("corporation_id")
                     else:
-                        corp_id = __pilot_dict[str(pilot_id)]["corporation_id"]
-                    sys.stdout.flush()
+                        try:
+                            # Public information about a character
+                            pilot_data = interface.get_esi_data(
+                                "characters/{}/".format(pilot_id),
+                                fully_trust_cache=True)
+                            corp_id = pilot_data["corporation_id"]
+                            various_characters_data.append({str(pilot_id): pilot_data})
+                        except requests.exceptions.HTTPError as err:
+                            status_code = err.response.status_code
+                            if status_code == 404:  # 404 Client Error: Not Found ('Character has been deleted!')
+                                various_characters_data.append({str(pilot_id): None})
+                            else:
+                                print(sys.exc_info())
+                                raise
+                        except:
+                            print(sys.exc_info())
+                            raise
+                        sys.stdout.flush()
                 elif shareholder['shareholder_type'] == 'corporation':
                     corp_id = shareholder['shareholder_id']
                 # Получение сведений о корпорациях, которым принадлежат акции, либо в которых состоят пилоты
-                __corp_dict = next((i for i in various_corporations_data if int(list(i.keys())[0]) == int(corp_id)), None)
-                if __corp_dict is None:
-                    # Public information about a character
-                    corp_data = interface.get_esi_data(
-                        "corporations/{}/".format(corp_id),
-                        fully_trust_cache=True)
-                    various_corporations_data.append({str(corp_id): corp_data})
+                if corp_id:
+                    __corp_dict = next((i for i in various_corporations_data if int(list(i.keys())[0]) == int(corp_id)), None)
+                    if __corp_dict is None:
+                        # Public information about a corporation
+                        corp_data = interface.get_esi_data(
+                            "corporations/{}/".format(corp_id),
+                            fully_trust_cache=True)
+                        various_corporations_data.append({str(corp_id): corp_data})
                 sys.stdout.flush()
 
             # Requires role(s): Director
@@ -321,11 +334,22 @@ def main():
                     issuer_id = c["issuer_id"]
                     __issuer_dict = next((i for i in various_characters_data if int(list(i.keys())[0]) == int(issuer_id)), None)
                     if __issuer_dict is None:
-                        # Public information about a character
-                        issuer_data = interface.get_esi_data(
-                            "characters/{}/".format(issuer_id),
-                            fully_trust_cache=True)
-                        various_characters_data.append({str(issuer_id): issuer_data})
+                        try:
+                            # Public information about a character
+                            issuer_data = interface.get_esi_data(
+                                "characters/{}/".format(issuer_id),
+                                fully_trust_cache=True)
+                            various_characters_data.append({str(issuer_id): issuer_data})
+                        except requests.exceptions.HTTPError as err:
+                            status_code = err.response.status_code
+                            if status_code == 404:  # 404 Client Error: Not Found ('Character has been deleted!')
+                                various_characters_data.append({str(issuer_id): None})
+                            else:
+                                print(sys.exc_info())
+                                raise
+                        except:
+                            print(sys.exc_info())
+                            raise
                     sys.stdout.flush()
             eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_contract_items_data.{}".format(corporation_name), corp_contract_items_data)
 
