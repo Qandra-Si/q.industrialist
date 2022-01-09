@@ -659,6 +659,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             # расчёт прогресса выполнения (постройки, сбора) материалов (bpmm3_j пропускаем, т.к. они не готовы ещё)
             if bpmm3_available >= bpmm3_q:
                 bpmm3_progress = 100
+            elif bpmm3_q == 0:
+                bpmm3_progress = 100
             else:
                 bpmm3_progress = float(100 * bpmm3_available / bpmm3_q)
             # вывод наименования ресурса
