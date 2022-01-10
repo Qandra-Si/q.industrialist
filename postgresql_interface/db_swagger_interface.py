@@ -496,7 +496,7 @@ class QSwaggerInterface:
             id
         )
         if row is None:
-            return None, None
+            return None, None, None
         data = {
             'name': row[0],
             'owner_id': row[1],
@@ -1032,9 +1032,9 @@ class QSwaggerInterface:
                 'end_date': row[18],
                 'ext': ext,
             }
-            if row[12]:
+            if row[12] is not None:
                 data_item.update({'licensed_runs': row[12]})
-            if row[13]:
+            if row[13] is not None:
                 data_item.update({'probability': row[13]})
             if row[14]:
                 data_item.update({'product_type_id': row[14]})
@@ -1044,7 +1044,7 @@ class QSwaggerInterface:
                 data_item.update({'completed_date': row[20]})
             if row[21]:
                 data_item.update({'completed_character_id': row[21]})
-            if row[22]:
+            if row[22] is not None:
                 data_item.update({'successful_runs': row[22]})
             data.append(data_item)
         return data
@@ -1862,9 +1862,9 @@ class QSwaggerInterface:
                 'type_id': row[0],
                 'ext': ext,
             }
-            if row[1]:
+            if row[1] is not None:
                 data_item.update({'adjusted_price': row[1]})
-            if row[2]:
+            if row[2] is not None:
                 data_item.update({'average_price': row[2]})
             data.append(data_item)
         return data

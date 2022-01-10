@@ -9,6 +9,7 @@ import requests
 import typing
 import datetime
 import pytz
+import math
 
 import eve_esi_interface as esi
 import postgresql_interface as db
@@ -57,13 +58,18 @@ class QEntity:
             if key in data:
                 if not (key in self.obj):
                     return False
-                elif data[key] != self.obj[key]:
-                    return False
             else:
                 if not (key in self.obj):
-                    pass
-                elif data[key] != self.obj[key]:
+                    continue
+            x = data[key]
+            y = self.obj[key]
+            if isinstance(x, float) or isinstance(y, float):
+                # 5.0 и 4.99 - False (разные), а 5.0 и 4.999 - True (одинаковые)
+                same: bool = math.isclose(x, y, abs_tol=0.00999)
+                if not same:
                     return False
+            elif x != y:
+                return False
         return True
 
 
@@ -96,6 +102,7 @@ class QDatabaseTools:
                                   'material_efficiency', 'runs']
     corporation_industry_job_diff = ['status']
     corporation_industry_order_diff = ['price', 'volume_remain']
+    markets_prices_diff = ['adjusted_price', 'average_price']
 
     def __init__(self, module_name, client_scope, database_prms, debug):
         """ constructor
@@ -1465,17 +1472,19 @@ class QDatabaseTools:
         # актуализация (добавление) narket цен в БД
         markets_prices_updated: int = 0
         for price_data in data:
-            # подсчёт статистики
-            markets_prices_updated += 1
-            # отправка в БД
-            self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
-            # актуализация кеша
+            # актуализация кеша (сравнение данных в кеше для минимизации обращений к БД)
             type_id: int = price_data['type_id']
             in_cache = self.__cached_markets_prices.get(type_id)
             if not in_cache:
                 self.__cached_markets_prices[type_id] = QEntity(True, True, price_data, updated_at)
-            else:
+            elif not in_cache.is_obj_equal_by_keys(price_data, self.markets_prices_diff):
                 in_cache.store(True, True, price_data, updated_at)
+            else:
+                continue
+            # отправка в БД
+            self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
+            # подсчёт статистики
+            markets_prices_updated += 1
 
         self.qidb.commit()
 
