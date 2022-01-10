@@ -15,11 +15,16 @@ Prerequisites:
       Note: never use localhost as a callback in released applications.
 
 To run this example, make sure you have completed the prerequisites and then
-run the following command from this directory as the root:
+run the following command from this directory:
 
 >>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
 >>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 >>> python q_universe_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
+
+Attention, the first launch takes about 4 hours of work!
+Usually single launch for one corporation takes 1.5-2 minutes, but in case of a long
+downtime, it will take up to 3-4 minutes for each very active corporation.
+Loading market prices for The Forge region will require about 1GB of memory.
 
 Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
@@ -95,22 +100,31 @@ def main():
 
             # Requires: public access
             for region in q_industrialist_settings.g_market_hubs:
-                found_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
-                print("'{}' market orders has {} updates\n".format(region['region'], 'no' if found_market_orders is None else found_market_orders))
+                found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
+                print("'{}' market has {} goods and {} order updates\n".format(
+                    region['region'],
+                    'not new' if found_market_goods is None else found_market_goods,
+                    'no' if updated_market_orders is None else updated_market_orders))
                 sys.stdout.flush()
 
             # Requires: public access
             for structure in q_industrialist_settings.g_market_structures:
                 if structure.get("corporation_name", None) is None:
-                    found_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
-                    print("'{}' market orders has {} updates\n".format(structure.get("structure_id"), 'no' if found_market_orders is None else found_market_orders))
+                    found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
+                    print("'{}' market has {} goods and {} order updates\n".format(
+                        structure.get("structure_id"),
+                        'not new' if found_market_goods is None else found_market_goods,
+                        'no' if updated_market_orders is None else updated_market_orders))
                     sys.stdout.flush()
 
         # Requires: public access
         for structure in q_industrialist_settings.g_market_structures:
             if structure.get("corporation_name") == corporation_name:
-                found_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
-                print("'{}' market orders has {} updates\n".format(structure.get("structure_id"), 'no' if found_market_orders is None else found_market_orders))
+                found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
+                print("'{}' market has {} goods and {} order updates\n".format(
+                    structure.get("structure_id"),
+                    'not new' if found_market_goods is None else found_market_goods,
+                    'no' if updated_market_orders is None else updated_market_orders))
                 sys.stdout.flush()
 
         # приступаем к загрузке корпоративных данных

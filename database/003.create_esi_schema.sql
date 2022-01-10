@@ -8,6 +8,17 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_etho_issued;
+DROP INDEX IF EXISTS qi.idx_etho_location_is_buy;
+DROP INDEX IF EXISTS qi.idx_etho_location_type_id;
+DROP INDEX IF EXISTS qi.idx_etho_type_id;
+DROP INDEX IF EXISTS qi.idx_etho_location_id;
+DROP INDEX IF EXISTS qi.idx_etho_pk;
+DROP TABLE IF EXISTS qi.esi_trade_hub_orders;
+
+DROP TYPE  IF EXISTS qi.esi_order_range;
+
+---
 DROP INDEX IF EXISTS qi.idx_ethp_pk;
 DROP TABLE IF EXISTS qi.esi_trade_hub_prices;
 
@@ -38,6 +49,7 @@ DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
 DROP INDEX IF EXISTS qi.idx_ecor_issued;
 DROP INDEX IF EXISTS qi.idx_ecor_wallet_division;
 DROP INDEX IF EXISTS qi.idx_ecor_location_id;
+DROP INDEX IF EXISTS qi.idx_ecor_type_id;
 DROP INDEX IF EXISTS qi.idx_ecor_corporation_id;
 DROP INDEX IF EXISTS qi.idx_ecor_pk;
 DROP TABLE IF EXISTS qi.esi_corporation_orders;
@@ -798,6 +810,11 @@ CREATE INDEX idx_ecor_corporation_id
     (ecor_corporation_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
+CREATE INDEX idx_ecor_type_id
+    ON qi.esi_corporation_orders USING btree
+    (ecor_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
 CREATE INDEX idx_ecor_location_id
     ON qi.esi_corporation_orders USING btree
     (ecor_location_id ASC NULLS LAST)
@@ -1002,6 +1019,57 @@ TABLESPACE pg_default;
 CREATE UNIQUE INDEX idx_ethp_pk
     ON qi.esi_trade_hub_prices USING btree
     (ethp_location_id ASC NULLS LAST, ethp_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+CREATE TYPE qi.esi_order_range AS ENUM ('station', 'region', 'solarsystem', '1', '2', '3', '4', '5', '10', '20', '30', '40');
+
+CREATE TABLE qi.esi_trade_hub_orders
+(
+    etho_location_id BIGINT NOT NULL,
+    etho_order_id BIGINT NOT NULL,
+    etho_type_id BIGINT NOT NULL,
+    etho_duration INTEGER NOT NULL,
+    etho_is_buy BOOLEAN NOT NULL,
+    etho_issued TIMESTAMP NOT NULL,
+    etho_min_volume INTEGER NOT NULL,
+    etho_price DOUBLE PRECISION NOT NULL,
+    etho_range qi.esi_order_range NOT NULL,
+    etho_volume_remain INTEGER NOT NULL,
+    etho_volume_total INTEGER NOT NULL,
+    etho_created_at TIMESTAMP,
+    etho_updated_at TIMESTAMP,
+    CONSTRAINT pk_etho PRIMARY KEY (etho_location_id, etho_order_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_etho_pk
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_location_id ASC NULLS LAST, etho_order_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_etho_location_id
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_etho_type_id
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_etho_location_type_id
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_location_id ASC NULLS LAST, etho_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_etho_location_is_buy
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_location_id ASC NULLS LAST, etho_is_buy ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_etho_issued
+    ON qi.esi_trade_hub_orders USING btree
+    (etho_issued ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

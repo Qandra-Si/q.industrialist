@@ -1751,6 +1751,7 @@ class QSwaggerInterface:
             "ON CONFLICT ON CONSTRAINT pk_ecor DO UPDATE SET"
             " ecor_price=%(p)s,"
             " ecor_volume_remain=%(vr)s,"
+            " ecor_issued=%(dt)s,"
             " ecor_history=%(h)s,"
             " ecor_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'co': corporation_id,
@@ -1976,82 +1977,126 @@ class QSwaggerInterface:
     # /markets/structures/structure_id/
     # -------------------------------------------------------------------------
 
-    def get_market_location_prices(self, location_id: int):
+    def get_market_location_orders_to_compare(self, location_id: int):
         data: typing.Dict[int, typing.Any] = {}
         rows = self.db.select_all_rows(
             "SELECT"
-            " ethp_type_id,"
-            " ethp_sell,"
-            " ethp_buy,"
-            " ethp_sell_volume,"
-            " ethp_buy_volume "
-            "FROM esi_trade_hub_prices "
-            "WHERE ethp_location_id=%s;",
+            " etho_order_id,"
+            " etho_price,"
+            " etho_volume_remain "
+            # " etho_type_id,"
+            # " etho_duration,"
+            # " etho_is_buy,"
+            # " etho_issued,"
+            # " etho_min_volume,"
+            # " etho_range,"
+            # " etho_volume_total "
+            "FROM esi_trade_hub_orders "
+            "WHERE etho_location_id=%s;",
             location_id
         )
         if rows is None:
             return data
         for row in rows:
-            type_id: int = int(row[0])
-            data[type_id] = {
-                'sell': row[1],
-                'buy': row[2],
-                'sell_volume': row[3],
-                'buy_volume': row[4],
+            order_id: int = int(row[0])
+            data[order_id] = {
+                'order_id': order_id,
+                'price': row[1],
+                'volume_remain': row[2],
+                # остальные поля ордера не меняются (выдаём набор данных только для сравнения)
+                # 'duration': row[2],
+                # 'is_buy_order': row[3],
+                # 'issued': row[4],
+                # 'location_id': location_id,
+                # 'min_volume': row[5],
+                # 'range': row[7],
+                # 'system_id': row[?],  # этого параметра у структур нет
+                # 'type_id': row[1],
+                # 'volume_total': row[8],
             }
         return data
 
-    def insert_or_update_market_location_prices(self, location_id: int, type_id: int, data, updated_at):
-        """ inserts markets price data into database
+    def insert_or_update_market_location_order(self, location_id: int, data, updated_at):
+        """ inserts markets order data into database
 
         :param data: market price data
         """
-        # { "sell": 620,
-        #   "buy": 605,
-        #   "sell_volume": 80,
-        #   "buy_volume": 80
+        # { "duration": 90,
+        #   "is_buy_order": false,
+        #   "issued": "2021-12-28T09:13:08Z",
+        #   "location_id": 60003760,
+        #   "min_volume": 1,
+        #   "order_id": 6160167353,
+        #   "price": 13000.0,
+        #   "range": "region",
+        #   "system_id": 30000142,
+        #   "type_id": 57457,
+        #   "volume_remain": 20000,
+        #   "volume_total": 20000
         # }
         self.db.execute(
-            "INSERT INTO esi_trade_hub_prices("
-            " ethp_location_id,"
-            " ethp_type_id,"
-            " ethp_sell,"
-            " ethp_buy,"
-            " ethp_sell_volume,"
-            " ethp_buy_volume,"
-            " ethp_created_at,"
-            " ethp_updated_at) "
+            "INSERT INTO esi_trade_hub_orders("
+            " etho_location_id,"
+            " etho_order_id,"
+            " etho_type_id,"
+            " etho_duration,"
+            " etho_is_buy,"
+            " etho_issued,"
+            " etho_min_volume,"
+            " etho_price,"
+            " etho_range,"
+            " etho_volume_remain,"
+            " etho_volume_total,"
+            " etho_created_at,"
+            " etho_updated_at) "
             "VALUES ("
             " %(l)s,"
+            " %(o)s,"
             " %(t)s,"
-            " %(s)s,"
+            " %(d)s,"
             " %(b)s,"
-            " %(sv)s,"
-            " %(bv)s,"
+            " %(dt)s,"
+            " %(mv)s,"
+            " %(p)s,"
+            " %(r)s,"
+            " %(vr)s,"
+            " %(vt)s,"
             " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
-            "ON CONFLICT ON CONSTRAINT pk_ethp DO UPDATE SET"
-            " ethp_sell=%(s)s,"
-            " ethp_buy=%(b)s,"
-            " ethp_sell_volume=%(sv)s,"
-            " ethp_buy_volume=%(bv)s,"
-            " ethp_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            "ON CONFLICT ON CONSTRAINT pk_etho DO UPDATE SET"
+            " etho_price=%(p)s,"
+            " etho_volume_remain=%(vr)s,"
+            " etho_issued=%(dt)s,"
+            " etho_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
             {'l': location_id,
-             't': type_id,
-             's': data.get('sell', None),
-             'b': data.get('buy', None),
-             'sv': data['sell_volume'],
-             'bv': data['buy_volume'],
+             'o': data['order_id'],
+             't': data['type_id'],
+             'd': data['duration'],
+             'b': data['is_buy_order'],
+             'dt': data['issued'],
+             'mv': data['min_volume'],
+             'p': data['price'],
+             'r': data['range'],
+             'vr': data['volume_remain'],
+             'vt': data['volume_total'],
              'at': updated_at,
              }
         )
 
-    def delete_market_location_price(self, location_id: int, type_id: int):
+    def delete_market_location_order(self, location_id: int, order_id: int):
         self.db.execute(
-            "DELETE FROM esi_trade_hub_prices "
-            "WHERE ethp_location_id=%s AND ethp_type_id=%s;",
+            "DELETE FROM esi_trade_hub_orders "
+            "WHERE etho_location_id=%s AND etho_order_id=%s;",
             location_id,
-            type_id
+            order_id
+        )
+
+    def sync_market_location_prices_with_orders(self, location_id: int):
+        # синхронизация данных в таблице esi_trade_hub_prices (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+        self.db.execute(
+            "CALL ethp_sync_with_etho(%s);",
+            location_id
         )
 
     # -------------------------------------------------------------------------
@@ -2088,6 +2133,8 @@ class QSwaggerInterface:
             " SELECT emp_type_id FROM esi_markets_prices"
             " union"
             " SELECT ethp_type_id FROM esi_trade_hub_prices"
+            " union"
+            " SELECT etho_type_id FROM esi_trade_hub_orders"
             ") t "
             "WHERE t.id NOT IN (SELECT sdet_type_id FROM eve_sde_type_ids);"
         )

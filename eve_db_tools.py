@@ -17,6 +17,26 @@ import postgresql_interface as db
 from __init__ import __version__
 
 
+def is_dicts_equal_by_keys(dict1, dict2, keys):
+    for key in keys:
+        if key in dict1:
+            if not (key in dict2):
+                return False
+        else:
+            if not (key in dict2):
+                continue
+        x = dict1[key]
+        y = dict2[key]
+        if isinstance(x, float) or isinstance(y, float):
+            # 5.0 и 4.99 - False (разные), а 5.0 и 4.999 - True (одинаковые)
+            same: bool = math.isclose(x, y, abs_tol=0.00999)
+            if not same:
+                return False
+        elif x != y:
+            return False
+    return True
+
+
 class QEntity:
     def __init__(self, db, esi, obj, at):
         """ данные объекта, хранящеося в индексированном справочнике в памяти
@@ -54,23 +74,7 @@ class QEntity:
         return True
 
     def is_obj_equal_by_keys(self, data, keys):
-        for key in keys:
-            if key in data:
-                if not (key in self.obj):
-                    return False
-            else:
-                if not (key in self.obj):
-                    continue
-            x = data[key]
-            y = self.obj[key]
-            if isinstance(x, float) or isinstance(y, float):
-                # 5.0 и 4.99 - False (разные), а 5.0 и 4.999 - True (одинаковые)
-                same: bool = math.isclose(x, y, abs_tol=0.00999)
-                if not same:
-                    return False
-            elif x != y:
-                return False
-        return True
+        return is_dicts_equal_by_keys(self.obj, data, keys)
 
 
 class QEntityDepth:
@@ -101,7 +105,7 @@ class QDatabaseTools:
     corporation_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
                                   'material_efficiency', 'runs']
     corporation_industry_job_diff = ['status']
-    corporation_industry_order_diff = ['price', 'volume_remain']
+    market_order_diff = ['price', 'volume_remain']
     markets_prices_diff = ['adjusted_price', 'average_price']
 
     def __init__(self, module_name, client_scope, database_prms, debug):
@@ -1361,7 +1365,7 @@ class QDatabaseTools:
         if not in_cache:
             pass
         elif in_cache.obj:
-            data_equal = in_cache.is_obj_equal_by_keys(order_data, self.corporation_industry_order_diff)
+            data_equal = in_cache.is_obj_equal_by_keys(order_data, self.market_order_diff)
         # ---
         # если все позиции в order-е закрыты, то откуда бы ни пришли данные, они должны стать архивными
         #if (order_data['volume_remain'] == 0):
@@ -1601,76 +1605,61 @@ class QDatabaseTools:
     def actualize_trade_hub_market_orders(self, trade_hub_id: int, orders_data, updated_at):
         # актуализируем станцию/структуру в БД
         self.actualize_station_or_structure(trade_hub_id, need_data=False)
-        # списки ордеров превращаем в сводные данные: buy price, avg price, sell price и т.п.
-        __cached_trade_hub: typing.Dict[int, QEntity] = {}
 
-        # актуализация (добавление) market цен в БД
-        found_market_orders: int = 0
+        # повторно проходимся по списку ордеров, то теперь уже сохраняем его в БД "напрямую" как есть
+        __cached_trade_hub_orders: typing.Dict[int, typing.Any] = {}
+        __cached_trade_hub_orders = self.dbswagger.get_market_location_orders_to_compare(trade_hub_id)
+        order_ids_in_cache: typing.Set[int] = set(__cached_trade_hub_orders.keys())
+        type_ids_in_cache: typing.Set[int] = set()
+
+        # актуализация (добавление) market ордеров в БД
+        updated_market_orders: int = 0
         for order_data in orders_data:
-            # поиск Jita Trade Hub среди всех ордеров региона
+            # поиск например Jita Trade Hub среди всех ордеров региона
+            # для структур эта проверка не актуальна, но набор данных у структур имеет тот же формат
             location_id: int = order_data['location_id']
             if not (location_id == trade_hub_id):  # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
                 continue
-            # актуализация кеша
+            # актуализация содержимого БД
             type_id: int = order_data['type_id']
-            in_cache = __cached_trade_hub.get(type_id)
+            order_id: int = order_data['order_id']
+            # этот ордер не должен быть удалён, т.к. он всё ещё в маркете
+            if order_id in order_ids_in_cache:
+                order_ids_in_cache.remove(order_id)
+            # проверяем изменился ли ордер? если не изменился, то переходим к следующему
+            in_cache = __cached_trade_hub_orders.get(order_id)
             if not in_cache:
-                if order_data['is_buy_order']:
-                    cache_obj = {
-                        'buy': order_data['price'],
-                        'buy_volume': order_data['volume_remain'],
-                        'sell_volume': 0,
-                    }
-                else:
-                    cache_obj = {
-                        'sell': order_data['price'],
-                        'sell_volume': order_data['volume_remain'],
-                        'buy_volume': 0,
-                    }
-                __cached_trade_hub[type_id] = QEntity(True, True, cache_obj, updated_at)
-                del cache_obj
-            else:
-                if order_data['is_buy_order']:
-                    cache_price = in_cache.obj.get('buy')
-                    if (cache_price is None) or (cache_price < order_data['price']):
-                        in_cache.obj.update({'buy': order_data['price']})
-                    in_cache.obj.update({
-                        'buy_volume': order_data['volume_remain'] + in_cache.obj.get('buy_volume', 0)
-                    })
-                else:
-                    cache_price = in_cache.obj.get('sell')
-                    if (cache_price is None) or (cache_price > order_data['price']):
-                        in_cache.obj.update({'sell': order_data['price']})
-                    in_cache.obj.update({
-                        'sell_volume': order_data['volume_remain'] + in_cache.obj.get('sell_volume', 0)
-                    })
+                pass
+            elif is_dicts_equal_by_keys(in_cache, order_data, self.market_order_diff):
+                continue
+            # добавляем новый или корректируем изменённый ордер в БД
+            self.dbswagger.insert_or_update_market_location_order(trade_hub_id, order_data, updated_at)
+            # подсчёт статистики
+            updated_market_orders += 1
+            if type_id not in type_ids_in_cache:
+                type_ids_in_cache.add(type_id)
 
-        # получение из БД последних данных по ордерам на этом location_id
-        __stored_trade_hub: typing.Dict[int, QEntity] = self.dbswagger.get_market_location_prices(trade_hub_id)
+        found_market_goods: int = len(type_ids_in_cache)
 
-        # отправка изменений в БД
-        for _type_id in __cached_trade_hub:
-            type_id: int = int(_type_id)
-            in_cache = __cached_trade_hub.get(type_id)
-            in_stored = __stored_trade_hub.get(type_id)
-            if (in_stored is None) or not in_cache.is_obj_equal(in_stored):
-                self.dbswagger.insert_or_update_market_location_prices(trade_hub_id, type_id, in_cache.obj, updated_at)
-                # подсчёт статистики
-                found_market_orders += 1
+        # поскорее очищаем память, данные уже в БД
+        del type_ids_in_cache
+        del __cached_trade_hub_orders
+
         # удаление из БД записей, по которым в маркете отсутствуют данные
-        for _type_id in __stored_trade_hub:
-            type_id: int = int(_type_id)
-            in_cache = __cached_trade_hub.get(type_id)
-            if not in_cache:
-                self.dbswagger.delete_market_location_price(trade_hub_id, type_id)
-                # подсчёт статистики
-                found_market_orders += 1
+        for _order_id in order_ids_in_cache:
+            order_id: int = int(_order_id)
+            self.dbswagger.delete_market_location_order(trade_hub_id, order_id)
+            # подсчёт статистики
+            updated_market_orders += 1
 
-        # очищаем память, данные уже в БД
-        del __cached_trade_hub
-        del __stored_trade_hub
+        # очищаем память, данные удалены из БД
+        del order_ids_in_cache
 
-        return found_market_orders
+        # синхронизация данных в таблице esi_trade_hub_prices (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+        self.dbswagger.sync_market_location_prices_with_orders(trade_hub_id)
+
+        return found_market_goods, updated_market_orders
 
     # -------------------------------------------------------------------------
     # /markets/structures/{structure_id}/
@@ -1689,24 +1678,24 @@ class QDatabaseTools:
         except requests.exceptions.HTTPError as err:
             status_code = err.response.status_code
             if status_code == 404:  # Not Found (спилили структурку?)
-                return None
+                return None, None
             elif status_code == 403:  # Forbidden (у этой корпорации нет доступа к этой структуре?)
-                return None
+                return None, None
             else:
                 # print(sys.exc_info())
                 # raise
-                return None
+                return None, None
         except:
             # print(sys.exc_info())
             # raise
-            return None  # продолжить загрузку очень важно!
+            return None, None  # продолжить загрузку очень важно!
 
         if data is None:
-            return None
+            return None, None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return None
+            return None, None
 
         # актуализируем данные по структуре (загружем по ESI или из БД, например её название)
         self.actualize_universe_structure(structure_id, True)
@@ -1717,7 +1706,7 @@ class QDatabaseTools:
             self.dbswagger.db.disable_debug()
 
         # актуализация (добавление) market цен в БД
-        found_market_orders: int = self.actualize_trade_hub_market_orders(structure_id, data, updated_at)
+        found_market_goods, updated_market_orders = self.actualize_trade_hub_market_orders(structure_id, data, updated_at)
 
         # стараемся пораньше очистить память
         del data
@@ -1728,7 +1717,7 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.enable_debug()
 
-        return found_market_orders
+        return found_market_goods, updated_market_orders
 
     # -------------------------------------------------------------------------
     # /markets/{region_id}/orders/
@@ -1754,7 +1743,7 @@ class QDatabaseTools:
     def actualize_trade_hubs_market_orders(self, region: str, trade_hubs):
         region_id = self.dbswagger.select_region_id_by_name(region)  # 'The Forge' = 10000002
         if region_id is None:
-            return None
+            return None, None
 
         trade_hub_ids = []
         for hub in trade_hubs:
@@ -1762,7 +1751,7 @@ class QDatabaseTools:
             if not (station_id is None):
                 trade_hub_ids.append(station_id)
         if not trade_hub_ids:
-            return None
+            return None, None
 
         url: str = self.get_markets_region_orders_url(region_id)
         try:
@@ -1771,7 +1760,7 @@ class QDatabaseTools:
             status_code = err.response.status_code
             if status_code == 404:
                 # 'error': 'Region not found!' (опечатка в настройках, или изменение в игре)
-                return None
+                return None, None
             else:
                 # print(sys.exc_info())
                 raise
@@ -1780,11 +1769,11 @@ class QDatabaseTools:
             raise
 
         if data is None:
-            return None
+            return None, None
         if self.esiswagger.offline_mode:
             updated_at = self.eve_now
         elif not is_updated:
-            return None
+            return None, None
 
         # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
         db_debug: bool = self.dbswagger.db.debug
@@ -1792,10 +1781,14 @@ class QDatabaseTools:
             self.dbswagger.db.disable_debug()
 
         # перебираем список торговых хабов в этом регионе
-        found_market_orders: int = 0
+        found_market_goods: int = 0
+        updated_market_orders: int = 0
         for _trade_hub_id in trade_hub_ids:
             trade_hub_id: int = int(_trade_hub_id)
-            found_market_orders += self.actualize_trade_hub_market_orders(trade_hub_id, data, updated_at)
+            found, updated = self.actualize_trade_hub_market_orders(trade_hub_id, data, updated_at)
+            if found and updated:
+                found_market_goods += found
+                updated_market_orders += updated
 
         # стараемся пораньше очистить память, т.к. загруженный кусок данных по Jita Trage Hub занимает большее 1.5 Гб
         del data
@@ -1806,7 +1799,7 @@ class QDatabaseTools:
         if db_debug:
             self.dbswagger.db.enable_debug()
 
-        return found_market_orders
+        return found_market_goods, updated_market_orders
 
     # -------------------------------------------------------------------------
     # /universe/types/

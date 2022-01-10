@@ -323,5 +323,82 @@ create trigger ecb_on_delete
 --------------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------------
+-- sync_trade_hub_prices_with_orders
+-- синхронизация данных в таблице esi_trade_hub_prices (с сохранением
+-- накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.ethp_sync_with_etho(location_id BIGINT)
+LANGUAGE SQL
+AS $$
+ update qi.esi_trade_hub_prices set
+  ethp_sell=case o.sell_volume when 0 then ethp_sell else o.sell end,
+  ethp_buy=case o.buy_volume when 0 then ethp_buy else o.buy end,
+  ethp_sell_volume=o.sell_volume,
+  ethp_buy_volume=o.buy_volume,
+  ethp_updated_at=o.updated_at
+ from
+  ( select
+     o.etho_location_id as loc,
+     o.etho_type_id as tid,
+     min(case o.etho_is_buy when true then null else o.etho_price end) as sell,
+     max(case o.etho_is_buy when true then o.etho_price else null end) as buy,
+     sum(case o.etho_is_buy when true then 0 else o.etho_volume_remain end) as sell_volume,
+     sum(case o.etho_is_buy when true then o.etho_volume_remain else 0 end) as buy_volume,
+     max(o.etho_updated_at) as updated_at
+    from qi.esi_trade_hub_orders o
+    group by 1, 2
+   ) o
+ where
+  ethp_location_id=location_id and
+  ethp_location_id=o.loc and ethp_type_id=o.tid
+ ;
+ update qi.esi_trade_hub_prices set
+  ethp_sell_volume=0,
+  ethp_buy_volume=0,
+  ethp_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
+ from
+  ( select ethp_location_id as loc, ethp_type_id as tid
+    from qi.esi_trade_hub_prices
+     left outer join (
+      select distinct o.etho_location_id as loc,o.etho_type_id as tid from qi.esi_trade_hub_orders o
+    ) o on (ethp_location_id=o.loc and ethp_type_id=o.tid)
+    where o.loc is null
+  ) p
+ where
+  ethp_location_id=location_id and
+  ethp_location_id=p.loc and ethp_type_id=p.tid
+ ;
+ insert into qi.esi_trade_hub_prices
+  select
+   o.loc,
+   o.tid,
+   o.sell,
+   o.buy,
+   o.sell_volume,
+   o.buy_volume,
+   o.updated_at,
+   o.updated_at
+  from
+   ( select
+      o.etho_location_id as loc,
+      o.etho_type_id as tid,
+      min(case o.etho_is_buy when true then null else o.etho_price end) as sell,
+      max(case o.etho_is_buy when true then o.etho_price else null end) as buy,
+      sum(case o.etho_is_buy when true then 0 else o.etho_volume_remain end) as sell_volume,
+      sum(case o.etho_is_buy when true then o.etho_volume_remain else 0 end) as buy_volume,
+      max(o.etho_updated_at) as updated_at
+     from qi.esi_trade_hub_orders o
+      left outer join (
+       select distinct p.ethp_location_id as loc,p.ethp_type_id as tid from qi.esi_trade_hub_prices p
+      ) p on (etho_location_id=p.loc and etho_type_id=p.tid)
+     where p.loc is null and o.etho_location_id=location_id
+     group by 1, 2
+    ) o
+ ;
+$$;
+--------------------------------------------------------------------------------
+
+
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.
