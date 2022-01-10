@@ -1,8 +1,16 @@
 ﻿<?php
 include 'qi_render_html.php';
 include_once '.settings.php';
+
+
+__dump_header("Closed Section", FS_RESOURCES);
+
+if (!extension_loaded('pgsql')) return;
+$conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+        or die('pg_connect err: '.pg_last_error());
+pg_exec($conn, "SET search_path TO qi");
+//---
 ?>
-<?php __dump_header("Closed Section", FS_RESOURCES); ?>
 <div class="container-fluid">
 <h2>Настройки работы открытого раздела</h2>
  <p>
@@ -46,7 +54,36 @@ include_once '.settings.php';
  <a class="btn btn-success" href="/qi_market_nisuwa.php" role="button">Nisuwa Market</a>
  <a class="btn btn-success" href="/qi_market_nsimw.php" role="button">Malpais Market</a>
  <a class="btn btn-success" href="/qi_market_4hwwf.php" role="button">4H-WWF Market</a>
- <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a>
+ <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a><br>
+ <br>
+<?php
+    $query = <<<EOD
+select distinct
+ o.ecor_corporation_id as cid,
+ o.ecor_location_id as lid,
+ nm.name as nm,
+ nm.solar_system_name as sys,
+ co.eco_name as co
+from esi_corporation_orders o
+ left outer join esi_known_stations nm on (nm.location_id=o.ecor_location_id)
+ left outer join esi_corporations co on (co.eco_corporation_id=o.ecor_corporation_id)
+where not o.ecor_history
+order by 4, 5;
+EOD;
+    $corp_trade_hubs_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $corp_trade_hubs = pg_fetch_all($corp_trade_hubs_cursor);
+    //---
+    if ($corp_trade_hubs)
+        foreach ($corp_trade_hubs as &$hub)
+        {
+            $corporation_id = $hub['cid'];
+            $location_id = $hub['lid'];
+            $trade_hub_name = $hub['nm']."\n".$hub['co'];
+            $button_caption = $hub['sys'].' &vert; '.$hub['co'];
+            ?><a class="btn btn-default" href="/qi_trade_hub.php?hub=<?=$location_id?>&corp=<?=$corporation_id?>&raw_materials=1" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$button_caption?></a> <?php
+        }
+?>
  </p>
 
  <p>
@@ -76,10 +113,6 @@ include_once '.settings.php';
  <p>
  Вам скучно и нечем заняться? Есть торговец в Jita или в Amarr, есть фура или простаивает jump-фура? Ознакомьтесь со списком выгодных ордеров в разных солнечных системах.<br>
 <?php
-    if (!extension_loaded('pgsql')) return;
-    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-            or die('pg_connect err: '.pg_last_error());
-    pg_exec($conn, "SET search_path TO qi");
     $query = <<<EOD
 select distinct th.ethp_location_id as id, nm.name as nm, nm.solar_system_name as sys
 from qi.esi_trade_hub_prices th
@@ -99,9 +132,11 @@ EOD;
             $solar_system_name = $hub['sys'];
             ?><a class="btn btn-success" href="/qi_trade_hub_profits.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
         }
-    //---
-    pg_close($conn);
 ?>
  </p>
 </div> <!--container-fluid-->
-<?php __dump_footer(); ?>
+<?php
+//---
+pg_close($conn);
+__dump_footer();
+?>

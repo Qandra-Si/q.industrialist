@@ -13,13 +13,13 @@ if (is_null($IMPORT_PRICE_TO_TRADE_HUB))
 if (is_null($MIN_PROFIT))
     $MIN_PROFIT = 0.05; // 5%
 if (is_null($DEFAULT_PROFIT))
-    $DEFAULT_PROFIT = 0.1; // 10%
+    $DEFAULT_PROFIT = null; // если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
 if (is_null($MAX_PROFIT))
     $MAX_PROFIT = 0.25; // 25%
 if (is_null($BROKERS_FEE))
-    $BROKERS_FEE = 0.1; // брокерская комиссия
+    $BROKERS_FEE = null; // брокерская комиссия - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
 if (is_null($TRADE_HUB_TAX))
-    $TRADE_HUB_TAX = 0.036; // sales tax, налог на структуре
+    $TRADE_HUB_TAX = null; // sales tax, налог на структуре - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
 if (is_null($CORPORATION_ID))
     $CORPORATION_ID = 98553333; // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
 if (is_null($TRADE_HUB_ID))
@@ -86,6 +86,103 @@ if (isset($_GET['trader'])) {
     if (is_numeric($_get_trader_id))
         $TRADER_ID = get_numeric($_get_trader_id);
 }
+
+
+
+    if (!extension_loaded('pgsql')) return;
+    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
+            or die('pg_connect err: '.pg_last_error());
+    pg_exec($conn, "SET search_path TO qi");
+    //---
+    $query = <<<EOD
+select
+ name,
+ solar_system_name as ssn,
+ prc.up as prc,
+ ord.up as ord,
+ tra.up as tra
+from
+ qi.esi_known_stations
+  left outer join (
+   select ethp_location_id, max(ethp_updated_at) as up
+   from qi.esi_trade_hub_prices
+   group by 1
+  ) prc on (prc.ethp_location_id = location_id)
+  left outer join (
+   select ecor_location_id, max(ecor_updated_at) as up
+   from qi.esi_corporation_orders
+   group by 1
+  ) ord on (ord.ecor_location_id = location_id)
+  left outer join (
+   -- список транзакций по покупке/продаже имени корпораций или от имени избранных персонажей
+   select t.ecwt_location_id, max(j.ecwj_date) as up
+   from
+    qi.esi_corporation_wallet_journals j
+     left outer join qi.esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
+   where
+    (ecwj_date > '2021-01-03') and
+    (ecwj_context_id_type = 'market_transaction_id') and
+    ( ( ecwj_corporation_id=$1 and
+        ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
+      ( ecwj_second_party_id=$3 and -- торговый персонаж,...
+        ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
+    ) and
+    ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
+   group by 1
+  ) tra on (tra.ecwt_location_id = location_id)
+where location_id = $2;
+EOD;
+    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID);
+    $trade_hub_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query err: '.pg_last_error());
+    $trade_hub_status = pg_fetch_all($trade_hub_cursor);
+    if ($trade_hub_status)
+    {
+        $trade_hub_system = $trade_hub_status[0]['ssn'];
+    }
+    else
+    {
+        $trade_hub_system = 'Unknown';
+        unset($trade_hub_status);
+        $trade_hub_status = null;
+    }
+
+    __dump_header($trade_hub_system." Market", FS_RESOURCES);
+
+    if (is_null($IMPORT_PRICE_TO_TRADE_HUB)) { ?>
+<div class="alert alert-warning" role="alert">
+<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+<span class="sr-only">Внимание:</span> Не указан параметр <mark>import_price</mark> (стоимость доставки товаров) который используется в автоматическом расчёте цены при размещении ордера. Воспользуйтесь руководством или обратитесь к разработчику для добавления шаблона торгового терминала для маркета в этой системе.
+</div> <?php
+    }
+
+    if (is_null($DEFAULT_PROFIT)) {
+        // устанавливаем профит в значение по умолчанию
+        $DEFAULT_PROFIT = 0.15; ?>
+<div class="alert alert-warning" role="alert">
+<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+<span class="sr-only">Внимание:</span> Не указан параметр <mark>profit</mark> (профит от продажи товаров) который используется в автоматическом расчёте цены при размещении ордера. Воспользуйтесь руководством или обратитесь к разработчику для добавления шаблона торгового терминала для маркета в этой системе. Значение параметра автоматически принято равным <mark><?=$DEFAULT_PROFIT*100?>%</mark>, что может не соответствовать ориентировочной доходности в системе <?=$trade_hub_system?>.
+</div> <?php
+    }
+
+    if (is_null($BROKERS_FEE)) {
+        // устанавливаем брокерскую комиссию в значение по умолчанию
+        $BROKERS_FEE = 0.02; ?>
+<div class="alert alert-warning" role="alert">
+<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+<span class="sr-only">Внимание:</span> Не указан параметр <mark>brokers_fee</mark> (брокерская комиссия) который используется в автоматическом расчёте цены при размещении ордера. Воспользуйтесь руководством или обратитесь к разработчику для добавления шаблона торгового терминала для маркета в этой системе. Значение параметра автоматически принято равным <mark><?=$BROKERS_FEE*100?>%</mark>, что может не соответствовать комисии вашего торговца на рынке в системе <?=$trade_hub_system?>.
+</div> <?php
+    }
+
+    if (is_null($TRADE_HUB_TAX)) {
+        // устанавливаем налог в значение по умолчанию
+        $TRADE_HUB_TAX = 0.036; ?>
+<div class="alert alert-warning" role="alert">
+<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+<span class="sr-only">Внимание:</span> Не указан параметр <mark>sales_tax</mark> (налог от продаж, налог на структуре) который используется в автоматическом расчёте цены при размещении ордера. Воспользуйтесь руководством или обратитесь к разработчику для добавления шаблона торгового терминала для маркета в этой системе. Значение параметра автоматически принято равным <mark><?=$TRADE_HUB_TAX*100?>%</mark>, что может не соответствовать налогу для вашего торговца на рынке в системе <?=$trade_hub_system?>.
+</div> <?php
+    }
+
 
 
 function eve_ceiling($isk) {
@@ -492,67 +589,6 @@ function __dump_querious_storage(&$storage, $trade_hub_system) { ?>
 }
 
 
-
-    if (!extension_loaded('pgsql')) return;
-    $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
-            or die('pg_connect err: '.pg_last_error());
-    pg_exec($conn, "SET search_path TO qi");
-    //---
-    $query = <<<EOD
-select
- name,
- solar_system_name as ssn,
- prc.up as prc,
- ord.up as ord,
- tra.up as tra
-from
- qi.esi_known_stations
-  left outer join (
-   select ethp_location_id, max(ethp_updated_at) as up
-   from qi.esi_trade_hub_prices
-   group by 1
-  ) prc on (prc.ethp_location_id = location_id)
-  left outer join (
-   select ecor_location_id, max(ecor_updated_at) as up
-   from qi.esi_corporation_orders
-   group by 1
-  ) ord on (ord.ecor_location_id = location_id)
-  left outer join (
-   -- список транзакций по покупке/продаже имени корпораций или от имени избранных персонажей
-   select t.ecwt_location_id, max(j.ecwj_date) as up
-   from
-    qi.esi_corporation_wallet_journals j
-     left outer join qi.esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
-   where
-    (ecwj_date > '2021-01-03') and
-    (ecwj_context_id_type = 'market_transaction_id') and
-    ( ( ecwj_corporation_id=$1 and
-        ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
-      ( ecwj_second_party_id=$3 and -- торговый персонаж,...
-        ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
-    ) and
-    ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
-   group by 1
-  ) tra on (tra.ecwt_location_id = location_id)
-where location_id = $2;
-EOD;
-    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID);
-    $trade_hub_cursor = pg_query_params($conn, $query, $params)
-            or die('pg_query err: '.pg_last_error());
-    $trade_hub_status = pg_fetch_all($trade_hub_cursor);
-    if ($trade_hub_status)
-    {
-        $trade_hub_system = $trade_hub_status[0]['ssn'];
-    }
-    else
-    {
-        $trade_hub_system = 'Unknown';
-        unset($trade_hub_status);
-        $trade_hub_status = null;
-    }
-    //---
-
-    __dump_header($trade_hub_system." Market", FS_RESOURCES);
 
     //---
     $query = <<<EOD
