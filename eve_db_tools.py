@@ -581,6 +581,15 @@ class QDatabaseTools:
                 # если из кеша (с диска) не удалось в offline режиме считать данные, читаем из БД
                 data, forbidden, updated_at = self.dbswagger.select_universe_structure(structure_id)
                 if not data:
+                    # если и из БД не удалось считать данные, то при загрузке corporation orders (после длительного
+                    # простоя, когда структура стала forbidden), в эту точку для одной и той же станции можем начать
+                    # попадать многократно, что плохо, потому как каждый такой ордер будет сопровождаться бесконечными
+                    # запросами по ESI, - сохраняем в кеше data=None
+                    if not in_cache:
+                        self.__cached_structures[structure_id] = QEntity(True, True, None, self.eve_now)
+                        self.__cached_structures[structure_id].store_ext({'forbidden': True})
+                    else:
+                        in_cache.store_ext({'forbidden': True})
                     return None
                 reload_esi = False
         else:
