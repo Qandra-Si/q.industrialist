@@ -21,7 +21,7 @@ def get_argv_prms():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version", "pilot=", "signup", "offline", "online",
                                                         "cache_dir=", "pilot1=", "pilot2=", "pilot3=", "pilot4=",
-                                                        "pilot5=", "pilot6=", "pilot7="])
+                                                        "pilot5=", "pilot6=", "pilot7=", "pilot8=", "pilot9="])
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
     if exit_or_wrong_getopt is None:
@@ -33,7 +33,7 @@ def get_argv_prms():
                 exit_or_wrong_getopt = 0
                 print_version_only = True
                 break
-            elif opt in ("--pilot", "--pilot1", "--pilot2", "--pilot3", "--pilot4", "--pilot5", "--pilot6", "--pilot7"):
+            elif opt in ("--pilot", "--pilot1", "--pilot2", "--pilot3", "--pilot4", "--pilot5", "--pilot6", "--pilot7", "--pilot8", "--pilot9"):
                 res["character_names"].append(arg)
             elif opt in ("--signup"):
                 res["signup_new_character"] = True
@@ -61,6 +61,8 @@ def get_argv_prms():
               '   --pilot5=NAME            5th character name previously signed in\n'
               '   --pilot6=NAME            6th character name previously signed in\n'
               '   --pilot7=NAME            7th character name previously signed in\n'
+              '   --pilot8=NAME            8th character name previously signed in\n'
+              '   --pilot9=NAME            9th character name previously signed in\n'
               '   --signup                 Signup new character\n'
               '   --offline                Flag which says that we are working offline\n'
               '   --online                 Flag which says that we are working online (default)\n'

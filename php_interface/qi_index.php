@@ -97,7 +97,7 @@ EOD;
             $location_id = $hub['id'];
             $trade_hub_name = $hub['nm'];
             $solar_system_name = $hub['sys'];
-            ?><a class="btn btn-success" href="/qi_trade_hub.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
+            ?><a class="btn btn-success" href="/qi_trade_hub_profits.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
         }
     //---
     pg_close($conn);

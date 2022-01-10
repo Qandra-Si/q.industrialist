@@ -70,20 +70,23 @@ create or replace view qi.esi_known_stations as
         s.system_id as solar_system_id,
         s.type_id as station_type_id,
         sol.sden_name as solar_system_name,
-        strct.sden_name as station_type_name
+        strct.sden_name as station_type_name,
+        s.forbidden as forbidden
     from (
         select
             s.ets_station_id as location_id,
             s.ets_name as name,
             s.ets_system_id as system_id,
-            s.ets_type_id as type_id
+            s.ets_type_id as type_id,
+            false as forbidden
         from qi.esi_tranquility_stations s
       union
         select
             s.eus_structure_id,
             s.eus_name,
             s.eus_system_id,
-            s.eus_type_id
+            s.eus_type_id,
+            s.eus_forbidden
         from qi.esi_universe_structures s
     ) s
     left outer join qi.eve_sde_names sol on (sol.sden_category = 3 and sol.sden_id = s.system_id) -- cat:3 invNames
