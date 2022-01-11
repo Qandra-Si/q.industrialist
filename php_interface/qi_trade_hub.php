@@ -879,10 +879,11 @@ EOD;
  <label class="btn btn-default qind-btn-market" group="sold"><input type="radio" name="options" autocomplete="off">Всё продано</label>
  <label class="btn btn-default qind-btn-market" group="very-few"><input type="radio" name="options" autocomplete="off">Товар заканчивается</label>
  <label class="btn btn-default qind-btn-market" group="need-delivery"><input type="radio" name="options" autocomplete="off">Требуется доставка</label>
- <label class="btn btn-default qind-btn-market" group="place-an-order"><input type="radio" name="options" autocomplete="off">Выставить на продажу</label>
- <label class="btn btn-default qind-btn-market" group="low-price"><input type="radio" name="options" autocomplete="off">Цена занижена</label>
  <label class="btn btn-default qind-btn-market" group="high-price"><input type="radio" name="options" autocomplete="off">Цена завышена</label>
- <label class="btn btn-default qind-btn-market" group="interrupt"><input type="radio" name="options" autocomplete="off">Конкуренты</label>
+ <label class="btn btn-default qind-btn-market" group="low-price"><input type="radio" name="options" autocomplete="off">Цена занижена</label>
+ <label class="btn btn-default qind-btn-market disabled" aria-disabled="true"><!--group="place-an-order"--><input type="radio" name="options" autocomplete="off">Выставить на продажу</label>
+ <label class="btn btn-default qind-btn-market disabled" aria-disabled="true"><input type="radio" name="options" autocomplete="off">Обновить ордера</label>
+ <label class="btn btn-default qind-btn-market" group="interrupt"><input type="radio" name="options" autocomplete="off">Спекуляции</label>
 </div>
 <?php __dump_querious_market($market, $storage, $purchase, $trade_hub_system); ?>
 <!-- --- --- --- -->
