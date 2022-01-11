@@ -4,27 +4,27 @@ include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 
 
-if (is_null($SHOW_ONLY_RI4_SALES))
+if (!isset($SHOW_ONLY_RI4_SALES))
     $SHOW_ONLY_RI4_SALES = 1; // признак отображения информации по ордерам, которые выставлены не нами
-if (is_null($DO_NOT_SHOW_RAW_MATERIALS))
+if (!isset($DO_NOT_SHOW_RAW_MATERIALS))
     $DO_NOT_SHOW_RAW_MATERIALS = 1; // не показывать метариалы, закуп которых выполняется для производственных работ (фильтрация спекуляции и закупа для производства, например минералов)
-if (is_null($IMPORT_PRICE_TO_TRADE_HUB))
+if (!isset($IMPORT_PRICE_TO_TRADE_HUB))
     $IMPORT_PRICE_TO_TRADE_HUB = null; // null; // например, цена импорта 1куб.м. из Jita в Querious была 866 ISK
-if (is_null($MIN_PROFIT))
+if (!isset($MIN_PROFIT))
     $MIN_PROFIT = 0.05; // 5%
-if (is_null($DEFAULT_PROFIT))
+if (!isset($DEFAULT_PROFIT))
     $DEFAULT_PROFIT = null; // если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
-if (is_null($MAX_PROFIT))
+if (!isset($MAX_PROFIT))
     $MAX_PROFIT = 0.25; // 25%
-if (is_null($BROKERS_FEE))
+if (!isset($BROKERS_FEE))
     $BROKERS_FEE = null; // брокерская комиссия - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
-if (is_null($TRADE_HUB_TAX))
+if (!isset($TRADE_HUB_TAX))
     $TRADE_HUB_TAX = null; // sales tax, налог на структуре - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
-if (is_null($CORPORATION_ID))
+if (!isset($CORPORATION_ID))
     $CORPORATION_ID = 98553333; // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
-if (is_null($TRADE_HUB_ID))
+if (!isset($TRADE_HUB_ID))
     $TRADE_HUB_ID = null; // PZ: 1034323745897, Nisuwa: 60015073, 4-HWWF: 1035466617946, NSI-MW: 1022822609240
-if (is_null($TRADER_ID))
+if (!isset($TRADER_ID))
     $TRADER_ID = 0; // Xatul' Madan: 95858524, DarkFman: 874053567, Zed Ostus: 2116422143
 
 
