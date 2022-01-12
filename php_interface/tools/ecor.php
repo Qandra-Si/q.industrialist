@@ -1,5 +1,5 @@
 ﻿<?php
-header('Content-Type: application/json');
+include '../qi_tools_and_utils.php';
 include_once '../.settings.php';
 
 
@@ -40,14 +40,34 @@ EOD;
     echo json_encode($corp_orders);
 }
 
-$CORPORATION_ID = 98553333;
-$TRADE_HUB_ID = 60003760;
-$PRODUCT_TYPE_ID = 12775;
+//$CORPORATION_ID = 98553333;
+//$TRADE_HUB_ID = 60003760;
+//$PRODUCT_TYPE_ID = 12775; 1190 - и buy и sell; 25812, 33824, 2873, 11239 - много; 44992 - PLEX
+
+if (!isset($_POST['corp'])) return; else {
+  $_get_corp = htmlentities($_POST['corp']);
+  if (!is_numeric($_get_corp)) return;
+  $CORPORATION_ID = get_numeric($_get_corp);
+}
+if (!isset($_POST['hub'])) return; else {
+  $_get_hub = htmlentities($_POST['hub']);
+  if (!is_numeric($_get_hub)) return;
+  $TRADE_HUB_ID = get_numeric($_get_hub);
+}
+if (!isset($_POST['tid'])) return; else {
+  $_get_tid = htmlentities($_POST['tid']);
+  if (!is_numeric($_get_tid)) return;
+  $PRODUCT_TYPE_ID = get_numeric($_get_tid);
+}
 
 if (!extension_loaded('pgsql')) return;
 $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
         or die('pg_connect err: '.pg_last_error());
 pg_exec($conn, "SET search_path TO qi");
+
+ob_end_clean();
+header('Content-Type: application/json');
 json_corporation_orders($conn, $CORPORATION_ID, $TRADE_HUB_ID, $PRODUCT_TYPE_ID);
+
 pg_close();
 ?>

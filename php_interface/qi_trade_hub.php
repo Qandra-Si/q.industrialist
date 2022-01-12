@@ -919,7 +919,9 @@ EOD;
   </tbody>
  </table>
 </div>
+<!-- -->
 <hr>
+<!-- -->
 <div class="row">
   <div class="col-md-8">Объём в упакованном виде</div>
   <div class="col-md-4" align="right"><mark id="dtlsPackedVolume"></mark> m³</div>
@@ -948,7 +950,9 @@ EOD;
   <div class="col-md-8">Усредн. цена последнего закупа</div>
   <div class="col-md-4" align="right"><mark id="dtlsLastBuyPrice"></mark> ISK</div>
 </div>
+<!-- -->
 <hr>
+<!-- -->
 <div class="btn-group btn-group-toggle" data-toggle="buttons" packed_volume="" id="dtlsCalc">
  <label class="btn btn-default qind-btn-calc" price="" profit="<?=$DEFAULT_PROFIT?>" caption="Jita Sell +<?=$DEFAULT_PROFIT*100?>%" id="dtlsCalcJS10"><input type="radio" name="options" autocomplete="off" checked>Jita +<?=$DEFAULT_PROFIT*100?>%</label>
  <label class="btn btn-default qind-btn-calc" price="" profit="0.05" caption="Jita Sell +5%" id="dtlsCalcJS5"><input type="radio" name="options" autocomplete="off">Jita +5%</label>
@@ -984,6 +988,36 @@ EOD;
   <div class="col-md-1"></div>
   <div class="col-md-7">профит на единицу товара</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_profit"></mark> ISK</div>
+</div>
+<!-- -->
+<hr>
+<!-- -->
+<style type="text/css">
+#tblMarketOrders tr { font-size: small; }
+#tblMarketOrders tbody td { padding: 0px; border-top: 0px solid #ddd; }
+#tblMarketOrders tbody tr td:nth-child(1) { text-align: right; font-weight: bold; }
+#tblMarketOrders tbody tr td:nth-child(2) { text-align: right; }
+#tblMarketOrders tbody tr td:nth-child(3) { text-align: center; }
+#tblMarketOrders tbody tr td:nth-child(4) { text-align: left; }
+#tblMarketOrders tbody tr td:nth-child(5) { text-align: left; font-weight: bold; }
+</style>
+<div class="table-responsive">
+ <table class="table table-condensed" style="padding:1px;font-size:small;" id="tblMarketOrders">
+  <thead>
+   <tr>
+    <th style="text-align:center; width:30%;" colspan="2">Покупка</th>
+    <th style="text-align:center; width:40%;">Текущие ордера в маркете<br>Цена,&nbsp;ISK</th>
+    <th style="text-align:center; width:30%;" colspan="2">Продажа</th>
+   </tr>
+  </thead>
+  <tbody>
+  </tbody>
+ </table>
+ <form id="frmMarketOrders">
+  <input type="hidden" name="corp" readonly value="<?=$CORPORATION_ID?>">
+  <input type="hidden" name="hub" readonly value="<?=$TRADE_HUB_ID?>">
+  <input type="hidden" name="tid" readonly>
+ </form>
 </div>
 <!-- -->
    </div>
@@ -1175,6 +1209,11 @@ var g_purchase_types = [<?php
     });
     $('button.qind-btn-details').on('click', function () {
       var tid = $(this).attr('type_id');
+      //- отправка запроса на формирование таблицы текущий маркет-ордеров
+      var frm = $("#frmMarketOrders");
+      frm.find("input[name='tid']").val(tid);
+      frm.submit();
+      //- инициализация автокалькулятора
       var cnt = g_market_types.length, i = 0;
       var market_type = null;
       for (;i<cnt;++i) {
@@ -1292,5 +1331,46 @@ var g_purchase_types = [<?php
     // Initialization
     rebuildStock('hide');
   });
+
+$("#frmMarketOrders").on("submit", function(e){
+ e.preventDefault();
+ $.ajax({
+  url: '/tools/etho_ecor.php',
+  method: 'post',
+  dataType: 'json',
+  data: $(this).serialize(),
+  success: function(data){
+   var tbody = '';
+   $(data).each(function(i,row) {
+    var tr = "";
+    var remain = (row.remain === null)?'':row.remain;
+    var bg = (row.is_buy?'#ff8080':'#80ff80') + ((row.remain === null)?'80':'');
+    if (row.is_buy)
+     tr = "<tr style='background:"+bg+"'><td>"+remain+"</td><td>"+row.volume+"</td><td>"+row.price+"</td><td></td><td></td></tr>";
+    else
+     tr = "<tr style='background:"+bg+"'><td></td><td></td><td>"+row.price+"</td><td>"+row.volume+"</td><td>"+remain+"</td></tr>";
+    tbody += tr;
+   });
+   $("#tblMarketOrders tbody").html(tbody);
+  },
+  error: function (jqXHR, exception) {
+   if (jqXHR.status === 0) {
+    alert('Not connect. Verify Network.');
+   } else if (jqXHR.status == 404) {
+    alert('Requested page not found (404).');
+   } else if (jqXHR.status == 500) {
+    alert('Internal Server Error (500).');
+   } else if (exception === 'parsererror') {
+    alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   } else if (exception === 'timeout') {
+    alert('Time out error.'); // сервер завис?
+   } else if (exception === 'abort') {
+    alert('Ajax request aborted.');
+   } else {
+    alert('Uncaught Error. ' + jqXHR.responseText);
+   }
+  }
+ });
+});
 </script>
 <?php __dump_copy_to_clipboard_javascript() ?>
