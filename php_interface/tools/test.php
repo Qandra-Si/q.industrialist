@@ -20,7 +20,7 @@
 $("#form").on("submit", function(e){
  e.preventDefault();
  $.ajax({
-  url: '/tools/etho_ecor.php',
+  url: '/tools/ethh.php',
   method: 'post',
   dataType: 'json',
   data: $(this).serialize(),

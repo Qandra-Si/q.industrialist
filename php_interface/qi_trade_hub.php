@@ -898,7 +898,7 @@ EOD;
 <?php __dump_footer(); ?>
 
 <div class="modal fade" id="modalDetails" tabindex="-1" role="dialog" aria-labelledby="modalDetailsLabel">
- <div class="modal-dialog" role="document">
+ <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
    <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -961,7 +961,7 @@ EOD;
  <label class="btn btn-default qind-btn-calc active" price="" profit="<?=$DEFAULT_PROFIT?>" caption="от цены закупа +<?=$DEFAULT_PROFIT*100?>%" id="dtlsCalcUP10"><input type="radio" name="options" autocomplete="off">Закуп +<?=$DEFAULT_PROFIT*100?>%</label>
 </div>
 <div class="row">
-  <div class="col-md-8">Цена закупа</mark></div>
+  <div class="col-md-8">Цена закупа</div>
   <div class="col-md-4" align="right"><mark id="dtlsSellVar_purchase"></mark> ISK</div>
 </div>
 <div class="row">
@@ -992,22 +992,26 @@ EOD;
 <!-- -->
 <hr>
 <!-- -->
+<div class="row">
+ <div class="col-md-5">
+  Текущие ордера в маркете
 <style type="text/css">
-#tblMarketOrders tr { font-size: small; }
-#tblMarketOrders tbody td { padding: 0px; border-top: 0px solid #ddd; }
-#tblMarketOrders tbody tr td:nth-child(1) { text-align: right; font-weight: bold; }
-#tblMarketOrders tbody tr td:nth-child(2) { text-align: right; }
-#tblMarketOrders tbody tr td:nth-child(3) { text-align: center; }
-#tblMarketOrders tbody tr td:nth-child(4) { text-align: left; }
-#tblMarketOrders tbody tr td:nth-child(5) { text-align: left; font-weight: bold; }
+.tblMarketOrders-wrapper { max-height: 300px; overflow: auto; }
+.tblMarketOrders-wrapper table { padding:1px; font-size: x-small; width: 100%; }
+.tblMarketOrders-wrapper thead th { position: sticky; top: 0; z-index: 1; background-color: #fff; text-align:center; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(1) { text-align: right; font-weight: bold; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(2) { text-align: right; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(3) { text-align: center; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(4) { text-align: left; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(5) { text-align: left; font-weight: bold; }
 </style>
-<div class="table-responsive">
- <table class="table table-condensed" style="padding:1px;font-size:small;" id="tblMarketOrders">
+<div class="tblMarketOrders-wrapper">
+ <table id="tblMarketOrders">
   <thead>
    <tr>
-    <th style="text-align:center; width:30%;" colspan="2">Покупка</th>
-    <th style="text-align:center; width:40%;">Текущие ордера в маркете<br>Цена,&nbsp;ISK</th>
-    <th style="text-align:center; width:30%;" colspan="2">Продажа</th>
+    <th style="width:30%;" colspan="2">Покупка</th>
+    <th style="width:40%;">Цена,&nbsp;ISK</th>
+    <th style="width:30%;" colspan="2">Продажа</th>
    </tr>
   </thead>
   <tbody>
@@ -1018,6 +1022,42 @@ EOD;
   <input type="hidden" name="hub" readonly value="<?=$TRADE_HUB_ID?>">
   <input type="hidden" name="tid" readonly>
  </form>
+</div>
+<!-- -->
+ </div>
+ <div class="col-md-7">
+  Хронология изменений ордеров
+<!-- -->
+<style type="text/css">
+.tblMarketHistory-wrapper { max-height: 300px; overflow: auto; }
+.tblMarketHistory-wrapper table { padding:1px; font-size: x-small; width: 100%; }
+.tblMarketHistory-wrapper thead th { position: sticky; top: 0; z-index: 1; background-color: #fff; text-align:center; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(1) { text-align: left; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(2) { text-align: right; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(3) { text-align: center; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(4) { text-align: left; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(5) { text-align: right; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(6) { text-align: right; }
+</style>
+<div class="tblMarketHistory-wrapper">
+ <table id="tblMarketHistory">
+  <thead>
+   <tr>
+    <th style="width:21%;" colspan="2">Покупка</th>
+    <th style="width:28%;">Цена,&nbsp;ISK</th>
+    <th style="width:21%;" colspan="2">Продажа</th>
+    <th style="width:30%;">Длительность</th>
+   </tr>
+  </thead>
+  <tbody>
+  </tbody>
+ </table>
+ <form id="frmMarketHistory">
+  <input type="hidden" name="hub" readonly value="<?=$TRADE_HUB_ID?>">
+  <input type="hidden" name="tid" readonly>
+ </form>
+</div>
+ </div>
 </div>
 <!-- -->
    </div>
@@ -1210,7 +1250,13 @@ var g_purchase_types = [<?php
     $('button.qind-btn-details').on('click', function () {
       var tid = $(this).attr('type_id');
       //- отправка запроса на формирование таблицы текущий маркет-ордеров
+      $("#tblMarketOrders tbody").html('');
       var frm = $("#frmMarketOrders");
+      frm.find("input[name='tid']").val(tid);
+      frm.submit();
+      //- отправка запроса на формирование таблицы текущий маркет-ордеров
+      $("#tblMarketHistory tbody").html('');
+      /*var*/ frm = $("#frmMarketHistory");
       frm.find("input[name='tid']").val(tid);
       frm.submit();
       //- инициализация автокалькулятора
@@ -1351,24 +1397,78 @@ $("#frmMarketOrders").on("submit", function(e){
      tr = "<tr style='background:"+bg+"'><td></td><td></td><td>"+row.price+"</td><td>"+row.volume+"</td><td>"+remain+"</td></tr>";
     tbody += tr;
    });
-   $("#tblMarketOrders tbody").html(tbody);
+   var tbl = $("#tblMarketOrders tbody");
+   tbl.html(tbody);
+   <?php /* как дождаться прорисовки tbody?!
+   $("#tblMarketOrders").parent().scrollTop(0);
+   //-- scroll
+   var rows = $("#tblMarketOrders thead tr");
+   if (!(rows === undefined) && (rows.length == 1)) { // на всякий случай
+     var tbl_head_px = rows[0].offsetHeight;
+     rows = $("#tblMarketOrders tbody tr");
+     if (!(rows === undefined) && (rows.length > 0)) { // вдруг содержимое таблицы пусто?
+       var px = rows[1].offsetHeight; // высота строки
+       var tbody_px = 300 - tbl_head_px;
+       if ((px > 0) && ((tbody_px / rows.length) < px)) { // если вся таблица не влезла в tblMarketOrders-wrapper=300px, то скроллируем её к середине
+         var split = row_buy_idx * px;
+         alert(tbody_px + ' ' + px + ' ' + ' ' + rows.length + ' ' + split);
+         if ((tbody_px/2) < split) {
+   $("#tblMarketOrders").parent().scrollTop(split);
+         }
+       }
+     }
+   }
+   */ ?>
   },
   error: function (jqXHR, exception) {
-   if (jqXHR.status === 0) {
-    alert('Not connect. Verify Network.');
-   } else if (jqXHR.status == 404) {
-    alert('Requested page not found (404).');
-   } else if (jqXHR.status == 500) {
-    alert('Internal Server Error (500).');
-   } else if (exception === 'parsererror') {
-    alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
-   } else if (exception === 'timeout') {
-    alert('Time out error.'); // сервер завис?
-   } else if (exception === 'abort') {
-    alert('Ajax request aborted.');
-   } else {
-    alert('Uncaught Error. ' + jqXHR.responseText);
-   }
+   if (jqXHR.status === 0) alert('Not connect. Verify Network.');
+   else if (jqXHR.status == 404) alert('Requested page not found (404).');
+   else if (jqXHR.status == 500) alert('Internal Server Error (500).');
+   else if (exception === 'parsererror') alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   else if (exception === 'timeout') alert('Time out error.'); // сервер завис?
+   else if (exception === 'abort') alert('Ajax request aborted.');
+   else alert('Uncaught Error. ' + jqXHR.responseText);
+  }
+ });
+});
+
+$("#frmMarketHistory").on("submit", function(e){
+ e.preventDefault();
+ $.ajax({
+  url: '/tools/ethh.php',
+  method: 'post',
+  dataType: 'json',
+  data: $(this).serialize(),
+  success: function(data){
+   var tbody = '';
+   $(data).each(function(i,row) {
+    var bg = (row.is_buy?'#ff8080':'#80ff80') + '80';// + ((row.remain === null)?'80':'');
+    var volume = '';
+    if (row.closed) {
+      if (row.volume == row.total)
+        volume = row.volume;
+      else
+        volume = row.volume+'&hellip;<span style="color:gray;">'+row.total+'</span>';
+    } else if (row.volume > 0)
+      volume = row.volume;
+    var closed = row.closed?'<span class="glyphicon glyphicon-remove" aria-hidden="true"></span>':'';
+    if (row.is_buy)
+     tr = "<td>"+closed+"</td><td>"+volume+"</td><td>"+row.price+"</td><td></td><td></td>";
+    else
+     tr = "<td></td><td></td><td>"+row.price+"</td><td>"+volume+"</td><td>"+closed+"</td>";
+    tbody += "<tr style='background:"+bg+"'>"+tr+'<td>'+row.duration+'</td></tr>';
+   });
+   var tbl = $("#tblMarketHistory tbody");
+   tbl.html(tbody);
+  },
+  error: function (jqXHR, exception) {
+   if (jqXHR.status === 0) alert('Not connect. Verify Network.');
+   else if (jqXHR.status == 404) alert('Requested page not found (404).');
+   else if (jqXHR.status == 500) alert('Internal Server Error (500).');
+   else if (exception === 'parsererror') alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   else if (exception === 'timeout') alert('Time out error.'); // сервер завис?
+   else if (exception === 'abort') alert('Ajax request aborted.');
+   else alert('Uncaught Error. ' + jqXHR.responseText);
   }
  });
 });
