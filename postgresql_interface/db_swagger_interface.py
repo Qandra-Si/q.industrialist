@@ -2099,6 +2099,14 @@ class QSwaggerInterface:
             location_id
         )
 
+    def sync_market_location_history_with_orders(self, location_id: int):
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+        self.db.execute(
+            "CALL ethh_sync_with_etho(%s);",
+            location_id
+        )
+
     # -------------------------------------------------------------------------
     # /universe/types/
     # /universe/types/{type_id}/
@@ -2133,8 +2141,8 @@ class QSwaggerInterface:
             " SELECT emp_type_id FROM esi_markets_prices"
             " union"
             " SELECT ethp_type_id FROM esi_trade_hub_prices"
-            " union"
-            " SELECT etho_type_id FROM esi_trade_hub_orders"
+            #те же данные: " union"
+            #те же данные: " SELECT etho_type_id FROM esi_trade_hub_orders"
             ") t "
             "WHERE t.id NOT IN (SELECT sdet_type_id FROM eve_sde_type_ids);"
         )

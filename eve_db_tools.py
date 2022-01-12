@@ -1659,6 +1659,10 @@ class QDatabaseTools:
         # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
         self.dbswagger.sync_market_location_prices_with_orders(trade_hub_id)
 
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+        self.dbswagger.sync_market_location_history_with_orders(trade_hub_id)
+
         return found_market_goods, updated_market_orders
 
     # -------------------------------------------------------------------------

@@ -8,6 +8,15 @@ CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
 ---
+DROP INDEX IF EXISTS qi.idx_ethh_updated_at;
+DROP INDEX IF EXISTS qi.idx_ethh_issued;
+DROP INDEX IF EXISTS qi.idx_ethh_location_is_buy;
+DROP INDEX IF EXISTS qi.idx_ethh_location_type_id;
+DROP INDEX IF EXISTS qi.idx_ethh_type_id;
+DROP INDEX IF EXISTS qi.idx_ethh_location_id;
+DROP INDEX IF EXISTS qi.idx_ethh_pk;
+DROP TABLE IF EXISTS qi.esi_trade_hub_history;
+
 DROP INDEX IF EXISTS qi.idx_etho_issued;
 DROP INDEX IF EXISTS qi.idx_etho_location_is_buy;
 DROP INDEX IF EXISTS qi.idx_etho_location_type_id;
@@ -16,9 +25,6 @@ DROP INDEX IF EXISTS qi.idx_etho_location_id;
 DROP INDEX IF EXISTS qi.idx_etho_pk;
 DROP TABLE IF EXISTS qi.esi_trade_hub_orders;
 
-DROP TYPE  IF EXISTS qi.esi_order_range;
-
----
 DROP INDEX IF EXISTS qi.idx_ethp_pk;
 DROP TABLE IF EXISTS qi.esi_trade_hub_prices;
 
@@ -53,6 +59,8 @@ DROP INDEX IF EXISTS qi.idx_ecor_type_id;
 DROP INDEX IF EXISTS qi.idx_ecor_corporation_id;
 DROP INDEX IF EXISTS qi.idx_ecor_pk;
 DROP TABLE IF EXISTS qi.esi_corporation_orders;
+
+DROP TYPE  IF EXISTS qi.esi_order_range;
 
 DROP INDEX IF EXISTS qi.idx_ecwt_date;
 DROP INDEX IF EXISTS qi.idx_ecwt_journal_ref_id;
@@ -771,6 +779,8 @@ TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 -- corporation_orders
 --------------------------------------------------------------------------------
+CREATE TYPE qi.esi_order_range AS ENUM ('station', 'region', 'solarsystem', '1', '2', '3', '4', '5', '10', '20', '30', '40');
+
 CREATE TABLE qi.esi_corporation_orders
 (
     ecor_corporation_id BIGINT NOT NULL,
@@ -778,7 +788,7 @@ CREATE TABLE qi.esi_corporation_orders
     ecor_type_id INTEGER NOT NULL,
     ecor_region_id INTEGER NOT NULL,
     ecor_location_id BIGINT NOT NULL,
-    ecor_range CHARACTER VARYING(255) NOT NULL,
+    ecor_range qi.esi_order_range NOT NULL,
     ecor_is_buy_order BOOLEAN NOT NULL,
     ecor_price DOUBLE PRECISION NOT NULL,
     ecor_volume_total INTEGER NOT NULL,
@@ -1021,8 +1031,15 @@ CREATE UNIQUE INDEX idx_ethp_pk
     (ethp_location_id ASC NULLS LAST, ethp_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
-CREATE TYPE qi.esi_order_range AS ENUM ('station', 'region', 'solarsystem', '1', '2', '3', '4', '5', '10', '20', '30', '40');
-
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+--  1. price меняется вместе с issued (order_id остаётся прежним)
+--  2. volume_remain меняется при покупке/продаже по order-у
+-- при этом total не меняется, даже если remain <> total при изменении price !
+--
+-- с историей изменении order-а синхронизируется (см. табл. esi_trade_hub_history):
+--  1. изменённая цена price
+--  2. остаток непроданных товаров volume_remain
+-- при этом issued не изменяется, - остаётся прежним (соответствует открытию order-а)
 CREATE TABLE qi.esi_trade_hub_orders
 (
     etho_location_id BIGINT NOT NULL,
@@ -1070,6 +1087,66 @@ TABLESPACE pg_default;
 CREATE INDEX idx_etho_issued
     ON qi.esi_trade_hub_orders USING btree
     (etho_issued ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+--  1. price меняется вместе с issued (order_id остаётся прежним)
+--  2. volume_remain меняется при покупке/продаже по order-у
+-- при этом total не меняется, даже если remain <> total при изменении price !
+--
+-- с историей изменении order-а синхронизируется (см. табл. esi_trade_hub_history):
+--  1. изменённая цена price
+--  2. остаток непроданных товаров volume_remain
+-- при этом issued не изменяется, - остаётся прежним (соответствует открытию order-а)
+CREATE TABLE qi.esi_trade_hub_history
+(
+    ethh_location_id BIGINT NOT NULL,
+    ethh_order_id BIGINT NOT NULL,
+    ethh_type_id BIGINT NOT NULL,
+    ethh_is_buy BOOLEAN NOT NULL,
+    ethh_issued TIMESTAMP NOT NULL,
+    ethh_price DOUBLE PRECISION NOT NULL,
+    ethh_volume_remain INTEGER NOT NULL, -- esi не отдаёт историю order-ов, т.ч. если order будет отмёнён с remain<>0, то об этом
+    ethh_volume_total INTEGER NOT NULL, -- ... никогда точно нельзя будет узнать (remain хранит остаток, когда order исчезнет)
+    ethh_done TIMESTAMP, -- если done is not null, то order закрылся
+    ethh_updated_at TIMESTAMP,
+    CONSTRAINT pk_ethh PRIMARY KEY (ethh_location_id, ethh_order_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_ethh_pk
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_location_id ASC NULLS LAST, ethh_order_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_location_id
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_type_id
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_location_type_id
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_location_id ASC NULLS LAST, ethh_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_location_is_buy
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_location_id ASC NULLS LAST, ethh_is_buy ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_issued
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_issued ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ethh_updated_at
+    ON qi.esi_trade_hub_history USING btree
+    (ethh_updated_at ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

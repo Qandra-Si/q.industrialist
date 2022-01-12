@@ -324,7 +324,7 @@ create trigger ecb_on_delete
 
 
 --------------------------------------------------------------------------------
--- sync_trade_hub_prices_with_orders
+-- ethp_sync_with_etho
 -- синхронизация данных в таблице esi_trade_hub_prices (с сохранением
 -- накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
 --------------------------------------------------------------------------------
@@ -395,6 +395,98 @@ AS $$
      where p.loc is null and o.etho_location_id=location_id
      group by 1, 2
     ) o
+ ;
+$$;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- ethh_sync_with_etho
+-- синхронизация данных в таблице esi_trade_hub_history (с сохранением
+--
+-- накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+--  1. price меняется вместе с issued (order_id остаётся прежним)
+--  2. volume_remain меняется при покупке/продаже по order-у
+-- при этом total не меняется, даже если remain <> total при изменении price !
+--
+-- с историей изменении order-а синхронизируется (см. табл. esi_trade_hub_history):
+--  1. изменённая цена price
+--  2. остаток непроданных товаров volume_remain
+-- при этом issued не изменяется, - остаётся прежним (соответствует открытию order-а)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.ethh_sync_with_etho(location_id BIGINT)
+LANGUAGE SQL
+AS $$
+ update qi.esi_trade_hub_history set
+  ethh_volume_remain=o.remain,
+  ethh_price=o.price,
+  ethh_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
+ from
+  ( select 
+     keys.loc,
+     keys.oid,
+     o.etho_volume_remain as remain,
+     o.etho_price as price
+    from
+     qi.esi_trade_hub_orders o,
+     ( select etho_location_id as loc, etho_order_id as oid from qi.esi_trade_hub_orders
+       where etho_location_id=location_id
+        intersect
+       select ethh_location_id, ethh_order_id from qi.esi_trade_hub_history
+       where ethh_location_id=location_id
+     ) keys -- те пары loc:order, которые есть в history
+    where
+     o.etho_location_id=location_id and
+     keys.loc=o.etho_location_id and
+     keys.oid=o.etho_order_id
+  ) o
+ where
+  ethh_location_id=location_id and
+  o.loc=ethh_location_id and
+  o.oid=ethh_order_id and
+  ( o.price <> ethh_price or o.remain <> ethh_volume_remain )
+ ;
+ update qi.esi_trade_hub_history set
+  ethh_done=CURRENT_TIMESTAMP AT TIME ZONE 'GMT',
+  ethh_updated_at=CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
+ from
+  ( select ethh_location_id loc, ethh_order_id oid from qi.esi_trade_hub_history
+    where ethh_location_id=location_id
+     except
+    select etho_location_id as loc, etho_order_id as oid from qi.esi_trade_hub_orders
+    where etho_location_id=location_id
+  ) keys -- те пары loc:order, которых нет в orders
+ where
+  ethh_location_id=location_id and
+  keys.loc=ethh_location_id and
+  keys.oid=ethh_order_id and
+  ethh_done is null
+ ;
+ insert into qi.esi_trade_hub_history
+  select
+   o.etho_location_id,
+   o.etho_order_id,
+   o.etho_type_id,
+   o.etho_is_buy,
+   o.etho_issued,
+   o.etho_price,
+   o.etho_volume_remain,
+   o.etho_volume_total,
+   null,
+   CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
+  from
+   qi.esi_trade_hub_orders o,
+   ( select etho_location_id as loc, etho_order_id as oid from qi.esi_trade_hub_orders
+     where etho_location_id=location_id
+      except
+     select ethh_location_id, ethh_order_id from qi.esi_trade_hub_history
+     where ethh_location_id=location_id
+   ) keys -- те пары loc:order, которых нет в history
+  where
+   o.etho_location_id=location_id and
+   keys.loc=o.etho_location_id and
+   keys.oid=o.etho_order_id
  ;
 $$;
 --------------------------------------------------------------------------------
