@@ -39,6 +39,22 @@ pg_exec($conn, "SET search_path TO qi");
  <br><a class="btn btn-info" href="/qi_lifetime.php" role="button">Lifetime</a>
  </p>
 
+<?php
+    $query = <<<EOD
+select count(1) as cnt
+from eve_sde_type_ids
+where sdet_created_at >= (current_timestamp at time zone 'GMT' - interval '14 days');
+EOD;
+    $items_new_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $items_new = pg_fetch_all($items_new_cursor);
+?>
+
+ <p>
+ Отслеживание новых предметов, появившихся в игре за последние две недели.
+ <br><a class="btn btn-info" href="/qi_items_new.php" role="button">New Items<?php if ($items_new) { ?> <span class="badge"><?=$items_new[0]['cnt']?></span><?php } ?></a>
+ </p>
+
 <h2>Производство</h2>
  <p>
  Производство и всё что с ним связано.<br>

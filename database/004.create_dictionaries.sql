@@ -23,6 +23,7 @@ DROP INDEX IF EXISTS qi.idx_sdeg_group_parent_ids;
 DROP INDEX IF EXISTS qi.idx_sdeg_pk;
 DROP TABLE IF EXISTS qi.eve_sde_market_groups;
 
+DROP INDEX IF EXISTS qi.idx_sdet_created_at;
 DROP INDEX IF EXISTS qi.idx_sdet_market_group_id;
 DROP INDEX IF EXISTS qi.idx_sdet_pk;
 DROP TABLE IF EXISTS qi.eve_sde_type_ids;
@@ -165,6 +166,7 @@ CREATE TABLE qi.eve_sde_type_ids
     -- sdet_group_id INTEGER,
     -- sdet_portion_size INTEGER,
     sdet_packaged_volume DOUBLE PRECISION,
+    sdet_created_at TIMESTAMP DEFAULT (current_timestamp at time zone 'GMT'),
     CONSTRAINT pk_sdet PRIMARY KEY (sdet_type_id)
 )
 TABLESPACE pg_default;
@@ -179,6 +181,11 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdet_market_group_id
     ON qi.eve_sde_type_ids USING btree
     (sdet_market_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdet_created_at
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_created_at ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
