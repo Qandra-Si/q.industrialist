@@ -1055,6 +1055,7 @@ EOD;
   </tbody>
  </table>
  <form id="frmMarketHistory">
+  <input type="hidden" name="corp" readonly value="<?=implode(',',$CORPORATION_IDs)?>">
   <input type="hidden" name="hub" readonly value="<?=$TRADE_HUB_ID?>">
   <input type="hidden" name="tid" readonly>
  </form>
@@ -1444,7 +1445,7 @@ $("#frmMarketHistory").on("submit", function(e){
   success: function(data){
    var tbody = '';
    $(data).each(function(i,row) {
-    var bg = (row.is_buy?'#ff8080':'#80ff80') + '80';// + ((row.remain === null)?'80':'');
+    var bg = (row.is_buy?'#ff8080':'#80ff80') + ((row.corp === null)?'80':'');
     var volume = '';
     if (row.closed) {
       if (row.volume == row.total)
