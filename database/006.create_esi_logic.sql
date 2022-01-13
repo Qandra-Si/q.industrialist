@@ -402,10 +402,10 @@ $$;
 
 --------------------------------------------------------------------------------
 -- ethh_sync_with_etho
--- синхронизация данных в таблице esi_trade_hub_history (с сохранением
 --
+-- синхронизация данных в таблице esi_trade_hub_history (с сохранением
 -- накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
--- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders и esi_corporation_orders):
 --  1. price меняется вместе с issued (order_id остаётся прежним)
 --  2. volume_remain меняется при покупке/продаже по order-у
 -- при этом total не меняется, даже если remain <> total при изменении price !
@@ -487,6 +487,103 @@ AS $$
    o.etho_location_id=location_id and
    keys.loc=o.etho_location_id and
    keys.oid=o.etho_order_id
+ ;
+$$;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- ethh_sync_with_ecor
+--
+-- синхронизация данных в таблице esi_trade_hub_history (с сохранением
+-- накопленных данных, по сведениям из таблицы esi_corporation_orders)
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders и esi_corporation_orders):
+--  1. price меняется вместе с issued (order_id остаётся прежним)
+--  2. volume_remain меняется при покупке/продаже по order-у
+-- при этом total не меняется, даже если remain <> total при изменении price !
+--
+-- с историей изменении order-а синхронизируется (см. табл. esi_trade_hub_history):
+--  1. изменённая цена price
+--  2. остаток непроданных товаров volume_remain
+-- при этом issued не изменяется, - остаётся прежним (соответствует открытию order-а)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.ethh_sync_with_ecor_by_loc(location_id BIGINT)
+LANGUAGE SQL
+AS $$
+ update qi.esi_trade_hub_history set
+  ethh_price=co.ecor_price,
+  ethh_volume_remain=co.ecor_volume_remain
+ from
+  ( select ecor_order_id, ecor_price, ecor_volume_remain
+    from qi.esi_corporation_orders
+    where ecor_location_id=location_id and ecor_history
+  ) co
+ where
+  ethh_done is not null and
+  ethh_location_id=location_id and
+  ethh_order_id=co.ecor_order_id and
+  (co.ecor_price<>ethh_price or co.ecor_volume_remain<>ethh_volume_remain)
+ ;
+ insert into qi.esi_trade_hub_history
+  select
+   o.ecor_location_id,
+   o.ecor_order_id,
+   o.ecor_type_id,
+   o.ecor_is_buy_order,
+   o.ecor_issued,
+   o.ecor_price,
+   o.ecor_volume_remain,
+   o.ecor_volume_total,
+   o.ecor_updated_at,
+   o.ecor_updated_at
+  from qi.esi_corporation_orders o
+   left outer join qi.esi_trade_hub_history h on (
+    o.ecor_location_id=h.ethh_location_id and
+    o.ecor_order_id=ethh_order_id
+   )
+  where
+   o.ecor_location_id=location_id and
+   h.ethh_location_id is null
+ ;
+$$;
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.ethh_sync_with_ecor_by_corp(corporation_id BIGINT)
+LANGUAGE SQL
+AS $$
+ update qi.esi_trade_hub_history set
+  ethh_price=co.ecor_price,
+  ethh_volume_remain=co.ecor_volume_remain
+ from
+  ( select ecor_location_id, ecor_order_id, ecor_price, ecor_volume_remain
+    from qi.esi_corporation_orders
+    where ecor_corporation_id=corporation_id and ecor_history
+  ) co
+ where
+  ethh_done is not null and
+  ethh_location_id=co.ecor_location_id and
+  ethh_order_id=co.ecor_order_id and
+  (co.ecor_price<>ethh_price or co.ecor_volume_remain<>ethh_volume_remain)
+ ;
+ insert into qi.esi_trade_hub_history
+  select
+   o.ecor_location_id,
+   o.ecor_order_id,
+   o.ecor_type_id,
+   o.ecor_is_buy_order,
+   o.ecor_issued,
+   o.ecor_price,
+   o.ecor_volume_remain,
+   o.ecor_volume_total,
+   o.ecor_updated_at,
+   o.ecor_updated_at
+  from qi.esi_corporation_orders o
+   left outer join qi.esi_trade_hub_history h on (
+    o.ecor_location_id=h.ethh_location_id and
+    o.ecor_order_id=ethh_order_id
+   )
+  where
+   o.ecor_corporation_id=corporation_id and
+   h.ethh_location_id is null
  ;
 $$;
 --------------------------------------------------------------------------------

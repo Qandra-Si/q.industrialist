@@ -781,6 +781,15 @@ TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 CREATE TYPE qi.esi_order_range AS ENUM ('station', 'region', 'solarsystem', '1', '2', '3', '4', '5', '10', '20', '30', '40');
 
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders и esi_corporation_orders):
+--  1. price меняется вместе с issued (order_id остаётся прежним)
+--  2. volume_remain меняется при покупке/продаже по order-у
+-- при этом total не меняется, даже если remain <> total при изменении price !
+--
+-- с историей изменении order-а синхронизируется (см. табл. esi_trade_hub_history):
+--  1. изменённая цена price
+--  2. остаток непроданных товаров volume_remain
+-- при этом issued не изменяется, - остаётся прежним (соответствует открытию order-а)
 CREATE TABLE qi.esi_corporation_orders
 (
     ecor_corporation_id BIGINT NOT NULL,
@@ -1031,7 +1040,7 @@ CREATE UNIQUE INDEX idx_ethp_pk
     (ethp_location_id ASC NULLS LAST, ethp_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
--- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders и esi_corporation_orders):
 --  1. price меняется вместе с issued (order_id остаётся прежним)
 --  2. volume_remain меняется при покупке/продаже по order-у
 -- при этом total не меняется, даже если remain <> total при изменении price !
@@ -1089,7 +1098,7 @@ CREATE INDEX idx_etho_issued
     (etho_issued ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
--- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders):
+-- у ордера с течением времени может меняться (см. табл. esi_trade_hub_orders и esi_corporation_orders):
 --  1. price меняется вместе с issued (order_id остаётся прежним)
 --  2. volume_remain меняется при покупке/продаже по order-у
 -- при этом total не меняется, даже если remain <> total при изменении price !

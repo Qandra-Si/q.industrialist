@@ -2107,6 +2107,22 @@ class QSwaggerInterface:
             location_id
         )
 
+    def sync_market_location_history_with_corp_orders_by_loc(self, location_id: int):
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_corporation_orders)
+        self.db.execute(
+            "CALL ethh_sync_with_ecor_by_loc(%s);",
+            location_id
+        )
+
+    def sync_market_location_history_with_corp_orders_by_corp(self, corporation_id: int):
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_corporation_orders)
+        self.db.execute(
+            "CALL ethh_sync_with_ecor_by_corp(%s);",
+            corporation_id
+        )
+
     # -------------------------------------------------------------------------
     # /universe/types/
     # /universe/types/{type_id}/

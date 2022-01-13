@@ -1456,6 +1456,10 @@ class QDatabaseTools:
         del history_data
         del active_data
 
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_corporation_orders)
+        self.dbswagger.sync_market_location_history_with_corp_orders_by_corp(corporation_id)
+
         return corp_has_active_orders, corp_has_finished_orders
 
     # -------------------------------------------------------------------------
@@ -1662,6 +1666,10 @@ class QDatabaseTools:
         # синхронизация данных в таблице esi_trade_hub_history (с сохранением
         # накопленных данных, по сведениям из таблицы esi_trade_hub_orders)
         self.dbswagger.sync_market_location_history_with_orders(trade_hub_id)
+
+        # синхронизация данных в таблице esi_trade_hub_history (с сохранением
+        # накопленных данных, по сведениям из таблицы esi_corporation_orders)
+        self.dbswagger.sync_market_location_history_with_corp_orders_by_loc(trade_hub_id)
 
         return found_market_goods, updated_market_orders
 
