@@ -3,7 +3,7 @@ include '../qi_tools_and_utils.php';
 include_once '../.settings.php';
 
 
-function json_corporation_orders(&$conn, $corporation_id, $trade_hub_id, $product_type_id) {
+function json_corporation_orders(&$conn, $corporation_ids, $trade_hub_id, $product_type_id) {
     $query = <<<EOD
 select
  o.ecor_order_id as id,
@@ -19,11 +19,11 @@ from esi_corporation_orders o
  left outer join esi_characters c on (c.ech_character_id=o.ecor_issued_by)
 where
  (not o.ecor_history or (o.ecor_issued >= (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - make_interval(days => 14)))) and
- o.ecor_corporation_id=$1 and
+ o.ecor_corporation_id=any($1) and
  o.ecor_location_id=$2 and
  o.ecor_type_id=$3;
 EOD;
-    $params = array($corporation_id, $trade_hub_id, $product_type_id);
+    $params = array('{'.implode(',',$corporation_ids).'}', $trade_hub_id, $product_type_id);
     $corp_orders_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $corp_orders = pg_fetch_all($corp_orders_cursor);
@@ -46,8 +46,9 @@ EOD;
 
 if (!isset($_POST['corp'])) return; else {
   $_get_corp = htmlentities($_POST['corp']);
-  if (!is_numeric($_get_corp)) return;
-  $CORPORATION_ID = get_numeric($_get_corp);
+  if (is_numeric($_get_corp)) $CORPORATION_IDs = array(get_numeric($_get_corp));
+  else if (is_numeric_array($_get_corp)) $CORPORATION_IDs = get_numeric_array($_get_corp);
+  else return;
 }
 if (!isset($_POST['hub'])) return; else {
   $_get_hub = htmlentities($_POST['hub']);
@@ -67,7 +68,7 @@ pg_exec($conn, "SET search_path TO qi");
 
 ob_end_clean();
 header('Content-Type: application/json');
-json_corporation_orders($conn, $CORPORATION_ID, $TRADE_HUB_ID, $PRODUCT_TYPE_ID);
+json_corporation_orders($conn, $CORPORATION_IDs, $TRADE_HUB_ID, $PRODUCT_TYPE_ID);
 
 pg_close();
 ?>
