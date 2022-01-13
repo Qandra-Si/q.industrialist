@@ -6,11 +6,12 @@ include_once '../.settings.php';
 function json_history_orders(&$conn, $corporation_ids, $trade_hub_id, $product_type_id) {
     $query = <<<EOD
 select
+ ethh_updated_at::date as date,
  ethh_is_buy as is_buy,
  round(ethh_price::numeric,2) as price,
  ethh_volume_total-ethh_volume_remain as volume,
  ethh_volume_total as total,
- case ethh_done is null when true then date_trunc('minutes', ethh_updated_at-ethh_issued)
+ case ethh_done is null when true then date_trunc('minutes', (CURRENT_TIMESTAMP AT TIME ZONE 'GMT')-ethh_issued)
  else date_trunc('minutes', ethh_done-ethh_issued) end as duration,
  case ethh_done is null when true then 0 else 1 end as closed,
  o.ecor_corporation_id as corp
@@ -20,7 +21,7 @@ from esi_trade_hub_history
   o.ecor_order_id=ethh_order_id
  )
 where ethh_location_id = $2 and ethh_type_id = $3
-order by ethh_updated_at desc
+order by ethh_updated_at desc, ethh_price desc
 limit 50;
 EOD;
     $params = array('{'.implode(',',$corporation_ids).'}',$trade_hub_id, $product_type_id);
@@ -28,16 +29,21 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $history_orders = pg_fetch_all($history_orders_cursor);
     if ($history_orders)
+    {
+        $prev_date = '';
         foreach ($history_orders as &$o)
         {
-            $o['is_buy'] = $o['is_buy'] == 't';
-            $o['price'] = floatval($o['price']);
+            if ($prev_date != $o['date']) $prev_date = $o['date']; else unset($o['date']);
+            if ($o['is_buy'] == 't') $o['buy'] = floatval($o['price']); else $o['sell'] = floatval($o['price']);
+            unset($o['is_buy']);
+            unset($o['price']);
             $o['volume'] = intval($o['volume']);
             $o['total'] = intval($o['total']);
-            $o['duration'] = strval($o['duration']);
+            $o['duration'] = strval(rtrim($o['duration'],':00'));
             $o['closed'] = $o['closed'] == 1;
-            if (!is_null($o['corp'])) $o['corp'] = intval($o['corp']);
+            if (is_null($o['corp'])) unset($o['corp']); else $o['corp'] = intval($o['corp']);
         }
+    }
     echo json_encode($history_orders);
 }
 

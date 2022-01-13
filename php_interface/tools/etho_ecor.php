@@ -9,7 +9,7 @@ select
  th.is_buy,
  th.price,
  th.volume,
- co.remain
+ co.remain as corp
 from (
  select
   etho_is_buy as is_buy,
@@ -41,10 +41,11 @@ EOD;
     if ($market_orders)
         foreach ($market_orders as &$o)
         {
-            $o['is_buy'] = $o['is_buy'] == 't';
-            $o['price'] = floatval($o['price']);
+            if ($o['is_buy'] == 't') $o['buy'] = floatval($o['price']); else $o['sell'] = floatval($o['price']);
+            unset($o['is_buy']);
+            unset($o['price']);
             $o['volume'] = intval($o['volume']);
-            if (!is_null($o['remain'])) $o['remain'] = intval($o['remain']);
+            if (is_null($o['corp'])) unset($o['corp']); else $o['corp'] = intval($o['corp']);
         }
     echo json_encode($market_orders);
 }
