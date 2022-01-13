@@ -3,7 +3,7 @@ include '../qi_tools_and_utils.php';
 include_once '../.settings.php';
 
 
-function json_market_orders(&$conn, $corporation_id, $trade_hub_id, $product_type_id) {
+function json_market_orders(&$conn, $corporation_ids, $trade_hub_id, $product_type_id) {
     $query = <<<EOD
 select
  th.is_buy,
@@ -27,14 +27,14 @@ from (
    sum(ecor_volume_remain) as remain
   from esi_corporation_orders
   where
-   ecor_corporation_id=$1 and
+   ecor_corporation_id=any($1) and
    ecor_location_id=$2 and
    ecor_type_id=$3 and
    not ecor_history
   group by 1, 2
  ) co on (co.is_buy=th.is_buy and co.price=th.price);
 EOD;
-    $params = array($corporation_id, $trade_hub_id, $product_type_id);
+    $params = array('{'.implode(',',$corporation_ids).'}', $trade_hub_id, $product_type_id);
     $market_orders_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $market_orders = pg_fetch_all($market_orders_cursor);
@@ -55,8 +55,9 @@ EOD;
 
 if (!isset($_POST['corp'])) return; else {
   $_get_corp = htmlentities($_POST['corp']);
-  if (!is_numeric($_get_corp)) return;
-  $CORPORATION_ID = get_numeric($_get_corp);
+  if (is_numeric($_get_corp)) $CORPORATION_IDs = array(get_numeric($_get_corp));
+  else if (is_numeric_array($_get_corp)) $CORPORATION_IDs = get_numeric_array($_get_corp);
+  else return;
 }
 if (!isset($_POST['hub'])) return; else {
   $_get_hub = htmlentities($_POST['hub']);
@@ -76,7 +77,7 @@ pg_exec($conn, "SET search_path TO qi");
 
 ob_end_clean();
 header('Content-Type: application/json');
-json_market_orders($conn, $CORPORATION_ID, $TRADE_HUB_ID, $PRODUCT_TYPE_ID);
+json_market_orders($conn, $CORPORATION_IDs, $TRADE_HUB_ID, $PRODUCT_TYPE_ID);
 
 pg_close();
 ?>

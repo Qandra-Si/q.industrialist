@@ -20,8 +20,8 @@ if (!isset($BROKERS_FEE))
     $BROKERS_FEE = null; // брокерская комиссия - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
 if (!isset($TRADE_HUB_TAX))
     $TRADE_HUB_TAX = null; // sales tax, налог на структуре - если не указан, то ниже будет установлен в дефолтное значение с выводом предупреждения)
-if (!isset($CORPORATION_ID))
-    $CORPORATION_ID = 98553333; // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
+if (!isset($CORPORATION_IDs))
+    $CORPORATION_IDs = array(98553333); // R Initiative 4: 98615601, R Strike: 98553333, R Industry: 98677876
 if (!isset($TRADE_HUB_ID))
     $TRADE_HUB_ID = null; // PZ: 1034323745897, Nisuwa: 60015073, 4-HWWF: 1035466617946, NSI-MW: 1022822609240
 if (!isset($TRADER_ID))
@@ -70,9 +70,11 @@ if (isset($_GET['tax'])) {
 }
 
 if (isset($_GET['corp'])) {
-    $_get_corporation_id = htmlentities($_GET['corp']);
-    if (is_numeric($_get_corporation_id))
-        $CORPORATION_ID = get_numeric($_get_corporation_id);
+    $_get_corp = htmlentities($_GET['corp']);
+    if (is_numeric($_get_corp))
+        $CORPORATION_IDs = array(get_numeric($_get_corp));
+    else if (is_numeric_array($_get_corp))
+        $CORPORATION_IDs = get_numeric_array($_get_corp);
 }
 
 if (isset($_GET['hub'])) {
@@ -122,7 +124,7 @@ from
    where
     (ecwj_date > '2021-01-03') and
     (ecwj_context_id_type = 'market_transaction_id') and
-    ( ( ecwj_corporation_id=$1 and
+    ( ( ecwj_corporation_id=any($1) and
         ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
       ( ecwj_second_party_id=$3 and -- торговый персонаж,...
         ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
@@ -132,7 +134,7 @@ from
   ) tra on (tra.ecwt_location_id = location_id)
 where location_id = $2;
 EOD;
-    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID);
+    $params = array('{'.implode(',',$CORPORATION_IDs).'}', $TRADE_HUB_ID, $TRADER_ID);
     $trade_hub_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $trade_hub_status = pg_fetch_all($trade_hub_cursor);
@@ -628,7 +630,7 @@ from
       where
         (ecwj_date > '2021-01-03') and
         (ecwj_context_id_type = 'market_transaction_id') and
-        ( ( ecwj_corporation_id=$1 and
+        ( ( ecwj_corporation_id=any($1) and
             ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
           ( ecwj_second_party_id=$3 and -- торговый персонаж,...
             ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
@@ -640,7 +642,7 @@ from
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
-        (ecor_corporation_id=$1) and
+        (ecor_corporation_id=any($1)) and
         (ecor_location_id=$2)  -- станка рынка
       union
       -- список того, что выставлено в маркете (не нами)
@@ -675,7 +677,7 @@ from
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
-        (ecor_corporation_id=$1) and
+        (ecor_corporation_id=any($1)) and
         (ecor_location_id=$2)  -- станка рынка
       group by ecor_type_id
     ) weeks_passed on (market.type_id = weeks_passed.ecor_type_id)
@@ -689,7 +691,7 @@ from
       from esi_corporation_wallet_transactions
       where
         not ecwt_is_buy and
-        (ecwt_corporation_id=$1) and
+        (ecwt_corporation_id=any($1)) and
         (ecwt_location_id=$2)  -- станка рынка
       group by 1
     ) transactions_stat on (market.type_id = transactions_stat.ecwt_type_id)
@@ -704,7 +706,7 @@ from
         not ecor_is_buy_order and
         (ecor_volume_remain > 0) and
         not ecor_history and
-        (ecor_corporation_id=$1) and
+        (ecor_corporation_id=any($1)) and
         (ecor_location_id=$2)  -- станка рынка
       group by 1
     ) orders_stat on (market.type_id = orders_stat.ecor_type_id)
@@ -740,7 +742,7 @@ where
 -- order by tid.sdet_packaged_volume desc
 order by market_group.name, tid.sdet_type_name;
 EOD;
-    $params = array($CORPORATION_ID, $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS);
+    $params = array('{'.implode(',',$CORPORATION_IDs).'}', $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS);
     $market_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $market = pg_fetch_all($market_cursor);
@@ -818,7 +820,7 @@ from
           not ecor_is_buy_order and
           (ecor_volume_remain > 0) and
           not ecor_history and
-          (ecor_corporation_id=$1) and
+          (ecor_corporation_id=any($1)) and
           (ecor_location_id=$2)  -- станка рынка
         group by 1
       ) o
@@ -830,7 +832,7 @@ where
 -- order by universe.price desc
 order by tid.sdet_market_group_id, tid.sdet_type_name;
 EOD;
-    $params = array($CORPORATION_ID, $TRADE_HUB_ID);
+    $params = array('{'.implode(',',$CORPORATION_IDs).'}', $TRADE_HUB_ID);
     $storage_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $storage = pg_fetch_all($storage_cursor);
@@ -1018,7 +1020,7 @@ EOD;
   </tbody>
  </table>
  <form id="frmMarketOrders">
-  <input type="hidden" name="corp" readonly value="<?=$CORPORATION_ID?>">
+  <input type="hidden" name="corp" readonly value="<?=implode(',',$CORPORATION_IDs)?>">
   <input type="hidden" name="hub" readonly value="<?=$TRADE_HUB_ID?>">
   <input type="hidden" name="tid" readonly>
  </form>
