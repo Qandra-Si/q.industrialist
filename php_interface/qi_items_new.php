@@ -42,7 +42,7 @@ function __dump_new_items_tree(&$new_items) { ?>
             $market_group_depth = $itm['mgd'];
             if ($market_group_depth == 1) continue; // уровень c корневыми наименованиями пропускаем (в нём нет элементов)
             $market_group_name = $itm['mgn'];
-            $market_group_id = $itm['mgi'];
+            $market_group_id = ($itm['mgi']>=0) ? $itm['mgi'] : null;
             // item info
             $item_type_id = $itm['tid'];
             $item_name = $itm['name'];
@@ -71,7 +71,7 @@ function __dump_new_items_tree(&$new_items) { ?>
                     }
                     ?></span><?php
                 }
-                ?><?=$market_group_name?> <span class="text-muted">(<?=$market_group_id?>)</span></strong></td></tr><?php
+                ?><?=$market_group_name?><?php if (!is_null($market_group_id)) { ?> <span class="text-muted">(<?=$market_group_id?>)</span><?php } ?></strong></td></tr><?php
             }
             ?>
 <tr>
@@ -143,6 +143,10 @@ from (
     --select r.* from r
     order by r.sort_str
   ) rr
+  union
+  select -2, null, 'Unknown Market Group', 1, 1000000
+  union
+  select -1, -2, 'Items with unknown Market Group', 2, 1000001
 ) rrr
  -- новые элементы в системе
  left outer join (
@@ -150,7 +154,7 @@ from (
     sdet_type_id as tid,
     sdet_type_name as name,
     sdet_published as pub,
-    sdet_market_group_id as mg,
+    coalesce(sdet_market_group_id,-1) as mg,
     sdet_meta_group_id as meta,
     sdet_packaged_volume as pv,
     sdet_created_at::date as at
