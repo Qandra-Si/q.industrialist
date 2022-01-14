@@ -1835,7 +1835,12 @@ class QDatabaseTools:
         except requests.exceptions.HTTPError as err:
             status_code = err.response.status_code
             if status_code == 404:
-                # это странно, но часть item_types может быть Not Found, хотя они есть в ассетах
+                # НЕ странно, часть item_types может быть Not Found, хотя они есть в ассетах
+                # с 2022-10-14 хранение данных в таблице eve_sde_type_ids перманентно (ранее при
+                # обновлении sde данные из таблицы полностью удалялись), т.о. часть type_ids хранится
+                # вечно, даже будучи удалена из ESI
+                # помечаем такой type_id признаком not published, тогда же он перестанет попадать сюда впредь
+                self.dbswagger.update_type_id_as_not_published(type_id)
                 return None
             else:
                 # print(sys.exc_info())
@@ -1850,27 +1855,45 @@ class QDatabaseTools:
             return None
 
         # добавляем данные по новому предмету в БД
-        self.dbswagger.insert_or_update_type_id(type_id, data)
+        self.dbswagger.insert_or_update_type_id(type_id, data, updated_at)
 
         return data
 
     def actualize_type_ids(self):
-        if self.dbswagger.is_any_type_id_packed_volume_known():
-            # выбираем отсутствющие в БД типы элементов, например подарочные наборы,
-            # которые внезапно появились в ассетах
-            type_ids_to_renew = self.dbswagger.select_unknown_type_ids()  # 59978 = 'Amarr Foundation Day Pants Crate'
-            if type_ids_to_renew is None:
-                return None
-        else:
+        # сначала проверяем содержимое БД и актуализируем её
+        # получаем либо весь набор type_ids (если есть маркер type_id=-1, свидетельствующий о
+        # полном устаревании данных), либо получаем лишь те записи, у которых нет известного параметра
+        # packaged_volume (а он есть даже у элемента '#System', и равен 0)
+        obsolete_type_ids = self.dbswagger.get_obsolete_type_ids_from_dictionary()
+        # получаем отсутствющие в БД типы элементов, например подарочные наборы,
+        # которые внезапно появились в ассетах
+        absent_type_ids = self.dbswagger.select_unknown_type_ids()  # 59978 = 'Amarr Foundation Day Pants Crate'
+        # если содержимое БД не содержит неактуальную информацию, то обращаемся к ESI для полчения type_ids
+        known_type_ids = None
+        if not obsolete_type_ids and not absent_type_ids:
             url: str = self.get_types_url()
-            type_ids_to_renew, updated_at, is_updated = self.load_from_esi_paged_data(url)
+            known_type_ids, updated_at, is_updated = self.load_from_esi_paged_data(url)
 
-            if type_ids_to_renew is None:
+            if known_type_ids is None:
                 return None
             if self.esiswagger.offline_mode:
                 pass
             elif not is_updated:
                 return None
+
+        # получение набора type_ids по которым надо запросить информацию с ESI
+        type_ids_to_renew: typing.Set[int] = set()
+        obsolete_type_ids_marker = False
+        if obsolete_type_ids:
+            type_ids_to_renew |= set(obsolete_type_ids)
+            del obsolete_type_ids
+            obsolete_type_ids_marker = True
+        if absent_type_ids:
+            type_ids_to_renew |= set(absent_type_ids)
+            del absent_type_ids
+        if known_type_ids:
+            type_ids_to_renew |= set(known_type_ids)
+            del known_type_ids
 
         actualized_type_ids = []
         for type_id in type_ids_to_renew:
@@ -1881,9 +1904,15 @@ class QDatabaseTools:
 
         del type_ids_to_renew
 
+        # удаляем из БД маркер "Waiting automatic data update from ESI"
+        if obsolete_type_ids_marker:
+            self.dbswagger.remove_obsolete_type_ids_marker_from_dictionary()
+
+        # commit выплолняется даже при пустом actualized_type_ids, т.к. устаревшие элементы
+        # отправляются в not published без попадания в actialized-список
+        self.qidb.commit()
+
         if not actualized_type_ids:
             return None
-
-        self.qidb.commit()
 
         return actualized_type_ids

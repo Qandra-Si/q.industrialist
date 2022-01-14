@@ -192,9 +192,6 @@ class QDictionaries:
                     time = reaction["time"]
                     self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
 
-    def clean_type_ids(self):
-        self.db.execute("DELETE FROM eve_sde_type_ids;")
-
     def insert_type_id(self, type_id: int, type_name: str, type_dict):
         self.db.execute(
             "INSERT INTO eve_sde_type_ids("
@@ -207,17 +204,58 @@ class QDictionaries:
             " sdet_market_group_id,"
             " sdet_meta_group_id,"
             " sdet_icon_id) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s);",
-            type_id,
-            type_name,
-            type_dict.get('volume', None),
-            type_dict.get('capacity', None),
-            type_dict.get('basePrice', None),
-            type_dict.get('published', None),
-            type_dict.get('marketGroupID', None),
-            type_dict.get('metaGroupID', None),
-            type_dict.get('iconID', None)
+            "VALUES ("
+            " %(t)s,"
+            " %(n)s,"
+            " %(v)s,"
+            " %(c)s,"
+            " %(bp)s,"
+            " %(p)s,"
+            " %(mg)s,"
+            " %(meg)s,"
+            " %(i)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdet DO UPDATE SET"
+            " sdet_type_name=%(n)s,"
+            " sdet_volume=%(v)s,"
+            " sdet_capacity=%(c)s,"
+            " sdet_base_price=%(bp)s,"
+            " sdet_published=%(p)s,"
+            " sdet_market_group_id=%(mg)s,"
+            " sdet_meta_group_id=%(meg)s,"
+            " sdet_icon_id=%(i)s;",
+            {'t': type_id,
+             'n': type_name,
+             'v': type_dict.get('volume', None),
+             'c': type_dict.get('capacity', None),
+             'bp': type_dict.get('basePrice', None),
+             'p': type_dict.get('published', None),
+             'mg': type_dict.get('marketGroupID', None),
+             'meg': type_dict.get('metaGroupID', None),
+             'i': type_dict.get('iconID', None),
+             }
         )
+
+    def hide_obsolete_type_ids(self, sde_type_ids):
+        # получение с сервера всех типов предметов (для поиска тех, что исчезли из sde)
+        stored_type_ids = self.db.select_all_rows(
+            "SELECT sdet_type_id FROM eve_sde_type_ids WHERE sdet_published and sdet_type_id<>-1;",
+        )
+        # поиск тех типов предметов, которые есть в БД, но отсутствуют в sde справочнике
+        stored_type_ids = set([int(r[0]) for r in stored_type_ids])
+        sde_type_ids = set([int(tid) for tid in sde_type_ids])
+        removed_type_ids = stored_type_ids - sde_type_ids
+        del stored_type_ids
+        del sde_type_ids
+        # помечаем в БД удалённые предметы как not published, т.к. в БД есть справочники
+        # (например исторические), в которых сохраняется type_id
+        if removed_type_ids:
+            print("{} Universe' items obsolete in database (market as not published):".format(len(removed_type_ids)))
+            for type_id in removed_type_ids:
+                print(" * ", type_id)
+                self.db.execute(
+                    "UPDATE eve_sde_type_ids SET sdet_published=false WHERE sdet_type_id=%s;",
+                    type_id)
+        del removed_type_ids
 
     def actualize_type_ids(self, sde_type_ids):
         # заполнение таблицы typeIDs
@@ -234,7 +272,15 @@ class QDictionaries:
             type_name = None
             if ("name" in type_dict) and ("en" in type_dict["name"]):
                 type_name = type_dict["name"]["en"]
+            # тип предмета либо добавится, либо обновится в содержимом полей из sde-справочника
             self.insert_type_id(type_id, type_name, type_dict)
+        # помечаем в БД удалённые предметы как not published, т.к. в БД есть справочники
+        # (например исторические), в которых сохраняется type_id
+        self.hide_obsolete_type_ids(items_keys)
+        del items_keys
+        # добавляем в БД маркер-индикатор того, что надо перечитать из esi данные по
+        # packaged_volume и обновить их в БД (в sde этих данных нет)
+        self.insert_type_id(-1, 'Waiting automatic data update from ESI', {'published': False})
 
     def clean_market_groups(self):
         self.db.execute("DELETE FROM eve_sde_market_groups;")

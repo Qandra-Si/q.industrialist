@@ -148,7 +148,6 @@ def main():
                       "Please type 'yes': ")
         if value == 'yes':
             sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
-            qidbdics.clean_type_ids()
             qidbdics.actualize_type_ids(sde_type_ids)
             del sde_type_ids
 
