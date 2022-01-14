@@ -1048,7 +1048,7 @@ EOD;
     <th style="width:21%;" colspan="2">Покупка</th>
     <th style="width:28%;">Цена,&nbsp;ISK</th>
     <th style="width:21%;" colspan="2">Продажа</th>
-    <th style="width:30%;">Длительность</th>
+    <th style="width:30%;">Длительность ордера</th>
    </tr>
   </thead>
   <tbody>
@@ -1392,12 +1392,13 @@ $("#frmMarketOrders").on("submit", function(e){
    var tbody = '';
    $(data).each(function(i,row) {
     var tr = "";
-    var remain = (row.remain === null)?'':row.remain;
-    var bg = (row.is_buy?'#ff8080':'#80ff80') + ((row.remain === null)?'80':'');
-    if (row.is_buy)
-     tr = "<tr style='background:"+bg+"'><td>"+remain+"</td><td>"+row.volume+"</td><td>"+row.price+"</td><td></td><td></td></tr>";
+    var corp_remain = (row.corp === undefined)?'':row.corp;
+    var buy = row.sell === undefined;
+    var bg = (buy?'#ff8080':'#80ff80') + ((row.corp === undefined)?'80':'');
+    if (buy)
+     tr = "<tr style='background:"+bg+"'><td>"+corp_remain+"</td><td>"+row.volume+"</td><td>"+row.buy+"</td><td></td><td></td></tr>";
     else
-     tr = "<tr style='background:"+bg+"'><td></td><td></td><td>"+row.price+"</td><td>"+row.volume+"</td><td>"+remain+"</td></tr>";
+     tr = "<tr style='background:"+bg+"'><td></td><td></td><td>"+row.sell+"</td><td>"+row.volume+"</td><td>"+corp_remain+"</td></tr>";
     tbody += tr;
    });
    var tbl = $("#tblMarketOrders tbody");
@@ -1445,7 +1446,12 @@ $("#frmMarketHistory").on("submit", function(e){
   success: function(data){
    var tbody = '';
    $(data).each(function(i,row) {
-    var bg = (row.is_buy?'#ff8080':'#80ff80') + ((row.corp === null)?'80':'');
+    tr = '';
+    if (!(row.date == undefined)) {
+      tr = "<tr style='background-color:#f5f5f5;'><td colspan='7' style='padding-left:10px;'><b>"+row.date+"</b></td></tr>";
+    }
+    var buy = row.sell === undefined;
+    var bg = (buy?'#ff8080':'#80ff80') + ((row.corp === undefined)?'80':'');
     var volume = '';
     if (row.closed) {
       if (row.volume == row.total)
@@ -1455,11 +1461,11 @@ $("#frmMarketHistory").on("submit", function(e){
     } else if (row.volume > 0)
       volume = row.volume;
     var closed = row.closed?'<span class="glyphicon glyphicon-remove" aria-hidden="true"></span>':'';
-    if (row.is_buy)
-     tr = "<td>"+closed+"</td><td>"+volume+"</td><td>"+row.price+"</td><td></td><td></td>";
+    if (buy)
+     tr += "<tr style='background:"+bg+"'><td>"+closed+"</td><td>"+volume+"</td><td>"+row.buy+"</td><td></td><td></td><td>"+row.duration+"</td></tr>";
     else
-     tr = "<td></td><td></td><td>"+row.price+"</td><td>"+volume+"</td><td>"+closed+"</td>";
-    tbody += "<tr style='background:"+bg+"'>"+tr+'<td>'+row.duration+'</td></tr>';
+     tr += "<tr style='background:"+bg+"'><td></td><td></td><td>"+row.sell+"</td><td>"+volume+"</td><td>"+closed+"</td><td>"+row.duration+"</td></tr>";
+    tbody += tr;
    });
    var tbl = $("#tblMarketHistory tbody");
    tbl.html(tbody);
