@@ -64,13 +64,14 @@ def __is_availabe_blueprints_present(
 def __dump_material(glf, quantity, type_id, type_name, with_copy_to_clipboard=False):
     # вывод наименования ресурса
     glf.write(
-        '<span style="white-space:nowrap"{qq}>'
+        '<span style="white-space:nowrap"{qq}{nnm}>'
         '<img class="icn24" src="{src}"> <b>{q:,d}</b> {nm} '
         '</span>\n'.format(
             src=render_html.__get_img_src(type_id, 32),
             q=quantity,
             nm=type_name,
-            qq=' quantity="{}"'.format(quantity) if with_copy_to_clipboard else '',
+            qq=' data-q="{}"'.format(quantity) if with_copy_to_clipboard else '',
+            nnm=' data-nm="{}"'.format(type_name) if with_copy_to_clipboard else '',
         )
     )
 
@@ -467,9 +468,9 @@ def __dump_not_available_materials_list_rows(
             ms_planned = __material_dict["p"]
             ms_blueprints = __material_dict.get("bpq", None)
             ms_runs = __material_dict.get("bpr", None)
-            ms_blueprint_id = __material_dict.get("bpid", None)
             ms_blueprint_name = __material_dict.get("bpnm", None)
             ms_blueprint_products = __material_dict.get("bpp", None)
+            # ms_blueprint_id = __material_dict.get("bpid", None)
             # получаем кол-во материалов этого типа, находящихся в стоке
             ms_in_stock = stock_resources.get(ms_type_id, None)
             # получаем кол-во метариалов этого типа, находящихся в стоке на других станциях
@@ -537,7 +538,7 @@ def __dump_not_available_materials_list_rows(
                     absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
             # подготовка элементов управления копирования данных в clipboard
             __copy2clpbrd = '' if not with_copy_to_clipboard else \
-                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
+                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
                 '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                 '  aria-hidden="true"></span></a>'. \
                 format(nm=ms_item_name if ms_blueprint_name is None else ms_blueprint_name)
@@ -556,8 +557,8 @@ def __dump_not_available_materials_list_rows(
             glf.write(
                 '<tr>\n'
                 ' <th scope="row">{num}</th>\n'
-                ' <td><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                ' <td quantity="{q}">{q:,d}{original}{copy}{absent}</td>\n'
+                ' <td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
+                ' <td data-q="{q}">{q:,d}{original}{copy}{absent}</td>\n'
                 ' <td class="qind-materials-runs hidden">{r}</td>\n'
                 ' <td class="qind-materials-planned hidden">{p}</td>\n'
                 ' <td class="qind-materials-exist hidden">{ins}</td>\n'
@@ -1058,7 +1059,7 @@ def __dump_blueprints_list_with_materials(
                         if enable_copy_to_clipboard:
                             glf.write(
                                 '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
-                                ' data-source="table" data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
+                                ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
                                 ' aria-hidden="true"></span></a>'.
                                 format(nm=blueprint_name)
                             )
@@ -1068,7 +1069,7 @@ def __dump_blueprints_list_with_materials(
                     if enable_copy_to_clipboard:
                         glf.write(
                             '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
-                            ' data-source="table" data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
+                            ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
                             ' aria-hidden="true"></span></a>'.
                             format(nm=blueprint_name)
                         )
@@ -2024,20 +2025,23 @@ def __dump_corp_conveyors(
                 start_row = undefined;
               else {
                 if (data_copy) data_copy += "\\n"; 
-                data_copy += td.find('a').attr('data-copy') + "\\t" + $(this).find('td').eq(1).attr('quantity');
+                data_copy += td.attr('data-nm') + "\\t" + $(this).find('td').eq(1).attr('data-q');
               }
             }
           });
         } else if (data_source == 'span') {
-          var div = $(this).parent();
-          var spans = div.children('span');
           data_copy = '';
-          spans.each( function(idx) {
-            var span = $(this);
-            if (data_copy) data_copy += "\\n";
-            var txt = span.text();
-            data_copy += txt.substring(txt.indexOf(' x ')+3) + "\\t" + span.attr('quantity');
-          });
+          var small = $(this).parent().find('small');
+          if (!(small === undefined)) {
+            var spans = small.children('span');
+            if (!(small === undefined)) {
+              spans.each( function(idx) {
+                var span = $(this);
+                if (data_copy) data_copy += "\\n";
+                data_copy += span.attr('data-nm') + "\\t" + span.attr('data-q');
+              });
+            }
+          }
         }
       }
       var $temp = $("<textarea>");
