@@ -327,11 +327,21 @@ def get_ntier_materials_list_of_not_available(
         if is_reaction_blueprint:
             __blueprints = ceil(m["q"] / (quantity_of_single_run * 50))
             ntier_set_of_blueprints = [{"r": -1, "q": __blueprints}]
-            m.update({"bps": __blueprints, "runs": 50})
+            m.update({"bp": {"q": __blueprints,
+                             "runs": 50,
+                             "id": blueprint_type_id,
+                             "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
+                             "p": quantity_of_single_run,
+            }})
         else:
             __runs = ceil(m["q"] / quantity_of_single_run)
             ntier_set_of_blueprints = [{"r": __runs}]
-            m.update({"bps": 1, "runs": __runs})
+            m.update({"bp": {"q": 1,
+                             "runs": __runs,
+                             "id": blueprint_type_id,
+                             "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
+                             "p": quantity_of_single_run,
+            }})
         # расчёт материалов по информации о чертеже с учётом ME
         nemlwe = get_materials_list_for_set_of_blueprints(
             sde_type_ids,
@@ -420,11 +430,21 @@ def __dump_not_available_materials_list_rows(
         __item_name = __summary_dict["nm"]
         __planned = next((ms['q'] for ms in materials_summary if ms['id'] == __type_id), None)
         # компонуем сведения о материале и о способе его получения
-        __material_dict = {"id": __type_id, "q": __quantity, "p": __planned, "nm": __item_name}
-        if "bps" in __summary_dict:
-            __material_dict.update({"bp": __summary_dict.get("bps")})
-        if "runs" in __summary_dict:
-            __material_dict.update({"r": __summary_dict.get("runs")})
+        __material_dict = {
+            "id": __type_id,
+            "q": __quantity,
+            "p": __planned,
+            "nm": __item_name
+        }
+        if "bp" in __summary_dict:
+            # см. компоновку элемента в get_ntier_materials_list_of_not_available
+            __material_dict.update({
+                "bpq": __summary_dict["bp"]["q"],
+                "bpr": __summary_dict["bp"]["runs"],
+                "bpid": __summary_dict["bp"]["id"],
+                "bpnm": __summary_dict["bp"]["nm"],
+                "bpp": __summary_dict["bp"]["p"],
+            })
         # определяем, какой market-группе относится товар?
         __market_group = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, __type_id)
         # добавляем товар в этой список market-группы
@@ -445,8 +465,11 @@ def __dump_not_available_materials_list_rows(
             not_available = __material_dict["q"]
             ms_item_name = __material_dict["nm"]
             ms_planned = __material_dict["p"]
-            ms_blueprints = __material_dict.get("bp", None)
-            ms_runs = __material_dict.get("r", None)
+            ms_blueprints = __material_dict.get("bpq", None)
+            ms_runs = __material_dict.get("bpr", None)
+            ms_blueprint_id = __material_dict.get("bpid", None)
+            ms_blueprint_name = __material_dict.get("bpnm", None)
+            ms_blueprint_products = __material_dict.get("bpp", None)
             # получаем кол-во материалов этого типа, находящихся в стоке
             ms_in_stock = stock_resources.get(ms_type_id, None)
             # получаем кол-во метариалов этого типа, находящихся в стоке на других станциях
@@ -469,13 +492,13 @@ def __dump_not_available_materials_list_rows(
                     ' <td class="active qind-materials-planned hidden"><b>Planned</b></th>'
                     ' <td class="active qind-materials-exist hidden"><b>Sotiyo</b></th>'
                     ' <td class="active qind-materials-exist hidden"><b>Tatara</b></th>'
-                    ' <td class="active qind-materials-progress hidden"><b>In progress (runs)</b></th>'
+                    ' <td class="active qind-materials-progress hidden"><b>In progress</b></th>'
                     '</tr>'.
                     format(nm=__grp_name,
                            id=ms_group_id,
                            clbrd=__copy2clpbrd))
                 group_diplayed = True
-            # получаем список работ, которые выдутся с этим материалом, а результаты сбрабываются в stock-ALL
+            # получаем список работ, которые ведутся с этим материалом, а результаты сбрабываются в stock-ALL
             jobs = [j for j in corp_industry_jobs_data if
                     (j["product_type_id"] == ms_type_id) and
                     (j['output_location_id'] in stock_all_loc_ids)]
@@ -483,7 +506,7 @@ def __dump_not_available_materials_list_rows(
             for j in jobs:
                 in_progress += j["runs"]
             del jobs
-            # получаем список работ, которые ведутся с этим материалов, а результаты сбрасываются в refine stock
+            # получаем список работ, которые ведутся с этим материалом, а результаты сбрасываются в refine stock
             jobs = [j for j in corp_industry_jobs_data if
                     (j["product_type_id"] == ms_type_id) and
                     (j['output_location_id'] in refine_stock_all_loc_ids)]
@@ -491,9 +514,8 @@ def __dump_not_available_materials_list_rows(
                 in_progress += j["runs"]
             del jobs
             # умножаем на кол-во производимых материалов на один run
-            __stub01, __bp_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(ms_type_id, sde_bp_materials)
-            if not (__bp_dict is None):
-                in_progress *= __bp_dict["activities"]["manufacturing"]["products"][0]["quantity"]
+            if ms_blueprint_products is not None:
+                in_progress *= ms_blueprint_products
             # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
             vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
                 ms_type_id,
@@ -518,7 +540,7 @@ def __dump_not_available_materials_list_rows(
                 '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn" data-source="table"' \
                 '  data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
                 '  aria-hidden="true"></span></a>'. \
-                format(nm=ms_item_name)
+                format(nm=ms_item_name if ms_blueprint_name is None else ms_blueprint_name)
             # конструируем строку со сведениями о стоках (стоке конвейера, и стоке на других станциях)
             __in_stock = ''
             if ms_in_stock:
@@ -615,6 +637,8 @@ def __dump_not_available_materials_list(
             calc_materials_summary(ntier_materials_list_for_buy, not_enough_materials__market)
         # сохраняем информацию о способе получения материалов (кол-во чертежей и запусков)
         # также сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
+        # примечание: когда ntier==0, данные в not_enough_materials__cycled взяты по ссылке из
+        #             not_enough_materials__initial, и потому уже изменены в initial-списке
         if ntier > 0:
             for m in not_enough_materials__cycled:
                 if m["id"] in products_for_bps or m["id"] in reaction_products_for_bps:
@@ -644,10 +668,6 @@ def __dump_not_available_materials_list(
 
     # вывод сведений в отчёт
     glf.write("""
-<style>
- .table > tbody > tr > td { padding: 1px; font-size: smaller; }
- .table > tbody > tr > th { padding: 1px; font-size: smaller; }
-</style>
 <div class="media qind-not-available-block">
  <div class="media-left">
   <span class="glyphicon glyphicon-remove-sign" aria-hidden="false" style="font-size: 64px;"></span>
@@ -1496,10 +1516,9 @@ def __dump_corp_conveyors(
         conveyor_data):
     glf.write("""
 <style>
-.qind-blueprints-tbl>tbody>tr>td {
-  padding: 4px;
-  border-top: none;
-}
+.table > tbody > tr > td { padding: 1px; font-size: smaller; }
+.table > tbody > tr > th { padding: 1px; font-size: smaller; }
+.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
 </style>
 
 <nav class="navbar navbar-default">
