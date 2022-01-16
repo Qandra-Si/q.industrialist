@@ -49,12 +49,12 @@ def main():
         # запускать в этом режиме без необходимости, т.к. ряд категорий актуализируется
         # ОЧЕНЬ ДОЛГО, часами и потому может пострадать оперативность ввода прочих данных)
         'all',
-        # актуализация сведений о вселенной, таких как:
+        # актуализация PUBLIC сведений о вселенной, таких как:
         # * public structures, появляющихся время от времени во вселенной - БЫСТРО
         # * public prices на trade hubs, например Jita-4-4 - МЕДЛЕННО
         # * public trade goods (ids), т.е. предметов добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
         # * markets region history, т.е. рыночных цен по регионам - раз в день ОЧЕНЬ МЕДЛЕННО
-        'universe',
+        'public',
         # актуализация рыночных цен на товары во вселенной, в частности:
         # * adjusted и average цен, которые которые отображаются в ingame-клиенте (т.н. universe price) - БЫСТРО
         # * цен в market-хабах по заданным настройках - скорость зависит от региона, но в частности Jita ДОЛГО
@@ -68,18 +68,18 @@ def main():
         'orders',
         # актуализация исторических рыночных цен по вселенной, т.н. markets region history - ОЧЕНЬ МЕДЛЕННО
         'trade_history',
+        # сведения о trade goods (ids), т.е. предметах добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
+        'goods',
         # ----- ----- ----- ----- -----
         # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
         # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
         'corporation',
-        # предустановка для категорий и действий, которые выполняются быстро
-        'fast',
         # предустановка для категорий и действий, которые выполняются медленно, и выполнение которых желательно либо
         # откладывать, либо запускать "в фоне"
-        'slow',
+        'rare',
         # предустановка для категорий и действий, которые выполняются крайне медленно, и выполнение которых желательно
         # запускать раз в сутки
-        'very_slow',
+        'once',
     ]
 
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
@@ -131,8 +131,8 @@ def main():
             first_time = False
 
             # один раз для первого пилота (его аутентификационного токена) читаем данные
-            # с серверов CCP по публичным структурам
-            if categories & {'all', 'universe', 'fast'}:
+            # с серверов CCP по публичным структурам - обычно быстро
+            if categories & {'all', 'public', 'rare'}:
                 # Requires: access token
                 universe_structures_stat = dbtools.actualize_universe_structures()
                 if universe_structures_stat is None:
@@ -144,7 +144,7 @@ def main():
 
             # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'universe', 'slow', 'trade_hubs'}:
+            if categories & {'all', 'public', 'rare', 'trade_hubs'}:
                 # Requires: public access
                 markets_prices_updated = dbtools.actualize_markets_prices()
                 print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
@@ -173,7 +173,7 @@ def main():
         # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,
         # так что одна корпорация может не иметь доступа к структуре, а другая иметь, таким
         # одразом фильтрация осуществляется по названиям корпораций)
-        if categories & {'all', 'corporation', 'slow', 'trade_hubs'}:
+        if categories & {'all', 'corporation', 'trade_hubs'}:
             # Requires: public access
             for structure in q_industrialist_settings.g_market_structures:
                 if structure.get("corporation_name") == corporation_name:
@@ -186,7 +186,7 @@ def main():
 
         # приступаем к загрузке корпоративных данных
 
-        if categories & {'all', 'corporation', 'fast', 'assets'}:
+        if categories & {'all', 'corporation', 'assets'}:
             # Requires role(s): Station_Manager
             corp_structures_data, corp_structures_new = dbtools.actualize_corporation_structures(corporation_id)
             if not corp_structures_data:
@@ -202,14 +202,14 @@ def main():
                   format(corporation_name, 'no updates in' if known_asset_items is None else known_asset_items))
             sys.stdout.flush()
 
-        if categories & {'all', 'corporation', 'fast', 'blueprints'}:
+        if categories & {'all', 'corporation', 'blueprints'}:
             # Requires role(s): Director
             known_blueprints = dbtools.actualize_corporation_blueprints(corporation_id)
             print("'{}' corporation has {} blueprints\n".
                   format(corporation_name, 'no updates in' if known_blueprints is None else known_blueprints))
             sys.stdout.flush()
 
-        if categories & {'all', 'corporation', 'fast', 'industry'}:
+        if categories & {'all', 'corporation', 'industry'}:
             # Requires role(s): Factory_Manager
             corp_industry_stat = dbtools.actualize_corporation_industry_jobs(corporation_id)
             if corp_industry_stat is None:
@@ -219,7 +219,7 @@ def main():
                       format(corporation_name, corp_industry_stat[1], corp_industry_stat[0]))
             sys.stdout.flush()
 
-        if categories & {'all', 'corporation', 'fast', 'finances'}:
+        if categories & {'all', 'corporation', 'finances'}:
             # Requires role(s): Accountant, Junior_Accountant
             corp_made_new_payments = dbtools.actualize_corporation_wallet_journals(corporation_id)
             print("'{}' corporation made {} new payments\n".
@@ -232,7 +232,7 @@ def main():
                   format(corporation_name, corp_made_new_transactions))
             sys.stdout.flush()
 
-        if categories & {'all', 'corporation', 'fast', 'orders'}:
+        if categories & {'all', 'corporation', 'orders'}:
             # Requires role(s): Accountant, Trader
             corp_orders_stat = dbtools.actualize_corporation_orders(corporation_id)
             if corp_orders_stat is None:
@@ -242,7 +242,7 @@ def main():
                       format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
             sys.stdout.flush()
 
-        if categories & {'all', 'corporation', 'fast', 'blueprints', 'industry'}:
+        if categories & {'all', 'corporation', 'blueprints', 'industry'}:
             # Пытаемся отследить и сохраняем связи между чертежами и работами
             dbtools.link_blueprints_and_jobs(corporation_id)
             print("'{}' corporation link blueprints and jobs completed\n".
@@ -255,7 +255,7 @@ def main():
             # их обнаружение и добавление в БД (список CCP-шниками обновлется раз в день и приводит к
             # ОЧЕНЬ ДЛИТЕЛЬНОМУ обновлению всех type_ids, поскольку даже проверить etags у нескольких
             # тысяч предметов - долго)
-            if categories & {'all', 'universe', 'very_slow'}:
+            if categories & {'all', 'public', 'once', 'goods'}:
                 # Public information about type_id
                 actualized_type_ids = dbtools.actualize_type_ids()
                 if actualized_type_ids is None:
@@ -270,7 +270,7 @@ def main():
             # загрузка исторических цен по регионам (ОЧЕНЬ МЕДЛЕННО из-за большого кол-ва данных), как
             # правило загрузка рыночных данных одного крупного региона, например The Forge, занимает
             # несколько часов
-            if categories & {'all', 'universe', 'very_slow', 'trade_history'}:
+            if categories & {'all', 'public', 'once', 'trade_history'}:
                 # Requires: public access
                 if dbtools.is_market_regions_history_refreshed():
                     for region in q_industrialist_settings.g_market_regions:
