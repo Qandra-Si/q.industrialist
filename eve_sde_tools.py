@@ -2,8 +2,9 @@
 
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 """
 import sys
 import os
@@ -70,6 +71,27 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
                 dicts_to_stay.append(i2s)
     f_name_yaml = __get_source_name(subname, name)
     f_name_json = __get_converted_name(ws_dir, name)
+    # файлы от CCP-шников действительно сохранены в utf-8 кодировке, т.к. например в groupIDs.yaml
+    # содержится группа 1764 с Unicode Character 'BLACK DIAMOND SUIT' (U+2666) см. подробнее тут
+    # https://www.fileformat.info/info/unicode/char/2666/index.htm и в файле содержится
+    # последовательность из октет 0xE2 0x99 0xA6, что соответствует utf-8
+    # ---
+    # метод open(..., 'r', encoding='utf8') и s = f.read() выполняет чтение данных из этого файле и возвращает
+    # строку, содержающую универсальные символы \u2666
+    # ---
+    # если пытаться конвертировать строки с пом. encode("utf-16"), то будут появляться bytes-последовательности:
+    #  b'\xff\xfef& \x00M\x00i\x00n\x00i\x00n\x00g\x00 \x00F\x00r\x00i\x00g\x00a\x00t\x00e\x00'
+    # если конвертировать строки с пом. encode("utf-8"), то будут появляться bytes-последовательности:
+    #  b'\xe2\x99\xa6 Mining Frigate'
+    # в том и в другом случае decode('utf-8') обратно вернёт строку:
+    #  "\u2666 Mining Frigate"
+    # ---
+    # для того, чтобы содержимое таких строк в windows отображалось в консоли, надо предварительно задать
+    # кодовую страницу utf-8 в cmd.exe с помощью команды cpch 65001, тогда строка при выводе будет выглядеть:
+    # ♦ Mining Frigate
+    # ---
+    # см. также https://stackoverflow.com/a/27527728
+    # см. также https://stackoverflow.com/a/31207398
     with open(f_name_yaml, 'r', encoding='utf8') as f:
         try:
             # yaml

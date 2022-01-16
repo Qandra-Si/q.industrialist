@@ -17,8 +17,9 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_logist.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python q_logist.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director

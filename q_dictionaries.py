@@ -12,8 +12,9 @@ Prerequisites:
       callback URL "https://localhost/callback/".
       Note: never use localhost as a callback in released applications.
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
 """
 import sys
 import getopt
@@ -38,6 +39,10 @@ def main():
         # используемым при работе с чертежами (данные не могут быть получены по ESI), поэтому
         # это единстенный способ актаулизации информации при обновлении во вселейнной)
         'blueprints',
+        # ввод данных по категориям групп предметов во вселенной
+        'categories',
+        # ввод данных по группам предметов во вселенной
+        'groups',
         # ввод данных по типам во вселенной (впоследствии актуализируется автоматически по ESI,
         # а также дополняется параметром packaged_volume (что является очень длительной процедурой
         # и крайне не рекомендуются запускать скрипт с этим параметром без необходимости)
@@ -142,14 +147,21 @@ def main():
         qidbdics.actualize_blueprints(sde_bp_materials)
         del sde_bp_materials
 
-    if category in ['all', 'type_ids']:
-        value = input("Are you sure to cleanup type_ids in database?\n"
-                      "Too much afterward overheads!!!\n"
-                      "Please type 'yes': ")
-        if value == 'yes':
-            sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
-            qidbdics.actualize_type_ids(sde_type_ids)
-            del sde_type_ids
+    # при удалении type_ids, market_groups, groups и categories важно соблюсти последовательность
+    # с тем, чтобы каскадоне удаление данных из связанных таблиц не уничтожало только что
+    # добавленные данные
+
+    if category in ['all', 'categories']:
+        sde_categories = eve_sde_tools.read_converted(workspace_cache_files_dir, "categoryIDs")
+        qidbdics.clean_categories()
+        qidbdics.actualize_categories(sde_categories)
+        del sde_categories
+
+    if category in ['all', 'groups']:
+        sde_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "groupIDs")
+        qidbdics.clean_groups()
+        qidbdics.actualize_groups(sde_groups)
+        del sde_groups
 
     if category in ['all', 'market_groups']:
         sde_market_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "marketGroups")
@@ -163,6 +175,15 @@ def main():
         qidbdics.clean_market_groups()
         qidbdics.actualize_market_groups(sde_market_groups)
         del sde_market_groups
+
+    if category in ['all', 'type_ids']:
+        value = input("Are you sure to cleanup type_ids in database?\n"
+                      "Too much afterward overheads!!!\n"
+                      "Please type 'yes': ")
+        if value == 'yes':
+            sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
+            qidbdics.actualize_type_ids(sde_type_ids)
+            del sde_type_ids
 
     del qidbdics
     del qidb

@@ -28,6 +28,13 @@ DROP INDEX IF EXISTS qi.idx_sdet_market_group_id;
 DROP INDEX IF EXISTS qi.idx_sdet_pk;
 DROP TABLE IF EXISTS qi.eve_sde_type_ids;
 
+DROP INDEX IF EXISTS qi.idx_sdecg_category_id;
+DROP INDEX IF EXISTS qi.idx_sdecg_pk;
+DROP TABLE IF EXISTS qi.eve_sde_group_ids;
+
+DROP INDEX IF EXISTS qi.idx_sdec_pk;
+DROP TABLE IF EXISTS qi.eve_sde_category_ids;
+
 DROP INDEX IF EXISTS qi.idx_sdebm_fk;
 DROP TABLE IF EXISTS qi.eve_sde_blueprint_materials;
 DROP INDEX IF EXISTS qi.idx_sdebp_fk;
@@ -146,6 +153,61 @@ TABLESPACE pg_default;
 ALTER TABLE qi.eve_sde_blueprints OWNER TO qi_user;
 ALTER TABLE qi.eve_sde_blueprint_products OWNER TO qi_user;
 ALTER TABLE qi.eve_sde_blueprint_materials OWNER TO qi_user;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (categoryIDs)
+-- сведения о категориях групп присутствующих в игре элементов, из categoryIDs.yaml
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_category_ids
+(
+    sdec_category_id INTEGER NOT NULL,
+    sdec_category_name CHARACTER VARYING(31) NOT NULL,
+    sdec_published BOOLEAN NOT NULL,
+    sdec_icon_id INTEGER,
+    CONSTRAINT pk_sdec PRIMARY KEY (sdec_category_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_category_ids OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdec_pk
+    ON qi.eve_sde_category_ids USING btree
+    (sdec_category_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (groupIDs)
+-- сведения о групп присутствующих в игре элементов, из groupIDs.yaml
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_group_ids
+(
+    sdecg_group_id INTEGER NOT NULL,
+    sdecg_category_id INTEGER NOT NULL,
+    sdecg_group_name CHARACTER VARYING(127) NOT NULL,
+    sdecg_published BOOLEAN NOT NULL,
+    sdecg_icon_id INTEGER,
+    sdecg_use_base_price BOOLEAN,
+    CONSTRAINT pk_sdecg PRIMARY KEY (sdecg_group_id),
+    CONSTRAINT fk_sdecg_category_id FOREIGN KEY (sdecg_category_id)
+        REFERENCES qi.eve_sde_category_ids(sdec_category_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_group_ids OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdecg_pk
+    ON qi.eve_sde_group_ids USING btree
+    (sdecg_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdecg_category_id
+    ON qi.eve_sde_group_ids USING btree
+    (sdecg_category_id ASC NULLS LAST)
+TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------

@@ -17,9 +17,10 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory:
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
->>> python q_universe_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
+$ python q_universe_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
 
 Attention, the first launch takes about 4 hours of work!
 Usually single launch for one corporation takes 1.5-2 minutes, but in case of a long

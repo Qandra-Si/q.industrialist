@@ -17,8 +17,9 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python eve_sde_tools.py --cache_dir=~/.q_industrialist
->>> python q_conveyor.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python q_conveyor.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 
 Requires application scopes:
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager

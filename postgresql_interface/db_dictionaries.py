@@ -77,6 +77,7 @@ class QDictionaries:
                     # }
                     nm = items[str(itm_key)]
                     self.insert_name(id, category, nm)
+            del items_keys
 
     def clean_integers(self, category):
         """ clean numbered items in the database by category
@@ -191,6 +192,110 @@ class QDictionaries:
                     products = reaction.get("products")
                     time = reaction["time"]
                     self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
+
+    def clean_categories(self):
+        self.db.execute("DELETE FROM eve_sde_category_ids;")
+
+    def insert_category_id(self, category_id: int, category_dict):
+        self.db.execute(
+            "INSERT INTO eve_sde_category_ids("
+            " sdec_category_id,"
+            " sdec_category_name,"
+            " sdec_published,"
+            " sdec_icon_id) "
+            "VALUES ("
+            " %(c)s,"
+            " %(n)s,"
+            " %(p)s,"
+            " %(i)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdec DO UPDATE SET"
+            " sdec_category_name=%(n)s,"
+            " sdec_published=%(p)s,"
+            " sdec_icon_id=%(i)s;",
+            {'c': category_id,
+             'n': category_dict['name']['en'],
+             'p': category_dict['published'],
+             'i': category_dict.get('iconID', None),
+             }
+        )
+
+    def actualize_categories(self, sde_categories):
+        # "9": {
+        #  "iconID": 21,
+        #  "name": {
+        #   "en": "Blueprint"
+        #  },
+        #  "published": true
+        # }
+        sde_categories_keys = sde_categories.keys()
+        for category_id in sde_categories_keys:
+            c = sde_categories[str(category_id)]
+            self.insert_category_id(int(category_id), c)
+        del sde_categories_keys
+
+    def clean_groups(self):
+        self.db.execute("DELETE FROM eve_sde_group_ids;")
+
+    def insert_group_id(self, group_id: int, group_dict):
+        self.db.execute(
+            "INSERT INTO eve_sde_group_ids("
+            " sdecg_group_id,"
+            " sdecg_category_id,"
+            " sdecg_group_name,"
+            " sdecg_published,"
+            " sdecg_icon_id,"
+            " sdecg_use_base_price) "
+            "VALUES ("
+            " %(g)s,"
+            " %(c)s,"
+            " %(n)s,"
+            " %(p)s,"
+            " %(i)s,"
+            " %(u)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdecg DO UPDATE SET"
+            " sdecg_category_id=%(c)s,"
+            " sdecg_group_name=%(n)s,"
+            " sdecg_published=%(p)s,"
+            " sdecg_icon_id=%(i)s,"
+            " sdecg_use_base_price=%(u)s;",
+            {'g': group_id,
+             'c': group_dict['categoryID'],
+             'n': group_dict.get('name', {'en': ''}).get('en', ''),  # у группы 1969 нет названия, но она и не published
+             'p': group_dict['published'],
+             'i': group_dict.get('iconID', None),
+             'u': group_dict.get('useBasePrice', None),
+             }
+        )
+
+    def actualize_groups(self, sde_groups):
+        # "18": {
+        #  "categoryID": 4,
+        #  "iconID": 22,
+        #  "name": {
+        #   "en": "Mineral"
+        #  },
+        #  "published": true,
+        #  "useBasePrice": true
+        # },
+        # "1764": {
+        #  "categoryID": 11,
+        #  "name": {
+        #   "en": "\u2666 Mining Frigate" -> ♦ Mining Frigate
+        #  },
+        #  "published": false,
+        #  "useBasePrice": false
+        # },
+        # "1969": {
+        #  "categoryID": 7,
+        #  "name": {},
+        #  "published": false,
+        #  "useBasePrice": false
+        # }
+        sde_groups_keys = sde_groups.keys()
+        for group_id in sde_groups_keys:
+            g = sde_groups[str(group_id)]
+            self.insert_group_id(int(group_id), g)
+        del sde_groups_keys
 
     def insert_type_id(self, type_id: int, type_name: str, type_dict):
         self.db.execute(
@@ -315,4 +420,5 @@ class QDictionaries:
             mg = sde_market_groups[str(group_id)]
             group_id: int = int(group_id)
             self.insert_market_group(group_id, mg)
+        del sde_market_groups_keys
 
