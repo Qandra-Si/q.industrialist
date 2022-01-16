@@ -78,18 +78,6 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
-        # Public information about type_id
-        actualized_type_ids = dbtools.actualize_type_ids()
-        if actualized_type_ids is None:
-            print("No new items found in the Universe")
-        else:
-            print("{} Universe' items actualized in database:".format(len(actualized_type_ids)))
-            if len(actualized_type_ids) < 100:  # в случае массового обновления, названия не показываем
-                for item in actualized_type_ids:
-                    print(" * {} with type_id={}".format(item['name'], item['type_id']))
-            del actualized_type_ids
-        return
-
         # один раз для первого пилота (его аутентификационного токена) читаем данные
         # с серверов CCP по публичным структурам
 
