@@ -44,6 +44,36 @@ import q_industrialist_settings
 
 
 def main():
+    possible_categories = [
+        # запуск скрипта со вводом всех возможных данных в БД (крайне не рекомендуется
+        # запускать в этом режиме без необходимости, т.к. ряд категорий актуализируется
+        # ОЧЕНЬ ДОЛГО, часами и потому может пострадать оперативность ввода прочих данных)
+        'all',
+        # актуализация сведений о вселенной, таких как:
+        # * public structures, появляющихся время от времени во вселенной - БЫСТРО
+        'universe',
+        # актуализация рыночных цен на товары во вселенной, в частности:
+        # * adjusted и average цен, которые которые отображаются в ingame-клиенте (т.н. universe price) - БЫСТРО
+        # * цен в market-хабах по заданным настройках - скорость зависит от региона, но в частности Jita ДОЛГО
+        # * цен на структурах по заданным настройкам - доступ зависит от корпорации, если альянс оч.крупный то НЕ БЫСТРО
+        'markets',
+        # актуализация ассетов корпорации, а также её прочего имущества, в частности структур в спейсе
+        'assets',
+        'blueprints',
+        'industry',
+        'finances',
+        'orders',
+        # ----- ----- ----- ----- -----
+        # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
+        # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
+        'corporation',
+        # предустановка для категорий и действий, которые выполняются быстро
+        'fast',
+        # предустановка для категорий и действий, которые выполняются медленно, и выполнение которых желательно либо
+        # откладывать, либо запускать "в фоне"
+        'slow',
+    ]
+
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
     dbtools = eve_db_tools.QDatabaseTools(
         "universe_structures",
@@ -55,7 +85,17 @@ def main():
 
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
-    argv_prms = console_app.get_argv_prms()
+    argv_prms = console_app.get_argv_prms(['category='])
+
+    # проверка названий категорий, они должны относится к ограниченному списку
+    wrong_categories = [c for c in argv_prms["category"] if c not in possible_categories]
+    if wrong_categories:
+        print("Unsupported category: {}".format(wrong_categories))
+        return
+    del wrong_categories
+    del possible_categories
+    # подготовка набора категорий, заданных пользователем к использованию
+    categories = set(argv_prms['category'])
 
     for pilot_num, pilot_name in enumerate(argv_prms["character_names"]):
         # настройка Eve Online ESI Swagger interface
@@ -78,38 +118,56 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
-        # один раз для первого пилота (его аутентификационного токена) читаем данные
-        # с серверов CCP по публичным структурам
-
         if first_time:
             first_time = False
 
-            # Requires: access token
-            universe_structures_stat = dbtools.actualize_universe_structures()
-            if universe_structures_stat is None:
-                print("Universe public structures has no updates\n")
-            else:
-                print("{} new of {} public structures found in the universe\n".
-                      format(universe_structures_stat[1], universe_structures_stat[0]))
-            sys.stdout.flush()
-
-            # Requires: public access
-            markets_prices_updated = dbtools.actualize_markets_prices()
-            print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
-            sys.stdout.flush()
-
-            # Requires: public access
-            for region in q_industrialist_settings.g_market_hubs:
-                found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
-                print("'{}' market has {} goods and {} order updates\n".format(
-                    region['region'],
-                    'not new' if found_market_goods is None else found_market_goods,
-                    'no' if updated_market_orders is None else updated_market_orders))
+            # один раз для первого пилота (его аутентификационного токена) читаем данные
+            # с серверов CCP по публичным структурам
+            if categories & {'all', 'universe', 'fast'}:
+                # Requires: access token
+                universe_structures_stat = dbtools.actualize_universe_structures()
+                if universe_structures_stat is None:
+                    print("Universe public structures has no updates\n")
+                else:
+                    print("{} new of {} public structures found in the universe\n".
+                          format(universe_structures_stat[1], universe_structures_stat[0]))
                 sys.stdout.flush()
 
+            # в зависимости от заданных натроек загружаем цены в регионаха, фильтруем по
+            # market-хабам и пишем в БД
+            if categories & {'all', 'universe', 'slow', 'markets'}:
+                # Requires: public access
+                markets_prices_updated = dbtools.actualize_markets_prices()
+                print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
+                sys.stdout.flush()
+
+                # Requires: public access
+                for region in q_industrialist_settings.g_market_hubs:
+                    found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
+                    print("'{}' market has {} goods and {} order updates\n".format(
+                        region['region'],
+                        'not new' if found_market_goods is None else found_market_goods,
+                        'no' if updated_market_orders is None else updated_market_orders))
+                    sys.stdout.flush()
+
+                # Requires: public access
+                for structure in q_industrialist_settings.g_market_structures:
+                    if structure.get("corporation_name", None) is None:
+                        found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
+                        print("'{}' market has {} goods and {} order updates\n".format(
+                            structure.get("structure_id"),
+                            'not new' if found_market_goods is None else found_market_goods,
+                            'no' if updated_market_orders is None else updated_market_orders))
+                        sys.stdout.flush()
+
+        # в зависимости от заданных настроек загружаем цены на альянсовых структурах
+        # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,
+        # так что одна корпорация может не иметь доступа к структуре, а другая иметь, таким
+        # одразом фильтрация осуществляется по названиям корпораций)
+        if categories & {'all', 'corporation', 'slow', 'markets'}:
             # Requires: public access
             for structure in q_industrialist_settings.g_market_structures:
-                if structure.get("corporation_name", None) is None:
+                if structure.get("corporation_name") == corporation_name:
                     found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
                     print("'{}' market has {} goods and {} order updates\n".format(
                         structure.get("structure_id"),
@@ -117,86 +175,83 @@ def main():
                         'no' if updated_market_orders is None else updated_market_orders))
                     sys.stdout.flush()
 
-        # Requires: public access
-        for structure in q_industrialist_settings.g_market_structures:
-            if structure.get("corporation_name") == corporation_name:
-                found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
-                print("'{}' market has {} goods and {} order updates\n".format(
-                    structure.get("structure_id"),
-                    'not new' if found_market_goods is None else found_market_goods,
-                    'no' if updated_market_orders is None else updated_market_orders))
-                sys.stdout.flush()
-
         # приступаем к загрузке корпоративных данных
 
-        # Requires role(s): Station_Manager
-        corp_structures_data, corp_structures_new = dbtools.actualize_corporation_structures(corporation_id)
-        if not corp_structures_data:
-            print("'{}' corporation has no any structures\n".format(corporation_name))
-        else:
-            print("'{}' corporation has {} of {} new structures\n".
-                  format(corporation_name, corp_structures_new, len(corp_structures_data)))
-        sys.stdout.flush()
-
-        # Requires role(s): Director
-        known_asset_items = dbtools.actualize_corporation_assets(corporation_id)
-        print("'{}' corporation has {} asset items\n".
-              format(corporation_name, 'no updates in' if known_asset_items is None else known_asset_items))
-        sys.stdout.flush()
-
-        # Requires role(s): Director
-        known_blueprints = dbtools.actualize_corporation_blueprints(corporation_id)
-        print("'{}' corporation has {} blueprints\n".
-              format(corporation_name, 'no updates in' if known_blueprints is None else known_blueprints))
-        sys.stdout.flush()
-
-        # Requires role(s): Factory_Manager
-        corp_industry_stat = dbtools.actualize_corporation_industry_jobs(corporation_id)
-        if corp_industry_stat is None:
-            print("'{}' corporation has no update in industry jobs\n".format(corporation_name))
-        else:
-            print("'{}' corporation has {} active of {} total industry jobs\n".
-                  format(corporation_name, corp_industry_stat[1], corp_industry_stat[0]))
-        sys.stdout.flush()
-
-        # Requires role(s): Accountant, Junior_Accountant
-        corp_made_new_payments = dbtools.actualize_corporation_wallet_journals(corporation_id)
-        print("'{}' corporation made {} new payments\n".
-              format(corporation_name, corp_made_new_payments))
-        sys.stdout.flush()
-
-        # Requires role(s): Accountant, Junior_Accountant
-        corp_made_new_transactions = dbtools.actualize_corporation_wallet_transactions(corporation_id)
-        print("'{}' corporation made {} new transactions\n".
-              format(corporation_name, corp_made_new_transactions))
-        sys.stdout.flush()
-
-        # Requires role(s): Accountant, Trader
-        corp_orders_stat = dbtools.actualize_corporation_orders(corporation_id)
-        if corp_orders_stat is None:
-            print("'{}' corporation has no update in orders\n".format(corporation_name))
-        else:
-            print("'{}' corporation has {} active and {} finished orders\n".
-                  format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
-        sys.stdout.flush()
-
-        # Пытаемся отследить и сохраняем связи между чертежами и работами
-        dbtools.link_blueprints_and_jobs(corporation_id)
-        print("'{}' corporation link blueprints and jobs completed\n".
-              format(corporation_name))
-
-        last_time = pilot_num == len(argv_prms["character_names"])-1
-        if last_time:
-            # Public information about type_id
-            actualized_type_ids = dbtools.actualize_type_ids()
-            if actualized_type_ids is None:
-                print("No new items found in the Universe")
+        if categories & {'all', 'corporation', 'fast', 'assets'}:
+            # Requires role(s): Station_Manager
+            corp_structures_data, corp_structures_new = dbtools.actualize_corporation_structures(corporation_id)
+            if not corp_structures_data:
+                print("'{}' corporation has no any structures\n".format(corporation_name))
             else:
-                print("{} Universe' items actualized in database:".format(len(actualized_type_ids)))
-                if len(actualized_type_ids) < 100:  # в случае массового обновления, названия не показываем
-                    for item in actualized_type_ids:
-                        print(" * {} with type_id={}".format(item['name'], item['type_id']))
-                del actualized_type_ids
+                print("'{}' corporation has {} of {} new structures\n".
+                      format(corporation_name, corp_structures_new, len(corp_structures_data)))
+            sys.stdout.flush()
+
+            # Requires role(s): Director
+            known_asset_items = dbtools.actualize_corporation_assets(corporation_id)
+            print("'{}' corporation has {} asset items\n".
+                  format(corporation_name, 'no updates in' if known_asset_items is None else known_asset_items))
+            sys.stdout.flush()
+
+        if categories & {'all', 'corporation', 'fast', 'blueprints'}:
+            # Requires role(s): Director
+            known_blueprints = dbtools.actualize_corporation_blueprints(corporation_id)
+            print("'{}' corporation has {} blueprints\n".
+                  format(corporation_name, 'no updates in' if known_blueprints is None else known_blueprints))
+            sys.stdout.flush()
+
+        if categories & {'all', 'corporation', 'fast', 'industry'}:
+            # Requires role(s): Factory_Manager
+            corp_industry_stat = dbtools.actualize_corporation_industry_jobs(corporation_id)
+            if corp_industry_stat is None:
+                print("'{}' corporation has no update in industry jobs\n".format(corporation_name))
+            else:
+                print("'{}' corporation has {} active of {} total industry jobs\n".
+                      format(corporation_name, corp_industry_stat[1], corp_industry_stat[0]))
+            sys.stdout.flush()
+
+        if categories & {'all', 'corporation', 'fast', 'finances'}:
+            # Requires role(s): Accountant, Junior_Accountant
+            corp_made_new_payments = dbtools.actualize_corporation_wallet_journals(corporation_id)
+            print("'{}' corporation made {} new payments\n".
+                  format(corporation_name, corp_made_new_payments))
+            sys.stdout.flush()
+
+            # Requires role(s): Accountant, Junior_Accountant
+            corp_made_new_transactions = dbtools.actualize_corporation_wallet_transactions(corporation_id)
+            print("'{}' corporation made {} new transactions\n".
+                  format(corporation_name, corp_made_new_transactions))
+            sys.stdout.flush()
+
+        if categories & {'all', 'corporation', 'fast', 'orders'}:
+            # Requires role(s): Accountant, Trader
+            corp_orders_stat = dbtools.actualize_corporation_orders(corporation_id)
+            if corp_orders_stat is None:
+                print("'{}' corporation has no update in orders\n".format(corporation_name))
+            else:
+                print("'{}' corporation has {} active and {} finished orders\n".
+                      format(corporation_name, corp_orders_stat[0], corp_orders_stat[1]))
+            sys.stdout.flush()
+
+        if categories & {'all', 'corporation', 'fast', 'blueprints', 'industry'}:
+            # Пытаемся отследить и сохраняем связи между чертежами и работами
+            dbtools.link_blueprints_and_jobs(corporation_id)
+            print("'{}' corporation link blueprints and jobs completed\n".
+                  format(corporation_name))
+
+        if categories & {'all', 'universe', 'slow'}:
+            last_time = pilot_num == len(argv_prms["character_names"])-1
+            if last_time:
+                # Public information about type_id
+                actualized_type_ids = dbtools.actualize_type_ids()
+                if actualized_type_ids is None:
+                    print("No new items found in the Universe")
+                else:
+                    print("{} Universe' items actualized in database:".format(len(actualized_type_ids)))
+                    if len(actualized_type_ids) < 100:  # в случае массового обновления, названия не показываем
+                        for item in actualized_type_ids:
+                            print(" * {} with type_id={}".format(item['name'], item['type_id']))
+                    del actualized_type_ids
 
     sys.stdout.flush()
 

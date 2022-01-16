@@ -2,12 +2,13 @@
 """
 import sys
 import getopt
+import typing
 from pathlib import Path
 
 from __init__ import __version__
 
 
-def get_argv_prms():
+def get_argv_prms(additional_longopts: typing.List[str] = []):
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     res = {
@@ -16,12 +17,21 @@ def get_argv_prms():
         "offline_mode": False,
         "workspace_cache_files_dir": '{}/.q_industrialist'.format(str(Path.home()))
     }
+    # для всех дополнительных (настраиваемых) длинных параметров запуска будет выдаваться список строк-значений, при
+    # условии, что параметр содержит символ '=' в конце наименования, либо bool-значение в том случае, если не модержит
+    if additional_longopts:
+        for opt in additional_longopts:
+            if opt[-1:] == '=':  # category=
+                res[opt[:-1]]: typing.List[str] = []
+            else:  # category
+                res[opt]: bool = False
     exit_or_wrong_getopt = None
     print_version_only = False
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "version", "pilot=", "signup", "offline", "online",
-                                                        "cache_dir=", "pilot1=", "pilot2=", "pilot3=", "pilot4=",
-                                                        "pilot5=", "pilot6=", "pilot7=", "pilot8=", "pilot9="])
+        longopts = ["help", "version", "pilot=", "signup", "offline", "online", "cache_dir=", "pilot1=", "pilot2=",
+                    "pilot3=", "pilot4=", "pilot5=", "pilot6=", "pilot7=", "pilot8=", "pilot9="]
+        longopts.extend(additional_longopts)
+        opts, args = getopt.getopt(sys.argv[1:], "hv", longopts)
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
     if exit_or_wrong_getopt is None:
@@ -43,6 +53,10 @@ def get_argv_prms():
                 res["offline_mode"] = False
             elif opt in ("--cache_dir"):
                 res["workspace_cache_files_dir"] = arg[:-1] if arg[-1:] == '/' else arg
+            elif opt.startswith('--') and (opt[2:]+'=' in additional_longopts):
+                res[opt[2:]].append(arg)
+            elif opt.startswith('--') and opt[2:] in additional_longopts:
+                res[opt[2:]] = True
         # д.б. либо указано имя, либо флаг регистрации нового пилота
         if (len(res["character_names"]) == 0) == (res["signup_new_character"] == False):
             exit_or_wrong_getopt = 0
