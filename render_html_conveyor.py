@@ -11,14 +11,13 @@ g_modal_industry_seq = 1
 
 
 def __is_availabe_blueprints_present(
-        type_id,
+        blueprint_type_id,
+        is_reaction,
         corp_bp_loc_data,
-        sde_bp_materials,
         exclude_loc_ids,
         blueprint_station_ids,
+        refine_station_ids,
         corp_assets_tree):
-    # определем type_id чертежа по известному type_id материала
-    blueprint_type_id, __stub01 = eve_sde_tools.get_blueprint_type_id_by_product_id(type_id, sde_bp_materials)
     # проверяем, возможно этот материал нельзя произвести с помощью чертежей?
     if blueprint_type_id is None:
         return False, False, True
@@ -30,9 +29,14 @@ def __is_availabe_blueprints_present(
         # пропускаем контейнеры, их которых нельзя доставать чертежи для достройки недостающих материалов
         if int(loc_id) in exclude_loc_ids:
             continue
-        # пропускаем прочие станции, на которых нет текущего stock-а и нет конвейеров (ищем свою станку)
-        if not eve_esi_tools.is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
-            continue
+        # пропускаем прочие станции, на которых нет текущего stock-а и нет конвейеров/реакций (ищем свою станку)
+        if is_reaction:
+            if not eve_esi_tools.is_location_nested_into_another(loc_id, refine_station_ids, corp_assets_tree):
+                continue
+        else:
+            if not eve_esi_tools.is_location_nested_into_another(loc_id, blueprint_station_ids, corp_assets_tree):
+                continue
+
         # проверяем состояния чертежей
         __bp2 = corp_bp_loc_data[str(loc)]
         __bp2_keys = __bp2.keys()
@@ -331,6 +335,7 @@ def get_ntier_materials_list_of_not_available(
             m.update({"bp": {"q": __blueprints,
                              "runs": 50,
                              "id": blueprint_type_id,
+                             "a": ntier_activity,
                              "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
                              "p": quantity_of_single_run,
             }})
@@ -340,6 +345,7 @@ def get_ntier_materials_list_of_not_available(
             m.update({"bp": {"q": 1,
                              "runs": __runs,
                              "id": blueprint_type_id,
+                             "a": ntier_activity,
                              "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
                              "p": quantity_of_single_run,
             }})
@@ -409,13 +415,13 @@ def __dump_not_available_materials_list_rows(
         corp_assets_tree,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        sde_bp_materials,
         sde_market_groups,
         # списки контейнеров и станок из экземпляра контейнера
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
         refine_stock_all_loc_ids,
+        refine_station_ids,
         # список ресурсов, которые используются в производстве
         stock_resources,
         refine_stock_resources,
@@ -444,6 +450,7 @@ def __dump_not_available_materials_list_rows(
                 "bpq": __summary_dict["bp"]["q"],
                 "bpr": __summary_dict["bp"]["runs"],
                 "bpid": __summary_dict["bp"]["id"],
+                "bpa": __summary_dict["bp"]["a"],
                 "bpnm": __summary_dict["bp"]["nm"],
                 "bpp": __summary_dict["bp"]["p"],
             })
@@ -467,11 +474,14 @@ def __dump_not_available_materials_list_rows(
             not_available = __material_dict["q"]
             ms_item_name = __material_dict["nm"]
             ms_planned = __material_dict["p"]
+            # получаем информацию по плану работ
             ms_blueprints = __material_dict.get("bpq", None)
             ms_runs = __material_dict.get("bpr", None)
+            # получаем информацию о чертеже
+            ms_blueprint_id = __material_dict.get("bpid", None)
+            ms_blueprint_activity = __material_dict.get("bpa", None)
             ms_blueprint_name = __material_dict.get("bpnm", None)
             ms_blueprint_products = __material_dict.get("bpp", None)
-            # ms_blueprint_id = __material_dict.get("bpid", None)
             # получаем кол-во материалов этого типа, находящихся в стоке
             ms_in_stock = stock_resources.get(ms_type_id, None)
             # получаем кол-во метариалов этого типа, находящихся в стоке на других станциях
@@ -522,12 +532,14 @@ def __dump_not_available_materials_list_rows(
             if ms_blueprint_products is not None:
                 in_progress *= ms_blueprint_products
             # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
+            is_reaction = ms_blueprint_activity is not None and ms_blueprint_activity == 'reaction'
             vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
-                ms_type_id,
+                ms_blueprint_id,
+                is_reaction,
                 corp_bp_loc_data,
-                sde_bp_materials,
                 exclude_loc_ids,
                 blueprint_station_ids,
+                refine_station_ids,
                 corp_assets_tree)
             # формируем информационные тэги по имеющимся (вакантным) цертежам для запуска производства
             vacant_originals_tag = ""
@@ -535,11 +547,14 @@ def __dump_not_available_materials_list_rows(
             absent_blueprints_tag = ""
             if not_available > in_progress:
                 if not not_a_product and vacant_originals:
-                    vacant_originals_tag = ' <span class="label label-info">original</span>'
+                    vacant_originals_tag = ' <span class="label label-{st}">{txt}</span>'.\
+                        format(st='success' if is_reaction else 'info',
+                               txt='reaction' if is_reaction else 'original')
                 if not not_a_product and vacant_copies:
                     vacant_copies_tag = ' <span class="label label-default">copy</span>'
                 if not not_a_product and not vacant_originals and not vacant_copies:
-                    absent_blueprints_tag = ' <span class="label label-danger">no blueprints</span>'
+                    absent_blueprints_tag = ' <span class="label label-danger">no {txt}</span>'.\
+                        format(txt='formulas' if is_reaction else 'blueprints')
             # подготовка элементов управления копирования данных в clipboard
             __copy2clpbrd = '' if not with_copy_to_clipboard else \
                 '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
@@ -605,6 +620,7 @@ def __dump_not_available_materials_list(
         exclude_loc_ids,
         blueprint_station_ids,
         refine_stock_all_loc_ids,
+        refine_station_ids,
         # списком материалов, которых не хватает в производстве
         stock_not_enough_materials,
         # список ресурсов, которые используются в производстве
@@ -698,13 +714,13 @@ def __dump_not_available_materials_list(
         corp_assets_tree,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
-        sde_bp_materials,
         sde_market_groups,
         # списки контейнеров и станок из экземпляра контейнера
         stock_all_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
         refine_stock_all_loc_ids,
+        refine_station_ids,
         # список ресурсов, которые используются в производстве
         stock_resources,
         refine_stock_resources,
@@ -735,13 +751,13 @@ def __dump_not_available_materials_list(
             corp_assets_tree,
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
-            sde_bp_materials,
             sde_market_groups,
             # списки контейнеров и станок из экземпляра контейнера
             stock_all_loc_ids,
             exclude_loc_ids,
             blueprint_station_ids,
             refine_stock_all_loc_ids,
+            refine_station_ids,
             # список ресурсов, которые используются в производстве
             stock_resources,
             refine_stock_resources,
@@ -773,13 +789,13 @@ def __dump_not_available_materials_list(
             corp_assets_tree,
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
-            sde_bp_materials,
             sde_market_groups,
             # списки контейнеров и станок из экземпляра контейнера
             stock_all_loc_ids,
             exclude_loc_ids,
             blueprint_station_ids,
             refine_stock_all_loc_ids,
+            refine_station_ids,
             # список ресурсов, которые используются в производстве
             stock_resources,
             refine_stock_resources,
@@ -839,6 +855,7 @@ def __dump_blueprints_list_with_materials(
     blueprint_loc_ids = conveyor_entity["containers"]
     blueprint_station_ids = [conveyor_entity["station_id"]]
     refine_stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["refine_stock"]])
+    refine_station_ids = set([int(ces["loc"]["station_id"]) for ces in conveyor_entity["refine_stock"]])
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
@@ -1251,6 +1268,7 @@ def __dump_blueprints_list_with_materials(
             exclude_loc_ids,
             blueprint_station_ids,
             refine_stock_all_loc_ids,
+            refine_station_ids,
             # списком материалов, которых не хватает в производстве
             stock_not_enough_materials,
             # список ресурсов, которые используются в производстве
@@ -1643,6 +1661,7 @@ def __dump_corp_conveyors(
             global_refine_stock_all_loc_ids = []
             # global_blueprint_loc_ids = []
             global_blueprint_station_ids = []
+            global_refine_station_ids = []
             for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
                 for id in [int(ces["id"]) for ces in conveyor_entity["stock"]]:
                     if not (id in global_stock_all_loc_ids):
@@ -1658,6 +1677,9 @@ def __dump_corp_conveyors(
                 #         global_blueprint_loc_ids.append(id)
                 if not (conveyor_entity["station_id"] in global_blueprint_station_ids):
                     global_blueprint_station_ids.append(conveyor_entity["station_id"])
+                for id in [int(cess["loc"]["station_id"]) for cess in conveyor_entity["refine_stock"]]:
+                    if not (id in global_refine_station_ids):
+                        global_refine_station_ids.append(id)
             # переводим списки в множества для ускорения работы программы
             global_stock_all_loc_ids = set(global_stock_all_loc_ids)
             global_exclude_loc_ids = set(global_exclude_loc_ids)
@@ -1684,6 +1706,7 @@ def __dump_corp_conveyors(
                 global_exclude_loc_ids,
                 global_blueprint_station_ids,
                 global_refine_stock_all_loc_ids,
+                global_refine_station_ids,
                 # списком материалов, которых не хватает в производстве
                 stock_not_enough_materials,
                 # список ресурсов, которые используются в производстве

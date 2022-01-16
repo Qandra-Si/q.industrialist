@@ -293,7 +293,8 @@ def main():
             if ce["refine_stock"]:
                 print('     refine stock containers:')
                 for cess in ce["refine_stock"]:
-                    print('       {} = {} : {}'.format(cess["id"], cess["loc"]["station"], cess["name"]))
+                    print('       {} = {}'.format(cess["loc"]["station_id"], cess["loc"]["station"]))
+                    print('         {} = {}'.format(cess["id"], cess["name"]))
             if ce["containers"]:
                 print('     exclude containers:')
                 for cee in ce["exclude"]:
