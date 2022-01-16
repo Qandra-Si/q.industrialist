@@ -202,12 +202,15 @@ function calculate_market_p2_payments(&$wallet_journals, &$market_payments, &$ma
 
             if ($show_debug)  print('<hr><small>'.$date.' комиссия '.number_format(-$amount,2,'.','').' по платежам '.$payments_per_date.'</small><br>');
 
-            $fee_per_date = -$amount / $payments_per_date;
-            foreach ($market_dates as &$md)
+            if ($payments_per_date > 0)
             {
-                if ($md[2] != $date_num) continue;
-                $md[4] = $fee_per_date * $md[3];
-                if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($md[4],2,'.','').'</small><br>');
+                $fee_per_date = -$amount / $payments_per_date;
+                foreach ($market_dates as &$md)
+                {
+                    if ($md[2] != $date_num) continue;
+                    $md[4] = $fee_per_date * $md[3];
+                    if ($show_debug) print('<small>'.$md[0].' платёж '.$md[3].' с комиссией '.number_format($md[4],2,'.','').'</small><br>');
+                }
             }
         }
 
