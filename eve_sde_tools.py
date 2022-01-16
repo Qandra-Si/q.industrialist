@@ -766,6 +766,14 @@ def main():  # rebuild .yaml files
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities"])
 
+    print("Rebuilding categoryIDs.yaml file...")
+    sys.stdout.flush()
+    __rebuild(workspace_cache_files_dir, "fsd", "categoryIDs", ["iconID", {"name": ["en"]}, "published"])
+
+    print("Rebuilding groupIDs.yaml file...")
+    sys.stdout.flush()
+    __rebuild(workspace_cache_files_dir, "fsd", "groupIDs", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
+
 
 def test():
     data = __get_yaml("static_data_interface", 'fsd/typeIDs.yaml', "32859:")
