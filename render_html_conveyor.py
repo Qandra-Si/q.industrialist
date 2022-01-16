@@ -421,7 +421,8 @@ def __dump_not_available_materials_list_rows(
         refine_stock_resources,
         materials_summary,
         # настройки
-        with_copy_to_clipboard):
+        with_copy_to_clipboard,
+        dump_listed_table_cells):
     # поиск групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
     # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
     material_groups_initial = {}
@@ -488,16 +489,19 @@ def __dump_not_available_materials_list_rows(
                 glf.write(
                     '<tr>\n'
                     ' <td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
-                    ' <td class="active"><b>Not available</b></th>'
-                    ' <td class="active qind-materials-runs hidden"><b>To launch</b></th>'
-                    ' <td class="active qind-materials-planned hidden"><b>Planned</b></th>'
-                    ' <td class="active qind-materials-exist hidden"><b>Sotiyo</b></th>'
-                    ' <td class="active qind-materials-exist hidden"><b>Tatara</b></th>'
-                    ' <td class="active qind-materials-progress hidden"><b>In progress</b></th>'
-                    '</tr>'.
-                    format(nm=__grp_name,
-                           id=ms_group_id,
-                           clbrd=__copy2clpbrd))
+                    ' <td class="active"><b>Not available</b></td>'.
+                    format(nm=__grp_name, id=ms_group_id, clbrd=__copy2clpbrd))
+                if 'runs' in dump_listed_table_cells:
+                    glf.write('<td class="active qind-materials-runs hidden"><b>To launch</b></td>')
+                if 'planned' in dump_listed_table_cells:
+                    glf.write('<td class="active qind-materials-planned hidden"><b>Planned</b></td>')
+                if 'exist' in dump_listed_table_cells:
+                    glf.write(
+                        '<td class="active qind-materials-exist hidden"><b>Sotiyo</b></td>'
+                        '<td class="active qind-materials-exist hidden"><b>Tatara</b></td>')
+                if 'progress' in dump_listed_table_cells:
+                    glf.write('<td class="active qind-materials-progress hidden"><b>In progress</b></td>')
+                glf.write('</tr>')
                 group_diplayed = True
             # получаем список работ, которые ведутся с этим материалом, а результаты сбрабываются в stock-ALL
             jobs = [j for j in corp_industry_jobs_data if
@@ -556,29 +560,31 @@ def __dump_not_available_materials_list_rows(
             # вывод сведений в отчёт
             glf.write(
                 '<tr>\n'
-                ' <th scope="row">{num}</th>\n'
+                ' <th scope="row"{thw}>{num}</th>\n'
                 ' <td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}</td>\n'
-                ' <td data-q="{q}">{q:,d}{original}{copy}{absent}</td>\n'
-                ' <td class="qind-materials-runs hidden">{r}</td>\n'
-                ' <td class="qind-materials-planned hidden">{p}</td>\n'
-                ' <td class="qind-materials-exist hidden">{ins}</td>\n'
-                ' <td class="qind-materials-exist hidden">{inr}</td>\n'
-                ' <td class="qind-materials-progress hidden">{inp}</td>\n'
-                '</tr>'.
+                ' <td data-q="{q}">{q:,d}{original}{copy}{absent}</td>\n'.
                 format(num=not_available_row_num,
+                       thw='' if not_available_row_num>1 else ' style="width:24px;"',
                        src=render_html.__get_img_src(ms_type_id, 32),
                        q=not_available,
-                       p='{:,d}'.format(ms_planned) if ms_planned else '',
-                       inp='{:,d}'.format(in_progress) if in_progress > 0 else '',
                        nm=ms_item_name,
-                       r=__runs,
-                       ins=__in_stock,
-                       inr=__in_refine_stock,
                        clbrd=__copy2clpbrd,
                        original=vacant_originals_tag,
                        copy=vacant_copies_tag,
                        absent=absent_blueprints_tag)
             )
+            if 'runs' in dump_listed_table_cells:
+                glf.write(' <td class="qind-materials-runs hidden">{r}</td>\n'.format(r=__runs))
+            if 'planned' in dump_listed_table_cells:
+                glf.write(' <td class="qind-materials-planned hidden">{p}</td>\n'.format(p='{:,d}'.format(ms_planned) if ms_planned else ''))
+            if 'exist' in dump_listed_table_cells:
+                glf.write(
+                    ' <td class="qind-materials-exist hidden">{ins}</td>\n'
+                    ' <td class="qind-materials-exist hidden">{inr}</td>\n'.
+                    format(ins=__in_stock, inr=__in_refine_stock,))
+            if 'progress' in dump_listed_table_cells:
+                glf.write(' <td class="qind-materials-progress hidden">{inp}</td>\n'.format(inp='{:,d}'.format(in_progress) if in_progress > 0 else ''))
+            glf.write('</tr>')
             not_available_row_num = not_available_row_num + 1
 
 
@@ -704,7 +710,8 @@ def __dump_not_available_materials_list(
         refine_stock_resources,
         materials_summary,
         # настройки
-        with_copy_to_clipboard)
+        with_copy_to_clipboard,
+        {'runs', 'planned', 'exist', 'progress'})
 
     del not_enough_materials__initial
 
@@ -740,7 +747,8 @@ def __dump_not_available_materials_list(
             refine_stock_resources,
             materials_summary,
             # настройки
-            with_copy_to_clipboard)
+            with_copy_to_clipboard,
+            {'planned', 'exist'})
         glf.write("""
 </tbody>
 </table>
@@ -777,7 +785,8 @@ def __dump_not_available_materials_list(
             refine_stock_resources,
             materials_summary,
             # настройки
-            with_copy_to_clipboard)
+            with_copy_to_clipboard,
+            {'runs', 'planned', 'exist', 'progress'})
 
     glf.write("""
 </tbody>
