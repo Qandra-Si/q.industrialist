@@ -51,18 +51,23 @@ def main():
         'all',
         # актуализация сведений о вселенной, таких как:
         # * public structures, появляющихся время от времени во вселенной - БЫСТРО
+        # * public prices на trade hubs, например Jita-4-4 - МЕДЛЕННО
+        # * public trade goods (ids), т.е. предметов добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
+        # * markets region history, т.е. рыночных цен по регионам - раз в день ОЧЕНЬ МЕДЛЕННО
         'universe',
         # актуализация рыночных цен на товары во вселенной, в частности:
         # * adjusted и average цен, которые которые отображаются в ingame-клиенте (т.н. universe price) - БЫСТРО
         # * цен в market-хабах по заданным настройках - скорость зависит от региона, но в частности Jita ДОЛГО
         # * цен на структурах по заданным настройкам - доступ зависит от корпорации, если альянс оч.крупный то НЕ БЫСТРО
-        'markets',
-        # актуализация ассетов корпорации, а также её прочего имущества, в частности структур в спейсе
+        'trade_hubs',
+        # актуализация ассетов корпорации, а также её прочего имущества (структур в спейсе), ордеров и работ:
         'assets',
         'blueprints',
         'industry',
         'finances',
         'orders',
+        # актуализация исторических рыночных цен по вселенной, т.н. markets region history - ОЧЕНЬ МЕДЛЕННО
+        'trade_history',
         # ----- ----- ----- ----- -----
         # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
         # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
@@ -72,6 +77,9 @@ def main():
         # предустановка для категорий и действий, которые выполняются медленно, и выполнение которых желательно либо
         # откладывать, либо запускать "в фоне"
         'slow',
+        # предустановка для категорий и действий, которые выполняются крайне медленно, и выполнение которых желательно
+        # запускать раз в сутки
+        'very_slow',
     ]
 
     # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
@@ -118,6 +126,7 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
+        last_time: bool = pilot_num == len(argv_prms["character_names"])-1
         if first_time:
             first_time = False
 
@@ -133,9 +142,9 @@ def main():
                           format(universe_structures_stat[1], universe_structures_stat[0]))
                 sys.stdout.flush()
 
-            # в зависимости от заданных натроек загружаем цены в регионаха, фильтруем по
+            # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'universe', 'slow', 'markets'}:
+            if categories & {'all', 'universe', 'slow', 'trade_hubs'}:
                 # Requires: public access
                 markets_prices_updated = dbtools.actualize_markets_prices()
                 print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
@@ -164,7 +173,7 @@ def main():
         # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,
         # так что одна корпорация может не иметь доступа к структуре, а другая иметь, таким
         # одразом фильтрация осуществляется по названиям корпораций)
-        if categories & {'all', 'corporation', 'slow', 'markets'}:
+        if categories & {'all', 'corporation', 'slow', 'trade_hubs'}:
             # Requires: public access
             for structure in q_industrialist_settings.g_market_structures:
                 if structure.get("corporation_name") == corporation_name:
@@ -239,9 +248,14 @@ def main():
             print("'{}' corporation link blueprints and jobs completed\n".
                   format(corporation_name))
 
-        if categories & {'all', 'universe', 'slow'}:
-            last_time = pilot_num == len(argv_prms["character_names"])-1
-            if last_time:
+        # приступаем к загрузке тех данных, что грузятся крайне медленно (публичные и их много)
+
+        if last_time:
+            # проверка необходимости актуализации добавленных CCP-шниками новых типов предметов,
+            # их обнаружение и добавление в БД (список CCP-шниками обновлется раз в день и приводит к
+            # ОЧЕНЬ ДЛИТЕЛЬНОМУ обновлению всех type_ids, поскольку даже проверить etags у нескольких
+            # тысяч предметов - долго)
+            if categories & {'all', 'universe', 'very_slow'}:
                 # Public information about type_id
                 actualized_type_ids = dbtools.actualize_type_ids()
                 if actualized_type_ids is None:
@@ -252,6 +266,18 @@ def main():
                         for item in actualized_type_ids:
                             print(" * {} with type_id={}".format(item['name'], item['type_id']))
                     del actualized_type_ids
+
+            # загрузка исторических цен по регионам (ОЧЕНЬ МЕДЛЕННО из-за большого кол-ва данных), как
+            # правило загрузка рыночных данных одного крупного региона, например The Forge, занимает
+            # несколько часов
+            if categories & {'all', 'universe', 'very_slow', 'trade_history'}:
+                # Requires: public access
+                if dbtools.is_market_regions_history_refreshed():
+                    for region in q_industrialist_settings.g_market_regions:
+                        market_region_history_updates = dbtools.actualize_market_region_history(region)
+                        print("Region '{}' has {} market history updates\n".
+                              format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
+                        sys.stdout.flush()
 
     sys.stdout.flush()
 
