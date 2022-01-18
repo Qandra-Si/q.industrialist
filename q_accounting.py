@@ -659,6 +659,10 @@ def main():
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
+    # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
+    for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
+        del sde_bp_materials[t]
+
     """
     === Сведения по рассчёту цены ===
     

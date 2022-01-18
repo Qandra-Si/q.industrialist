@@ -111,16 +111,18 @@ select
 from
   -- продукты производства
   qi.eve_sde_blueprint_products as product
+    -- сведения о чертеже (должен быть published)
+    left outer join qi.eve_sde_type_ids product_bp on (product.sdebp_blueprint_type_id = product_bp.sdet_type_id)
     -- цены на продукт производства в жите прямо сейчас
     left outer join (
       select ethp_type_id, ethp_sell, ethp_buy
-      from esi_trade_hub_prices
+      from qi.esi_trade_hub_prices
       where ethp_location_id = 60003760
     ) jita on (product.sdebp_product_id = jita.ethp_type_id)
     -- цены на продукт производства в жите прямо сейчас
     left outer join (
       select ethp_type_id, ethp_sell, ethp_buy
-      from esi_trade_hub_prices
+      from qi.esi_trade_hub_prices
       where ethp_location_id = 60008494
     ) amarr on (product.sdebp_product_id = amarr.ethp_type_id),
   -- сведения о предмете
@@ -139,13 +141,13 @@ from
         -- цены на материалы в жите прямо сейчас
         left outer join (
           select ethp_type_id, ethp_sell
-          from esi_trade_hub_prices
+          from qi.esi_trade_hub_prices
           where ethp_location_id = 60003760
         ) jita on (m.sdebm_material_id = jita.ethp_type_id)
         -- цены на материалы в жите прямо сейчас
         left outer join (
           select ethp_type_id, ethp_sell
-          from esi_trade_hub_prices
+          from qi.esi_trade_hub_prices
           where ethp_location_id = 60008494
         ) amarr on (m.sdebm_material_id = amarr.ethp_type_id)
     where
@@ -156,7 +158,9 @@ from
 where
   product.sdebp_blueprint_type_id = cost.sdebm_blueprint_type_id and
   product.sdebp_activity = 1 and
+  product_bp.sdet_published and 
   tid.sdet_type_id = product.sdebp_product_id and
+  tid.sdet_published and
   market_group.id = tid.sdet_market_group_id
 order by market_group.name, tid.sdet_type_name;
 EOD;

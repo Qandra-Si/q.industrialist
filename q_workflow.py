@@ -654,6 +654,10 @@ def main():
         sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
         sde_named_type_ids = eve_sde_tools.convert_sde_type_ids(sde_type_ids)
 
+        # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
+        for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
+            del sde_bp_materials[t]
+
         # Public information about a character
         character_data = interface.get_esi_data(
             "characters/{}/".format(character_id),
