@@ -571,7 +571,7 @@ def __dump_not_available_materials_list_rows(
             # конструируем строку со сведениями о способе получения материала (кол-во ранов)
             __runs = ''
             if ms_blueprints and ms_runs:
-                __runs = "{} &times; {}".format(ms_blueprints, ms_runs)
+                __runs = "{} &times; {:,d}".format(ms_blueprints, ms_runs)
             # вывод сведений в отчёт
             glf.write(
                 '<tr>\n'
