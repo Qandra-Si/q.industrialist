@@ -401,6 +401,22 @@ $$;
 
 
 --------------------------------------------------------------------------------
+-- ethh_clean_obsolete
+--
+-- очистка таблицы esi_trade_hub_history от устаревших записей (не храним данные
+-- о истории торгов в торговом хабе более 2х недель)
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.ethh_clean_obsolete()
+LANGUAGE SQL
+AS $$
+ delete from esi_trade_hub_history
+ where ethh_done < (current_timestamp at time zone 'GMT' - interval '14 day');
+ ;
+$$;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
 -- ethh_sync_with_etho
 --
 -- синхронизация данных в таблице esi_trade_hub_history (с сохранением
@@ -488,6 +504,8 @@ AS $$
    keys.loc=o.etho_location_id and
    keys.oid=o.etho_order_id
  ;
+ call qi.ethh_clean_obsolete()
+ ;
 $$;
 --------------------------------------------------------------------------------
 
@@ -543,7 +561,10 @@ AS $$
    )
   where
    o.ecor_location_id=location_id and
+   o.ecor_updated_at > (current_timestamp at time zone 'GMT' - interval '14 day') and
    h.ethh_location_id is null
+ ;
+ call qi.ethh_clean_obsolete()
  ;
 $$;
 --------------------------------------------------------------------------------
@@ -583,7 +604,10 @@ AS $$
    )
   where
    o.ecor_corporation_id=corporation_id and
+   o.ecor_updated_at > (current_timestamp at time zone 'GMT' - interval '14 day') and
    h.ethh_location_id is null
+ ;
+ call qi.ethh_clean_obsolete()
  ;
 $$;
 --------------------------------------------------------------------------------
