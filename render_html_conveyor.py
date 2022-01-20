@@ -603,6 +603,10 @@ def __dump_not_available_materials_list_rows(
             not_available_row_num = not_available_row_num + 1
 
 
+dump_run_times: int = 0
+dump_run_debug: bool = False
+
+
 def __dump_not_available_materials_list(
         glf,
         # esi данные, загруженные с серверов CCP
@@ -641,6 +645,10 @@ def __dump_not_available_materials_list(
         check_absolutely_not_available=False)
     if not not_enough_materials__initial:
         return
+    global dump_run_times, dump_run_debug
+    if dump_run_debug:
+        dump_run_times += 1
+        print("\n\n#{}-0'tier NOT ENOUGH: {}".format(dump_run_times, ["{} {}".format(m['q'], m['nm']) for m in not_enough_materials__initial if m['q']>0]))
     # расчёт списка материалов, которых не хватает
     ntier: int = 0
     not_enough_materials__market = []
@@ -657,6 +665,8 @@ def __dump_not_available_materials_list(
             reaction_products_for_bps)
         # сохраняем материалы, которые невозможно произвести, - возможен только их закуп
         if ntier_materials_list_for_buy:
+            if dump_run_debug:
+                print("#{}-{}'tier FOR BUY: {}".format(dump_run_times, ntier, ["{} {}".format(m['q'], m['nm']) for m in ntier_materials_list_for_buy if m['q']>0]))
             calc_materials_summary(ntier_materials_list_for_buy, not_enough_materials__market)
         # сохраняем информацию о способе получения материалов (кол-во чертежей и запусков)
         # также сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
@@ -669,6 +679,8 @@ def __dump_not_available_materials_list(
         # если материалов, которые пригодны для производства не найдено - завершаем итерации
         if not ntier_materials_list_for_next_itr:
             break
+        if dump_run_debug:
+            print("#{}-{}'tier NOT ENOUGH: {}".format(dump_run_times, ntier+1, ["{} {}".format(m['q'], m['nm']) for m in ntier_materials_list_for_next_itr if m['q']>0]))
         # проверка наличия имеющихся ресурсов для постройки по этому БП
         # сохраняем недостающее кол-во материалов для производства по этому чертежу
         (uaem, not_enough_materials__cycled) = calc_materials_availability(
