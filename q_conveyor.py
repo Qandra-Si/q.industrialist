@@ -56,11 +56,11 @@ def main():
     # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
     for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
         del sde_bp_materials[t]
-    # индексация списка модулей и ресурсов, которые используются в производстве
+    # индексация списка модулей и ресурсов, которые ИСПОЛЬЗУЮТСЯ в производстве
     materials_for_bps = set(eve_sde_tools.get_materials_for_blueprints(sde_bp_materials))
     research_materials_for_bps = set(eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials))
-    # индексация списка продуктов, которые появляются в результате производства
-    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials))
+    # индексация списка продуктов, которые ПОЯВЛЯЮТСЯ в результате производства
+    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="manufacturing"))
     reaction_products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="reaction"))
 
     conveyor_data = []
