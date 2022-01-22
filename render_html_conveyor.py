@@ -68,9 +68,8 @@ def __is_availabe_blueprints_present(
 def __dump_material(glf, quantity, type_id, type_name, with_copy_to_clipboard=False):
     # вывод наименования ресурса
     glf.write(
-        '<span style="white-space:nowrap"{qq}{nnm}>'
-        '<img class="icn24" src="{src}"> <b>{q:,d}</b> {nm} '
-        '</span>\n'.format(
+        '<tid{qq}{nnm}><img class="icn24" src="{src}"> <b>{q:,d}</b> {nm} </tid>\n'.
+        format(
             src=render_html.__get_img_src(type_id, 32),
             q=quantity,
             nm=type_name,
@@ -396,10 +395,10 @@ def __dump_materials_list(
         materials_list.sort(key=lambda bp: bp['nm'])
 
         # вывод наименований материалов
-        glf.write("<small>")
+        glf.write("<div class='qind-tid'>")
         for m_usd in materials_list:
             __dump_material(glf, m_usd['q'], m_usd['id'], m_usd['nm'], with_copy_to_clipboard)
-        glf.write("""</small>
+        glf.write("""</div>
  </div>
 </div>
 </div>
@@ -549,7 +548,7 @@ def __dump_not_available_materials_list_rows(
                 if not not_a_product and vacant_originals:
                     vacant_originals_tag = ' <span class="label label-{st}">{txt}</span>'.\
                         format(st='success' if is_reaction else 'info',
-                               txt='reaction' if is_reaction else 'original')
+                               txt='formula' if is_reaction else 'original')
                 if not not_a_product and vacant_copies:
                     vacant_copies_tag = ' <span class="label label-default">copy</span>'
                 if not not_a_product and not vacant_originals and not vacant_copies:
@@ -1127,9 +1126,9 @@ def __dump_blueprints_list_with_materials(
                         runnable_blueprints += 1
 
                     # вывод наименования ресурсов (материалов)
-                    glf.write('<div class="qind-materials-used hidden"><small>\n')  # div(materials)
+                    glf.write('<div class="qind-materials-used qind-tid hiddend">\n')  # div(materials)
                     __dump_materials_list_with_efficiency(glf, materials_list_with_efficiency)
-                    glf.write('</small></div>\n')  # div(materials)
+                    glf.write('</div>\n')  # div(materials)
 
                     # отображение списка материалов, которых не хватает
                     if not_enough_materials:
@@ -1462,6 +1461,8 @@ def __dump_corp_conveyors_stock_all(
 .label-not-available { color: #fff; background-color: #b7b7b7; }
 .text-material-industry-ntier { color: #aaa; }
 .text-material-buy-ntier { color: #a67877; }
+div.qind-tid { font-size: 85%; }
+tid { white-space: nowrap; }
 </style>
 
  <table id="tblStock" class="table table-condensed table-hover table-responsive">
@@ -2063,14 +2064,14 @@ def __dump_corp_conveyors(
           });
         } else if (data_source == 'span') {
           data_copy = '';
-          var small = $(this).parent().find('small');
-          if (!(small === undefined)) {
-            var spans = small.children('span');
-            if (!(small === undefined)) {
-              spans.each( function(idx) {
-                var span = $(this);
+          var div = $(this).parent().find('div.qind-tid');
+          if (!(div === undefined)) {
+            var tids = div.children('tid');
+            if (!(tids === undefined)) {
+              tids.each( function(idx) {
+                var tid = $(this);
                 if (data_copy) data_copy += "\\n";
-                data_copy += span.attr('data-nm') + "\\t" + span.attr('data-q');
+                data_copy += tid.attr('data-nm') + "\\t" + tid.attr('data-q');
               });
             }
           }
