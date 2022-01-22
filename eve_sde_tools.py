@@ -175,15 +175,14 @@ def __rebuild_list2dict_by_key(ws_dir, name, key, val=None):
 
 
 def get_item_name_by_type_id(type_ids, type_id):
-    if not (str(type_id) in type_ids):
-        name = type_id
-    else:
-        type_dict = type_ids[str(type_id)]
-        if ("name" in type_dict) and ("en" in type_dict["name"]):
-            name = type_dict["name"]["en"]
-        else:
-            name = type_id
-    return name
+    type_dict = type_ids.get(str(type_id))
+    if type_dict is not None:
+        name_dict = type_dict.get('name')
+        if name_dict is not None:
+            en_name = name_dict.get('en')
+            if en_name is not None:
+                return en_name
+    return type_id
 
 
 def convert_sde_type_ids(type_ids):
@@ -229,23 +228,22 @@ def get_type_id_by_item_name(type_ids, name):
 
 
 def get_market_group_name_by_id(sde_type_ids, group_id):
-    group_sid = str(group_id)
-    if group_sid in sde_type_ids:
-        group_dict = sde_type_ids[group_sid]
-        if ("nameID" in group_dict) and ("en" in group_dict["nameID"]):
-            return group_dict["nameID"]["en"]
-        else:
-            return group_sid
+    group_sid: str = str(group_id)
+    group_dict = sde_type_ids.get(str(group_id))
+    if group_dict is not None:
+        name_dict = group_dict.get('nameID')
+        if name_dict is not None:
+            en_name = name_dict.get('en')
+            if en_name is not None:
+                return en_name
     return group_sid
 
 
 def get_market_group_by_type_id(sde_type_ids, type_id):
-    if not (str(type_id) in sde_type_ids):
+    type_dict = sde_type_ids.get(str(type_id))
+    if type_dict is None:
         return None
-    type_dict = sde_type_ids[str(type_id)]
-    if "marketGroupID" in type_dict:
-        return type_dict["marketGroupID"]
-    return None
+    return type_dict.get("marketGroupID")
 
 
 def get_market_group_by_name(sde_market_groups, name):
