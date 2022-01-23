@@ -121,6 +121,10 @@ class ConveyorItem:
                 return True
         return False
 
+    # выполняем проверку на необходимость/возможность транспортировки части стока с одной станции на другую
+    def need_transfer_between_stocks(self):
+        return self.need_transfer_into_manuf_stock() or self.need_transfer_into_react_stock()
+
     # получаем информацию о чертежах и способе производства материала
     # TODO: внимание! возможно, что один и тот же продукт может производиться разными способами - касается инвентов!
     def setup_blueprint_details(self, sde_type_ids, sde_bp_materials):
@@ -1187,7 +1191,8 @@ def __dump_not_available_materials_list(
         reaction_stock_resources,
         materials_summary,
         # настройки
-        with_copy_to_clipboard):
+        with_copy_to_clipboard,
+        with_list_of_assets_movement):
     # отображение в отчёте summary-информации по недостающим материалам
     if not materials_summary:
         return
@@ -1214,6 +1219,8 @@ def __dump_not_available_materials_list(
     not_enough_materials__market = [t for t in type_ids if conveyor_materials.get(t).blueprint_type_id is None]
     not_enough_materials__initial = [t for t in type_ids if t not in not_enough_materials__market and conveyor_materials.get(t).user_data.get('initial')]
     not_enough_materials__intermediate = [t for t in type_ids if t not in not_enough_materials__market and t not in not_enough_materials__initial]
+    # построение списка материалов, которые надо перевезти с одной станции на другую
+    list_of_assets_movement__materials = [t for t in type_ids if conveyor_materials.get(t).need_transfer_between_stocks()]
     del type_ids
 
     # номер строки, с которой пойдёт отсчёт (строка будет уникальная в группе таблиц, чтобы голосом быстро находить)
@@ -1242,16 +1249,21 @@ def __dump_not_available_materials_list(
     # поиск в вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
     # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
 
-    if group_with_are_enough__initial:
+    if group_with_are_enough__initial and group_with_are_enough__market and group_with_are_enough__intermediate:
         glf.write('<div class="qind-em hidden">')
     glf.write("""
-<div class="media qind-not-available-block">
+<div class="media qind-not-available-block hidden">
  <div class="media-left">
   <span class="glyphicon glyphicon-remove-sign" aria-hidden="false" style="font-size: 64px;"></span>
  </div>
  <div class="media-body">
   <h4 class="media-heading">Not available materials</h4>
+""")
 
+    if not_enough_materials__initial:
+        if group_with_are_enough__initial:
+            glf.write('<div class="qind-em hidden">')
+        glf.write("""
 <h4 class="text-primary">End-level manufacturing</h4>
 <div class="table-responsive">
 <table class="table table-condensed table-hover qind-end-level-manuf">
@@ -1267,33 +1279,33 @@ def __dump_not_available_materials_list(
  </thead>
  <tbody>
 """)
-    __dump_not_available_materials_list_rows(
-        glf,
-        not_enough_materials__initial,
-        conveyor_materials,
-        mutable_not_available_row_num,
-        # esi данные, загруженные с серверов CCP
-        corp_bp_loc_data,
-        corp_assets_tree,
-        # списки контейнеров и станок из экземпляра контейнера
-        exclude_loc_ids,
-        blueprint_station_ids,
-        react_station_ids,
-        # настройки
-        with_copy_to_clipboard,
-        {'runs', 'planned', 'exist', 'progress'})
-    del not_enough_materials__initial
-    glf.write("""
+        __dump_not_available_materials_list_rows(
+            glf,
+            not_enough_materials__initial,
+            conveyor_materials,
+            mutable_not_available_row_num,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_assets_tree,
+            # списки контейнеров и станок из экземпляра контейнера
+            exclude_loc_ids,
+            blueprint_station_ids,
+            react_station_ids,
+            # настройки
+            with_copy_to_clipboard,
+            {'runs', 'planned', 'exist', 'progress'})
+        glf.write("""
  </tbody>
 </table>
  </div>
 """)
-    if group_with_are_enough__initial:
-        glf.write('</div>')
+        if group_with_are_enough__initial:
+            glf.write('</div>')
+    del not_enough_materials__initial
 
-    if group_with_are_enough__market:
-        glf.write('<div class="qind-em hidden">')
     if not_enough_materials__market:
+        if group_with_are_enough__market:
+            glf.write('<div class="qind-em hidden">')
         glf.write("""
 <h4 class="text-primary">Entry-level purchasing</h4>
 <div class="table-responsive">
@@ -1323,18 +1335,18 @@ def __dump_not_available_materials_list(
             # настройки
             with_copy_to_clipboard,
             {'planned', 'exist'})
-        del not_enough_materials__market
         glf.write("""
  </tbody>
 </table>
 </div>
 """)
-    if group_with_are_enough__market:
-        glf.write('</div')
+        if group_with_are_enough__market:
+            glf.write('</div')
+    del not_enough_materials__market
 
-    if group_with_are_enough__intermediate:
-        glf.write('<div class="qind-em hidden">')
     if not_enough_materials__intermediate:
+        if group_with_are_enough__intermediate:
+            glf.write('<div class="qind-em hidden">')
         glf.write("""
 <h4 class="text-primary">Intermediate manufacturing</h4>
 <div class="table-responsive">
@@ -1368,19 +1380,70 @@ def __dump_not_available_materials_list(
             # настройки
             with_copy_to_clipboard,
             {'runs', 'planned', 'exist', 'progress'})
-    del not_enough_materials__intermediate
-    glf.write("""
+        glf.write("""
  </tbody>
 </table>
 </div>
-    """)
-    if group_with_are_enough__intermediate:
-        glf.write('</div>')
+""")
+        if group_with_are_enough__intermediate:
+            glf.write('</div>')
+    del not_enough_materials__intermediate
 
     glf.write("""
-     </div> <!--media-body-->
-    </div> <!--media-->
-    """)
+ </div> <!--media-body-->
+</div> <!--media-->
+""")
+    if group_with_are_enough__initial and group_with_are_enough__market and group_with_are_enough__intermediate:
+        glf.write('</div>')
+
+    # вывод в отчёт списка тех материалов, которые необходимо перевезти с одной станции на другую
+
+    if with_list_of_assets_movement and list_of_assets_movement__materials:
+        glf.write("""
+<div class="media qind-assets-move-block hidden">
+ <div class="media-left">
+  <span class="glyphicon glyphicon-transfer" aria-hidden="false" style="font-size: 64px;"></span>
+ </div>
+ <div class="media-body">
+  <h4 class="media-heading">List of assets movement</h4>
+
+<h4 class="text-primary">Missing materials at the neighboring station</h4>
+<div class="table-responsive">
+<table class="table table-condensed table-hover qind-missing-materials">
+ <thead>
+ <tr>
+  <th colspan="2" class="active"></th>
+  <th colspan="2" class="active qind-mr">Required</th>
+  <th colspan="2" class="active qind-mp hidden">Planned</th>
+  <th colspan="2" class="active qind-me hidden">Stock</th>
+  <th class="active qind-ip hidden"></th>
+ </tr>
+ </thead>
+ <tbody>
+""")
+        __dump_not_available_materials_list_rows(
+            glf,
+            list_of_assets_movement__materials,
+            conveyor_materials,
+            mutable_not_available_row_num,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_assets_tree,
+            # списки контейнеров и станок из экземпляра контейнера
+            exclude_loc_ids,
+            blueprint_station_ids,
+            react_station_ids,
+            # настройки
+            with_copy_to_clipboard,
+            {'planned', 'exist', 'progress'})
+        glf.write("""
+ </tbody>
+</table>
+</div> <!--table-responsive-->
+ </div> <!--media-body-->
+</div> <!--media-->
+""")
+    del list_of_assets_movement__materials
 
 
 def get_stock_resources(stock_loc_ids, corp_ass_loc_data):
@@ -1860,7 +1923,8 @@ def __dump_blueprints_list_with_materials(
             react_stock_resources,
             materials_summary,
             # настройки
-            enable_copy_to_clipboard)
+            enable_copy_to_clipboard,
+            False)
 
         glf.write("""
    </div> <!--panel-body-->
@@ -2140,7 +2204,10 @@ table.qind-entry-level-purch > tbody > tr > td,
 table.qind-entry-level-purch > tbody > tr > th,
 table.qind-intermediate-manuf > thead > tr > th,
 table.qind-intermediate-manuf > tbody > tr > td,
-table.qind-intermediate-manuf > tbody > tr > th
+table.qind-intermediate-manuf > tbody > tr > th,
+table.qind-missing-materials > thead > tr > th,
+table.qind-missing-materials > tbody > tr > td,
+table.qind-missing-materials > tbody > tr > th
 { padding: 1px; font-size: smaller; }
 
 table.qind-end-level-manuf > tbody > tr > th,
@@ -2148,17 +2215,21 @@ table.qind-end-level-manuf > thead > tr > th,
 table.qind-entry-level-purch > tbody > tr > th,
 table.qind-entry-level-purch > thead > tr > th,
 table.qind-intermediate-manuf > tbody > tr > th,
-table.qind-intermediate-manuf > thead > tr > th
+table.qind-intermediate-manuf > thead > tr > th,
+table.qind-missing-materials > tbody > tr > th,
+table.qind-missing-materials > thead > tr > th
 { font-weight: bold; text-align: center; }
 
 /*table.qind-end-level-manuf > tbody > tr > th,
 table.qind-entry-level-purch > tbody > tr > th,
-table.qind-intermediate-manuf > tbody > tr > th
+table.qind-intermediate-manuf > tbody > tr > th,
+table.qind-missing-materials > tbody > tr > th
 { width: 100px; }*/
 
 table.qind-end-level-manuf tbody tr th:nth-child(1),
 table.qind-entry-level-purch tbody tr th:nth-child(1),
-table.qind-intermediate-manuf tbody tr th:nth-child(1)
+table.qind-intermediate-manuf tbody tr th:nth-child(1),
+table.qind-missing-materials tbody tr th:nth-child(1)
 { width: 24px; }
 
 td.qind-mr, /* materials required */
@@ -2206,6 +2277,7 @@ tr.qind-em td /* enough materials */
        <li><a id="btnToggleUsedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUsedMaterials"></span> Show used materials</a></li>
        <li><a id="btnToggleSummary" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowSummary"></span> Show summary materials</a></li>
        <li><a id="btnToggleNotAvailable" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowNotAvailable"></span> Show not available materials</a></li>
+       <li><a id="btnToggleAssetsMovement" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAssetsMovement"></span> Show list of assets movement</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleRecommendedRuns" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowRecommendedRuns"></span> Show recommended runs</a></li>
        <li><a id="btnTogglePlannedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlannedMaterials"></span> Show planned materials</a></li>
@@ -2348,6 +2420,7 @@ tr.qind-em td /* enough materials */
                 global_react_stock_resources,
                 global_materials_summary,
                 # настройки
+                True,
                 True)
             glf.write("</div>")  # <h3>Summary</h3>
 
@@ -2371,7 +2444,7 @@ tr.qind-em td /* enough materials */
     render_html.__dump_any_into_modal_footer(glf)
 
     glf.write("""
-<div id="legend-block">
+<div id="legend-block" class="hidden">
  <hr>
  <h4>Legend</h4>
  <p>
@@ -2425,12 +2498,13 @@ tr.qind-em td /* enough materials */
 
   // Conveyor Options storage (init)
   function resetOptionsMenuToDefault() {
-    resetOptionToDefault('Show Legend', 1);
+    resetOptionToDefault('Show Legend', 0);
     resetOptionToDefault('Show Summary', 0);
-    resetOptionToDefault('Show Not Available', 0);
+    resetOptionToDefault('Show Not Available', 1);
+    resetOptionToDefault('Show Assets Movement', 0);
     resetOptionToDefault('Show Impossible', 1);
     resetOptionToDefault('Show Active', 1);
-    resetOptionToDefault('Show Used Materials', 1);
+    resetOptionToDefault('Show Used Materials', 0);
     resetOptionToDefault('Show Exist In Stock', 0);
     resetOptionToDefault('Show In Progress', 0);
     resetOptionToDefault('Show Enough Materials', 0);
@@ -2442,6 +2516,7 @@ tr.qind-em td /* enough materials */
     displayOptionInMenu('Show Legend', $('#imgShowLegend'));
     displayOptionInMenu('Show Summary', $('#imgShowSummary'));
     displayOptionInMenu('Show Not Available', $('#imgShowNotAvailable'));
+    displayOptionInMenu('Show Assets Movement', $('#imgShowAssetsMovement'));
     displayOptionInMenu('Show Impossible', $('#imgShowImpossible'));
     displayOptionInMenu('Show Active', $('#imgShowActive'));
     displayOptionInMenu('Show Used Materials', $('#imgShowUsedMaterials'));
@@ -2548,6 +2623,13 @@ tr.qind-em td /* enough materials */
       else
         $(this).addClass('hidden');
     })
+    show = ls.getItem('Show Assets Movement');
+    $('div.qind-assets-move-block').each(function() {
+      if (show == 1)
+        $(this).removeClass('hidden');
+      else
+        $(this).addClass('hidden');
+    })
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
@@ -2643,6 +2725,7 @@ tr.qind-em td /* enough materials */
     $('#btnToggleLegend').on('click', function () { toggleMenuOption('Show Legend'); });
     $('#btnToggleSummary').on('click', function () { toggleMenuOption('Show Summary'); });
     $('#btnToggleNotAvailable').on('click', function () { toggleMenuOption('Show Not Available'); });
+    $('#btnToggleAssetsMovement').on('click', function () { toggleMenuOption('Show Assets Movement'); });
     $('#btnToggleImpossible').on('click', function () { toggleMenuOption('Show Impossible'); });
     $('#btnToggleActive').on('click', function () { toggleMenuOption('Show Active'); });
     $('#btnToggleUsedMaterials').on('click', function () { toggleMenuOption('Show Used Materials'); });
