@@ -1095,6 +1095,9 @@ def __dump_not_available_materials_list_rows(
             # считаем остатки и потребности кол-ва материалов в стоке
             ms_not_available__manuf: int = (ms_planned__manuf - ms_in_stock__manuf) if ms_in_stock__manuf < ms_planned__manuf else 0
             ms_not_available__react: int = (ms_planned__react - ms_in_stock__react) if ms_in_stock__react < ms_planned__react else 0
+            # считаем кол-во материалов, которые планируется забрать из стока (м.б. весь сток, либо не больше planned)
+            ms_consumed__manuf: int = ms_in_stock__manuf if ms_in_stock__manuf < ms_planned__manuf else ms_planned__manuf
+            ms_consumed__react: int = ms_in_stock__react if ms_in_stock__react < ms_planned__react else ms_planned__react
             # считаем кол-во материалов, которое производится в сток
             # TODO: вывести предупреждение о том, что какие-то материалы производятся ИЗ конвейера НЕ В сток
             ms_in_progress = in_cache.in_progress
@@ -1143,6 +1146,12 @@ def __dump_not_available_materials_list_rows(
                         '<th class="active qind-mp hidden">{prfx}Sotiyo</th>'
                         '<th class="active qind-mp hidden">{prfx}Tatara</th>'.
                         format(prfx='Planned<br>' if __high_group_header else '',
+                               ))
+                if 'consumed' in dump_listed_table_cells:
+                    glf.write(
+                        '<th class="active qind-mc hidden">{prfx}Sotiyo</th>'
+                        '<th class="active qind-mc hidden">{prfx}Tatara</th>'.
+                        format(prfx='Consumed<br>' if __high_group_header else '',
                                ))
                 if 'exist' in dump_listed_table_cells:
                     glf.write(
@@ -1237,6 +1246,13 @@ def __dump_not_available_materials_list_rows(
                     ' <td class="qind-mp hidden">{pr}</td>\n'.
                     format(pm="{:,d}".format(ms_planned__manuf) if ms_planned__manuf else '',
                            pr="{:,d}".format(ms_planned__react) if ms_planned__react else '',
+                           ))
+            if 'consumed' in dump_listed_table_cells:
+                glf.write(
+                    ' <td class="qind-mc hidden">{pm}</td>\n'
+                    ' <td class="qind-mc hidden">{pr}</td>\n'.
+                    format(pm="{:,d}".format(ms_consumed__manuf) if ms_planned__manuf else '',
+                           pr="{:,d}".format(ms_consumed__react) if ms_planned__react else '',
                            ))
             if 'exist' in dump_listed_table_cells:
                 glf.write(
@@ -1370,7 +1386,7 @@ def __dump_not_available_materials_list(
             # настройки
             with_copy_to_clipboard,
             with_copy_to_clipboard,
-            {'runs', 'planned', 'exist', 'progress'})
+            {'runs', 'planned', 'consumed', 'exist', 'progress'})
         glf.write("""
  </tbody>
 </table>
@@ -1440,7 +1456,7 @@ def __dump_not_available_materials_list(
             # настройки
             with_copy_to_clipboard,
             with_copy_to_clipboard,
-            {'runs', 'planned', 'exist', 'progress'})
+            {'runs', 'planned', 'consumed', 'exist', 'progress'})
         glf.write("""
  </tbody>
 </table>
@@ -2272,6 +2288,7 @@ table.qind-table-materials tbody tr th:nth-child(1)
 
 td.qind-mr, /* materials required */
 td.qind-mp, /* materials planned */
+td.qind-mc, /* materials consumed */
 td.qind-rr, /* recommended runs */
 td.qind-me, /* materials exist */
 td.qind-ip /* materials in progress */
@@ -2279,8 +2296,10 @@ td.qind-ip /* materials in progress */
 
 td.qind-mr { background-color: #fffbf1; } /* materials required : light yellow */
 td.qind-me { background-color: #f2fff1; } /* materials exist : light green */
+td.qind-mc { background-color: #f1f7ff; } /* materials consumed : light cyan */
 tr:hover td.qind-mr { background-color: #f4f0e7; }
 tr:hover td.qind-me { background-color: #e8f4e6; }
+tr:hover td.qind-mc { background-color: #e5ecf4; }
 
 a.qind-sign { color: #a52a2a; } /* exclamation sign: brown color */
 a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) */
@@ -2320,6 +2339,7 @@ tr.qind-em th
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleRecommendedRuns" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowRecommendedRuns"></span> Show recommended runs</a></li>
        <li><a id="btnTogglePlannedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowPlannedMaterials"></span> Show planned materials</a></li>
+       <li><a id="btnToggleConsumedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowConsumedMaterials"></span> Show consumed materials</a></li>
        <li><a id="btnToggleExistInStock" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowExistInStock"></span> Show exist in stock</a></li>
        <li><a id="btnToggleInProgress" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowInProgress"></span> Show in progress</a></li>
        <li><a id="btnToggleEnoughMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowEnoughMaterials"></span> Show materials which are enough</a></li>
@@ -2548,6 +2568,7 @@ tr.qind-em th
     resetOptionToDefault('Show In Progress', 0);
     resetOptionToDefault('Show Enough Materials', 0);
     resetOptionToDefault('Show Planned Materials', 0);
+    resetOptionToDefault('Show Consumed Materials', 0);
     resetOptionToDefault('Show Recommended Runs', 1);
   }
   // Conveyor Options storage (rebuild menu components)
@@ -2561,6 +2582,7 @@ tr.qind-em th
     displayOptionInMenu('Show Used Materials', $('#imgShowUsedMaterials'));
     displayOptionInMenu('Show Exist In Stock', $('#imgShowExistInStock'));
     displayOptionInMenu('Show Planned Materials', $('#imgShowPlannedMaterials'));
+    displayOptionInMenu('Show Consumed Materials', $('#imgShowConsumedMaterials'));
     displayOptionInMenu('Show Recommended Runs', $('#imgShowRecommendedRuns'));
     displayOptionInMenu('Show In Progress', $('#imgShowInProgress'));
     displayOptionInMenu('Show Enough Materials', $('#imgShowEnoughMaterials'));
@@ -2665,6 +2687,7 @@ tr.qind-em th
     applyOption('Show Used Materials', '.qind-materials-used');
     applyOption('Show Exist In Stock', '.qind-me');
     applyOption('Show Planned Materials', '.qind-mp');
+    applyOption('Show Consumed Materials', '.qind-mc');
     applyOption('Show Recommended Runs', '.qind-rr');
     applyOption('Show In Progress', '.qind-ip');
     applyOption('Show Enough Materials', '.qind-em');
@@ -2720,6 +2743,7 @@ tr.qind-em th
     $('#btnToggleUsedMaterials').on('click', function () { toggleMenuOption('Show Used Materials'); });
     $('#btnToggleExistInStock').on('click', function () { toggleMenuOption('Show Exist In Stock'); });
     $('#btnTogglePlannedMaterials').on('click', function () { toggleMenuOption('Show Planned Materials'); });
+    $('#btnToggleConsumedMaterials').on('click', function () { toggleMenuOption('Show Consumed Materials'); });
     $('#btnToggleRecommendedRuns').on('click', function () { toggleMenuOption('Show Recommended Runs'); });
     $('#btnToggleInProgress').on('click', function () { toggleMenuOption('Show In Progress'); });
     $('#btnToggleEnoughMaterials').on('click', function () { toggleMenuOption('Show Enough Materials'); });
