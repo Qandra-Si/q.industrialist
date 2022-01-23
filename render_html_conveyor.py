@@ -987,7 +987,8 @@ def __dump_not_available_materials_list_rows(
         blueprint_station_ids,
         react_station_ids,
         # настройки
-        with_copy_to_clipboard,
+        with_copy_to_clipboard__blueprints,
+        with_copy_to_clipboard__signs,
         dump_listed_table_cells):
     # поиск групп материалов, которых где не хватает для завершения производства по списку
     # чертежи в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
@@ -1047,7 +1048,7 @@ def __dump_not_available_materials_list_rows(
                 __grp_name = group_dict["nameID"]["en"]
                 __icon_id = group_dict.get("iconID", 0)
                 # подготовка элементов управления копирования данных в clipboard
-                __copy2clpbrd = '' if not with_copy_to_clipboard else \
+                __copy2clpbrd = '' if not with_copy_to_clipboard__blueprints else \
                     '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
                     '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
                     '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
@@ -1099,23 +1100,30 @@ def __dump_not_available_materials_list_rows(
                 if __blueprints_availability:
                     __blueprints_availability = '<div class="qind-ba">' + __blueprints_availability + '</div>'
             # подготовка элемента с признаком необходимости передачи накопленных стоков в другую локацию
-            __transfer_sign__manuf = '' if not ms_need_stock_transfer__manuf else \
-                '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
-                '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
-                '  aria-hidden="true"></span></a> '. \
-                format(q=ms_not_available__manuf)
-            __transfer_sign__react = '' if not ms_need_stock_transfer__react else \
-                '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
-                '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
-                '  aria-hidden="true"></span></a> '. \
-                format(q=ms_not_available__react)
+            __transfer_sign__manuf = ''
+            __transfer_sign__react = ''
+            if with_copy_to_clipboard__signs:
+                if ms_need_stock_transfer__manuf:
+                    __transfer_sign__manuf = \
+                        '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
+                        '  aria-hidden="true"></span></a> '. \
+                        format(q=ms_not_available__manuf)
+                if ms_need_stock_transfer__react:
+                    __transfer_sign__react = \
+                        '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
+                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
+                        '  aria-hidden="true"></span></a> '. \
+                        format(q=ms_not_available__react)
             # подготовка элементов управления копирования данных в clipboard
-            __copy2clpbrd = '' if not with_copy_to_clipboard else \
-                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
-                ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
-                ' aria-hidden="true"></span></a>'. \
-                format(nm=ms_item_name if ms_blueprint_name is None else ms_blueprint_name)
-            if ms_need_stock_transfer__manuf or ms_need_stock_transfer__react:
+            __copy2clpbrd = ''
+            if with_copy_to_clipboard__blueprints:
+                __copy2clpbrd =\
+                    '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                    ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
+                    ' aria-hidden="true"></span></a>'. \
+                    format(nm=ms_item_name if ms_blueprint_name is None else ms_blueprint_name)
+            if with_copy_to_clipboard__signs and (ms_need_stock_transfer__manuf or ms_need_stock_transfer__react):
                 __copy2clpbrd +=\
                     '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn qind-sign"' \
                     ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
@@ -1293,6 +1301,7 @@ def __dump_not_available_materials_list(
             react_station_ids,
             # настройки
             with_copy_to_clipboard,
+            with_copy_to_clipboard,
             {'runs', 'planned', 'exist', 'progress'})
         glf.write("""
  </tbody>
@@ -1333,6 +1342,7 @@ def __dump_not_available_materials_list(
             blueprint_station_ids,
             react_station_ids,
             # настройки
+            with_copy_to_clipboard,
             with_copy_to_clipboard,
             {'planned', 'exist'})
         glf.write("""
@@ -1378,6 +1388,7 @@ def __dump_not_available_materials_list(
             blueprint_station_ids,
             react_station_ids,
             # настройки
+            with_copy_to_clipboard,
             with_copy_to_clipboard,
             {'runs', 'planned', 'exist', 'progress'})
         glf.write("""
@@ -1434,6 +1445,7 @@ def __dump_not_available_materials_list(
             blueprint_station_ids,
             react_station_ids,
             # настройки
+            False,
             with_copy_to_clipboard,
             {'planned', 'exist', 'progress'})
         glf.write("""
