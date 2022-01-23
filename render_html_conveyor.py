@@ -1251,8 +1251,8 @@ def __dump_not_available_materials_list_rows(
                 glf.write(
                     ' <td class="qind-mc hidden">{pm}</td>\n'
                     ' <td class="qind-mc hidden">{pr}</td>\n'.
-                    format(pm="{:,d}".format(ms_consumed__manuf) if ms_planned__manuf else '',
-                           pr="{:,d}".format(ms_consumed__react) if ms_planned__react else '',
+                    format(pm="{:,d}".format(ms_consumed__manuf) if ms_consumed__manuf else '',
+                           pr="{:,d}".format(ms_consumed__react) if ms_consumed__react else '',
                            ))
             if 'exist' in dump_listed_table_cells:
                 glf.write(
