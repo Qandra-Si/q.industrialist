@@ -182,10 +182,9 @@ class ConveyorItem:
                     self.in_progress += j["runs"]
                 elif output_location_id in reaction_stock_loc_ids:
                     self.in_progress += j["runs"]
-                else:
-                    blueprint_location_id: int = j['blueprint_location_id']
-                    if blueprint_location_id in manufacturing_blueprint_loc_ids:
-                        self.in_progress += j["runs"]
+                # TODO: потерявшиеся работы надо как-то отдельным образом подсвечивать
+                # возможна ситуация, когда какая-либо работа запущена из коробки с чертежами, но её выход направлен не
+                # в сток, а например в ту же коробку, что можно обнаружить с помощью blueprint_location_id и учесть
             # умножаем на кол-во производимых материалов на один run
             if self.products_per_single_run is not None:
                 self.in_progress *= self.products_per_single_run
@@ -367,6 +366,10 @@ class ConveyorMaterials:
                 # операций выполненных выше
                 if in_cache.where is None:
                     continue
+                #
+                #remained_in_all_stocks: int = in_cache.exist_in_manuf_stock - in_cache.reserved_in_manuf_stock + \
+                #                              in_cache.exist_in_react_stock - in_cache.reserved_in_react_stock
+                #not_available_over_all_stocks: int = 0 if remained_in_all_stocks >= need_quantity else need_quantity - remained_in_all_stocks
                 # сохраняем недостающее кол-во материалов для производства по этому чертежу
                 not_enough_materials.append({"id": type_id, "q": not_available, "w": in_cache.where})
         # вывод материалов в стоке имеющихся и помеченным использованными, а также список недостающего кол-ва
@@ -1944,8 +1947,9 @@ def __dump_blueprints_list_with_materials(
  </div> <!--panel-->
 """)
         glf.write(
-            "<script> $(document).ready(function(){{ $('#rnblB{id}').html('{bps}'); }});</script>".
-            format(id=loc_id, bps=runnable_blueprints)
+            "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('{bps}'); "
+            "el.parent().css('background-color', '{cl}'); }});</script>".
+            format(id=loc_id, bps=runnable_blueprints, cl='darkgreen' if runnable_blueprints else 'maroon')
         )
 
     return stock_not_enough_materials
