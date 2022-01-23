@@ -201,7 +201,7 @@ def main():
                     __conveyor_entity.update({
                         "containers": [],
                         "stock": [],
-                        "refine_stock": [],
+                        "react_stock": [],
                         "exclude": [],
                         "num": __manuf_dict_num,
                     })
@@ -239,7 +239,7 @@ def main():
                                 __conveyor_entity["exclude"].append({"id": __exclude_id, "name": next((n["name"] for n in corp_ass_names_data if n['item_id'] == __exclude_id), None)})
                     # на любой другой станции находим контейнер, в котором находится сток для нужд конвейера, но пока
                     # ещё на нужную станцию (например с Татары на Сотию)
-                    for tmplt in __manuf_dict.get("refine_stock_containers", []):
+                    for tmplt in __manuf_dict.get("reaction_stock_containers", []):
                         rs_ids = [(n["item_id"], n['name']) for n in corp_ass_names_data if re.search(tmplt, n['name'])]
                         for (rs_id, rs_name) in rs_ids:
                             rs_loc_dict = eve_esi_tools.get_universe_location_by_item(
@@ -251,7 +251,7 @@ def main():
                                 foreign_structures_data
                             )
                             if "station_id" in rs_loc_dict:
-                                __conveyor_entity["refine_stock"].append({"id": rs_id, "name": rs_name, "loc": rs_loc_dict})
+                                __conveyor_entity["react_stock"].append({"id": rs_id, "name": rs_name, "loc": rs_loc_dict})
                         del rs_ids
                 # добавляем к текущей станции контейнер с чертежами
                 # добаляем в свойства контейнера фиксированное кол-во запусков чертежей из настроек
@@ -294,9 +294,9 @@ def main():
             print('     stock containers:')
             for ces in ce["stock"]:
                 print('       {} = {}'.format(ces["id"], ces["name"]))
-            if ce["refine_stock"]:
-                print('     refine stock containers:')
-                for cess in ce["refine_stock"]:
+            if ce["react_stock"]:
+                print('     reaction stock containers:')
+                for cess in ce["react_stock"]:
                     print('       {} = {}'.format(cess["loc"]["station_id"], cess["loc"]["station"]))
                     print('         {} = {}'.format(cess["id"], cess["name"]))
             if ce["containers"]:
