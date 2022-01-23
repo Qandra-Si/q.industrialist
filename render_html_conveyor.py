@@ -2618,34 +2618,18 @@ tr.qind-em td /* enough materials */
       return _res;
     }).appendTo(tbody);
   }
+  // Conveyor Options applier
+  function applyOption(option, selector) {
+    show = ls.getItem(option);
+    $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
+  }
   // Conveyor Options storage (rebuild body components)
   function rebuildBody() {
-    show = ls.getItem('Show Legend');
-    if (show == 1)
-      $('#legend-block').removeClass('hidden');
-    else
-      $('#legend-block').addClass('hidden');
-    show = ls.getItem('Show Summary');
-    $('div.qind-summary-block').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Not Available');
-    $('div.qind-not-available-block').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Assets Movement');
-    $('div.qind-assets-move-block').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
+    applyOption('Show Legend', '#legend-block');
+    applyOption('Show Summary', 'div.qind-summary-block');
+    applyOption('Show Not Available', 'div.qind-not-available-block');
+    applyOption('Show Assets Movement', 'div.qind-assets-move-block');
+    //-
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
     if ((show_impossible == 1) && (show_active == 1)) {
@@ -2654,48 +2638,14 @@ tr.qind-em td /* enough materials */
     } else {
       $('div.media').each(function() { toggleMediaVisibility($(this), show_impossible, show_active); })
     }
-    show = ls.getItem('Show Used Materials');
-    $('.qind-materials-used').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Exist In Stock');
-    $('.qind-me').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Planned Materials');
-    $('.qind-mp').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Recommended Runs');
-    $('.qind-rr').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show In Progress');
-    $('.qind-ip').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
-    show = ls.getItem('Show Enough Materials');
-    $('.qind-em').each(function() {
-      if (show == 1)
-        $(this).removeClass('hidden');
-      else
-        $(this).addClass('hidden');
-    })
+    //-
+    applyOption('Show Used Materials', '.qind-materials-used');
+    applyOption('Show Exist In Stock', '.qind-me');
+    applyOption('Show Planned Materials', '.qind-mp');
+    applyOption('Show Recommended Runs', '.qind-rr');
+    applyOption('Show In Progress', '.qind-ip');
+    applyOption('Show Enough Materials', '.qind-em');
+    //-
     sort_by = ls.getItem('Sort By');
     sort_by = (sort_by === null) ? 0 : sort_by;
     $('table.qind-blueprints-tbl').each(function() {
