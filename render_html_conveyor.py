@@ -1412,15 +1412,6 @@ def __dump_not_available_materials_list(
 <h4 class="text-primary">Missing materials at the neighboring station</h4>
 <div class="table-responsive">
 <table class="table table-condensed table-hover qind-missing-materials qind-table-materials">
- <thead>
- <tr>
-  <th colspan="2" class="active"></th>
-  <th colspan="2" class="active qind-mr">Required</th>
-  <th colspan="2" class="active qind-mp hidden">Planned</th>
-  <th colspan="2" class="active qind-me hidden">Stock</th>
-  <th class="active qind-ip hidden"></th>
- </tr>
- </thead>
  <tbody>
 """)
         __dump_not_available_materials_list_rows(
@@ -2235,7 +2226,8 @@ a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) 
 div.qind-ba /* blueprints availability */
 { margin-left: auto; margin-right: 0; float: right; padding-top: 1px; white-space: nowrap; }
 
-tr.qind-em td /* enough materials */
+tr.qind-em td, /* enough materials */
+tr.qind-em th
 { color: #aaa; }
 </style>
 
