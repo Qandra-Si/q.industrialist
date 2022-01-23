@@ -589,12 +589,14 @@ class ConveyorMaterials:
             # зарегистрировать эти требования с помощью calc_materials_availability (этот метод для w='R' ранее
             # не выполнялся.
             if where == 'M':
-                # uaem - used and exist materials
-                # cnem - current not enough materials
+                # - uaem : used and exist materials
+                # - cnem : current not enough materials
+                # - not_enough_materials__cycled['R'] : составлен в ходе планирования manufacturing-работ, расчёт
+                #   достаточного кол-ва этих материалов надо провести на производственной станке (Сотия, а не Татара)
                 # подготовка списка недостающих материалов к текущей итерации этого цикла
                 (uaem, cnem) = self.calc_materials_availability(
                     not_enough_materials__cycled['R'],
-                    'R')
+                    'M')
                 # сохраняем в промежуточный список материалы, которые уже есть в стоке
                 if uaem:
                     self.calc_materials_summary(uaem, used_and_exist_materials)
