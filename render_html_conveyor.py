@@ -1007,6 +1007,7 @@ def __dump_not_available_materials_list_rows(
         else:
             group_dict.append(in_cache)
     # вывод списка материалов, которых не хватает для завершения производства по списку чертежей
+    group_header_first_time: bool = True
     ms_groups = material_groups.keys()
     for ms_group_id in ms_groups:
         material_groups[ms_group_id].sort(key=lambda m: m.name)
@@ -1055,30 +1056,45 @@ def __dump_not_available_materials_list_rows(
                     '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
                     '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
                     '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
+                # подготовка стиля строки, который меняется в зависимости от ей порядка в таблице и содержимого таблицы
+                __tr_class = ''
+                if group_with_are_enough:
+                    __tr_class = 'qind-em hidden'
+                if group_header_first_time:
+                    __tr_class += ' ' if __tr_class else ''
+                    __tr_class += 'qind-fgh'
+                if __tr_class:
+                    __tr_class = ' class="' + __tr_class + '"'
                 glf.write(
-                    '<tr{em}>\n'
+                    '<tr{trcl}>\n'
                     ' <td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
-                    ' <th class="active qind-mr">Sotiyo</th>'
-                    ' <th class="active qind-mr">Tatara</th>'.
+                    ' <th class="active qind-mr">{prfx}Sotiyo</th>'
+                    ' <th class="active qind-mr">{prfx}Tatara</th>'.
                     format(nm=__grp_name,
                            id=ms_group_id,
                            clbrd=__copy2clpbrd,
-                           em=' class="qind-em hidden"' if group_with_are_enough else '',
+                           trcl=__tr_class,
+                           prfx='Required<br>' if group_header_first_time else '',
                            ))
                 if 'runs' in dump_listed_table_cells:
                     glf.write('<th class="active qind-rr hidden">To launch</th>')
                 if 'planned' in dump_listed_table_cells:
                     glf.write(
-                        '<th class="active qind-mp hidden">Sotiyo</th>'
-                        '<th class="active qind-mp hidden">Tatara</th>')
+                        '<th class="active qind-mp hidden">{prfx}Sotiyo</th>'
+                        '<th class="active qind-mp hidden">{prfx}Tatara</th>'.
+                        format(prfx='Planned<br>' if group_header_first_time else '',
+                               ))
                 if 'exist' in dump_listed_table_cells:
                     glf.write(
-                        '<th class="active qind-me hidden">Sotiyo</th>'
-                        '<th class="active qind-me hidden">Tatara</th>')
+                        '<th class="active qind-me hidden">{prfx}Sotiyo</th>'
+                        '<th class="active qind-me hidden">{prfx}Tatara</th>'.
+                        format(prfx='Stock<br>' if group_header_first_time else '',
+                               ))
                 if 'progress' in dump_listed_table_cells:
                     glf.write('<th class="active qind-ip hidden">In progress</th>')
                 glf.write('</tr>')
                 group_diplayed = True
+                group_header_first_time = False
             # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
             vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
                 ms_blueprint_type_id,
@@ -1277,17 +1293,7 @@ def __dump_not_available_materials_list(
         glf.write("""
 <h4 class="text-primary">End-level manufacturing</h4>
 <div class="table-responsive">
-<table class="table table-condensed table-hover qind-end-level-manuf">
- <thead>
- <tr>
-  <th colspan="2" class="active"></th>
-  <th colspan="2" class="active qind-mr">Required</th>
-  <th class="active qind-rr hidden"></th>
-  <th colspan="2" class="active qind-mp hidden">Planned</th>
-  <th colspan="2" class="active qind-me hidden">Stock</th>
-  <th class="active qind-ip hidden"></th>
- </tr>
- </thead>
+<table class="table table-condensed table-hover qind-end-level-manuf qind-table-materials">
  <tbody>
 """)
         __dump_not_available_materials_list_rows(
@@ -1321,15 +1327,7 @@ def __dump_not_available_materials_list(
         glf.write("""
 <h4 class="text-primary">Entry-level purchasing</h4>
 <div class="table-responsive">
-<table class="table table-condensed table-hover qind-entry-level-purch">
- <thead>
- <tr>
-  <th colspan="2" class="active"></th>
-  <th colspan="2" class="active qind-mr">Required</th>
-  <th colspan="2" class="active qind-mp hidden">Planned</th>
-  <th colspan="2" class="active qind-me hidden">Stock</th>
- </tr>
- </thead>
+<table class="table table-condensed table-hover qind-entry-level-purch qind-table-materials">
  <tbody>
 """)
         __dump_not_available_materials_list_rows(
@@ -1363,17 +1361,7 @@ def __dump_not_available_materials_list(
         glf.write("""
 <h4 class="text-primary">Intermediate manufacturing</h4>
 <div class="table-responsive">
-<table class="table table-condensed table-hover qind-intermediate-manuf">
- <thead>
- <tr>
-  <th colspan="2" class="active"></th>
-  <th colspan="2" class="active qind-mr">Required</th>
-  <th class="active qind-rr hidden"></th>
-  <th colspan="2" class="active qind-mp hidden">Planned</th>
-  <th colspan="2" class="active qind-me hidden">Stock</th>
-  <th class="active qind-ip hidden"></th>
- </tr>
- </thead>
+<table class="table table-condensed table-hover qind-intermediate-manuf qind-table-materials">
  <tbody>
 """)
         # поиск и вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
@@ -1423,7 +1411,7 @@ def __dump_not_available_materials_list(
 
 <h4 class="text-primary">Missing materials at the neighboring station</h4>
 <div class="table-responsive">
-<table class="table table-condensed table-hover qind-missing-materials">
+<table class="table table-condensed table-hover qind-missing-materials qind-table-materials">
  <thead>
  <tr>
   <th colspan="2" class="active"></th>
@@ -1548,15 +1536,15 @@ def __dump_blueprints_list_with_materials(
                 bps=len(__bp2)
             )
         )
-        __type_keys = __bp2.keys()
         # сортировка чертежей по их названиям
         type_keys = []
-        for type_id in __type_keys:
-            type_keys.append({"id": int(type_id), "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, int(type_id))})
+        for tid in __bp2.keys():
+            type_id: int = tid
+            type_keys.append({"id": type_id, "name": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, type_id)})
         type_keys.sort(key=lambda bp: bp["name"])
         # инициализация скрытой таблицы, которая предназначена для сортировки чертежей по различным критериям
         glf.write("""
- <table class="table table-condensed table-responsive qind-blueprints-tbl">
+ <table class="table table-condensed qind-blueprints-tbl">
   <tbody>
 """)
         # вывод в отчёт инфорации о чертежах
@@ -2212,40 +2200,21 @@ def __dump_corp_conveyors(
 <style>
 table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
 
-table.qind-end-level-manuf > thead > tr > th,
-table.qind-end-level-manuf > tbody > tr > td,
-table.qind-end-level-manuf > tbody > tr > th,
-table.qind-entry-level-purch > thead > tr > th,
-table.qind-entry-level-purch > tbody > tr > td,
-table.qind-entry-level-purch > tbody > tr > th,
-table.qind-intermediate-manuf > thead > tr > th,
-table.qind-intermediate-manuf > tbody > tr > td,
-table.qind-intermediate-manuf > tbody > tr > th,
-table.qind-missing-materials > thead > tr > th,
-table.qind-missing-materials > tbody > tr > td,
-table.qind-missing-materials > tbody > tr > th
+table.qind-table-materials tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
+{ margin-top: -2px; margin-bottom: -1px; }
+
+table.qind-table-materials > tbody > tr > td,
+table.qind-table-materials > tbody > tr > th
 { padding: 1px; font-size: smaller; }
 
-table.qind-end-level-manuf > tbody > tr > th,
-table.qind-end-level-manuf > thead > tr > th,
-table.qind-entry-level-purch > tbody > tr > th,
-table.qind-entry-level-purch > thead > tr > th,
-table.qind-intermediate-manuf > tbody > tr > th,
-table.qind-intermediate-manuf > thead > tr > th,
-table.qind-missing-materials > tbody > tr > th,
-table.qind-missing-materials > thead > tr > th
-{ font-weight: bold; text-align: center; }
+table.qind-table-materials > tbody > tr > th
+{ font-weight: bold; text-align: right; }
 
-/*table.qind-end-level-manuf > tbody > tr > th,
-table.qind-entry-level-purch > tbody > tr > th,
-table.qind-intermediate-manuf > tbody > tr > th,
-table.qind-missing-materials > tbody > tr > th
-{ width: 100px; }*/
+table tbody tr.qind-fgh td, /* first group header */
+table tbody tr.qind-fgh th
+{ vertical-align: bottom; }
 
-table.qind-end-level-manuf tbody tr th:nth-child(1),
-table.qind-entry-level-purch tbody tr th:nth-child(1),
-table.qind-intermediate-manuf tbody tr th:nth-child(1),
-table.qind-missing-materials tbody tr th:nth-child(1)
+table.qind-table-materials tbody tr th:nth-child(1)
 { width: 24px; }
 
 td.qind-mr, /* materials required */
@@ -2264,7 +2233,7 @@ a.qind-sign { color: #a52a2a; } /* exclamation sign: brown color */
 a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) */
 
 div.qind-ba /* blueprints availability */
-{ margin-left: auto; margin-right: 0; float: right; padding-top: 2px; white-space: nowrap; }
+{ margin-left: auto; margin-right: 0; float: right; padding-top: 1px; white-space: nowrap; }
 
 tr.qind-em td /* enough materials */
 { color: #aaa; }
