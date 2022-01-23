@@ -1,4 +1,5 @@
-﻿import json
+﻿import typing
+import json
 from pathlib import Path
 
 
@@ -103,7 +104,44 @@ def get_corp_ass_loc_data(corp_assets_data, containers_filter=None):
     return corp_ass_loc_data
 
 
+g_universe_items_with_names: typing.Set[int] = {
+    2233,    # Customs Office
+    3293,    # Medium Standard Container
+    3296,    # Large Standard Container
+    3297,    # Small Standard Container
+    3465,    # Large Secure Container
+    3466,    # Medium Secure Container
+    3467,    # Small Secure Container
+    11488,   # Huge Secure Container
+    11489,   # Giant Secure Container
+    17363,   # Small Audit Log Secure Container
+    17364,   # Medium Audit Log Secure Container
+    17365,   # Large Audit Log Secure Container
+    17366,   # Station Container
+    17367,   # Station Vault Container
+    17368,   # Station Warehouse Container
+    24445,   # Giant Freight Container
+    33003,   # Enormous Freight Container
+    33005,   # Huge Freight Container
+    33007,   # Large Freight Container
+    33009,   # Medium Freight Container
+    33011,   # Small Freight Container
+    35825,   # Raitaru
+    35826,   # Azbel
+    35827,   # Sotiyo
+    35828,   # Medium Laboratory
+    35829,   # Large Laboratory
+    35830,   # X-Large Laboratory
+    35832,   # Astrahus
+    35833,   # Fortizar
+    35834,   # Keepstar
+    35835,   # Athanor
+    35836,   # Tatara
+}
+
+
 def get_assets_named_ids(corp_assets_data):
+    global g_universe_items_with_names
     ass_cont_ids = []
     for a in corp_assets_data:
         if not a["is_singleton"]:
@@ -111,31 +149,7 @@ def get_assets_named_ids(corp_assets_data):
         loc_flag = str(a["location_flag"])
         if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
-        if a["type_id"] in [17363,   # Small Audit Log Secure Container
-                            17364,   # Medium Audit Log Secure Container
-                            17365,   # Large Audit Log Secure Container
-                            17366,   # Station Container
-                            17367,   # Station Vault Container
-                            17368,   # Station Warehouse Container
-                            2233,    # Customs Office
-                            24445,   # Giant Freight Container
-                            33003,   # Enormous Freight Container
-                            33005,   # Huge Freight Container
-                            33007,   # Large Freight Container
-                            33009,   # Medium Freight Container
-                            33011,   # Small Freight Container
-                            35825,   # Raitaru
-                            35826,   # Azbel
-                            35827,   # Sotiyo
-                            35828,   # Medium Laboratory
-                            35829,   # Large Laboratory
-                            35830,   # X-Large Laboratory
-                            35832,   # Astrahus
-                            35833,   # Fortizar
-                            35834,   # Keepstar
-                            35835,   # Athanor
-                            35836    # Tatara
-                           ]:
+        if a["type_id"] in g_universe_items_with_names:
             if ass_cont_ids.count(a["item_id"]) == 0:
                 ass_cont_ids.append(a["item_id"])
     return ass_cont_ids

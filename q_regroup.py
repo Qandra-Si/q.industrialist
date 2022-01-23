@@ -71,7 +71,7 @@ def __get_containers(
         throw_when_not_found=False
     )
     for station_dict in regroup_containers:
-        station_dict["containers"] = [c for c in station_dict["containers"] if c["name"] in station_dict[tmp_sc]]
+        station_dict["containers"] = [c for c in station_dict["containers"] if c.get("name") in station_dict[tmp_sc]]
         del station_dict[tmp_sc]
         del station_dict["hangars_filter"]
     return regroup_containers
