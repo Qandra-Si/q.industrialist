@@ -822,16 +822,27 @@ class QDatabaseTools:
         # Requires role(s): Director
         return "corporations/{corporation_id}/assets/names/".format(corporation_id=corporation_id)
 
+    def can_assets_item_be_renamed(self, item_data) -> bool:
+        # пропускаем экземпляры контейнеров, сложенные в стопки (у них нет уник. id и названий тоже не будет)
+        is_singleton: bool = item_data['is_singleton']
+        if not is_singleton:
+            return False
+        # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
+        location_flag: str = item_data['location_flag']
+        if location_flag[:-1] != 'CorpSAG':  # and location_flag != 'Unlocked' and location_flag != 'AutoFit':
+            return False
+        type_id: int = item_data['type_id']
+        return type_id in self.universe_items_with_names
+
     def load_corporation_assets_names_from_esi(self, corporation_id: int):
         # получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
         corp_cache = self.__cached_corporation_assets.get(corporation_id)
         item_ids: typing.List[int] = []
 
         for (item_id, in_cache) in corp_cache.items():
-            type_id: int = in_cache.obj['type_id']
-            if type_id in self.universe_items_with_names:
-                item_id: int = in_cache.obj['item_id']
-                item_ids.append(item_id)
+            if not self.can_assets_item_be_renamed(in_cache.obj):
+                continue
+            item_ids.append(item_id)
         del corp_cache
 
         # Requires role(s): Director
@@ -874,10 +885,9 @@ class QDatabaseTools:
         corp_cache = self.get_corp_cache(self.__cached_corporation_assets, corporation_id)
         in_cache = corp_cache.get(item_id)
         # ---
-        type_id: int = int(item_data['type_id'])
-        item_possible_with_name: bool = type_id in self.universe_items_with_names
+        item_possible_be_renamed: bool = self.can_assets_item_be_renamed(item_data)
         in_cache_item_name = None
-        if item_possible_with_name:
+        if item_possible_be_renamed:
             corp_names_cache = self.get_corp_cache(self.__cached_corporation_assets_names, corporation_id)
             in_cache_item_name = corp_names_cache.get(item_id)
         # 1. либо данных нет в кеше
@@ -889,7 +899,7 @@ class QDatabaseTools:
         elif in_cache.obj:
             data_equal = in_cache.is_obj_equal_by_keys(item_data, self.corporation_asset_diff)
             # дополнительно: если у item-а присутствует наименование, то сравниванием с тем, который имеется в БД
-            if item_possible_with_name:
+            if item_possible_be_renamed:
                 if data_equal:
                     data_equal = in_cache.compare_ext('name', in_cache_item_name)
                 if not data_equal:
