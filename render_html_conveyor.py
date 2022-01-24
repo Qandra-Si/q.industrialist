@@ -3,631 +3,14 @@ import render_html
 import eve_sde_tools
 import eve_esi_tools
 import eve_efficiency
+import eve_conveyor_tools
+from render_html import get_span_glyphicon as glyphicon
 from math import ceil
 
 import q_conveyor_settings
 
 
 g_modal_industry_seq = 1
-
-
-# ConveyorItem - это и материал (material) используемый в производстве, и продукт (product) используемый в производстве
-class ConveyorItem:
-    def __init__(self,
-                 type_id: int,
-                 # sde данные, загруженные из .converted_xxx.json файлов
-                 sde_type_ids,
-                 sde_bp_materials,
-                 sde_market_groups,
-                 # esi данные, загруженные с серверов CCP
-                 corp_industry_jobs_data,
-                 # списки контейнеров и станок из экземпляра контейнера
-                 manufacturing_blueprint_loc_ids,
-                 manufacturing_stock_loc_ids,
-                 reaction_stock_loc_ids,
-                 # список ресурсов, которые используются в производстве
-                 manufacturing_stock_resources,
-                 reaction_stock_resources):
-        # код продукта
-        self.type_id: int = type_id
-        # название продукта
-        self.name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, type_id)
-        # market-группа, которой принадлежит продукт
-        self.market_group: int = eve_sde_tools.get_market_group_by_type_id(sde_type_ids, type_id)
-        self.market_group_dict = sde_market_groups.get(str(self.market_group))
-        # базовая (основная) market-группа, которой принадлежит товар
-        self.basis_market_group: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id)
-        self.basis_market_group_dict = sde_market_groups.get(str(self.basis_market_group))
-        # кол-во данного продукта, который имеется на manufacturing-станции
-        self.exist_in_manuf_stock: int = manufacturing_stock_resources.get(type_id, 0)
-        # кол-во данного продукта, который имеется на reaction-станции
-        self.exist_in_react_stock: int = reaction_stock_resources.get(type_id, 0)
-        # кол-во данного продукта, который зарезервирован на manufacturing-станции (в результате расчёта производства)
-        self.reserved_in_manuf_stock: int = 0
-        # кол-во данного продукта, который зарезервирован на reaction-станции (в результате расчёта производства)
-        self.reserved_in_react_stock: int = 0
-        # поиск чертежа, который подходит для производства данного типа продукта
-        self.blueprint_type_id = None
-        self.blueprint_name = None
-        self.blueprint_activity = None
-        self.blueprint_activity_dict = None
-        # признак, получается ли данный продукт в результате реакции
-        self.is_reaction = None
-        # 'символ' станции, на которой происходит производство данного продукта
-        #  'M' - индустриальная станция (Sotiyo)
-        #  'R' - станция проведения реакций (Tatara)
-        #  None - если продукт не производится (например Tritanium) или данных по нему нет (не обновлён SDE)
-        self.where = None
-        # сведения о запуске чертежа/ей
-        self.products_per_single_run = None
-        # настраиваем запуски чертежей: списка запусков (план по имеющимся в наличие чертежам)
-        self.runs_and_jobs = []
-        # настраиваем справочник для сохранения "пользовательских" данных в объекте (очищается методом clear)
-        self.user_data = {}
-        # сводные сведения о работах
-        self.in_progress: int = 0
-        # ---
-        # получаем информацию о чертежах и способе производства материала
-        # настройка запусков чертежей
-        self.setup_blueprint_details(sde_type_ids, sde_bp_materials)
-        # получаем список работ, которые ведутся с этим материалом, а результаты сбрасываются в сток
-        self.setup_industry_jobs(
-            corp_industry_jobs_data,
-            manufacturing_blueprint_loc_ids,
-            manufacturing_stock_loc_ids, reaction_stock_loc_ids)
-
-    def __del__(self):
-        self.clear()
-        del self.blueprint_activity_dict
-        del self.runs_and_jobs
-        del self.user_data
-
-    # сброс сведений о зерезервированности продукта (меняются в результате расчёта)
-    def clear(self):
-        self.reserved_in_manuf_stock: int = 0
-        self.reserved_in_react_stock: int = 0
-        self.runs_and_jobs = []
-        self.user_data = {}
-
-    # считаем остатки и потребности кол-ва материалов в manufacturing-стоке
-    def get_not_available_in_manuf_stock(self):
-        res: int = (self.reserved_in_manuf_stock - self.exist_in_manuf_stock) if self.exist_in_manuf_stock < self.reserved_in_manuf_stock else 0
-        return res
-
-    # считаем остатки и потребности кол-ва материалов в reaction-стоке
-    def get_not_available_in_react_stock(self):
-        res: int = (self.reserved_in_react_stock - self.exist_in_react_stock) if self.exist_in_react_stock < self.reserved_in_react_stock else 0
-        return res
-
-    # считаем остатки и потребности кол-ва материалов и в manufacturing-стоке и в reaction-стоке
-    def get_not_available_in_all_stocks(self):
-        return self.get_not_available_in_manuf_stock() + self.get_not_available_in_react_stock()
-
-    # выполняем проверку на необходимость/возможность транспортировки части стока с другой станции в manufacturing-сток
-    def need_transfer_into_manuf_stock(self):
-        if self.exist_in_react_stock:
-            if self.get_not_available_in_react_stock():
-                return False
-            elif self.get_not_available_in_manuf_stock():
-                return True
-        return False
-
-    # выполняем проверку на необходимость/возможность транспортировки части стока с другой станции в reaction-сток
-    def need_transfer_into_react_stock(self):
-        if self.exist_in_manuf_stock:
-            if self.get_not_available_in_manuf_stock():
-                return False
-            elif self.get_not_available_in_react_stock():
-                return True
-        return False
-
-    # выполняем проверку на необходимость/возможность транспортировки части стока с одной станции на другую
-    def need_transfer_between_stocks(self):
-        return self.need_transfer_into_manuf_stock() or self.need_transfer_into_react_stock()
-
-    # получаем информацию о чертежах и способе производства материала
-    # TODO: внимание! возможно, что один и тот же продукт может производиться разными способами - касается инвентов!
-    def setup_blueprint_details(self, sde_type_ids, sde_bp_materials):
-        # если продукт производится по формулам, то это однозначно реакция (производить на татаре)
-        (self.blueprint_type_id, activity_dict) = eve_sde_tools.get_blueprint_type_id_by_product_id(
-            self.type_id,
-            sde_bp_materials,
-            'reaction')
-        if self.blueprint_type_id is not None:
-            self.is_reaction = True
-            self.where = 'R'
-            self.blueprint_activity = 'reaction'
-        else:
-            # если имеем дело с manufacturing-производством, то проверяем какой market-группе принадлежит продукт, если
-            # это топливные блоки, то помечаем, что они будут крафтиться на reaction-станции
-            (self.blueprint_type_id, activity_dict) = eve_sde_tools.get_blueprint_type_id_by_product_id(
-                self.type_id,
-                sde_bp_materials,
-                'manufacturing')
-            if self.blueprint_type_id is None:
-                # если продукт не производится в результате производства, то оставляем поля None
-                # если данные по производимому продукту отсутствуют (не обновлён SDE), то оставляем поля None
-                return
-            self.is_reaction = False
-            self.where = 'M'
-            self.blueprint_activity = 'manufacturing'
-        # получаем прочую справочную информацию о чертеже и методе производства материала
-        self.blueprint_name = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, self.blueprint_type_id)
-        self.blueprint_activity_dict = activity_dict['activities'][self.blueprint_activity]
-        if len(self.blueprint_activity_dict['products']) != 1:
-            raise Exception('Unable to get product quantity information')
-        self.products_per_single_run = self.blueprint_activity_dict['products'][0]['quantity']
-        # определяем какой группе принадлежит производимый продукт и корректируем использование чертежей
-        if self.market_group == 1870:  # Fuel Blocks -> Tatara
-            self.where = 'R'
-
-    # получаем список работ, которые ведутся с этим материалом, а результаты сбрасываются в сток
-    def setup_industry_jobs(
-            self,
-            corp_industry_jobs_data,
-            manufacturing_blueprint_loc_ids,
-            manufacturing_stock_loc_ids,
-            reaction_stock_loc_ids):
-        if self.blueprint_type_id is None:
-            self.in_progress = 0
-        else:
-            # проверяем список работ, которые ведутся с этим материалом, а результаты сбрасываются в manuf/react stock
-            # также проверяем список работ, чертежи которых были взяты из контейнеров конвейера
-            for j in corp_industry_jobs_data:
-                product_type_id: int = j["product_type_id"]
-                if product_type_id != self.type_id:
-                    continue
-                output_location_id: int = j['output_location_id']
-                if output_location_id in manufacturing_stock_loc_ids:
-                    self.in_progress += j["runs"]
-                elif output_location_id in reaction_stock_loc_ids:
-                    self.in_progress += j["runs"]
-                # TODO: потерявшиеся работы надо как-то отдельным образом подсвечивать
-                # возможна ситуация, когда какая-либо работа запущена из коробки с чертежами, но её выход направлен не
-                # в сток, а например в ту же коробку, что можно обнаружить с помощью blueprint_location_id и учесть
-            # умножаем на кол-во производимых материалов на один run
-            if self.products_per_single_run is not None:
-                self.in_progress *= self.products_per_single_run
-
-    # отслеживание (подготовка) запусков работ
-    def schedule_job_launches(self, blueprints: int, runs: int):
-        # реакции планируются к запуску определённым кол-вом запусков, поэтому не сверяемся с кол-вом run-ов
-        if self.is_reaction:
-            if not self.runs_and_jobs:
-                self.runs_and_jobs = [{'q': blueprints, 'runs': runs}]
-            else:
-                self.runs_and_jobs[0]['q'] += blueprints
-        # по всем остальным типам работ пока нет никаких конкретных планов, поэтому увеличиваем раны одного чертежа
-        # TODO: найти чертежи и построить план запусков bpc (пока не кончатся), а потом уже планировать использовать bpo
-        else:
-            if not self.runs_and_jobs:
-                self.runs_and_jobs = [{'q': 1, 'runs': runs}]
-            else:
-                self.runs_and_jobs[0]['runs'] += runs
-
-    # blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
-    # метод возвращает список tuple: [{"id": 11399, "q": 11, "qmin": 11"}] с учётом ME
-    def get_materials_list_for_set_of_blueprints(
-            self,  # используются сведения о чертеже, тип индустрии (manufacturing, research_material),...
-            blueprints_details,  # при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
-            material_efficiency,  # параметр чертежа (набора чертежей)
-            is_blueprint_copy=True,  # при is_blueprint_copy=True, в списке blueprints_details анализиуется только "r"
-            fixed_number_of_runs=None):  # учитывается только для оригиналов, т.е. для is_blueprint_copy=False
-        # список материалов по набору чертежей с учётом ME
-        materials_list_with_efficiency = []
-        # перебираем все ресурсы (материалы) чертежа
-        for m in self.blueprint_activity_dict["materials"]:
-            bp_manuf_need_all = 0
-            bp_manuf_need_min = 0
-            for __bp3 in blueprints_details:
-                # расчёт кол-ва ранов для этого чертежа
-                if is_blueprint_copy:
-                    quantity_of_runs = __bp3["r"]
-                    quantity_of_blueprints = 1
-                else:
-                    quantity_of_blueprints = __bp3["q"] if __bp3["q"] > 0 else 1
-                    quantity_of_runs = fixed_number_of_runs if fixed_number_of_runs else 1
-                    # умножение на количество оригиналов будет выполнено позже...
-                # расчёт кол-ва материала с учётом эффективности производства
-                __industry_input = eve_efficiency.get_industry_material_efficiency(
-                    self.blueprint_activity,
-                    quantity_of_runs,
-                    m["quantity"],  # сведения из чертежа
-                    material_efficiency)
-                # вычисляем минимально необходимое материалов, необходимых для работ хотя-бы по одному чертежу
-                bp_manuf_need_min = __industry_input if bp_manuf_need_min == 0 else min(bp_manuf_need_min, __industry_input)
-                # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
-                __industry_input *= quantity_of_blueprints
-                # считаем общее количество материалов, необходимых для работ по этом чертежу
-                bp_manuf_need_all += __industry_input
-            # вывод информации о ресурсе (материале)
-            bpmm_tid: int = m["typeID"]
-            materials_list_with_efficiency.append({
-                "id": bpmm_tid,
-                "q": bp_manuf_need_all,
-                "qmin": bp_manuf_need_min,
-            })
-        return materials_list_with_efficiency
-
-# ConveyorMaterials - набор материалов и продуктов, задействованных в производстве конвейера (всё то, что расположено
-# в коробках, или рассчитано как нужды производства)
-class ConveyorMaterials:
-    def __init__(self,
-                 # sde данные, загруженные из .converted_xxx.json файлов
-                 sde_type_ids,
-                 sde_bp_materials,
-                 sde_market_groups,
-                 # esi данные, загруженные с серверов CCP
-                 corp_industry_jobs_data,
-                 # списки контейнеров и станок из экземпляра контейнера
-                 manufacturing_blueprint_loc_ids,
-                 manufacturing_stock_loc_ids,
-                 reaction_stock_loc_ids,
-                 # список ресурсов, которые используются в производстве
-                 manufacturing_stock_resources,
-                 reaction_stock_resources):
-        self.__sde_type_ids = sde_type_ids
-        self.__sde_bp_materials = sde_bp_materials
-        self.__sde_market_groups = sde_market_groups
-        self.__corp_industry_jobs_data = corp_industry_jobs_data
-        self.__manufacturing_stock_loc_ids = manufacturing_stock_loc_ids
-        self.__manufacturing_blueprint_loc_ids = manufacturing_blueprint_loc_ids
-        self.__reaction_stock_loc_ids = reaction_stock_loc_ids
-        self.__manufacturing_stock_resources = manufacturing_stock_resources
-        self.__reaction_stock_resources = reaction_stock_resources
-        # подготовка списка-справочника, который будет хранить все продукты, используемые конвейером
-        self.materials: typing.Dict[int, ConveyorItem] = {}
-
-    def __del__(self):
-        # уничтожаем свой список-спрвочник, остальные (не наши) не трогаем
-        del self.materials
-
-    def get(self, type_id: int):
-        in_cache = self.materials.get(type_id)
-        if in_cache is None:
-            in_cache = ConveyorItem(
-                type_id,
-                # sde данные, загруженные из .converted_xxx.json файлов
-                self.__sde_type_ids,
-                self.__sde_bp_materials,
-                self.__sde_market_groups,
-                # esi данные, загруженные с серверов CCP
-                self.__corp_industry_jobs_data,
-                # списки контейнеров и станок из экземпляра контейнера
-                self.__manufacturing_blueprint_loc_ids,
-                self.__manufacturing_stock_loc_ids,
-                self.__reaction_stock_loc_ids,
-                # список ресурсов, которые используются в производстве
-                self.__manufacturing_stock_resources,
-                self.__reaction_stock_resources)
-            self.materials[type_id] = in_cache
-        return in_cache
-
-    def load(self):
-        # инициализируем (загружаем) справочники о материалах в стоке и о продуктах производства
-        # списки сюда могут попадать как экземплярами list(), так и экземплярами set(), так и dict(id: val,...)
-        for tids in [self.__manufacturing_stock_resources,
-                     self.__reaction_stock_resources]:
-            for tid in tids:
-                type_id: int = tid
-                if self.get(type_id) is None:
-                    self.materials[type_id] = ConveyorItem(
-                        type_id,
-                        self.__sde_type_ids,
-                        self.__sde_bp_materials,
-                        self.__sde_market_groups,
-                        self.__manufacturing_stock_resources,
-                        self.__reaction_stock_resources)
-
-    # выполнение расчётов достаточности материалов:
-    # - materials_to_produce_with_efficiency - список [{'id':?,'q':?},...] материалов, которые требуется потратить
-    # - materials_will_consumed_from_factory - признак 'M' или 'R', откуда планируется тратить материалы (в том случае,
-    #   если материалы не производятся, а покупаются)
-    # на выходе будут сформированы два списка:
-    # - used_and_exist_materials - список [{'id':?,'q':?},...] материалов, которые отмечены зарезервированными (использ)
-    # - not_enough_materials - список [{'id':?,'q':?},...] материалов, которых не хватает для производства по вх.списку
-    def calc_materials_availability(
-            self,
-            materials_to_produce_with_efficiency,
-            materials_will_consumed_from_factory: str):
-        # подготовка промежуточных списков со сведениями об изменении достаточности и используемости материалов
-        used_and_exist_materials = []
-        not_enough_materials = []
-        for m_me in materials_to_produce_with_efficiency:
-            # перебор материалов, количество которых рассчитано на основании сведений о ME
-            type_id: int = m_me["id"]
-            need_quantity: int = m_me["q"]
-            # получение сведений о материале, находящемся в справочнике конвейера
-            in_cache = self.get(type_id)
-            # считаем сколько материала не хватает с учётом того количества, что находится в стоке (стоках)
-            if materials_will_consumed_from_factory == 'M':
-                # проверяем manufacturing-сток
-                in_stock_remained: int = in_cache.exist_in_manuf_stock - in_cache.reserved_in_manuf_stock
-                not_available: int = 0 if in_stock_remained >= need_quantity else need_quantity - in_stock_remained
-                consumed: int = need_quantity if in_stock_remained >= need_quantity else in_stock_remained
-                # корректируем справочник материалов, увеличивая зарезервированное кол-во предметов этого типа
-                in_cache.reserved_in_manuf_stock += need_quantity
-            elif materials_will_consumed_from_factory == 'R':
-                # проверяем reaction-сток
-                in_stock_remained: int = in_cache.exist_in_react_stock - in_cache.reserved_in_react_stock
-                not_available: int = 0 if in_stock_remained >= need_quantity else need_quantity - in_stock_remained
-                consumed: int = need_quantity if in_stock_remained >= need_quantity else in_stock_remained
-                # корректируем справочник материалов, увеличивая зарезервированное кол-во предметов этого типа
-                in_cache.reserved_in_react_stock += need_quantity
-            else:
-                raise Exception('Unable to check the stock at industry station')
-            # сохраняем использованное из стока кол-во материалов для производства по этому чертежу
-            if consumed > 0:
-                used_and_exist_materials.append({"id": type_id, "q": consumed, "w": materials_will_consumed_from_factory})
-            # сохраняем недостающее кол-во материалов для производства по этому чертежу
-            if not_available > 0:
-                # устанавливаем, где и как именно производится данный вид продукта (не там же, где находится его сток!)
-                # если это покупной материал и сведений о его производстве нет, то его закупка уже рассчитана вследствие
-                # операций выполненных выше
-                if in_cache.where is None:
-                    not_enough_materials.append({"id": type_id, "q": not_available, "w": materials_will_consumed_from_factory})
-                    continue
-                #
-                #remained_in_all_stocks: int = in_cache.exist_in_manuf_stock - in_cache.reserved_in_manuf_stock + \
-                #                              in_cache.exist_in_react_stock - in_cache.reserved_in_react_stock
-                #not_available_over_all_stocks: int = 0 if remained_in_all_stocks >= need_quantity else need_quantity - remained_in_all_stocks
-                # сохраняем недостающее кол-во материалов для производства по этому чертежу
-                not_enough_materials.append({"id": type_id, "q": not_available, "w": in_cache.where})
-        # вывод материалов в стоке имеющихся и помеченным использованными, а также список недостающего кол-ва
-        return used_and_exist_materials, not_enough_materials
-
-    # объединение двух списков типа ['id':?,'q':?] таким образом, чтобы в результирующий не содержал повторения по id
-    # возможна работа со списками ['id':?,'q':?,'w':?] с проверкой флага 'w' в src и dst (с пом. check_where_flag)
-    @staticmethod
-    def calc_materials_summary(
-            source_list,
-            destination_list,
-            check_where_flag=True):
-        # выполнение расчётов достаточности материала и добавление его количества в summary-списки
-        for src in source_list:
-            # перебор материалов, количество которых рассчитано на основании сведений о ME
-            type_id: int = src['id']
-            where = src['w'] if check_where_flag else None
-            # сохраняем материалы для производства в список их суммарного кол-ва
-            found: bool = False
-            for dst in destination_list:
-                if dst['id'] != type_id:
-                    continue
-                if check_where_flag and dst['w'] != where:
-                    continue
-                dst['q'] += src['q']
-                found = True
-                break
-            if not found:
-                destination_list.append({'id': type_id, 'q': src['q']})
-                if check_where_flag:
-                    destination_list[len(destination_list)-1].update({'w': where})
-
-    # расчёт материалов, необходимых на следующем уровне производства по справочным данным, имеющимся в каталоге
-    # конвейера:
-    # - not_enough_materials - список [{'id':?,'q':?},...] материалов, которых не хватает для производства по вх.списку
-    #   см. результат работы метода calc_materials_availability
-    # - next_tier_materials - список материалов для производства на следующем уровне
-    # - next_tier_for_buy - список на закуп на следующем уровне (произвести нельзя)
-    def get_ntier_materials_list_of_not_available(
-            self,
-            not_enough_materials):
-        # расчёт списка материалов, предыдущего уровня вложенности (по информации о ресурсах, которых не хватает)
-        next_tier_materials = []
-        next_tier_for_buy = []
-        for m in not_enough_materials:
-            type_id: int = m['id']
-            # получение сведений о материале, находящемся в справочнике конвейера
-            in_cache = self.get(type_id)
-            # проверяем, можно ли произвести данный ресурс (материал)?
-            if in_cache.blueprint_type_id is None:
-                self.calc_materials_summary([m], next_tier_for_buy, check_where_flag=False)
-                continue
-            # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
-            # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
-            if in_cache.is_reaction:
-                blueprints: int = ceil(m['q'] / (in_cache.products_per_single_run * 50))
-                ntier_set_of_blueprints = [{'r': -1, 'q': blueprints}]
-                in_cache.schedule_job_launches(blueprints, 50)
-            else:
-                runs: int = ceil(m['q'] / in_cache.products_per_single_run)
-                ntier_set_of_blueprints = [{'r': runs}]
-                in_cache.schedule_job_launches(1, runs)
-            # расчёт материалов по информации о чертеже с учётом ME
-            # TODO: добавить авторасчёт необходимых чертежей в список конвейера
-            nemlwe = in_cache.get_materials_list_for_set_of_blueprints(
-                ntier_set_of_blueprints,
-                # мы не знаем с какой эффективностью будет делаться вложенная работа, наверное 10?
-                # по-хорошему тут надо слазить в библиотеку чертежей...
-                0 if in_cache.is_reaction else 10,
-                is_blueprint_copy=not in_cache.is_reaction,
-                fixed_number_of_runs=50 if in_cache.is_reaction else None)
-            # получение сведений о материалах, находящемся (или пока ещё нет) в справочнике конвейера
-            for m2 in nemlwe:
-                type_id2: int = m2['id']
-                in_cache2 = self.get(type_id2)
-                # - в том случае, если известно где будет производиться материал, добавляем его в список с w-маркером
-                # - в том случае, если место производства неизвестно, то скорее всего будет запланирован его закуп с
-                #   доставкой на станцию, где будет запускаться производство текущего чертежа (определяется в вызывающем
-                #   методе)
-                self.calc_materials_summary(
-                    [{'id': type_id2, 'q': m2['q'], 'w': in_cache2.where}],  # in_cache2.where м.б. None
-                    next_tier_materials,
-                    check_where_flag=True)
-            del nemlwe
-        return next_tier_materials, next_tier_for_buy
-
-    calc_run_times: int = 0
-    calc_run_debug: bool = False
-
-    def show_debug_list(self, prefix: str, materials):
-        print("{}: {}".format(
-            prefix,
-            ["{} {}".format(m['q'], self.get(m['id']).name) for m in materials if m['q'] > 0]))
-
-    def calc_not_available_materials_list(
-            self,
-            # список ресурсов, которые требуется произвести, в формате: ['id':?,'q':?]
-            materials_summary):
-        # расчёт информации по недостающим материалам
-        if not materials_summary:
-            return
-        # набор lambda-функций, которые применяются ниже
-        make_m = lambda m: {'id': m['id'], 'q': m['q']}
-        # подготовка списков материалов к работе
-        # noinspection PyUnusedLocal
-        used_and_exist_materials = []
-        # noinspection PyUnusedLocal
-        not_enough_materials__initial = []
-        not_enough_materials__market = []
-        not_enough_materials__intermediate = []
-        not_enough_materials__cycled = {'M': [], 'R': []}
-        # проверка наличия имеющихся ресурсов с учётом запаса в стоке
-        # (эта версия расчётов конвейера в качестве "старта расчёта" имеет только manufacturing-план)
-        if True:
-            # запускаем расчёт недостающего кол-ва материалов для производственных работ в manufacturing-станции
-            (used_and_exist_materials, not_enough_materials__initial) = self.calc_materials_availability(
-                materials_summary,
-                'M')
-            # если всех материалов в стоке достаточно, то выходим; иначе продолжаем вычислять производственные цепочки
-            if not not_enough_materials__initial:
-                return
-            # отмечаем "стартовые" материалы в справочнике initial-флагом
-            for m in not_enough_materials__initial:
-                self.get(m['id']).user_data.update({'initial': True})
-            # расчёт списка материалов, которых не хватает
-            # - заполняем cycled-список для manufacturing-производства
-            # - не трогаем initial-список для reaction-производства (все изменения в not_available и consumed
-            #   уже произошли) и возможная ситуация, что продукты реакций отсутствуют в стоке, в этом случае они уже
-            #   попали в initial-список с w='R' и повлияли на значения полей в ConveyorItem
-            self.calc_materials_summary(
-                [make_m(m) for m in not_enough_materials__initial if m['w'] == 'M'],
-                not_enough_materials__cycled['M'],
-                check_where_flag=False)
-        # вывод отладочной информации (временная мера для отслеживания справочников)
-        if self.calc_run_debug:
-            self.calc_run_times += 1
-            self.show_debug_list("\n\n#{}-0'tier NOT ENOUGH".format(self.calc_run_times), not_enough_materials__initial)
-        # На первой итерации собираем все производственные работы и рассчитываем их потребность и возможность выполнить
-        # производство с учётом имеющихся в стоке материалов. В том случае, если попадаются реакции, то откладываем их в
-        # список работ Татары.
-        # На второй итерации все работы на Татаре рассчитываются аналогично тому, как это делалось на предыдущем шаге,
-        # но расчёт продолжается до тех пор, пока не будут спланированы вообще все работы, потому как даже зависимое
-        # производство Fuel-блоков выполняется на Татаре.
-        for where in ['M', 'R']:
-            ntier: int = 0
-            while not_enough_materials__cycled[where]:
-                # Расчёт списка материалов, предыдущего уровня вложенности (по информации о ресурсах, которых не
-                # хватает).
-                # ---
-                # Следующий метод расщепляет список not_enough_materials__cycled на:
-                # - buy : для тех материалов, которые в cycled-списке не производятся, а лишь покупаются
-                # - next_tier : прочие материалы, следовательно, можно произвести и новый список будет содержать
-                #   из чего именно
-                (next_tier, buy) = self.get_ntier_materials_list_of_not_available(
-                    not_enough_materials__cycled[where])
-                # сохраняем материалы, которые невозможно произвести - возможен только их закуп
-                if buy:
-                    if self.calc_run_debug:
-                        # вывод отладочной информации (временная мера для отслеживания справочников)
-                        self.show_debug_list("#{}-{}{}'tier FOR BUY".format(self.calc_run_times, ntier, where), buy)
-                    self.calc_materials_summary(
-                        buy,
-                        not_enough_materials__market,
-                        check_where_flag=False)
-                # Сохраняем информацию о способе получения материалов (кол-во чертежей и запусков)
-                # если материалов, которые пригодны для производства не найдено - завершаем итерации
-                if not next_tier:
-                    break
-                # вывод отладочной информации (временная мера для отслеживания справочников)
-                if self.calc_run_debug:
-                    self.show_debug_list("#{}-{}{}'tier PLANNED at SOTIYO".format(self.calc_run_times, ntier+1, where), [m for m in next_tier if (m['w'] is None and where == 'M') or m['w'] == 'M'])
-                    self.show_debug_list("#{}-{}{}'tier PLANNED at TATARA".format(self.calc_run_times, ntier+1, where), [m for m in next_tier if (m['w'] is None and where == 'R') or m['w'] == 'R'])
-                # первые прогоны цикла лишь накапливают сведения о материалах, производство которых запланировано на
-                # станции проведения реакций (Tatara)
-                if where == 'M':
-                    self.calc_materials_summary(
-                        [make_m(m) for m in next_tier if m['w'] == 'R'],
-                        not_enough_materials__cycled['R'],
-                        check_where_flag=False)
-                # далее подготавливаем список тех материалов, которые будут крафтиться на текущем типе станции
-                next_tier__plan = [make_m(m) for m in next_tier if m['w'] is None or m['w'] == where]
-                # уничтожаем список, чтобы случайно к нему не обратиться
-                if where == 'R' and [1 for m in next_tier if m['w'] == 'M']:
-                    raise Exception('Unable to apply manufacturing plan at station for reactions')
-                del next_tier
-                # uaem - used and exist materials
-                # подготовка списка недостающих материалов к следующей итерации этого цикла
-                (uaem, not_enough_materials__cycled[where]) = self.calc_materials_availability(
-                    next_tier__plan,
-                    where)
-                # уничтожаем список, чтобы случайно к нему не обратиться
-                del next_tier__plan
-                if uaem:
-                    self.calc_materials_summary(uaem, used_and_exist_materials)
-                # уничтожаем ненужный список
-                del uaem
-                # сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
-                for m in not_enough_materials__cycled[where]:
-                    if self.get(m['id']).blueprint_type_id is not None:
-                        self.calc_materials_summary(
-                            [m],
-                            not_enough_materials__intermediate,
-                            check_where_flag=False)
-                # вывод отладочной информации (временная мера для отслеживания справочников)
-                if self.calc_run_debug:
-                    self.show_debug_list("#{}-{}{}'tier NOT ENOUGH SOTIYO".format(self.calc_run_times, ntier+1, where), [m for m in not_enough_materials__cycled[where] if (m['w'] is None and where == 'M') or m['w'] == 'M'])
-                    self.show_debug_list("#{}-{}{}'tier NOT ENOUGH TATARA".format(self.calc_run_times, ntier+1, where), [m for m in not_enough_materials__cycled[where] if (m['w'] is None and where == 'R') or m['w'] == 'R'])
-                # ---
-                # переходим к следующему уровню вложенности, строим план производства для следующего
-                # списка not_enough_materials__cycled
-                ntier += 1
-            # уничтожаем список, чтобы случайно к нему не обратиться
-            del not_enough_materials__cycled[where]
-            # --
-            # На первом запуска цикла для reaction-производства (по собранным требованиям в cycled-списке) надо
-            # зарегистрировать эти требования с помощью calc_materials_availability (этот метод для w='R' ранее
-            # не выполнялся.
-            if where == 'M':
-                # - uaem : used and exist materials
-                # - cnem : current not enough materials
-                # - not_enough_materials__cycled['R'] : составлен в ходе планирования manufacturing-работ, расчёт
-                #   достаточного кол-ва этих материалов надо провести на производственной станке (Сотия, а не Татара)
-                # подготовка списка недостающих материалов к текущей итерации этого цикла
-                (uaem, cnem) = self.calc_materials_availability(
-                    not_enough_materials__cycled['R'],
-                    'M')
-                # сохраняем в промежуточный список материалы, которые уже есть в стоке
-                if uaem:
-                    self.calc_materials_summary(uaem, used_and_exist_materials)
-                # если всех материалов в стоке достаточно, то выходим; иначе продолжаем вычислять
-                # производственные цепочки
-                if cnem:
-                    # заново компонуем cycled-список для reaction-производства
-                    not_enough_materials__cycled['R'] = []
-                    cnem = [make_m(m) for m in cnem]
-                    self.calc_materials_summary(
-                        cnem,
-                        not_enough_materials__cycled['R'],
-                        check_where_flag=False)
-                    # в этот список также войдёт содержимое initial-списка для reaction-производства, но без
-                    # вызова метода calc_materials_availability, ктоорый для initial-списка ранее уже вызывался
-                    self.calc_materials_summary(
-                        [make_m(m) for m in not_enough_materials__initial if m['w'] == 'R'],
-                        not_enough_materials__cycled['R'],
-                        check_where_flag=False)
-                    # сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
-                    cnem = [m for m in cnem if self.get(m['id']).blueprint_type_id is not None]
-                    if cnem:
-                        self.calc_materials_summary(
-                            cnem,
-                            not_enough_materials__intermediate,
-                            check_where_flag=False)
-                # уничтожаем списки, чтобы случайно к ним не обратиться (в т.ч. более ненужный список
-                # стартовых потребностей)
-                del uaem
-                del cnem
-                del not_enough_materials__initial
 
 
 def __is_availabe_blueprints_present(
@@ -685,16 +68,16 @@ def __is_availabe_blueprints_present(
     return vacant_originals, vacant_copies, False
 
 
-def __dump_material(glf, quantity, type_id, type_name, with_copy_to_clipboard=False):
+def __dump_material(glf, quantity: int, type_id: int, type_name: str, with_copy_to_clipboard: bool = False):
     # вывод наименования ресурса
     glf.write(
-        '<tid{qq}{nnm}><img class="icn24" src="{src}"> <b>{q:,d}</b> {nm} </tid>\n'.
+        '<tid{qq}{tt}><img class="icn24" src="{src}"> <b>{q:,d}</b> {nm} </tid>\n'.
         format(
             src=render_html.__get_img_src(type_id, 32),
             q=quantity,
             nm=type_name,
             qq=' data-q="{}"'.format(quantity) if with_copy_to_clipboard else '',
-            nnm=' data-nm="{}"'.format(type_name) if with_copy_to_clipboard else '',
+            tt=' data-tid="{}"'.format(type_id) if with_copy_to_clipboard else '',
         )
     )
 
@@ -1034,7 +417,7 @@ def __dump_materials_list(
 def __dump_not_available_materials_list_rows(
         glf,
         not_enough_materials,
-        conveyor_materials: ConveyorMaterials,
+        conveyor_materials: eve_conveyor_tools.ConveyorMaterials,
         mutable_row_num: typing.List[int],
         # esi данные, загруженные с серверов CCP
         corp_bp_loc_data,
@@ -1049,9 +432,9 @@ def __dump_not_available_materials_list_rows(
         dump_listed_table_cells):
     # поиск групп материалов, которых где не хватает для завершения производства по списку
     # чертежи в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
-    material_groups: typing.Dict[int, typing.List[ConveyorItem]] = {}
+    material_groups: typing.Dict[int, typing.List[eve_conveyor_tools.ConveyorItem]] = {}
     for type_id in not_enough_materials:
-        in_cache: ConveyorItem = conveyor_materials.get(type_id)
+        in_cache: eve_conveyor_tools.ConveyorItem = conveyor_materials.get(type_id)
         # определяем, какой market-группе относится товар?
         group_id: int = in_cache.basis_market_group
         # добавляем товар в этот список market-группы
@@ -1112,8 +495,8 @@ def __dump_not_available_materials_list_rows(
                 # подготовка элементов управления копирования данных в clipboard
                 __copy2clpbrd = '' if not with_copy_to_clipboard__blueprints else \
                     '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
-                    '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
-                    '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
+                    ' data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs">'+glyphicon("copy")+ \
+                    ' Export to multibuy</button></a>'
                 # подготовка стиля строки, который меняется в зависимости от ей порядка в таблице и содержимого таблицы
                 __tr_class = ''
                 if group_with_are_enough:
@@ -1130,9 +513,9 @@ def __dump_not_available_materials_list_rows(
                     __tr_class = ' class="' + __tr_class + '"'
                 glf.write(
                     '<tr{trcl}>\n'
-                    ' <td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
-                    ' <th class="active qind-mr">{prfx}Sotiyo</th>'
-                    ' <th class="active qind-mr">{prfx}Tatara</th>'.
+                    '<td class="active" colspan="2"><b>{nm}</b><!--{id}-->{clbrd}</td>\n'
+                    '<th class="active qind-mr">{prfx}Sotiyo</th>\n'
+                    '<th class="active qind-mr">{prfx}Tatara</th>\n'.
                     format(nm=__grp_name,
                            id=ms_group_id,
                            clbrd=__copy2clpbrd,
@@ -1140,28 +523,28 @@ def __dump_not_available_materials_list_rows(
                            prfx='Required<br>' if __high_group_header else '',
                            ))
                 if 'runs' in dump_listed_table_cells:
-                    glf.write('<th class="active qind-rr hidden">To launch</th>')
+                    glf.write('<th class="active qind-rr hidden">To launch</th>\n')
                 if 'planned' in dump_listed_table_cells:
                     glf.write(
-                        '<th class="active qind-mp hidden">{prfx}Sotiyo</th>'
-                        '<th class="active qind-mp hidden">{prfx}Tatara</th>'.
+                        '<th class="active qind-mp hidden">{prfx}Sotiyo</th>\n'
+                        '<th class="active qind-mp hidden">{prfx}Tatara</th>\n'.
                         format(prfx='Planned<br>' if __high_group_header else '',
                                ))
                 if 'consumed' in dump_listed_table_cells:
                     glf.write(
-                        '<th class="active qind-mc hidden">{prfx}Sotiyo</th>'
-                        '<th class="active qind-mc hidden">{prfx}Tatara</th>'.
+                        '<th class="active qind-mc hidden">{prfx}Sotiyo</th>\n'
+                        '<th class="active qind-mc hidden">{prfx}Tatara</th>\n'.
                         format(prfx='Consumed<br>' if __high_group_header else '',
                                ))
                 if 'exist' in dump_listed_table_cells:
                     glf.write(
-                        '<th class="active qind-me hidden">{prfx}Sotiyo</th>'
-                        '<th class="active qind-me hidden">{prfx}Tatara</th>'.
+                        '<th class="active qind-me hidden">{prfx}Sotiyo</th>\n'
+                        '<th class="active qind-me hidden">{prfx}Tatara</th>\n'.
                         format(prfx='Stock<br>' if __high_group_header else '',
                                ))
                 if 'progress' in dump_listed_table_cells:
-                    glf.write('<th class="active qind-ip hidden">In progress</th>')
-                glf.write('</tr>')
+                    glf.write('<th class="active qind-ip hidden">In progress</th>\n')
+                glf.write('</tr>\n')
                 group_diplayed = True
             # получаем список чертежей, которые имеются в распоряжении корпорации для постройки этих материалов
             vacant_originals, vacant_copies, not_a_product = __is_availabe_blueprints_present(
@@ -1173,7 +556,7 @@ def __dump_not_available_materials_list_rows(
                 react_station_ids,
                 corp_assets_tree)
             # формируем информационные тэги по имеющимся (вакантным) чертежам для запуска производства
-            __blueprints_availability = ''
+            __blueprints_availability: str = ''
             if ms_where is not None and ((ms_not_available__manuf + ms_not_available__react) > ms_in_progress):
                 if not not_a_product and vacant_originals:
                     __blueprints_availability += ' <span class="label label-{st}">{txt}</span>'.\
@@ -1184,8 +567,14 @@ def __dump_not_available_materials_list_rows(
                 if not not_a_product and not vacant_originals and not vacant_copies:
                     __blueprints_availability += ' <span class="label label-danger">no {txt}</span>'.\
                         format(txt='formulas' if is_reaction else 'blueprints')
-                if __blueprints_availability:
-                    __blueprints_availability = '<div class="qind-ba">' + __blueprints_availability + '</div>'
+            # конструируем строку для вызова выпадающего меню для взаимодействия с таблицей(ами) списком материалов
+            __materials_menu: str = \
+                ' <a data-target="#" role="button" data-tid="{tid}"{bp} data-toggle="popover">{gly}</a>'. \
+                format(tid=ms_type_id,
+                       bp='' if ms_blueprint_type_id is None else ' data-bp="{}"'.format(ms_blueprint_type_id),
+                       gly=glyphicon("option-horizontal"),
+                       )
+            __blueprints_interactions = '<div class="qind-bib">' + __blueprints_availability + __materials_menu + '</div>'
             # подготовка элемента с признаком необходимости передачи накопленных стоков в другую локацию
             __transfer_sign__manuf = ''
             __transfer_sign__react = ''
@@ -1193,45 +582,43 @@ def __dump_not_available_materials_list_rows(
                 if ms_need_stock_transfer__manuf:
                     __transfer_sign__manuf = \
                         '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
-                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
-                        '  aria-hidden="true"></span></a> '. \
-                        format(q=ms_not_available__manuf)
+                        ' data-toggle="tooltip">{gly}</a> '. \
+                        format(q=ms_not_available__manuf, gly=glyphicon("transfer"))
                 if ms_need_stock_transfer__react:
                     __transfer_sign__react = \
                         '<a data-target="#" role="button" data-copy="{q}" class="qind-copy-btn qind-sign"' \
-                        '  data-toggle="tooltip"><span class="glyphicon glyphicon-transfer"' \
-                        '  aria-hidden="true"></span></a> '. \
-                        format(q=ms_not_available__react)
+                        ' data-toggle="tooltip">{gly}</a> '. \
+                        format(q=ms_not_available__react, gly=glyphicon("transfer"))
             # подготовка элементов управления копирования данных в clipboard
             __copy2clpbrd = ''
-            if with_copy_to_clipboard__blueprints:
+            if with_copy_to_clipboard__blueprints and ms_blueprint_type_id is not None:
                 __copy2clpbrd =\
-                    '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
-                    ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
-                    ' aria-hidden="true"></span></a>'. \
-                    format(nm=ms_item_name if ms_blueprint_name is None else ms_blueprint_name)
-            if with_copy_to_clipboard__signs and (ms_need_stock_transfer__manuf or ms_need_stock_transfer__react):
+                    '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn"' \
+                    ' data-toggle="tooltip">{gly}</a>'. \
+                    format(tid=ms_blueprint_type_id, gly=glyphicon("copy"))
+            # если предыдущее условие не отработало, то нет чертежа, поэтому следующее настроит копирование материала
+            if with_copy_to_clipboard__blueprints and ms_blueprint_type_id is None or \
+               with_copy_to_clipboard__signs and (ms_need_stock_transfer__manuf or ms_need_stock_transfer__react):
                 __copy2clpbrd +=\
-                    '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn qind-sign"' \
-                    ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"' \
-                    ' aria-hidden="true"></span></a>'. \
-                    format(nm=ms_item_name)
+                    '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
+                    ' data-toggle="tooltip">{gly}</a>'. \
+                    format(tid=ms_type_id, gly=glyphicon("copy"))
             # конструируем строку со сведениями о способе получения материала (кол-во ранов)
             __runs = "{} &times; {:,d}".format(ms_blueprints, ms_runs) if ms_blueprints and ms_runs else ''
             # вывод сведений в отчёт
             glf.write(
                 '<tr{em}>\n'
                 ' <th scope="row">{num}</th>\n'
-                ' <td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{ba}</td>\n'
-                ' <td data-q="{qm}" class="qind-mr">{tsm}{qtm}</td>\n'
-                ' <td data-q="{qr}" class="qind-mr">{tsr}{qtr}</td>\n'.
+                ' <td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{bib}</td>\n'
+                ' <td{qm} class="qind-mr">{tsm}{qtm}</td>\n'
+                ' <td{qr} class="qind-mr">{tsr}{qtr}</td>\n'.
                 format(num=mutable_row_num[0],
                        src=render_html.__get_img_src(ms_type_id, 32),
                        nm=ms_item_name,
                        clbrd=__copy2clpbrd,
-                       ba=__blueprints_availability,
-                       qm=ms_not_available__manuf,
-                       qr=ms_not_available__react,
+                       bib=__blueprints_interactions,
+                       qm=' data-q="{}"'.format(ms_not_available__manuf) if ms_not_available__manuf else '',
+                       qr=' data-q="{}"'.format(ms_not_available__react) if ms_not_available__react else '',
                        tsm=__transfer_sign__manuf,
                        tsr=__transfer_sign__react,
                        qtm="{:,d}".format(ms_not_available__manuf) if ms_not_available__manuf else '',
@@ -1273,49 +660,16 @@ def __dump_not_available_materials_list(
         glf,
         # esi данные, загруженные с серверов CCP
         corp_bp_loc_data,
-        corp_industry_jobs_data,
         corp_assets_tree,
-        # sde данные, загруженные из .converted_xxx.json файлов
-        sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
         # списки контейнеров и станок из экземпляра контейнера
-        manufacturing_blueprint_loc_ids,
-        manufacturing_stock_loc_ids,
         exclude_loc_ids,
         blueprint_station_ids,
-        reaction_stock_loc_ids,
         react_station_ids,
-        # список материалов, которых не хватает в производстве
-        stock_not_enough_materials,
         # список ресурсов, которые используются в производстве
-        manufacturing_stock_resources,
-        reaction_stock_resources,
-        materials_summary,
+        conveyor_materials,
         # настройки
         with_copy_to_clipboard,
         with_list_of_assets_movement):
-    # отображение в отчёте summary-информации по недостающим материалам
-    if not materials_summary:
-        return
-    # построение справочника материалов, используемых в производстве и производство которых предполагается
-    conveyor_materials = ConveyorMaterials(
-        # sde данные, загруженные из .converted_xxx.json файлов
-        sde_type_ids,
-        sde_bp_materials,
-        sde_market_groups,
-        # esi данные, загруженные с серверов CCP
-        corp_industry_jobs_data,
-        # списки контейнеров и станок из экземпляра контейнера
-        manufacturing_blueprint_loc_ids,
-        manufacturing_stock_loc_ids,
-        reaction_stock_loc_ids,
-        # список ресурсов, которые используются в производстве
-        manufacturing_stock_resources,
-        reaction_stock_resources)
-    # расчёт списка материалов, требуемых для производства заданного списка продуктов, в формате: ['id':?,'q':?]
-    conveyor_materials.calc_not_available_materials_list(materials_summary)
-
     # добавляем в список изначально отсутствующих материалов те, что надо приобрести, initial-список и т.п.
     type_ids = conveyor_materials.materials.keys()
     not_enough_materials__market = [t for t in type_ids if conveyor_materials.get(t).blueprint_type_id is None]
@@ -1331,19 +685,19 @@ def __dump_not_available_materials_list(
     # считаем достаточно ли материалов в группах, чтобы сделать возможность прятать их
     group_with_are_enough__initial = True
     for type_id in not_enough_materials__initial:
-        in_cache: ConveyorItem = conveyor_materials.get(type_id)
+        in_cache: eve_conveyor_tools.ConveyorItem = conveyor_materials.get(type_id)
         if in_cache.get_not_available_in_all_stocks():
             group_with_are_enough__initial = False
             break
     group_with_are_enough__market = True
     for type_id in not_enough_materials__market:
-        in_cache: ConveyorItem = conveyor_materials.get(type_id)
+        in_cache: eve_conveyor_tools.ConveyorItem = conveyor_materials.get(type_id)
         if in_cache.get_not_available_in_all_stocks():
             group_with_are_enough__market = False
             break
     group_with_are_enough__intermediate = True
     for type_id in not_enough_materials__intermediate:
-        in_cache: ConveyorItem = conveyor_materials.get(type_id)
+        in_cache: eve_conveyor_tools.ConveyorItem = conveyor_materials.get(type_id)
         if in_cache.get_not_available_in_all_stocks():
             group_with_are_enough__intermediate = False
             break
@@ -1514,9 +868,6 @@ def __dump_not_available_materials_list(
 """)
     del list_of_assets_movement__materials
 
-    # удаляем более ненужный список материалов
-    del conveyor_materials
-
 
 def get_stock_resources(stock_loc_ids, corp_ass_loc_data):
     stock_resources = {}
@@ -1533,6 +884,32 @@ def get_stock_resources(stock_loc_ids, corp_ass_loc_data):
                         else:
                             stock_resources.update({itm: __a2[itm]})
     return stock_resources
+
+
+"""
+def __dump_blueprints_list_with_materials_rows(
+        glf,
+        conveyor_station,
+        conveyor_materials: eve_conveyor_tools.ConveyorMaterials):
+    glf.write(
+        ' <div class="panel panel-default">\n'
+        '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
+        '   <h4 class="panel-title">\n'
+        '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
+        '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>'
+        '    <span class="badge"><span id="rnblB{id}">0</span> of {bps}</span>\n'
+        '   </h4>\n'
+        '  </div>\n'
+        '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
+        'aria-labelledby="headingB{id}">\n'
+        '   <div class="panel-body">\n'.format(
+            id=loc_id,
+            station=conveyor_station,
+            nm=loc_name,
+            bps=len(__bp2)
+        )
+    )
+"""
 
 
 def __dump_blueprints_list_with_materials(
@@ -1578,6 +955,40 @@ def __dump_blueprints_list_with_materials(
         loc_name = __container["name"]
         sorted_locs_by_names.append({"id": loc_id, "nm": loc_name, "box": __container})
     sorted_locs_by_names.sort(key=lambda loc: loc["nm"])
+
+    """
+    # перебираем контейнеры, находим в них чертежи, строим план производства
+    for loc in sorted_locs_by_names:
+        loc_id: int = loc["id"]
+        loc_name: str = loc["nm"]
+        fixed_number_of_runs = loc["box"].get("fixed_number_of_runs")  # обычно None, но м.б. кол-вом runs для bpo
+        manufacturing_activities: typing.List[str] = loc["box"]["manufacturing_activities"]  # список типов производства
+        # получаем список чертежей с одинаковым названием (типом), но с возможно разными подмножествами me_te и status
+        # список чертежей не может быть пуст, иначе коробка конвейера не попадёт в обработку
+        blueprins_list_dict = corp_bp_loc_data[str(loc_id)]
+        # построение справочника материалов, используемых в производстве и производство которых предполагается
+        conveyor_materials = eve_conveyor_tools.ConveyorMaterials(
+            # sde данные, загруженные из .converted_xxx.json файлов
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            # esi данные, загруженные с серверов CCP
+            corp_industry_jobs_data,
+            # списки контейнеров и станок из экземпляра контейнера
+            manufacturing_blueprint_loc_ids,
+            manufacturing_stock_loc_ids,
+            reaction_stock_loc_ids,
+            # список ресурсов, которые используются в производстве
+            manufacturing_stock_resources,
+            reaction_stock_resources)
+        # вывод в отчёт списка чертежей
+        __dump_blueprints_list_with_materials_rows(
+            glf,
+            conveyor_entity["station"],
+            conveyor_materials)
+        # уничтожение более ненужного списка материалов
+        del conveyor_materials
+    """
 
     # вывод информации по контейнерам
     for loc in sorted_locs_by_names:
@@ -1788,20 +1199,18 @@ def __dump_blueprints_list_with_materials(
                         runnable_blueprints += 1
                         if enable_copy_to_clipboard:
                             glf.write(
-                                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
-                                ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
-                                ' aria-hidden="true"></span></a>'.
-                                format(nm=blueprint_name)
+                                '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn"'
+                                ' data-toggle="tooltip">{gly}</a>'.
+                                format(tid=type_id, gly=glyphicon("copy"))
                             )
                     glf.write('</br></span>')  # qind-blueprints-?
                 else:
                     # подготовка элементов управления копирования данных в clipboard
                     if enable_copy_to_clipboard:
                         glf.write(
-                            '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
-                            ' data-toggle="tooltip"><span class="glyphicon glyphicon-copy"'
-                            ' aria-hidden="true"></span></a>'.
-                            format(nm=blueprint_name)
+                            '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn"'
+                            ' data-toggle="tooltip">{gly}</a>'.
+                            format(tid=type_id, gly=glyphicon("copy"))
                         )
                     glf.write('</br></span>')  # qind-blueprints-?
 
@@ -1850,9 +1259,8 @@ def __dump_blueprints_list_with_materials(
                             ntier=False)
                         if q_conveyor_settings.g_generate_with_show_details:
                             glf.write('&nbsp;<button type="button" class="btn btn-default btn-xs qind-materials-used'
-                                      ' hidden" data-toggle="modal" data-target="#modal{nmm}"><span class="glyphicon'
-                                      ' glyphicon-expand" aria-hidden="true"></span> Show details</button>'.
-                                      format(nmm=g_modal_industry_seq))
+                                      ' hidden" data-toggle="modal" data-target="#modal{nmm}">{gly} Show details</button>'.
+                                      format(nmm=g_modal_industry_seq, gly=glyphicon("expand")))
                         glf.write('</div>\n')  # div(not_enough_materials 1-level)
 
                         # создаём заголовок модального окна, где будем показывать вывод одних материалов в другие
@@ -1971,32 +1379,41 @@ def __dump_blueprints_list_with_materials(
         # отображение в отчёте summary-информации по недостающим материалам
         __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', 'qind-materials-used hidden', materials_used, True, True)
         __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', 'qind-summary-block hidden', materials_summary, False, True)
-        __dump_not_available_materials_list(
-            glf,
-            # esi данные, загруженные с серверов CCP
-            corp_bp_loc_data,
-            corp_industry_jobs_data,
-            corp_assets_tree,
+        # построение справочника материалов, используемых в производстве и производство которых предполагается
+        conveyor_materials = eve_conveyor_tools.ConveyorMaterials(
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            # esi данные, загруженные с серверов CCP
+            corp_industry_jobs_data,
             # списки контейнеров и станок из экземпляра контейнера
-            blueprint_loc_ids,
-            stock_all_loc_ids,
+            blueprint_loc_ids,  # TODO: manufacturing_blueprint_loc_ids
+            stock_all_loc_ids,  # TODO: manufacturing_stock_loc_ids
+            react_stock_all_loc_ids,  # TODO: reaction_stock_loc_ids
+            # список ресурсов, которые используются в производстве
+            stock_resources,  # TODO: manufacturing_stock_resources
+            react_stock_resources  # TODO: reaction_stock_resources
+        )
+        # расчёт списка материалов, требуемых для производства заданного списка продуктов, в формате: ['id':?,'q':?]
+        conveyor_materials.calc_not_available_materials_list(materials_summary)
+        # отображение в отчёте summary-информации по недостающим материалам
+        __dump_not_available_materials_list(
+            glf,
+            # esi данные, загруженные с серверов CCP
+            corp_bp_loc_data,
+            corp_assets_tree,
+            # списки контейнеров и станок из экземпляра контейнера
             exclude_loc_ids,
             blueprint_station_ids,
-            react_stock_all_loc_ids,
             react_station_ids,
-            # список материалов, которых не хватает в производстве
-            stock_not_enough_materials,
             # список ресурсов, которые используются в производстве
-            stock_resources,
-            react_stock_resources,
-            materials_summary,
+            conveyor_materials,
             # настройки
             enable_copy_to_clipboard,
             False)
+        # удаляем более ненужный список материалов
+        del conveyor_materials
 
         glf.write("""
    </div> <!--panel-body-->
@@ -2304,13 +1721,26 @@ tr:hover td.qind-mc { background-color: #e5ecf4; }
 a.qind-sign { color: #a52a2a; } /* exclamation sign: brown color */
 a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) */
 
-div.qind-ba /* blueprints availability */
+div.qind-bib /* blueprints interactivity block */
 { margin-left: auto; margin-right: 0; float: right; padding-top: 1px; white-space: nowrap; }
+
+div.qind-bib a { color: #aaa; } /* material menu: gray color */
+div.qind-bib a:hover { color:  #c70039; } /* material menu: dark red color */
 
 tr.qind-em td, /* enough materials */
 tr.qind-em th
 { color: #aaa; }
 </style>
+
+<div id="qind-tid-caption" style="display:none"><b>{nm}</b></div>
+<div id="qind-tid-menu" style="display:none">
+ <b>{nm}</b> {tid}
+ <ol style="padding:10px">
+  <li>Download this file</li>
+  <li>Install the software {nm}</li>
+  <li>Restart your computer {tid}</li>
+ </ol>
+</div>
 
 <nav class="navbar navbar-default">
  <div class="container-fluid">
@@ -2367,14 +1797,14 @@ tr.qind-em th
         if corp_blueprints_data_len >= 22500:  # 10%
             overflow = corp_blueprints_data_len >= 23750  # 5%
             glf.write(
-                '<div class="alert alert-{alc}" role="alert">'
-                '<span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>'
+                '<div class="alert alert-{alc}" role="alert">{gly}'
                 '<span class="sr-only">{ew}:</span> The number of corporate blueprints should not exceed 25,000 pieces.'
                 ' Otherwise, they cannot be found in the industry control window. Also, the correctness of the'
                 ' calculations of industry processes will suffer. <b>{cnm}</b> now has <b>{q:,d}</b> blueprints in'
                 ' assets.'
                 '</div>'.
                 format(
+                    gly=glyphicon("exclamation-sign"),
                     alc='danger' if overflow else 'warning',
                     ew='Error' if overflow else 'Warning',
                     cnm=corp_conveyors["corporation_name"],
@@ -2384,6 +1814,7 @@ tr.qind-em th
     # инициализация списка материалов, требуемых (и уже используемых) в производстве
     global_materials_summary = []
     global_materials_used = []
+    global_materials_dictionary = eve_conveyor_tools.ConveyorDictionary()
 
     for corp_conveyors in conveyor_data:
         glf.write("""
@@ -2455,32 +1886,44 @@ tr.qind-em th
             # формирование списка ресурсов, которые используются в производстве (но лежат на других станциях)
             global_react_stock_resources = get_stock_resources(global_react_stock_all_loc_ids, corp_conveyors["corp_ass_loc_data"])
 
-            __dump_not_available_materials_list(
-                glf,
-                # esi данные, загруженные с серверов CCP
-                corp_conveyors["corp_bp_loc_data"],
-                corp_conveyors["corp_industry_jobs_data"],
-                corp_conveyors["corp_assets_tree"],
+            # построение справочника материалов, используемых в производстве и производство которых предполагается
+            conveyor_materials = eve_conveyor_tools.ConveyorMaterials(
                 # sde данные, загруженные из .converted_xxx.json файлов
                 sde_type_ids,
                 sde_bp_materials,
                 sde_market_groups,
+                # esi данные, загруженные с серверов CCP
+                corp_conveyors["corp_industry_jobs_data"],
                 # списки контейнеров и станок из экземпляра контейнера
-                global_blueprint_loc_ids,
-                global_stock_all_loc_ids,
+                global_blueprint_loc_ids,  # TODO: global_manufacturing_blueprint_loc_ids
+                global_stock_all_loc_ids,  # TODO: global_manufacturing_stock_loc_ids
+                global_react_stock_all_loc_ids,  # TODO: global_reaction_stock_loc_ids
+                # список ресурсов, которые используются в производстве
+                global_stock_resources,  # TODO: global_manufacturing_stock_resources
+                global_react_stock_resources  # TODO: global_reaction_stock_resources
+            )
+            # расчёт списка материалов, требуемых для производства заданного списка продуктов, в формате: ['id':?,'q':?]
+            conveyor_materials.calc_not_available_materials_list(global_materials_summary)
+            # отображение в отчёте summary-информации по недостающим материалам
+            __dump_not_available_materials_list(
+                glf,
+                # esi данные, загруженные с серверов CCP
+                corp_conveyors["corp_bp_loc_data"],
+                corp_conveyors["corp_assets_tree"],
+                # списки контейнеров и станок из экземпляра контейнера
                 global_exclude_loc_ids,
                 global_blueprint_station_ids,
-                global_react_stock_all_loc_ids,
                 global_react_station_ids,
-                # список материалов, которых не хватает в производстве
-                stock_not_enough_materials,
                 # список ресурсов, которые используются в производстве
-                global_stock_resources,
-                global_react_stock_resources,
-                global_materials_summary,
+                conveyor_materials,
                 # настройки
                 True,
                 True)
+            # сохраняем в справочник материалов данные из накопленного плана производства
+            global_materials_dictionary.load(conveyor_materials)
+            # удаляем более ненужный список материалов
+            del conveyor_materials
+
             glf.write("</div>")  # <h3>Summary</h3>
 
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
@@ -2538,6 +1981,37 @@ tr.qind-em th
 </div>
 </div>
 <script>
+""")
+
+    # сохраняем в отчёт справочник названий, кодов и сведений о производстве
+    type_ids = global_materials_dictionary.materials.keys()
+    sorted_type_ids = sorted(type_ids, key=lambda x: int(x))
+    glf.write('var g_sde_max_type_id={max};\n'
+              'var g_sde_type_len={len};\n'
+              'var g_sde_type_ids=['.format(max=sorted_type_ids[-1], len=len(sorted_type_ids)))
+    for (idx, type_id) in enumerate(sorted_type_ids):
+        in_ref: eve_conveyor_tools.ConveyorReference = global_materials_dictionary.get(type_id)
+        # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
+        glf.write('{end}[{id},"{nm}"]'.format(
+            id=type_id,
+            nm=in_ref.name.replace('"', '\\\"'),
+            end=',' if idx else "\n"))
+    glf.write("""
+];
+function getSdeItemName(t) {
+ if ((t < 0) || (t > g_sde_max_type_id)) return null;
+ for (var i=0; i<g_sde_type_len; ++i) {
+  var ti = g_sde_type_ids[i][0];
+  if (t == ti) return g_sde_type_ids[i][1];
+  if (ti >= g_sde_max_type_id) break;
+ }
+ return null;
+}
+""")
+    # удаляем более ненужный список материалов
+    del global_materials_dictionary
+
+    glf.write("""
   // Conveyor Options dictionaries
   var g_tbl_col_orders = [-1,+1]; // -1:desc, +1:asc
   var g_tbl_col_types = [0,1]; // 0:str, 1:num, 2:x-data
@@ -2726,6 +2200,89 @@ tr.qind-em th
       });
     }
   }
+  // Working with clipboard
+  function copyToClipboard(elem, data_copy) {
+   var $temp = $("<textarea>");
+   $("body").append($temp);
+   $temp.val(data_copy).select();
+   try {
+    success = document.execCommand("copy");
+    if (success) {
+     elem.trigger('copied', ['Copied!']);
+    }
+   } finally {
+    $temp.remove();
+   }
+  }
+  // Working with clipboard (much input variants)
+  function doCopyToClipboard(elem) {
+   // ожидаем либо data-tid="type_id"; либо data-copy="some value"; либо data-source="table"; либо data-source="span"
+   var data_tid = elem.data('tid');
+   if (!(data_tid === undefined)) {
+    var nm = getSdeItemName(data_tid);
+    if (!(nm === null)) copyToClipboard(elem, nm);
+    return;
+   }
+   var data_copy = elem.data('copy');
+   if (!(data_copy === undefined)) {
+    copyToClipboard(elem, data_copy);
+    return;
+   }
+   data_copy = '';
+   var data_source = elem.data('source');
+   if (data_source == 'table') {
+    var tr = elem.parent().parent();
+    var tbody = tr.parent();
+    var rows = tbody.children('tr');
+    var start_row = rows.index(tr);
+    rows.each( function(idx) {
+     var tr = $(this);
+     if (!(start_row === undefined) && (idx > start_row)) {
+      var td = tr.find('td').eq(0);
+      if (!(td.attr('class') === undefined))
+       start_row = undefined;
+      else {
+       if (data_copy) data_copy += "\\n"; 
+       var q1 = tr.find('td').eq(1).data('q'); q1 = (q1==undefined)?0:parseInt(q1,10);
+       var q2 = tr.find('td').eq(2).data('q'); q2 = (q2==undefined)?0:parseInt(q2,10);
+       data_copy += td.data('nm') + "\\t" + (q1+q2);
+      }
+     }
+    });
+   } else if (data_source == 'span') {
+    var div = elem.parent().find('div.qind-tid');
+    if (!(div === undefined)) {
+     var tids = div.children('tid');
+     if (!(tids === undefined)) {
+      tids.each( function(idx) {
+       var tid = $(this);
+       if (data_copy) data_copy += "\\n";
+       data_copy += getSdeItemName(tid.data('tid')) + "\\t" + tid.data('q');
+      });
+     }
+    }
+   }
+   if (data_copy) copyToClipboard(elem, data_copy);
+  }
+  // Working with materials menu
+  function initPopoverMenus() {
+   $('[data-toggle="popover"]').popover({
+    placement: 'right',
+    trigger: 'hover',
+    html: true,
+    title: function() {
+     var elem = $('#qind-tid-caption');
+     var nm = getSdeItemName($(this).data('tid'));
+     return elem.html().replace(/{nm}/g, nm);
+    },
+    content: function() {
+     var elem = $('#qind-tid-menu');
+     return elem.html().
+      replace(/{nm}/g, $(this).data('tid')).
+      replace(/{tid}/g, $(this).data('tid'));
+    },
+   });
+  }
   // Conveyor Options menu and submenu setup
   function toggleMenuOption(name) {
     show = (ls.getItem(name) == 1) ? 0 : 1;
@@ -2776,60 +2333,14 @@ tr.qind-em th
     rebuildBody();
     rebuildStocksDropdown();
     rebuildStockMaterials();
+    // init popover menus
+    initPopoverMenus();
     // Working with clipboard
     $('a.qind-copy-btn').each(function() {
       $(this).tooltip();
     })
     $('a.qind-copy-btn').bind('click', function () {
-      var data_copy = $(this).attr('data-copy');
-      if (data_copy === undefined) {
-        var data_source = $(this).attr('data-source');
-        if (data_source == 'table') {
-          var tr = $(this).parent().parent();
-          var tbody = tr.parent();
-          var rows = tbody.children('tr');
-          var start_row = rows.index(tr);
-          data_copy = '';
-          rows.each( function(idx) {
-            if (!(start_row === undefined) && (idx > start_row)) {
-              var td = $(this).find('td').eq(0);
-              if (!(td.attr('class') === undefined))
-                start_row = undefined;
-              else {
-                if (data_copy) data_copy += "\\n"; 
-                data_copy += td.attr('data-nm') + "\\t" + (
-                  parseInt($(this).find('td').eq(1).attr('data-q'),10) +
-                  parseInt($(this).find('td').eq(2).attr('data-q'),10)
-                );
-              }
-            }
-          });
-        } else if (data_source == 'span') {
-          data_copy = '';
-          var div = $(this).parent().find('div.qind-tid');
-          if (!(div === undefined)) {
-            var tids = div.children('tid');
-            if (!(tids === undefined)) {
-              tids.each( function(idx) {
-                var tid = $(this);
-                if (data_copy) data_copy += "\\n";
-                data_copy += tid.attr('data-nm') + "\\t" + tid.attr('data-q');
-              });
-            }
-          }
-        }
-      }
-      var $temp = $("<textarea>");
-      $("body").append($temp);
-      $temp.val(data_copy).select();
-      try {
-        success = document.execCommand("copy");
-        if (success) {
-          $(this).trigger('copied', ['Copied!']);
-        }
-      } finally {
-        $temp.remove();
-      }
+      doCopyToClipboard($(this));
     });
     $('a.qind-copy-btn').bind('copied', function(event, message) {
       $(this).attr('title', message)
