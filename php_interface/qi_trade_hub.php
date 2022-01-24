@@ -90,6 +90,11 @@ if (isset($_GET['trader'])) {
 }
 
 
+// настройки видимости элементов таблицы (по умолчанию)
+const MARKET_TABLE_columns = 9;
+const MARKET_TABLE_DEFAULT_order_volume_visible = 0; // видимость колонки таблицы "кол-во сделок (неделя/ордер)"
+
+
 
     if (!extension_loaded('pgsql')) return;
     $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
@@ -203,11 +208,11 @@ function eve_ceiling($isk) {
 }
 
 function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell, $jita_buy) { ?>
-<tr style="font-weight:bold;">
- <td colspan="3" align="right"><?=$market_group?> Summary</td>
- <td align="right"><?=number_format($price,0,'.',',').'<br>'.number_format($volume,0,'.',',')?>m³</td>
- <td align="right"><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
- <td colspan="4"></td>
+<tr class="qind-summary">
+ <td colspan="<?=MARKET_TABLE_DEFAULT_order_volume_visible?3:2?>"><?=$market_group?> Summary</td>
+ <td><?=number_format($price,0,'.',',').'<br>'.number_format($volume,0,'.',',')?>m³</td>
+ <td><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
+ <td colspan="<?=MARKET_TABLE_columns-5-(MARKET_TABLE_DEFAULT_order_volume_visible?0:1)?>"></td>
 </tr>
 <?php }
 
@@ -219,28 +224,44 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
 ?>
 <h2><?=$trade_hub_system?> Market</h2>
 <style>
-.label-noordersreal { color: #fff; background-color: #d9534f; }
-.label-noorders { color: #fff; background-color: #eebbb9; }
-.label-interrupt { color: #8e8e8e; background-color: #e8ce43; }
-.label-dontbuy { color: #e8ce43; background-color: #b74c33; }
-.label-needdelivery { color: #fff; background-color: #5bc0de; }
-.label-placeanorder { color: #fff; background-color: #d973e8; }
-.label-lowprice { color: #fff; background-color: #f0ad4e; }
-.label-highprice { color: #fff; background-color: #777; }
-.label-veryfew { color: #fff; background-color: #337ab7; }
-.text-muted-much { color: #bbb; }
+/*метки*/
+.label-qind-noordersreal { color: #fff; background-color: #d9534f; }
+.label-qind-noorders { color: #fff; background-color: #eebbb9; }
+.label-qind-interrupt { color: #8e8e8e; background-color: #e8ce43; }
+.label-qind-dontbuy { color: #e8ce43; background-color: #b74c33; }
+.label-qind-needdelivery { color: #fff; background-color: #5bc0de; }
+.label-qind-placeanorder { color: #fff; background-color: #d973e8; }
+.label-qind-lowprice { color: #fff; background-color: #f0ad4e; }
+.label-qind-highprice { color: #fff; background-color: #777; }
+.label-qind-veryfew { color: #fff; background-color: #337ab7; }
+/*стили отображения ячеек таблицы*/
+#tblMarket thead tr th:nth-child(3),
+#tblMarket tbody tr td:nth-child(3) { text-align: right; display: <?=MARKET_TABLE_DEFAULT_order_volume_visible?'table-cell':'none'?>; }
+#tblMarket thead tr th:nth-child(4),
+#tblMarket tbody tr td:nth-child(4) { text-align: right; }
+#tblMarket thead tr th:nth-child(5),
+#tblMarket tbody tr td:nth-child(5) { text-align: right; }
+#tblMarket tfoot tr,
+.qind-summary { font-weight: bold; }
+#tblMarket tfoot tr td,
+.qind-summary { text-align: right; }
+tr.qind-summary td:nth-child(3) { display: table-cell !important; }
+/*цвета,тексты*/
+mute, mute-sm { padding: 0.2em; color: #bbb; }
+mute-sm { font-size: 85%; }
 </style>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblMarket">
 <thead>
  <tr>
-  <th></th>
-  <th>Items</th>
-  <th style="text-align: right;">Weekly<br><mark>Order</mark></th>
-  <th style="text-align: right;">RI4 Price&nbsp;/&nbsp;<?=$trade_hub_system?> Sell<br>Quantity</th>
-  <th style="text-align: right;">Jita Buy..Sell<br><?php if (!is_null($IMPORT_PRICE_TO_TRADE_HUB)) { ?><mark>Import Price</mark><?php } ?></th>
-  <th style="text-align: right;">Amarr<br>Sell</th>
-  <th style="text-align: right;">Universe<br>Price</th>
-  <th style="text-align: center;">Details</th>
+  <th style="width:32px;"></th>
+  <th>Названия предметов (+продано за сутки)</th>
+  <th>Неделя<br><mark>Ордер</mark> шт</th>
+  <th>Цена RI4<sup>sell</sup><br><mark>Кол-во</mark> шт</th>
+  <th>Цена <?=$trade_hub_system?><sup>sell</sup><br><mark>Кол-во</mark> шт</th>
+  <th style="text-align:right;">Jita Buy..Sell<br><?php if (!is_null($IMPORT_PRICE_TO_TRADE_HUB)) { ?><mark>Import Price</mark><?php } ?></th>
+  <th style="text-align:right;">Amarr<br>Sell</th>
+  <th style="text-align:right;">Universe<br>Price</th>
+  <th style="text-align:center;">Details</th>
  </tr>
 </thead>
 <tbody>
@@ -304,42 +325,42 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
 
             if (is_null($ri4_price)) {
                 if (is_null($trade_hub_sell_volume) || !$trade_hub_sell_volume)
-                    $problems .= '<span class="label label-noordersreal">no orders</span>&nbsp;';
+                    $problems .= '<span class="label label-qind-noordersreal">no orders</span>&nbsp;';
                 else
-                    $problems .= '<span class="label label-noorders">no orders</span>&nbsp;';
+                    $problems .= '<span class="label label-qind-noorders">no orders</span>&nbsp;';
             }
             if (!is_null($ri4_market_quantity)) {
                 if ($weekly_volume >= ($ri4_market_quantity+$storage_quantity))
-                    $problems .= '<span class="label label-needdelivery">need delivery</span>&nbsp;';
+                    $problems .= '<span class="label label-qind-needdelivery">need delivery</span>&nbsp;';
                 if ($storage_quantity && ($weekly_volume >= $ri4_market_quantity))
-                    $warnings .= '<span class="label label-placeanorder">place an order</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-placeanorder">place an order</span>&nbsp;';
             }
-            if (!is_null($ri4_market_quantity) && ($order_volume >= $ri4_market_quantity)) $problems .= '<span class="label label-veryfew">very few</span>&nbsp;';
+            if (!is_null($ri4_market_quantity) && ($order_volume >= $ri4_market_quantity)) $problems .= '<span class="label label-qind-veryfew">very few</span>&nbsp;';
             if (!is_null($ri4_price)) {
                 if ($ri4_price > 100000 || $packaged_volume < 5) {
                     $min_jita_price = $jita_sell * (1.0+$MIN_PROFIT+$TAX_AND_FEE);
                     $min_amarr_price = $amarr_sell * (1.0+$MIN_PROFIT+$TAX_AND_FEE);
                     if (($ri4_price < $min_jita_price) && ($ri4_price < $min_amarr_price))
-                        $warnings .= '<span class="label label-lowprice" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
+                        $warnings .= '<span class="label label-qind-lowprice" data-toggle="tooltip" data-placement="bottom" title="Min Amarr: '.number_format(eve_ceiling($min_amarr_price),2,'.',',').', min Jita: '.number_format(eve_ceiling($min_jita_price),2,'.',',').'">low price</span>&nbsp;';
                 }
                 $max_jita_price = $jita_sell * (1.0+$MAX_PROFIT+$TAX_AND_FEE);
                 $max_amarr_price = $amarr_sell * (1.0+$MAX_PROFIT+$TAX_AND_FEE);
                 if (($ri4_price > $max_jita_price) && ($ri4_price > $max_amarr_price))
-                    $warnings .= '<span class="label label-highprice" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-highprice" data-toggle="tooltip" data-placement="bottom" title="Max Amarr: '.number_format(eve_ceiling($max_amarr_price),2,'.',',').', max Jita: '.number_format(eve_ceiling($max_jita_price),2,'.',',').'">price too high</span>&nbsp;';
                 if (!is_null($trade_hub_sell) && ($trade_hub_sell < $ri4_price) && ($trade_hub_sell_volume > $ri4_market_quantity)) {
                     $interrupt_detected = true;
-                    $warnings .= '<span class="label label-interrupt">interrupt</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-interrupt">interrupt</span>&nbsp;';
                 }
             }
             if ($trade_hub_sell_volume > $ri4_market_quantity) {
                 // рассчитываем минимальную цену, ниже которой закупку производить не следует - позиция перебита конкурентами
                 $min_buy_price = $trade_hub_sell / (1.0+$TAX_AND_FEE+$MIN_PROFIT);
                 if (($jita_sell > $min_buy_price) && ($amarr_sell > $min_buy_price))
-                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy</span>&nbsp;';
                 else if ($amarr_sell > $min_buy_price)
-                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Amarr</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Amarr</span>&nbsp;';
                 else if ($jita_sell > $min_buy_price)
-                    $warnings .= '<span class="label label-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
+                    $warnings .= '<span class="label label-qind-dontbuy" data-toggle="tooltip" data-placement="bottom" title="Min buy price: '.number_format(eve_ceiling($min_buy_price),2,'.',',').'">don&apos;t buy in Jita</span>&nbsp;';
             }
 
             if (!is_null($ri4_market_quantity)&&!is_null($ri4_price))
@@ -398,62 +419,57 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
                 $market_group_summary_market_volume = 0;
                 $market_group_summary_jita_sell = 0;
                 $market_group_summary_jita_buy = 0;
-                ?><tr><td class="active" colspan="8"><strong><?=$market_group?></strong></td></tr><?php
+                ?><tr><td class="active" colspan="<?=MARKET_TABLE_columns?>"><strong><?=$market_group?></strong></td></tr><?php
             }
 ?>
 <tr<?php if ($ri4_sell_lvl==2) { ?> style="background: #e8e8e8;"<?php } ?>>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
-
  <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
 
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
- <td align="right"><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
+ <td><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
  <?php } ?>
 
 <?php
-    // поле с информацией о наличии товара на рынке
-    if (is_null($trade_hub_sell) && is_null($ri4_price))
-    {
-        ?><td></td><?php
-    }
-    else
-    {
-        if ($interrupt_detected) { ?><td align="right" bgcolor="#e8c8c8"><?php } else { ?><td align="right"><?php }
-
-        if (!is_null($ri4_price))
-        {
-            ?><?=number_format($ri4_price,2,'.',',')?>&nbsp;<mark><?=number_format($ri4_market_quantity,0,'.',',')?></mark><?php
-        }
-        if ($storage_quantity)
-        {
-            ?>&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ <?=number_format($storage_quantity,0,'.',',')?>&nbsp;</span></small><?php
-        }
-        if (!is_null($trade_hub_sell))
-        {
-            if (!is_null($ri4_price) && ($ri4_price == $trade_hub_sell) && ($ri4_market_quantity == $trade_hub_sell_volume))
-            {
-            }
-            else
-            {
-                if ($ri4_price == $trade_hub_sell) { ?><span class="text-muted-much"><?php }
-                ?><br><?=number_format($trade_hub_sell,2,'.',',')?>&nbsp;<mark><?=number_format($trade_hub_sell_volume,0,'.',',')?></mark><?php
-                if ($ri4_price == $trade_hub_sell) { ?></span><?php }
-            }
-        }
-
-        ?></td><?php
-    }
-
-  if (is_null($amarr_sell)) { ?><td></td><?php }
+  // поле с информацией о наличии товара на рынке (текущие цены, текущее кол-во)
+  if (is_null($ri4_price))
+  {
+    ?><td></td><?php
+  }
   else
   {
-    ?><td align="right"><small><span class="text-muted-much"><?=number_format($jita_buy,2,'.',',')?> ..</span></small> <?=$amarr_price_lower?'<span class="text-muted-much">':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</span>':''?><?php if (!is_null($trade_hub_import_price)) { ?><br><mark><small><?=number_format($trade_hub_import_price,2,'.',',')?></small></mark><?php } ?></td><?php
+    if ($interrupt_detected) { ?><td bgcolor="#e8c8c8"><?php } else { ?><td><?php }
+    ?><?=number_format($ri4_price,2,'.',',')?><br><mark><?=number_format($ri4_market_quantity,0,'.',',')?></mark><?php
+    if ($storage_quantity)
+    {
+      ?>&nbsp;<small><span style="background-color:#c7c7c7">&nbsp;+ <?=number_format($storage_quantity,0,'.',',')?>&nbsp;</span></small><?php
+    }
+    ?></td><?php
+  }
+  
+  if (is_null($trade_hub_sell))
+  {
+    ?><td></td><?php
+  }
+  else
+  {
+    if ($interrupt_detected) { ?><td bgcolor="#e8c8c8"><?php } else { ?><td><?php }
+    if ($ri4_price == $trade_hub_sell) { ?><mute><?php }
+    ?><?=number_format($trade_hub_sell,2,'.',',')?><br><mark><?=number_format($trade_hub_sell_volume,0,'.',',')?></mark><?php
+    if ($ri4_price == $trade_hub_sell) { ?></mute><?php }
+    ?></td><?php
   }
 
   if (is_null($amarr_sell)) { ?><td></td><?php }
   else
   {
-      ?><td align="right"><?=$jita_price_lower?'<span class="text-muted-much">':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</class>':''?></td><?php
+    ?><td align="right"><mute-sm><?=number_format($jita_buy,2,'.',',')?> ..</mute-sm> <?=$amarr_price_lower?'<mute>':''?><?=number_format($jita_sell,2,'.',',')?><?=$amarr_price_lower?'</mute>':''?><?php if (!is_null($trade_hub_import_price)) { ?><br><mark><small><?=number_format($trade_hub_import_price,2,'.',',')?></small></mark><?php } ?></td><?php
+  }
+
+  if (is_null($amarr_sell)) { ?><td></td><?php }
+  else
+  {
+      ?><td align="right"><?=$jita_price_lower?'<mute>':''?><?=number_format($amarr_sell,2,'.',',')?><?=$jita_price_lower?'</mute>':''?></td><?php
   }
 ?>
 
@@ -484,13 +500,15 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
         );
     }
 ?>
-<tr style="font-weight:bold;">
- <td colspan="3" align="right">Summary</td>
- <td align="right"><?=number_format($summary_market_price,0,'.',',').'<br>'.number_format($summary_market_volume,0,'.',',')?>m³</td>
- <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
- <td colspan="4"></td>
-</tr>
 </tbody>
+<tfoot>
+<tr class="qind-summary">
+ <td colspan="<?=MARKET_TABLE_DEFAULT_order_volume_visible?3:2?>">Summary</td>
+ <td><?=number_format($summary_market_price,0,'.',',').'<br>'.number_format($summary_market_volume,0,'.',',')?>m³</td>
+ <td><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
+ <td colspan="<?=MARKET_TABLE_columns-5-(MARKET_TABLE_DEFAULT_order_volume_visible?0:1)?>"></td>
+</tr>
+</tfoot>
 </table>
 
 <div class="row">
@@ -580,12 +598,14 @@ function __dump_querious_storage(&$storage, $trade_hub_system) { ?>
 <?php
         }
 ?>
+</tbody>
+<tfoot>
 <tr style="font-weight:bold;">
  <td colspan="5" align="right">Summary</td>
  <td align="right"><?=number_format($summary_jita_sell,0,'.',',').'<br>'.number_format($summary_jita_buy,0,'.',',')?></td>
  <td colspan="3"></td>
 </tr>
-</tbody>
+</tfoot>
 </table>
 <?php
 }
@@ -869,25 +889,67 @@ EOD;
     pg_close($conn);
 ?>
 
+
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-tasks" aria-hidden="true"></span></a>
+  </div>
+
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки таблицы <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a data-target="#" role="button" id="btn-qind-showlabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать цветные маркеры</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" id="btn-qind-showordervolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём сделок (неделя/ордер)</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" id="qind-btn-reset">Сбросить настройки</a></li>
+      </ul>
+    </li>
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Фильтрация <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="all"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Все ордера</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="active"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Активные ордера</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="sold"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Всё продано</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="very-few"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар заканчивается</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="need-delivery"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Требуется доставка</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="high-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена завышена</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="low-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена занижена</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="interrupt"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Обновить ордера (конкуренты)</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="place-an-order"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Выставить на продажу (довоз)</a></li>
+      </ul>
+    </li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <label>Sort:&nbsp;</label>
+    <div class="btn-group" role="group" aria-label="Sort">
+     <button id="btnSortByName" type="button" class="btn btn-default active">Name</button>
+    </div>
+   </form>
+  </div>
+ </div>
+</nav>
+
+
 <div class="container-fluid">
 <?php
     if ($trade_hub_status)
     {
       ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации цен: <span class="text-primary"><?=is_null($trade_hub_status[0]['prc'])?'нет данных':$trade_hub_status[0]['prc'].' ET'?></span><br>Время последней актуализации ордеров: <span class="text-primary"><?=is_null($trade_hub_status[0]['ord'])?'нет данных':$trade_hub_status[0]['ord'].' ET'?></span><br>Время последней сделки: <span class="text-primary"><?=is_null($trade_hub_status[0]['tra'])?'нет данных':$trade_hub_status[0]['tra'].' ET'?></span></p><?php
     }
+    __dump_querious_market($market, $storage, $purchase, $trade_hub_system);
 ?>
-<div class="btn-group btn-group-toggle" data-toggle="buttons">
- <label class="btn btn-default qind-btn-market active" group="all"><input type="radio" name="options" autocomplete="off" checked>Все</label>
- <label class="btn btn-default qind-btn-market" group="sold"><input type="radio" name="options" autocomplete="off">Всё продано</label>
- <label class="btn btn-default qind-btn-market" group="very-few"><input type="radio" name="options" autocomplete="off">Товар заканчивается</label>
- <label class="btn btn-default qind-btn-market" group="need-delivery"><input type="radio" name="options" autocomplete="off">Требуется доставка</label>
- <label class="btn btn-default qind-btn-market" group="high-price"><input type="radio" name="options" autocomplete="off">Цена завышена</label>
- <label class="btn btn-default qind-btn-market" group="low-price"><input type="radio" name="options" autocomplete="off">Цена занижена</label>
- <label class="btn btn-default qind-btn-market disabled" aria-disabled="true"><!--group="place-an-order"--><input type="radio" name="options" autocomplete="off">Выставить на продажу</label>
- <label class="btn btn-default qind-btn-market disabled" aria-disabled="true"><input type="radio" name="options" autocomplete="off">Обновить ордера</label>
- <label class="btn btn-default qind-btn-market" group="interrupt"><input type="radio" name="options" autocomplete="off">Спекуляции</label>
-</div>
-<?php __dump_querious_market($market, $storage, $purchase, $trade_hub_system); ?>
 <!-- --- --- --- -->
 <hr>
 <!-- --- --- --- -->
@@ -1182,20 +1244,20 @@ var g_purchase_types = [<?php
       if (show_group == 'all')
         show = true;
       else if (show_group == 'sold')
-        show = tr.find('td').eq(1).find('span.label-noordersreal').length ||
-               tr.find('td').eq(1).find('span.label-noorders').length;
+        show = tr.find('td').eq(1).find('span.label-qind-noordersreal').length ||
+               tr.find('td').eq(1).find('span.label-qind-noorders').length;
       else if (show_group == 'low-price')
-        show = tr.find('td').eq(1).find('span.label-lowprice').length;
+        show = tr.find('td').eq(1).find('span.label-qind-lowprice').length;
       else if (show_group == 'high-price')
-        show = tr.find('td').eq(1).find('span.label-highprice').length;
+        show = tr.find('td').eq(1).find('span.label-qind-highprice').length;
       else if (show_group == 'very-few')
-        show = tr.find('td').eq(1).find('span.label-veryfew').length;
+        show = tr.find('td').eq(1).find('span.label-qind-veryfew').length;
       else if (show_group == 'need-delivery')
-        show = tr.find('td').eq(1).find('span.label-needdelivery').length;
+        show = tr.find('td').eq(1).find('span.label-qind-needdelivery').length;
       else if (show_group == 'place-an-order')
-        show = tr.find('td').eq(1).find('span.label-placeanorder').length;
+        show = tr.find('td').eq(1).find('span.label-qind-placeanorder').length;
       else if (show_group == 'interrupt')
-        show = tr.find('td').eq(1).find('span.label-interrupt').length;
+        show = tr.find('td').eq(1).find('span.label-qind-interrupt').length;
       if (show)
         tr.removeClass('hidden');
       else if (tr.find('td').eq(0).hasClass('active'))
@@ -1241,7 +1303,80 @@ var g_purchase_types = [<?php
     else
       $('#dtlsSellVar_import').parent().addClass('hidden');
   }
-  $(document).ready(function(){
+//-----------
+// работа с пунктами меню
+//-----------
+function isMenuActivated(btn){
+ return btn.hasClass('qind-btn-active');
+}
+function toggleMenuMarker(btn, active){
+ if(active){
+  btn.addClass('qind-btn-active');
+  btn.find('span').removeClass('hidden');
+ }else{
+  btn.removeClass('qind-btn-active');
+  btn.find('span').addClass('hidden');
+ }
+}
+function rebuildFilterMenu(active_grp) {
+ $('a.qind-btn-filter').each(function() {
+  if(active_grp==$(this).attr('qind-group')){
+   $(this).addClass('qind-btn-active');
+   toggleMenuMarker($(this),true);
+  }else{
+   $(this).removeClass('qind-btn-active');
+   toggleMenuMarker($(this),false);
+  }
+ })
+}
+//-----------
+// обработчики нажатий на кнопки
+//-----------
+$('a.qind-btn-filter').on('click', function () {
+ if(!isMenuActivated($(this))){// включается
+  var grp=$(this).attr('qind-group');
+  rebuildMarket(grp);
+  rebuildFilterMenu(grp);
+ }
+});
+//-----------
+$('#btn-qind-showlabels').on('click', function () {
+ var turn_off=!isMenuActivated($(this));
+ toggleMenuMarker($(this),turn_off);
+ $('*[class*=label-qind-]').each(function(){
+  if(turn_off)
+   $(this).removeClass('hidden');
+  else
+   $(this).addClass('hidden');
+ });
+});
+//-----------
+$('#btn-qind-showordervolumes').on('click', function () {
+ var turn_on=!isMenuActivated($(this));
+ toggleMenuMarker($(this),turn_on);
+ $('#tblMarket thead tr th:nth-child(3)').each(function() {
+  turn_on ? $(this).css('display','table-cell') : $(this).css('display','none');
+ });
+ $('#tblMarket tbody tr td:nth-child(3)').each(function() {
+  turn_on ? $(this).css('display','table-cell') : $(this).css('display','none');
+ });
+ // двигаем слово summary на место колонки, которую удалили
+ $('tr.qind-summary td:nth-child(1)').each(function() {
+  $(this).attr('colspan',turn_on?3:2);
+ });
+});
+//-----------
+// настройки по умолчанию (те, что автоматически действуют после загрузки страницы)
+//-----------
+$(document).ready(function(){
+ rebuildFilterMenu('all');
+ toggleMenuMarker($('#btn-qind-showlabels'), true);
+ toggleMenuMarker($('#btn-qind-showordervolumes'), <?=MARKET_TABLE_DEFAULT_order_volume_visible?1:0?>);
+ 
+
+
+
+
     $('label.qind-btn-market').on('click', function () {
       if (!$(this).hasClass('active')) // включается
         rebuildMarket($(this).attr('group'));
@@ -1379,7 +1514,7 @@ var g_purchase_types = [<?php
     });
     // Initialization
     rebuildStock('hide');
-  });
+});
 
 $("#frmMarketOrders").on("submit", function(e){
  e.preventDefault();
