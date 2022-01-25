@@ -146,7 +146,7 @@ def get_assets_named_ids(corp_assets_data):
     for a in corp_assets_data:
         if not a["is_singleton"]:
             continue  # пропускаем экземпляры контейнеров, сложенные в стопки (у них нет уник. id и названий тоже не будет)
-        loc_flag = str(a["location_flag"])
+        loc_flag: str = a["location_flag"]
         if not (loc_flag[:-1] == "CorpSAG") and not (loc_flag == "Unlocked") and not (loc_flag == "AutoFit"):
             continue  # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
         if a["type_id"] in g_universe_items_with_names:

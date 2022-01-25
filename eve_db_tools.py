@@ -65,6 +65,15 @@ class QEntity:
         else:
             self.ext = ext
 
+    def compare_ext(self, key: str, val) -> bool:
+        if val is not None:
+            if not self.ext or (self.ext.get(key) != val):
+                return False
+        else:
+            if self.ext and (self.ext.get(key) is not None):
+                return False
+        return True
+
     def is_obj_equal(self, data):
         for key in self.obj:
             if not (key in data):
@@ -107,6 +116,40 @@ class QDatabaseTools:
     corporation_industry_job_diff = ['status']
     market_order_diff = ['price', 'volume_remain']
     markets_prices_diff = ['adjusted_price', 'average_price']
+    universe_items_with_names: typing.Set[int] = {
+        # 2233,  # Customs Office
+        3293,  # Medium Standard Container
+        3296,  # Large Standard Container
+        3297,  # Small Standard Container
+        3465,  # Large Secure Container
+        3466,  # Medium Secure Container
+        3467,  # Small Secure Container
+        11488,  # Huge Secure Container
+        11489,  # Giant Secure Container
+        17363,  # Small Audit Log Secure Container
+        17364,  # Medium Audit Log Secure Container
+        17365,  # Large Audit Log Secure Container
+        17366,  # Station Container
+        17367,  # Station Vault Container
+        17368,  # Station Warehouse Container
+        24445,  # Giant Freight Container
+        33003,  # Enormous Freight Container
+        33005,  # Huge Freight Container
+        33007,  # Large Freight Container
+        33009,  # Medium Freight Container
+        33011,  # Small Freight Container
+        # 35825,  # Raitaru
+        # 35826,  # Azbel
+        # 35827,  # Sotiyo
+        # 35828,  # Medium Laboratory
+        # 35829,  # Large Laboratory
+        # 35830,  # X-Large Laboratory
+        # 35832,  # Astrahus
+        # 35833,  # Fortizar
+        # 35834,  # Keepstar
+        # 35835,  # Athanor
+        # 35836,  # Tatara
+    }
 
     def __init__(self, module_name, client_scope, database_prms, debug):
         """ constructor
@@ -130,6 +173,7 @@ class QDatabaseTools:
         self.__cached_structures: typing.Dict[int, QEntity] = {}
         self.__cached_corporation_structures: typing.Dict[int, QEntity] = {}
         self.__cached_corporation_assets: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_corporation_assets_names: typing.Dict[int,  typing.Dict[int, str]] = {}
         self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
@@ -147,6 +191,7 @@ class QDatabaseTools:
         del self.__cached_corporation_orders
         del self.__cached_corporation_industry_jobs
         del self.__cached_corporation_blueprints
+        del self.__cached_corporation_assets_names
         del self.__cached_corporation_assets
         del self.__cached_corporation_structures
         del self.__cached_structures
@@ -218,6 +263,18 @@ class QDatabaseTools:
             None
         )
 
+        rows = self.dbswagger.get_exist_corporation_assets_names()
+        if rows:
+            prev_corporation_id = None
+            corporation_cache = None
+            for row in rows:
+                item_id: int = row[0]
+                corporation_id: int = row[1]
+                if prev_corporation_id != corporation_id:
+                    corporation_cache = self.get_corp_cache(self.__cached_corporation_assets_names, corporation_id)
+                    prev_corporation_id = corporation_id
+                corporation_cache[item_id] = row[2]
+
         rows = self.dbswagger.get_last_known_markets_prices()
         if rows:
             for row in rows:
@@ -283,9 +340,18 @@ class QDatabaseTools:
     # e v e   s w a g g e r   i n t e r f a c e
     # -------------------------------------------------------------------------
 
-    def load_from_esi(self, url: str, fully_trust_cache=False):
+    def load_from_esi(self, url: str, fully_trust_cache=False, body=None):
         data = self.esiswagger.get_esi_data(
             url,
+            fully_trust_cache=fully_trust_cache)
+        updated_at = self.esiswagger.last_modified
+        is_updated = self.esiswagger.is_last_data_updated
+        return data, updated_at, is_updated
+
+    def load_from_esi_piece_data(self, url: str, body: typing.List[int], fully_trust_cache=False):
+        data = self.esiswagger.get_esi_piece_data(
+            url,
+            body,
             fully_trust_cache=fully_trust_cache)
         updated_at = self.esiswagger.last_modified
         is_updated = self.esiswagger.is_last_data_updated
@@ -304,7 +370,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_character_url(character_id: int):
+    def get_character_url(character_id: int) -> str:
         # Public information about a character
         return "characters/{character_id}/".format(character_id=character_id)
 
@@ -383,7 +449,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_url(corporation_id: int):
+    def get_corporation_url(corporation_id: int) -> str:
         # Public information about a corporation
         return "corporations/{corporation_id}/".format(corporation_id=corporation_id)
 
@@ -453,7 +519,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_universe_station_url(station_id: int):
+    def get_universe_station_url(station_id: int) -> str:
         # Public information about a universe_station
         return "universe/stations/{station_id}/".format(station_id=station_id)
 
@@ -519,7 +585,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_universe_structure_url(structure_id: int):
+    def get_universe_structure_url(structure_id: int) -> str:
         # Requires: access token
         return "universe/structures/{structure_id}/".format(structure_id=structure_id)
 
@@ -646,7 +712,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_structures_url(corporation_id: int):
+    def get_corporation_structures_url(corporation_id: int) -> str:
         # Requires role(s): Station_Manager
         return "corporations/{corporation_id}/structures/".format(corporation_id=corporation_id)
 
@@ -748,11 +814,63 @@ class QDatabaseTools:
         return system_id
 
     # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/assets/names/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_corporation_assets_names_url(corporation_id: int) -> str:
+        # Requires role(s): Director
+        return "corporations/{corporation_id}/assets/names/".format(corporation_id=corporation_id)
+
+    def can_assets_item_be_renamed(self, item_data) -> bool:
+        # пропускаем экземпляры контейнеров, сложенные в стопки (у них нет уник. id и названий тоже не будет)
+        is_singleton: bool = item_data['is_singleton']
+        if not is_singleton:
+            return False
+        # пропускаем дронов в дронбеях, патроны в карго, корабли в ангарах и т.п.
+        location_flag: str = item_data['location_flag']
+        if location_flag[:-1] != 'CorpSAG':  # and location_flag != 'Unlocked' and location_flag != 'AutoFit':
+            return False
+        type_id: int = item_data['type_id']
+        return type_id in self.universe_items_with_names
+
+    def load_corporation_assets_names_from_esi(self, corporation_id: int):
+        # получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        corp_cache = self.__cached_corporation_assets.get(corporation_id)
+        item_ids: typing.List[int] = []
+
+        for (item_id, in_cache) in corp_cache.items():
+            if not self.can_assets_item_be_renamed(in_cache.obj):
+                continue
+            item_ids.append(item_id)
+        del corp_cache
+
+        # Requires role(s): Director
+        url: str = self.get_corporation_assets_names_url(corporation_id)
+        data, updated_at, is_updated = self.load_from_esi_piece_data(url, item_ids)
+        del item_ids
+
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            pass
+        elif not is_updated:
+            return None
+
+        corp_names_cache = self.get_corp_cache(self.__cached_corporation_assets_names, corporation_id)
+        corp_names_cache.clear()
+        for itm in data:
+            # { "item_id": 1035960770272, "name": "[prod] conveyor 2" },..
+            item_id: int = itm['item_id']
+            corp_names_cache[item_id] = itm['name']
+        del data
+
+    # -------------------------------------------------------------------------
     # corporations/{corporation_id}/assets/
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_assets_url(corporation_id: int):
+    def get_corporation_assets_url(corporation_id: int) -> str:
         # Requires role(s): Director
         return "corporations/{corporation_id}/assets/".format(corporation_id=corporation_id)
 
@@ -766,6 +884,12 @@ class QDatabaseTools:
         item_id: int = int(item_data['item_id'])
         corp_cache = self.get_corp_cache(self.__cached_corporation_assets, corporation_id)
         in_cache = corp_cache.get(item_id)
+        # ---
+        item_possible_be_renamed: bool = self.can_assets_item_be_renamed(item_data)
+        in_cache_item_name = None
+        if item_possible_be_renamed:
+            corp_names_cache = self.get_corp_cache(self.__cached_corporation_assets_names, corporation_id)
+            in_cache_item_name = corp_names_cache.get(item_id)
         # 1. либо данных нет в кеше
         # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
         #    если данные изменились, то надо также обновить их в БД
@@ -774,6 +898,15 @@ class QDatabaseTools:
             pass
         elif in_cache.obj:
             data_equal = in_cache.is_obj_equal_by_keys(item_data, self.corporation_asset_diff)
+            # дополнительно: если у item-а присутствует наименование, то сравниванием с тем, который имеется в БД
+            if item_possible_be_renamed:
+                if data_equal:
+                    data_equal = in_cache.compare_ext('name', in_cache_item_name)
+                if not data_equal:
+                    if in_cache_item_name:
+                        in_cache.store_ext({'name': in_cache_item_name})
+                    elif in_cache.ext and 'name' in in_cache.ext:
+                        del in_cache.ext['name']
         # ---
         # из соображений о том, что корпоративные ассеты может читать только пилот с ролью корпорации,
         # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
@@ -782,6 +915,8 @@ class QDatabaseTools:
         # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
         if data_equal:
             return
+        elif in_cache_item_name:
+            item_data['name'] = in_cache_item_name
         self.dbswagger.insert_or_update_corporation_assets(item_data, corporation_id, updated_at)
         # сохраняем данные в кеше
         if not in_cache:
@@ -814,9 +949,13 @@ class QDatabaseTools:
             del data
             return None
 
+        # получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
+        self.load_corporation_assets_names_from_esi(corporation_id)
+
         known_asset_items: int = len(data)
         if self.depth.push(url):
             for item_data in data:
+                item_id: int = item_data['item_id']
                 self.actualize_corporation_asset_item(corporation_id, item_data, updated_at)
             self.depth.pop()
         del data
@@ -867,7 +1006,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_blueprints_url(corporation_id: int):
+    def get_corporation_blueprints_url(corporation_id: int) -> str:
         # Requires role(s): Director
         return "corporations/{corporation_id}/blueprints/".format(corporation_id=corporation_id)
 
@@ -968,7 +1107,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_industry_jobs_url(corporation_id: int):
+    def get_corporation_industry_jobs_url(corporation_id: int) -> str:
         # Requires role(s): Director
         return "corporations/{corporation_id}/industry/jobs/?include_completed=true".format(corporation_id=corporation_id)
 
@@ -1079,7 +1218,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_wallets_division_journal_url(corporation_id: int, division: int):
+    def get_corporation_wallets_division_journal_url(corporation_id: int, division: int) -> str:
         # Requires role(s): Accountant, Junior_Accountant
         return "corporations/{corporation_id}/wallets/{division}/journal/".format(
             corporation_id=corporation_id,
@@ -1149,7 +1288,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_character_wallet_journal_url(character_id: int):
+    def get_character_wallet_journal_url(character_id: int) -> str:
         # Requires: access token
         return "characters/{character_id}/wallet/journal/".format(
             character_id=character_id
@@ -1214,7 +1353,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_wallets_division_transactions_url(corporation_id: int, division: int):
+    def get_corporation_wallets_division_transactions_url(corporation_id: int, division: int) -> str:
         # Requires role(s): Accountant, Junior_Accountant
         return "corporations/{corporation_id}/wallets/{division}/transactions/".format(
             corporation_id=corporation_id,
@@ -1280,7 +1419,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_character_wallet_transactions_url(character_id: int):
+    def get_character_wallet_transactions_url(character_id: int) -> str:
         # Requires: access token
         return "characters/{character_id}/wallet/transactions/".format(
             character_id=character_id
@@ -1341,12 +1480,12 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_corporation_orders_url(corporation_id: int):
+    def get_corporation_orders_url(corporation_id: int) -> str:
         # Requires one of the following EVE corporation role(s): Accountant, Trader
         return "corporations/{corporation_id}/orders/".format(corporation_id=corporation_id)
 
     @staticmethod
-    def get_corporation_orders_history_url(corporation_id: int):
+    def get_corporation_orders_history_url(corporation_id: int) -> str:
         # Requires one of the following EVE corporation role(s): Accountant, Trader
         return "corporations/{corporation_id}/orders/history/".format(corporation_id=corporation_id)
 
@@ -1467,7 +1606,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_markets_prices_url():
+    def get_markets_prices_url() -> str:
         # Requires: public access
         return "markets/prices/"
 
@@ -1518,7 +1657,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_markets_region_history_url(region_id: int, type_id: int):
+    def get_markets_region_history_url(region_id: int, type_id: int) -> str:
         # Requires: public access
         return "markets/{region_id}/history/?type_id={type_id}".format(region_id=region_id, type_id=type_id)
 
@@ -1678,7 +1817,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_markets_structures_url(structure_id: int):
+    def get_markets_structures_url(structure_id: int) -> str:
         # Requires: access token
         return "markets/structures/{structure_id}/".format(structure_id=structure_id)
 
@@ -1736,7 +1875,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_markets_region_orders_url(region_id: int, order_type: str = 'all', type_id = None):
+    def get_markets_region_orders_url(region_id: int, order_type: str = 'all', type_id = None) -> str:
         # Requires: access token
         # 'The Forge' = 10000002
         # 'Tritanium' = 34
@@ -1819,12 +1958,12 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_types_url():
+    def get_types_url() -> str:
         # Requires: piblic access
         return "universe/types/"
 
     @staticmethod
-    def get_type_id_url(type_id: int):
+    def get_type_id_url(type_id: int) -> str:
         # Requires: piblic access
         return "universe/types/{type_id}/".format(type_id=type_id)
 

@@ -716,6 +716,17 @@ class QSwaggerInterface:
             })
         return data
 
+    def get_exist_corporation_assets_names(self):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " eca_item_id,"
+            " eca_corporation_id,"
+            " eca_name "
+            "FROM esi_corporation_assets "
+            "WHERE eca_name IS NOT NULL;"
+        )
+        return rows  # м.б. None
+
     def delete_obsolete_corporation_assets(self, deleted_ids):
         """ обновляет updated_at у существующих корп-ассетов и удаляет устаревшие (исчезнувшие) ассеты
 
