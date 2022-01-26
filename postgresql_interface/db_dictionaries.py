@@ -302,6 +302,7 @@ class QDictionaries:
             "INSERT INTO eve_sde_type_ids("
             " sdet_type_id,"
             " sdet_type_name,"
+            " sdet_group_id,"
             " sdet_volume,"
             " sdet_capacity,"
             " sdet_base_price,"
@@ -312,6 +313,7 @@ class QDictionaries:
             "VALUES ("
             " %(t)s,"
             " %(n)s,"
+            " %(g)s,"
             " %(v)s,"
             " %(c)s,"
             " %(bp)s,"
@@ -321,6 +323,7 @@ class QDictionaries:
             " %(i)s) "
             "ON CONFLICT ON CONSTRAINT pk_sdet DO UPDATE SET"
             " sdet_type_name=%(n)s,"
+            " sdet_group_id=%(g)s,"
             " sdet_volume=%(v)s,"
             " sdet_capacity=%(c)s,"
             " sdet_base_price=%(bp)s,"
@@ -330,6 +333,7 @@ class QDictionaries:
             " sdet_icon_id=%(i)s;",
             {'t': type_id,
              'n': type_name,
+             'g': type_dict['groupID'],
              'v': type_dict.get('volume', None),
              'c': type_dict.get('capacity', None),
              'bp': type_dict.get('basePrice', None),
@@ -385,7 +389,7 @@ class QDictionaries:
         del items_keys
         # добавляем в БД маркер-индикатор того, что надо перечитать из esi данные по
         # packaged_volume и обновить их в БД (в sde этих данных нет)
-        self.insert_type_id(-1, 'Waiting automatic data update from ESI', {'published': False})
+        self.insert_type_id(-1, 'Waiting automatic data update from ESI', {'published': False, 'groupID': 0})
 
     def clean_market_groups(self):
         self.db.execute("DELETE FROM eve_sde_market_groups;")

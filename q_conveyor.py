@@ -28,9 +28,8 @@ Requires application scopes:
 """
 import sys
 import requests
+import typing
 import re
-
-import eve_esi_interface as esi
 
 import eve_esi_tools
 import eve_sde_tools
@@ -38,6 +37,9 @@ import console_app
 import render_html_conveyor
 import q_industrialist_settings
 import q_conveyor_settings
+
+import eve_esi_interface as esi
+import postgresql_interface as db
 
 from __init__ import __version__
 
@@ -47,11 +49,36 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
-    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
-    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
-    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
-    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    if argv_prms["database_mode"]:
+        corporation_name: str = 'R Industry'
+
+        qidb = db.QIndustrialistDatabase("conveyor", debug=argv_prms["verbose_mode"])
+        qidb.connect(q_industrialist_settings.g_database)
+        dbtranslator = db.QSwaggerTranslator(qidb)
+        # загрузка справочников
+        sde_market_groups: typing.Dict[int, db.QSwaggerMarketGroup] = dbtranslator.get_market_groups()
+        sde_type_ids: typing.Dict[int, db.QSwaggerTypeId] = dbtranslator.get_published_type_ids()
+        sde_blueprints: typing.Dict[int, db.QSwaggerBlueprint] = dbtranslator.get_blueprints(sde_type_ids)
+        # загрузка корпоративных ассетов
+        corporation_id: int = dbtranslator.get_corporation_id(corporation_name)
+        if not corporation_id:
+            raise Exception("There are no corporation '{}' in the database, please preload data".format(corporation_name))
+        corporation_assets: typing.Dict[int, db.QSwaggerCorporationAssetsItem] = dbtranslator.get_corporation_assets(
+            corporation_id,
+            sde_type_ids,
+            load_unknown_type_assets=False,
+            load_asseted_blueprints=False)
+        corporation_blueprints: typing.Dict[int, db.QSwaggerCorporationBlueprint] = dbtranslator.get_corporation_blueprints(
+            corporation_id,
+            sde_blueprints,
+            load_unknown_type_blueprints=False)
+        del qidb
+    else:
+        sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+        sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+        sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+        sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+        sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
     # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
     for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
@@ -72,7 +99,7 @@ def main():
         client = esi.EveESIClient(
             auth,
             keep_alive=True,
-            debug=False,
+            debug=argv_prms["verbose_mode"],
             logger=True,
             user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
         interface = esi.EveOnlineInterface(

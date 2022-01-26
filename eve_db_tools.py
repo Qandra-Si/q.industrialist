@@ -116,40 +116,6 @@ class QDatabaseTools:
     corporation_industry_job_diff = ['status']
     market_order_diff = ['price', 'volume_remain']
     markets_prices_diff = ['adjusted_price', 'average_price']
-    universe_items_with_names: typing.Set[int] = {
-        # 2233,  # Customs Office
-        3293,  # Medium Standard Container
-        3296,  # Large Standard Container
-        3297,  # Small Standard Container
-        3465,  # Large Secure Container
-        3466,  # Medium Secure Container
-        3467,  # Small Secure Container
-        11488,  # Huge Secure Container
-        11489,  # Giant Secure Container
-        17363,  # Small Audit Log Secure Container
-        17364,  # Medium Audit Log Secure Container
-        17365,  # Large Audit Log Secure Container
-        17366,  # Station Container
-        17367,  # Station Vault Container
-        17368,  # Station Warehouse Container
-        24445,  # Giant Freight Container
-        33003,  # Enormous Freight Container
-        33005,  # Huge Freight Container
-        33007,  # Large Freight Container
-        33009,  # Medium Freight Container
-        33011,  # Small Freight Container
-        # 35825,  # Raitaru
-        # 35826,  # Azbel
-        # 35827,  # Sotiyo
-        # 35828,  # Medium Laboratory
-        # 35829,  # Large Laboratory
-        # 35830,  # X-Large Laboratory
-        # 35832,  # Astrahus
-        # 35833,  # Fortizar
-        # 35834,  # Keepstar
-        # 35835,  # Athanor
-        # 35836,  # Tatara
-    }
 
     def __init__(self, module_name, client_scope, database_prms, debug):
         """ constructor
@@ -178,6 +144,11 @@ class QDatabaseTools:
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_markets_prices: typing.Dict[int, QEntity] = {}
+        self.__cached_category_ids: typing.Set[int] = set()
+        self.__cached_group_ids: typing.Set[int] = set()
+        self.__cached_market_group_ids: typing.Set[int] = set()
+        self.__cached_type_ids: typing.Set[int] = set()
+        self.__universe_items_with_names: typing.Set[int] = set()
         self.prepare_cache()
 
         self.depth = QEntityDepth()
@@ -187,6 +158,11 @@ class QDatabaseTools:
         """
         del self.depth
 
+        del self.__universe_items_with_names
+        del self.__cached_type_ids
+        del self.__cached_market_group_ids
+        del self.__cached_group_ids
+        del self.__cached_category_ids
         del self.__cached_markets_prices
         del self.__cached_corporation_orders
         del self.__cached_corporation_industry_jobs
@@ -284,7 +260,33 @@ class QDatabaseTools:
                 del row['ext']
                 self.__cached_markets_prices[type_id] = QEntity(True, False, row, updated_at)
 
-    def get_corp_cache(self, cache, corporation_id):
+        # загрузка из БД type_ids, market_group_ids, group_ids, category_ids (в таблицах в БД таких данных может быть
+        # больше, чем может выдать ESI, т.к. БД может хранить устаревшие non published товары)
+        self.prepare_goods_dictionaries()
+
+    def prepare_goods_dictionaries(self):
+        rows = self.dbswagger.get_exist_category_ids()
+        if rows:
+            self.__cached_category_ids: typing.Set[int] = set([row[0] for row in rows])
+
+        rows = self.dbswagger.get_exist_group_ids()
+        if rows:
+            self.__cached_group_ids: typing.Set[int] = set([row[0] for row in rows])
+
+        rows = self.dbswagger.get_exist_market_group_ids()
+        if rows:
+            self.__cached_market_group_ids: typing.Set[int] = set([row[0] for row in rows])
+
+        rows = self.dbswagger.get_exist_type_ids()
+        if rows:
+            self.__cached_type_ids: typing.Set[int] = set([row[0] for row in rows])
+
+        rows = self.dbswagger.get_universe_items_with_names()
+        if rows:
+            self.__universe_items_with_names: typing.Set[int] = set([row[0] for row in rows])
+
+    @staticmethod
+    def get_corp_cache(cache, corporation_id):
         corp_cache = cache.get(corporation_id)
         if not corp_cache:
             cache[corporation_id] = {}
@@ -876,7 +878,14 @@ class QDatabaseTools:
         return "corporations/{corporation_id}/assets/".format(corporation_id=corporation_id)
 
     def actualize_corporation_asset_item_details(self, item_data, need_data=False):
+        # добавление в БД возможно отсутствующего типа товара
         type_id: int = int(item_data['type_id'])
+        if type_id not in self.__cached_type_ids:
+            url: str = self.get_type_id_url(type_id)
+            if self.depth.push(url):
+                self.actualize_type_id(type_id)
+                self.depth.pop()
+        # актуализация прочей информации об ассетах
         if type_id == 27:  # Office
             location_id: int = int(item_data['location_id'])
             self.actualize_station_or_structure(location_id, need_data=need_data)
@@ -1638,7 +1647,13 @@ class QDatabaseTools:
                 in_cache.store(True, True, price_data, updated_at)
             else:
                 continue
-            # отправка в БД
+            # добавление в БД возможно отсутствующего типа товара
+            if type_id not in self.__cached_type_ids:
+                url: str = self.get_type_id_url(type_id)
+                if self.depth.push(url):
+                    self.actualize_type_id(type_id)
+                    self.depth.pop()
+            # отправка в БД цену товара
             self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
             # подсчёт статистики
             markets_prices_updated += 1
@@ -1746,6 +1761,7 @@ class QDatabaseTools:
     # /markets/structures/{structure_id}/
     # /markets/{region_id}/orders/
     # -------------------------------------------------------------------------
+
     def actualize_trade_hub_market_orders(self, trade_hub_id: int, orders_data, updated_at):
         # актуализируем станцию/структуру в БД
         self.actualize_station_or_structure(trade_hub_id, need_data=False)
@@ -1776,6 +1792,12 @@ class QDatabaseTools:
                 pass
             elif is_dicts_equal_by_keys(in_cache, order_data, self.market_order_diff):
                 continue
+            # добавление в БД возможно отсутствующего типа товара
+            if type_id not in self.__cached_type_ids:
+                url: str = self.get_type_id_url(type_id)
+                if self.depth.push(url):
+                    self.actualize_type_id(type_id)
+                    self.depth.pop()
             # добавляем новый или корректируем изменённый ордер в БД
             self.dbswagger.insert_or_update_market_location_order(trade_hub_id, order_data, updated_at)
             # подсчёт статистики
@@ -1876,7 +1898,7 @@ class QDatabaseTools:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def get_markets_region_orders_url(region_id: int, order_type: str = 'all', type_id = None) -> str:
+    def get_markets_region_orders_url(region_id: int, order_type: str = 'all', type_id=None) -> str:
         # Requires: access token
         # 'The Forge' = 10000002
         # 'Tritanium' = 34
@@ -1954,6 +1976,207 @@ class QDatabaseTools:
         return found_market_goods, updated_market_orders
 
     # -------------------------------------------------------------------------
+    # /universe/categories/
+    # /universe/categories/{category_id}/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_category_id_url(category_id: int) -> str:
+        # Requires: piblic access
+        return "universe/categories/{category_id}/".format(category_id=category_id)
+
+    def actualize_category_id(self, category_id: int):
+        # проверяем только то, что группа/категория присутствует в БД по указанному идентификатору
+        # исходим из того, что группы/категории не модифицируются CCP-шниками, только добавляются
+        if category_id in self.__cached_category_ids:
+            return None
+        # ---
+        url: str = self.get_category_id_url(category_id)
+        try:
+            data, updated_at, is_updated = self.load_from_esi(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:
+                # поступаем аналогично алгоритму в actualize_type_id, где часть item_types может быть Not Found, хотя
+                # они есть в ассетах, а с 2022-10-14 хранение данных в таблице eve_sde_type_ids перманентно (ранее при
+                # обновлении sde данные из таблицы полностью удалялись), т.о. часть type_ids хранится
+                # вечно, даже будучи удалена из ESI
+                # помечаем такой group_id признаком not published, тогда же он перестанет попадать сюда впредь
+                self.dbswagger.update_category_id_as_not_published(category_id)
+                # сохраняем идентификатор загруженных и добавленных в БД данных
+                self.__cached_category_ids.add(category_id)
+                return None
+            else:
+                # print(sys.exc_info())
+                # raise
+                return None  # продолжить загрузку очень важно!
+        except:
+            # print(sys.exc_info())
+            # raise
+            return None  # продолжить загрузку очень важно!
+
+        if data is None:
+            return None
+
+        # сперва добавляем категорию, а потом в неё добавляем связанные с нею группы
+        self.dbswagger.insert_or_update_category_id(data)
+
+        # сохраняем идентификатор загруженных и добавленных в БД данных
+        self.__cached_category_ids.add(category_id)
+
+        # поскольку мы оказались в этом методе, то это новая категория группы товаров
+        # прочие группы в этой же категории отсутствуют в БД, а мы знаем их номера - тоже добавляем их в БД
+        for group_id in data['groups']:
+            # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+            url: str = self.get_group_id_url(group_id)
+            if self.depth.push(url):
+                self.actualize_group_id(group_id)
+                self.depth.pop()
+
+        return data
+
+    # -------------------------------------------------------------------------
+    # /universe/groups/
+    # /universe/groups/{group_id}/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_group_id_url(group_id: int) -> str:
+        # Requires: piblic access
+        return "universe/groups/{group_id}/".format(group_id=group_id)
+
+    def actualize_group_id_details(self, group_id_data) -> None:
+        # сохраняем сопутствующие данные в БД
+        # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+        category_id: int = group_id_data['category_id']
+        url: str = self.get_category_id_url(category_id)
+        if self.depth.push(url):
+            self.actualize_category_id(category_id)
+            self.depth.pop()
+
+    def actualize_group_id(self, group_id: int) -> None:
+        # проверяем только то, что группа/категория присутствует в БД по указанному идентификатору
+        # исходим из того, что группы/категории не модифицируются CCP-шниками, только добавляются
+        if group_id in self.__cached_group_ids:
+            return
+        # ---
+        url: str = self.get_group_id_url(group_id)
+        try:
+            data, updated_at, is_updated = self.load_from_esi(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:
+                # поступаем аналогично алгоритму в actualize_type_id, где часть item_types может быть Not Found, хотя
+                # они есть в ассетах, а с 2022-10-14 хранение данных в таблице eve_sde_type_ids перманентно (ранее при
+                # обновлении sde данные из таблицы полностью удалялись), т.о. часть type_ids хранится
+                # вечно, даже будучи удалена из ESI
+                # помечаем такой group_id признаком not published, тогда же он перестанет попадать сюда впредь
+                self.dbswagger.update_group_id_as_not_published(group_id)
+                # сохраняем идентификатор загруженных и добавленных в БД данных
+                self.__cached_group_ids.add(group_id)
+                return
+            else:
+                # print(sys.exc_info())
+                # raise
+                return  # продолжить загрузку очень важно!
+        except:
+            # print(sys.exc_info())
+            # raise
+            return  # продолжить загрузку очень важно!
+
+        if data is None:
+            return
+
+        # сперва актуализируем связанные данные, с тем чтобы они автоматически добавились в БД до того, как будет
+        # произведена попытка добавления товара без соответствующих групп и ограничений на связанные ключи
+        self.actualize_group_id_details(data)
+        # добавляем данные по новомй группе в БД
+        self.dbswagger.insert_or_update_group_id(data)
+
+        # сохраняем идентификатор загруженных и добавленных в БД данных
+        self.__cached_group_ids.add(group_id)
+
+        # поскольку мы оказались в этом методе, то это новая группа товаров
+        # прочие товары в этой же группе отсутствуют в БД, а мы знаем их номера - тоже добавляем их в БД
+        for type_id in data['types']:
+            if type_id not in self.__cached_type_ids:
+                # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+                url: str = self.get_type_id_url(type_id)
+                if self.depth.push(url):
+                    self.actualize_type_id(type_id)
+                    self.depth.pop()
+
+        del data
+
+    # -------------------------------------------------------------------------
+    # /markets/groups/
+    # /markets/groups/{market_group_id}/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_market_group_id_url(market_group_id: int) -> str:
+        # Requires: piblic access
+        return "markets/groups/{market_group_id}/".format(market_group_id=market_group_id)
+
+    def actualize_market_group_id_details(self, market_group_id_data) -> None:
+        # сохраняем сопутствующие данные в БД
+        if 'parent_group_id' in market_group_id_data:
+            # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+            parent_group_id: int = market_group_id_data['parent_group_id']
+            url: str = self.get_market_group_id_url(parent_group_id)
+            if self.depth.push(url):
+                self.actualize_market_group_id(parent_group_id)
+                self.depth.pop()
+
+    def actualize_market_group_id(self, market_group_id: int) -> None:
+        # проверяем только то, что группа/категория присутствует в БД по указанному идентификатору
+        # исходим из того, что группы/категории не модифицируются CCP-шниками, только добавляются
+        if market_group_id in self.__cached_market_group_ids:
+            return
+        # ---
+        url: str = self.get_market_group_id_url(market_group_id)
+        try:
+            data, updated_at, is_updated = self.load_from_esi(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:
+                return
+            else:
+                # сохраняем идентификатор загруженных и добавленных в БД данных (больше в этот метод входить не надо)
+                self.__cached_market_group_ids.add(market_group_id)
+                # print(sys.exc_info())
+                # raise
+                return  # продолжить загрузку очень важно!
+        except:
+            # print(sys.exc_info())
+            # raise
+            return  # продолжить загрузку очень важно!
+
+        if data is None:
+            return
+
+        # сперва актуализируем связанные данные, с тем чтобы они автоматически добавились в БД до того, как будет
+        # произведена попытка добавления товара без соответствующих групп и ограничений на связанные ключи
+        self.actualize_market_group_id_details(data)
+        # добавляем данные по новому предмету в БД
+        self.dbswagger.insert_or_update_market_group_id(data)
+
+        # сохраняем идентификатор загруженных и добавленных в БД данных
+        self.__cached_market_group_ids.add(market_group_id)
+
+        # поскольку мы оказались в этом методе, то это новая группа товаров
+        # прочие товары в этой же группе отсутствуют в БД, а мы знаем их номера - тоже добавляем их в БД
+        for type_id in data['types']:
+            if type_id not in self.__cached_type_ids:
+                # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+                url: str = self.get_type_id_url(type_id)
+                if self.depth.push(url):
+                    self.actualize_type_id(type_id)
+                    self.depth.pop()
+
+        del data
+
+    # -------------------------------------------------------------------------
     # /universe/types/
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
@@ -1968,7 +2191,28 @@ class QDatabaseTools:
         # Requires: piblic access
         return "universe/types/{type_id}/".format(type_id=type_id)
 
+    def actualize_type_id_details(self, type_id_data) -> None:
+        # сохраняем сопутствующие данные в БД
+        # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+        group_id: int = type_id_data['group_id']
+        url: str = self.get_group_id_url(group_id)
+        if self.depth.push(url):
+            self.actualize_group_id(type_id_data['group_id'])
+            self.depth.pop()
+        if 'market_group_id' in type_id_data:
+            # проверяем, возможно ли зацикливание при загрузке сопутствующих данных?
+            market_group_id: int = type_id_data['market_group_id']
+            url: str = self.get_market_group_id_url(market_group_id)
+            if self.depth.push(url):
+                self.actualize_market_group_id(market_group_id)
+                self.depth.pop()
+
     def actualize_type_id(self, type_id: int):
+        # проверяем только то, что группа/категория присутствует в БД по указанному идентификатору
+        # исходим из того, что группы/категории не модифицируются CCP-шниками, только добавляются
+        if type_id in self.__cached_type_ids:
+            return None
+        # ---
         url: str = self.get_type_id_url(type_id)
         try:
             data, updated_at, is_updated = self.load_from_esi(url)
@@ -1981,6 +2225,8 @@ class QDatabaseTools:
                 # вечно, даже будучи удалена из ESI
                 # помечаем такой type_id признаком not published, тогда же он перестанет попадать сюда впредь
                 self.dbswagger.update_type_id_as_not_published(type_id)
+                # сохраняем идентификатор загруженных и добавленных в БД данных
+                self.__cached_type_ids.add(type_id)
                 return None
             else:
                 # print(sys.exc_info())
@@ -1994,12 +2240,22 @@ class QDatabaseTools:
         if data is None:
             return None
 
+        # сперва актуализируем связанные данные, с тем чтобы они автоматически добавились в БД до того, как будет
+        # произведена попытка добавления товара без соответствующих групп и ограничений на связанные ключи
+        self.actualize_type_id_details(data)
         # добавляем данные по новому предмету в БД
         self.dbswagger.insert_or_update_type_id(type_id, data, updated_at)
 
+        # сохраняем идентификатор загруженных и добавленных в БД данных
+        self.__cached_type_ids.add(type_id)
+
         return data
 
-    def actualize_type_ids(self):
+    def actualize_type_ids(self, full_database_upgrade: bool = True) -> int:
+        # Внимание! установка full_database_upgrade=False не защищает от возможной длительной работы этого метода при
+        #           обновлении всех справочников в БД (например когда справочник был обновлён из q_dictionaries.py)
+        #           (здесь этот параметр скорее имеет отладочное применение)
+        # ---
         # сначала проверяем содержимое БД и актуализируем её
         # получаем либо весь набор type_ids (если есть маркер type_id=-1, свидетельствующий о
         # полном устаревании данных), либо получаем лишь те записи, у которых нет известного параметра
@@ -2015,11 +2271,11 @@ class QDatabaseTools:
             known_type_ids, updated_at, is_updated = self.load_from_esi_paged_data(url)
 
             if known_type_ids is None:
-                return None
+                return 0
             if self.esiswagger.offline_mode:
                 pass
             elif not is_updated:
-                return None
+                return 0
 
         # получение набора type_ids по которым надо запросить информацию с ESI
         type_ids_to_renew: typing.Set[int] = set()
@@ -2035,12 +2291,25 @@ class QDatabaseTools:
             type_ids_to_renew |= set(known_type_ids)
             del known_type_ids
 
-        actualized_type_ids = []
+        quantity_of_actualized_type_ids: int = 0
+        if full_database_upgrade:
+            # будем заниматься ПОЛНОЙ перезагрузкой справочных данных по товарам, поэтому стираем все идентификаторы
+            self.__cached_type_ids.clear()
+            self.__cached_market_group_ids.clear()
+            self.__cached_group_ids.clear()
+            self.__cached_category_ids.clear()
+        else:
+            # обновляем только те данные, которых не хватает (помечены устаревшими, или же появились откуда-то)
+            self.__cached_type_ids -= type_ids_to_renew
+        quantity_of_actualized_type_ids = len(self.__cached_type_ids)
+
         for type_id in type_ids_to_renew:
-            data = self.actualize_type_id(type_id)
-            if data is not None:
-                actualized_type_ids.append({'type_id': data['type_id'], 'name': data['name']})
-                del data
+            if type_id not in self.__cached_type_ids:
+                url: str = self.get_type_id_url(type_id)
+                if self.depth.push(url):
+                    self.actualize_type_id(type_id)
+                    self.depth.pop()
+        quantity_of_actualized_type_ids = len(self.__cached_type_ids) - quantity_of_actualized_type_ids
 
         del type_ids_to_renew
 
@@ -2052,7 +2321,8 @@ class QDatabaseTools:
         # отправляются в not published без попадания в actialized-список
         self.qidb.commit()
 
-        if not actualized_type_ids:
-            return None
+        # загрузка из БД type_ids, market_group_ids, group_ids, category_ids (в таблицах в БД таких данных может быть
+        # больше, чем может выдать ESI, т.к. БД может хранить устаревшие non published товары)
+        self.prepare_goods_dictionaries()
 
-        return actualized_type_ids
+        return quantity_of_actualized_type_ids

@@ -178,5 +178,46 @@ create or replace view qi.eve_sde_market_groups_semantic as
 --------------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------------
+-- eve_sde_workable_blueprints
+-- список чертежей, связанных с продуктами, которые можно использовать (и
+-- чертежи, и продукты являются published)
+--------------------------------------------------------------------------------
+create or replace view qi.eve_sde_workable_blueprints as
+  select
+    sdeb_blueprint_type_id as blueprint_type_id,
+    sdeb_activity as activity_id,
+    sdeb_time as time,
+    sdebp_product_id as product_type_id,
+    sdebp_quantity as quantity,
+    sdebp_probability as probability
+  from (
+    select b.* from eve_sde_blueprints b
+      inner join eve_sde_type_ids bt on (bt.sdet_type_id=sdeb_blueprint_type_id and bt.sdet_published)
+  ) b
+    left outer join (
+      select p.* from eve_sde_blueprint_products p
+        inner join eve_sde_type_ids bt on (bt.sdet_type_id=sdebp_product_id and bt.sdet_published)
+    ) p on (sdebp_blueprint_type_id=sdeb_blueprint_type_id AND sdebp_activity=sdeb_activity);
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- eve_sde_available_blueprint_materials
+-- список материалов, связанных доступными чертежами, которые можно использовать
+-- (и чертежи, и продукты, и материалы являются published)
+--------------------------------------------------------------------------------
+create or replace view qi.eve_sde_available_blueprint_materials as
+  select
+    blueprint_type_id,
+    activity_id,
+    m.sdebm_material_id as material_type_id,
+    m.sdebm_quantity as quantity
+  from
+    (select distinct blueprint_type_id, activity_id from eve_sde_workable_blueprints) b
+      inner join eve_sde_blueprint_materials m on (m.sdebm_blueprint_type_id=b.blueprint_type_id and m.sdebm_activity=b.activity_id)
+      inner join qi.eve_sde_type_ids on (m.sdebm_material_id = sdet_type_id and sdet_published);
+--------------------------------------------------------------------------------
+
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.

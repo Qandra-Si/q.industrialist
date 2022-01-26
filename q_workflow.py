@@ -636,7 +636,7 @@ def main():
         client = esi.EveESIClient(
             auth,
             keep_alive=True,
-            debug=False,
+            debug=argv_prms["verbose_mode"],
             logger=True,
             user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
         interface = esi.EveOnlineInterface(

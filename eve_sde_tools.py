@@ -748,7 +748,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding typeIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
+    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "groupID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
 
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()

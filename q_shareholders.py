@@ -15,7 +15,7 @@ Prerequisites:
 To run this example, make sure you have completed the prerequisites and then
 run the following command from this directory as the root:
 
->>> python q_shareholders.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
+>>> python q_shareholders.py --pilot="Qandra Si" --pilot="Your Name" --online --cache_dir=~/.q_industrialist
 
 Required application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
@@ -52,7 +52,7 @@ def main():
         client = esi.EveESIClient(
             auth,
             keep_alive=True,
-            debug=False,
+            debug=argv_prms["verbose_mode"],
             logger=True,
             user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
         interface = esi.EveOnlineInterface(
