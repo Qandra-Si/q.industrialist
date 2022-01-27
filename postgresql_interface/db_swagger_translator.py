@@ -1,512 +1,6 @@
-# -*- encoding: utf-8 -*-
-import typing
-import datetime
-
+﻿# -*- encoding: utf-8 -*-
+from .db_swagger_cache import *
 from .db_interface import QIndustrialistDatabase
-
-
-class QSwaggerMarketGroup:
-    def __init__(self, row):
-        self.__group_id: int = row[0]
-        self.__parent_id: typing.Optional[int] = row[1]
-        self.__semantic_id: int = row[2]
-        self.__name: str = row[3]
-        self.__icon_id: typing.Optional[int] = row[4]
-
-    @property
-    def group_id(self) -> int:
-        return self.__group_id
-
-    @property
-    def parent_id(self) -> typing.Optional[int]:
-        return self.__parent_id
-
-    @property
-    def semantic_id(self) -> int:
-        return self.__semantic_id
-
-    @property
-    def name(self) -> str:
-        return self.__name
-
-    @property
-    def icon_id(self) -> typing.Optional[int]:
-        return self.__icon_id
-
-
-class QSwaggerTypeId:
-    def __init__(self, row):
-        self.__type_id: int = row[0]
-        self.__name: str = row[1]
-        self.__volume: typing.Optional[float] = row[2]
-        self.__capacity: typing.Optional[float] = row[3]
-        self.__base_price: typing.Optional[float] = row[4]
-        self.__published: bool = True
-        self.__market_group_id: typing.Optional[int] = row[5]
-        self.__meta_group_id: typing.Optional[int] = row[6]
-        self.__icon_id: typing.Optional[int] = row[7]
-        self.__packaged_volume: typing.Optional[float] = row[8]
-
-    @property
-    def type_id(self) -> int:
-        return self.__type_id
-
-    @property
-    def name(self) -> str:
-        return self.__name
-
-    @property
-    def volume(self) -> typing.Optional[float]:
-        return self.__volume
-
-    @property
-    def capacity(self) -> typing.Optional[float]:
-        return self.__capacity
-
-    @property
-    def base_price(self) -> typing.Optional[float]:
-        return self.__base_price
-
-    @property
-    def published(self) -> bool:
-        return self.__published
-
-    @property
-    def market_group_id(self) -> typing.Optional[int]:
-        return self.__market_group_id
-
-    @property
-    def meta_group_id(self) -> typing.Optional[int]:
-        return self.__meta_group_id
-
-    @property
-    def icon_id(self) -> typing.Optional[int]:
-        return self.__icon_id
-
-    @property
-    def packaged_volume(self) -> typing.Optional[float]:
-        return self.__packaged_volume
-
-
-class QSwaggerProduct:
-    def __init__(self, product_type: QSwaggerTypeId, quantity: int):
-        self.__product_type: QSwaggerTypeId = product_type
-        self.__quantity: int = quantity
-
-    @property
-    def product_type(self) -> QSwaggerTypeId:
-        return self.__product_type
-
-    @property
-    def quantity(self) -> int:
-        return self.__quantity
-
-    @property
-    def product_id(self) -> int:
-        return self.__product_type.type_id
-
-
-class QSwaggerInventionProduct:
-    def __init__(self, product_type: QSwaggerTypeId, quantity: int, probability: float):
-        self.__product_type: QSwaggerTypeId = product_type
-        self.__quantity: int = quantity
-        self.__probability: float = probability
-
-    @property
-    def product_type(self) -> QSwaggerTypeId:
-        return self.__product_type
-
-    @property
-    def quantity(self) -> int:
-        return self.__quantity
-
-    @property
-    def probability(self) -> float:
-        return self.__probability
-
-    @property
-    def product_id(self) -> int:
-        return self.__product_type.type_id
-
-
-class QSwaggerMaterial:
-    def __init__(self, material_type: QSwaggerTypeId, quantity: int):
-        self.__material_type: QSwaggerTypeId = material_type
-        self.__quantity: int = quantity
-
-    @property
-    def material_type(self) -> QSwaggerTypeId:
-        return self.__material_type
-
-    @property
-    def quantity(self) -> int:
-        return self.__quantity
-
-    @property
-    def material_id(self) -> int:
-        return self.__material_type.type_id
-
-
-class QSwaggerActivityMaterials:
-    def __init__(self):
-        self.__materials: typing.List[QSwaggerMaterial] = []
-
-    def __del__(self):
-        self.__materials.clear()
-        del self.__materials
-
-    def add_material(self, material: QSwaggerTypeId, quantity: int) -> None:
-        material_id: int = material.type_id
-        if [1 for m in self.__materials if m.material_id == material_id]:
-            raise Exception("Unable to add blueprint activity material twice")
-        self.__materials.append(QSwaggerMaterial(material, quantity))
-
-    @property
-    def materials(self) -> typing.List[QSwaggerMaterial]:
-        return self.__materials
-
-
-class QSwaggerActivity:
-    def __init__(self, time: int):
-        self.__time: int = time
-        self.__materials = QSwaggerActivityMaterials()
-
-    def __del__(self):
-        del self.__materials
-
-    @property
-    def time(self) -> int:
-        return self.__time
-
-    @property
-    def materials(self) -> QSwaggerActivityMaterials:
-        return self.__materials
-
-
-class QSwaggerBlueprintManufacturing(QSwaggerActivity):
-    def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time)
-        self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
-
-    def __del__(self):
-        del self.__product
-
-    @staticmethod
-    def activity_id() -> int:
-        return 1
-
-    @property
-    def product(self) -> QSwaggerProduct:
-        return self.__product
-
-    @property
-    def product_type(self) -> QSwaggerTypeId:
-        return self.__product.product_type
-
-    @property
-    def product_id(self) -> int:
-        return self.__product.product_id
-
-    @property
-    def quantity(self) -> int:
-        return self.__product.quantity
-
-
-class QSwaggerBlueprintInvention(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time)
-        self.__products: typing.List[QSwaggerInventionProduct] = []
-
-    def __del__(self):
-        self.__products.clear()
-        del self.__products
-
-    def add_product(self, product_type: QSwaggerTypeId, row) -> None:
-        product_id: int = product_type.type_id
-        if [1 for p in self.__products if p.product_id == product_id]:
-            raise Exception("Unable to add invention product twice")
-        product: QSwaggerInventionProduct = QSwaggerInventionProduct(product_type, row[4], row[5])
-        self.__products.append(product)
-
-    @staticmethod
-    def activity_id() -> int:
-        return 8
-
-    @property
-    def time(self) -> int:
-        return self.__time
-
-    @property
-    def products(self) -> typing.List[QSwaggerInventionProduct]:
-        return self.__products
-
-
-class QSwaggerBlueprintCopying(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time)
-
-    def __del__(self):
-        pass
-
-    @staticmethod
-    def activity_id() -> int:
-        return 5
-
-
-class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time)
-
-    def __del__(self):
-        pass
-
-    @staticmethod
-    def activity_id() -> int:
-        return 4
-
-
-class QSwaggerBlueprintResearchTime(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time)
-
-    def __del__(self):
-        pass
-
-    @staticmethod
-    def activity_id() -> int:
-        return 3
-
-
-class QSwaggerBlueprintReaction(QSwaggerActivity):
-    def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time)
-        self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
-
-    def __del__(self):
-        del self.__product
-
-    @staticmethod
-    def activity_id() -> int:
-        return 9
-
-    @property
-    def product(self) -> QSwaggerProduct:
-        return self.__product
-
-    @property
-    def product_type(self) -> QSwaggerTypeId:
-        return self.__product.product_type
-
-    @property
-    def product_id(self) -> int:
-        return self.__product.product_id
-
-    @property
-    def quantity(self) -> int:
-        return self.__product.quantity
-
-
-class QSwaggerBlueprint:
-    def __init__(self, blueprint_type: QSwaggerTypeId):
-        self.__blueprint_type: QSwaggerTypeId = blueprint_type
-        self.__manufacturing: typing.Optional[QSwaggerBlueprintManufacturing] = None
-        self.__invention: typing.Optional[QSwaggerBlueprintInvention] = None
-        self.__copying: typing.Optional[QSwaggerBlueprintCopying] = None
-        self.__research_material: typing.Optional[QSwaggerBlueprintResearchMaterial] = None
-        self.__research_time: typing.Optional[QSwaggerBlueprintResearchTime] = None
-        self.__reaction: typing.Optional[QSwaggerBlueprintReaction] = None
-
-    def __del__(self):
-        if self.__manufacturing is not None:
-            del self.__manufacturing
-        if self.__invention is not None:
-            del self.__invention
-        if self.__copying is not None:
-            del self.__copying
-        if self.__research_material is not None:
-            del self.__research_material
-        if self.__research_time is not None:
-            del self.__research_time
-        if self.__reaction is not None:
-            del self.__reaction
-
-    def add_activity(self, product_type: typing.Optional[QSwaggerTypeId], row) -> None:
-        activity_id: int = row[1]
-        time: int = row[2]
-        if activity_id == 1:
-            quantity: int = row[4]
-            self.__manufacturing = QSwaggerBlueprintManufacturing(time, product_type, quantity)
-        elif activity_id == 9:
-            quantity: int = row[4]
-            self.__reaction = QSwaggerBlueprintReaction(time, product_type, quantity)
-
-    def add_activity_without_product(self, activity_id: int, time: int) -> None:
-        if activity_id == 8:
-            self.__invention = QSwaggerBlueprintInvention(time)  # продукты добавляются отдельным методом
-        elif activity_id == 5:
-            self.__copying = QSwaggerBlueprintCopying(time)  # не имеет продукта (продукт того же типа)...
-        elif activity_id == 4:
-            self.__research_material = QSwaggerBlueprintResearchMaterial(time)  # ...также не имеет продукта
-        elif activity_id == 3:
-            self.__research_time = QSwaggerBlueprintResearchTime(time)  # ...также не имеет продукта
-
-    @property
-    def type_id(self) -> int:
-        return self.__blueprint_type.type_id
-
-    @property
-    def blueprint_type(self) -> QSwaggerTypeId:
-        return self.__blueprint_type
-
-    @property
-    def manufacturing(self) -> QSwaggerBlueprintManufacturing:
-        return self.__manufacturing
-
-    @property
-    def invention(self) -> QSwaggerBlueprintInvention:
-        return self.__invention
-
-    @property
-    def copying(self) -> QSwaggerBlueprintCopying:
-        return self.__copying
-
-    @property
-    def research_material(self) -> QSwaggerBlueprintResearchMaterial:
-        return self.__research_material
-
-    @property
-    def research_time(self) -> QSwaggerBlueprintResearchTime:
-        return self.__research_time
-
-    @property
-    def reaction(self) -> QSwaggerBlueprintReaction:
-        return self.__reaction
-
-    def get_activity(self, activity_id: int) -> typing.Union[QSwaggerBlueprintManufacturing, QSwaggerBlueprintInvention,
-                                                             QSwaggerBlueprintCopying, QSwaggerBlueprintResearchMaterial,
-                                                             QSwaggerBlueprintResearchTime, QSwaggerBlueprintReaction]:
-        if activity_id == 1:
-            return self.__manufacturing
-        elif activity_id == 8:
-            return self.__invention
-        elif activity_id == 5:
-            return self.__copying
-        elif activity_id == 4:
-            return self.__research_material
-        elif activity_id == 3:
-            return self.__research_time
-        elif activity_id == 9:
-            return self.__reaction
-        else:
-            raise Exception("Impossible to get an activity #{}".format(activity_id))
-
-
-class QSwaggerCorporationAssetsItem:
-    def __init__(self, item_type: QSwaggerTypeId, row):
-        self.__item_id: int = row[0]
-        self.__type_id: int = row[1]
-        self.__item_type: QSwaggerTypeId = item_type  # None, если данные о типе предмета недоступны (пока)
-        self.__quantity: int = row[2]
-        self.__location_id: int = row[3]
-        self.__location_type: str = row[4]
-        self.__location_flag: str = row[5]
-        self.__is_singleton: bool = row[6]
-        self.__name: typing.Optional[str] = row[7]
-        self.__updated_at: datetime.datetime = row[8]
-
-    @property
-    def item_id(self) -> int:
-        return self.__item_id
-
-    @property
-    def type_id(self) -> int:  # безопасный метод получения type_id (известен, даже когда неизвестен item_type)
-        return self.__type_id
-
-    @property
-    def item_type(self) -> QSwaggerTypeId:
-        return self.__item_type
-
-    @property
-    def quantity(self) -> int:
-        return self.__quantity
-
-    @property
-    def location_id(self) -> int:
-        return self.__location_id
-
-    @property
-    def location_type(self) -> str:
-        return self.__location_type
-
-    @property
-    def location_flag(self) -> str:
-        return self.__location_flag
-
-    @property
-    def is_singleton(self) -> bool:
-        return self.__is_singleton
-
-    @property
-    def name(self) -> typing.Optional[str]:
-        return self.__name
-
-    @property
-    def updated_at(self) -> datetime.datetime:
-        return self.__updated_at
-
-
-class QSwaggerCorporationBlueprint:
-    def __init__(self, blueprint_type: QSwaggerBlueprint, row):
-        self.__item_id: int = row[0]
-        self.__type_id: int = row[1]
-        self.__blueprint_type: QSwaggerBlueprint = blueprint_type  # None, если данные о типе предмета недоступны (пока)
-        self.__location_id: int = row[2]
-        self.__location_flag: str = row[3]
-        self.__quantity: int = row[4]
-        self.__time_efficiency: int = row[5]
-        self.__material_efficiency: int = row[6]
-        self.__runs: int = row[7]
-        self.__updated_at: datetime.datetime = row[8]
-
-    @property
-    def item_id(self) -> int:
-        return self.__item_id
-
-    @property
-    def type_id(self) -> int:  # безопасный метод получения type_id (известен, даже когда неизвестен blueprint_type)
-        return self.__type_id
-
-    @property
-    def blueprint_type(self) -> QSwaggerBlueprint:
-        return self.__blueprint_type
-
-    @property
-    def location_id(self) -> int:
-        return self.__location_id
-
-    @property
-    def location_flag(self) -> str:
-        return self.__location_flag
-
-    @property
-    def quantity(self) -> int:
-        return self.__quantity
-
-    @property
-    def time_efficiency(self) -> int:
-        return self.__time_efficiency
-
-    @property
-    def material_efficiency(self) -> int:
-        return self.__material_efficiency
-
-    @property
-    def runs(self) -> int:
-        return self.__runs
-
-    @property
-    def updated_at(self) -> datetime.datetime:
-        return self.__updated_at
 
 
 class QSwaggerTranslator:
@@ -707,6 +201,7 @@ class QSwaggerTranslator:
             if material_type is None:
                 raise Exception("Unable to add material #{} into blueprint #{} activity #{}".format(material_id, blueprint_type_id, activity_id))
             activity.materials.add_material(material_type, row[3])
+        del rows
         return data
 
     # -------------------------------------------------------------------------
@@ -714,12 +209,118 @@ class QSwaggerTranslator:
     # -------------------------------------------------------------------------
     def get_corporation_id(self, corporation_name: str) -> typing.Optional[int]:
         row = self.db.select_one_row(
-            "SELECT eco_corporation_id FROM esi_corporations WHERE eco_name=%s;",
-            corporation_name
+            "SELECT eco_corporation_id "
+            "FROM esi_corporations "
+            "WHERE eco_name=%(nm)s;",
+            {'nm': corporation_name}
         )
         if row is None:
             return None
         return row[0]
+
+    # -------------------------------------------------------------------------
+    # characters/{character_id}/
+    # -------------------------------------------------------------------------
+
+    def get_character(self, character_name: str) -> typing.Optional[QSwaggerCharacter]:
+        row = self.db.select_one_row(
+            "SELECT ech_character_id "
+            "FROM esi_characters "
+            "WHERE ech_name=%(nm)s;",
+            {'nm': character_name}
+        )
+        if row is None:
+            return None
+        cached_character: QSwaggerCharacter = QSwaggerCharacter(row[0], character_name)
+        del row
+        return cached_character
+
+    def get_characters(
+            self,
+            character_ids: typing.Union[typing.List[int], typing.Set[int]]) -> typing.Dict[int, QSwaggerCharacter]:
+        if isinstance(character_ids, list):
+            ids: typing.List[int] = character_ids[:]
+        elif isinstance(character_ids, set):
+            ids: typing.List[int] = list(character_ids)
+        else:
+            raise Exception("Unable to determine type of character ids")
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " ech_character_id,"
+            " ech_name "
+            "FROM esi_characters "
+            "WHERE ech_character_id IN (SELECT * FROM UNNEST(%(ids)s));",
+            {'ids': ids}
+        )
+        del ids
+        if rows is None:
+            return {}
+        data = {}
+        for row in rows:
+            character_id: int = row[0]
+            data[character_id] = QSwaggerCharacter(character_id, row[1])
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
+    # universe/stations/{station_id}/
+    # universe/structures/{structure_id}/
+    # -------------------------------------------------------------------------
+
+    def get_station(
+            self,
+            station_name: str,
+            type_ids: typing.Dict[int, QSwaggerTypeId]) -> typing.Optional[QSwaggerStation]:
+        row = self.db.select_one_row(
+            "SELECT"
+            " location_id,"
+            " solar_system_id,"
+            " station_type_id,"
+            " solar_system_name "
+            "FROM esi_known_stations "
+            "WHERE name=%(nm)s;",
+            {'nm': station_name}
+        )
+        if row is None:
+            return None
+        station_type_id: int = row[2]
+        station_type: QSwaggerTypeId = type_ids.get(station_type_id)  # маловероятно, что тип неизвестен
+        cached_station: QSwaggerStation = QSwaggerStation(row[0], station_name, row[1], row[3], station_type)
+        del row
+        return cached_station
+
+    def get_stations(
+            self,
+            station_ids: typing.Union[typing.List[int], typing.Set[int]],
+            type_ids: typing.Dict[int, QSwaggerTypeId]) -> typing.Dict[int, QSwaggerStation]:
+        if isinstance(station_ids, list):
+            ids: typing.List[int] = station_ids[:]
+        elif isinstance(station_ids, set):
+            ids: typing.List[int] = list(station_ids)
+        else:
+            raise Exception("Unable to determine type of station ids")
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " location_id,"
+            " name,"
+            " solar_system_id,"
+            " station_type_id,"
+            " solar_system_name "
+            "FROM esi_known_stations "
+            "WHERE location_id IN (SELECT * FROM UNNEST(%(ids)s));",
+            {'ids': ids}
+        )
+        del ids
+        if rows is None:
+            return {}
+        data = {}
+        for row in rows:
+            station_id: int = row[0]
+            station_type_id: int = row[3]
+            station_type: QSwaggerTypeId = type_ids.get(station_type_id)  # маловероятно, что тип неизвестен
+            data[station_id] = QSwaggerStation(station_id, row[1], row[2], row[4], station_type)
+        del rows
+        return data
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/assets/
@@ -750,8 +351,8 @@ class QSwaggerTranslator:
             " eca_updated_at "
             "FROM esi_corporation_assets "
             + filter_blueprints +
-            "WHERE eca_corporation_id=%s;",
-            corporation_id,
+            "WHERE eca_corporation_id=%(id)s;",
+            {'id': corporation_id}
         )
         if rows is None:
             return {}
@@ -787,8 +388,8 @@ class QSwaggerTranslator:
             " ecb_runs,"
             " ecb_updated_at "
             "FROM esi_corporation_blueprints "
-            "WHERE ecb_corporation_id=%s;",
-            corporation_id,
+            "WHERE ecb_corporation_id=%(id)s;",
+            {'id': corporation_id}
         )
         if rows is None:
             return {}
@@ -800,5 +401,147 @@ class QSwaggerTranslator:
             if cached_blueprint_type is None and not load_unknown_type_blueprints:
                 continue
             data[item_id] = QSwaggerCorporationBlueprint(cached_blueprint_type, row)
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
+    def get_corporation_industry_jobs(
+            self,
+            corporation_id: int,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            blueprints: typing.Dict[int, QSwaggerBlueprint],
+            characters: typing.Dict[int, QSwaggerCharacter],
+            stations: typing.Dict[int, QSwaggerStation],
+            corporation_assets: typing.Dict[int, QSwaggerCorporationAssetsItem],
+            corporation_blueprints: typing.Dict[int, QSwaggerCorporationBlueprint],
+            load_unknown_type_blueprints: bool = True) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
+        rows = self.db.select_all_rows(  # около 3000 одновременных активных корп работ, или больше...
+            "SELECT"
+            " ecj_job_id,"
+            " ecj_installer_id,"
+            " ecj_facility_id,"
+            " ecj_activity_id,"
+            " ecj_blueprint_id,"
+            " ecj_blueprint_type_id,"
+            " ecj_blueprint_location_id,"
+            " ecj_output_location_id,"
+            " ecj_runs,"
+            " ecj_cost,"
+            " ecj_licensed_runs,"
+            " ecj_probability,"
+            " ecj_product_type_id,"
+            " ecj_end_date "
+            "FROM esi_corporation_industry_jobs "
+            "WHERE ecj_completed_date IS NULL AND ecj_corporation_id=%(id)s;",
+            {'id': corporation_id}
+        )
+        if rows is None:
+            return {}
+        # получаем список пилотов, которые запустили работы, обычно 100 уникальных пилотов на 3000 работах
+        unique_installer_ids: typing.List[int] = list(set([r[1] for r in rows]))
+        unknown_installer_ids: typing.List[int] = [c_id for c_id in unique_installer_ids if not characters.get(c_id)]
+        unknown_job_installers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_installer_ids)
+        for (character_id, cached_character) in unknown_job_installers.items():
+            characters[character_id] = cached_character
+        del unknown_job_installers
+        del unknown_installer_ids
+        del unique_installer_ids
+        # получаем список фабрик, на которых запущены работы, обычно единицы уникальных станций/структур
+        unique_facility_ids: typing.List[int] = list(set([r[2] for r in rows]))
+        unknown_facility_ids: typing.List[int] = [c_id for c_id in unique_facility_ids if not stations.get(c_id)]
+        unknown_job_facilities: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_facility_ids, type_ids)
+        for (facility_id, cached_facility) in unknown_job_facilities.items():
+            stations[facility_id] = cached_facility
+        del unknown_job_facilities
+        del unknown_facility_ids
+        del unique_facility_ids
+        # обработка данных по корпоративным работам и связывание их с другими кешированными объектами
+        data = {}
+        prev_blueprint_type_id: int = -1
+        cached_blueprint_type: typing.Optional[QSwaggerBlueprint] = None
+        prev_installer_id: int = -1
+        cached_installer: typing.Optional[QSwaggerCharacter] = None
+        prev_product_type_id: int = -1
+        cached_product_type: typing.Optional[QSwaggerTypeId] = None
+        prev_blueprint_location_id: int = -1
+        blueprint_location: typing.Optional[QSwaggerCorporationAssetsItem] = None
+        prev_output_location_id: int = -1
+        output_location: typing.Optional[QSwaggerCorporationAssetsItem] = None
+        prev_facility_id: int = -1
+        facility: typing.Optional[QSwaggerStation] = None
+        for row in rows:
+            job_id: int = row[0]
+            installer_id: int = row[1]
+            facility_id: int = row[2]
+            activity_id: int = row[3]
+            blueprint_id: int = row[4]
+            blueprint_type_id: int = row[5]
+            blueprint_location_id: int = row[6]
+            output_location_id: int = row[7]
+            product_type_id: int = row[12]
+            # определяем тип чертежа, например Photon Microprocessor Blueprint
+            if prev_blueprint_type_id != blueprint_type_id:
+                prev_blueprint_type_id = blueprint_type_id
+                cached_blueprint_type = blueprints.get(blueprint_type_id)
+                # если задана настройка "не реботать с неизвестными данными", то пропускаем чертёж
+                if cached_blueprint_type is None and not load_unknown_type_blueprints:
+                    continue
+            # определяем продукт производства, например Photon Microprocessor
+            if prev_product_type_id != product_type_id:
+                product_type_id = product_type_id
+                cached_product_type = None
+                # стараемся найти тип продукта в наборе данных, ассоциированных с типом чертежа
+                if cached_blueprint_type:
+                    if activity_id == 1:
+                        cached_product_type = cached_blueprint_type.manufacturing.product_type
+                    elif activity_id == 9:
+                        cached_product_type = cached_blueprint_type.reaction.product_type
+                    elif activity_id == 5 or activity_id == 4 or activity_id == 3:  # продукт копирки и научки - чертёж
+                        cached_product_type = cached_blueprint_type.blueprint_type
+                    elif activity_id == 8:
+                        cached_product_type = next((p.product_type for p in cached_blueprint_type.invention.products if p.product_id == product_type_id), None)
+                    # если задана настройка "не реботать с неизвестными данными", то пропускаем чертёж
+                    if cached_product_type is None and not load_unknown_type_blueprints:
+                        continue
+                # если продукт найти с помощью типа чертежа не удалось, то ищем в глобальном справочнике type_ids
+                if not cached_product_type:
+                    cached_product_type = type_ids.get(product_type_id)
+                    # если задана настройка "не реботать с неизвестными данными", то пропускаем чертёж
+                    if cached_product_type is None and not load_unknown_type_blueprints:
+                        continue
+            # определяем пилота (обычно известен) т.к. добавляется в БД синхронно работе (если не удалён вручную)
+            if prev_installer_id != installer_id:
+                prev_installer_id = installer_id
+                cached_installer = characters[installer_id]
+            # определяем фабрику (обычно известна) т.к. добавляется в БД синхронно работе (и не удаляется), но к
+            # фабрике может пропасть доступ и q_universe_preload.py не сможет получить информацию о ней
+            if prev_facility_id != facility_id:
+                prev_facility_id = facility_id
+                facility = stations.get(facility_id)
+            # определяем место расположения чертежа (коробка из которой была запущена работа)
+            if prev_blueprint_location_id != blueprint_location_id:
+                prev_blueprint_location_id = blueprint_location_id
+                blueprint_location = corporation_assets.get(blueprint_location_id)
+            # определяем место, куда будет отправлен продукт (коробка куда направлен выход запущенной работы)
+            if prev_output_location_id != output_location_id:
+                prev_output_location_id = output_location_id
+                output_location = corporation_assets.get(output_location_id)
+            # ищет среди корпоративных чертежей bp с идентичным идентификатором
+            # то, что чертёж может быть не найден, - это может быть вполне себе стандартной ситуацией, т.к.
+            # сведения от CCP несинхронны
+            cached_blueprint: typing.Optional[QSwaggerCorporationBlueprint] = corporation_blueprints.get(blueprint_id)
+            # добавляем новую корпоративную работку
+            data[job_id] = QSwaggerCorporationIndustryJob(
+                cached_blueprint,  # неизвестен, если в корпчертежах нет этого bp, либо сведения о работе несинхронны
+                cached_blueprint_type,  # неизвестен, если в БД нет данных об этом типе чертежа (пока не обновится sde)
+                cached_product_type,  # неизвестен, если в БД нет данных об этом типе продукта (пока не обновится esi)
+                cached_installer,  # обычно известен, т.к. добавляется в БД синхронно работе (если не удалён вручную)
+                blueprint_location,  # коробки редко перемещаются, поэтому обычно известны
+                output_location,  # коробки редко перемещаются, поэтому обычно известны
+                facility,  # фабрики обычно известны, если не пропал доступ (и БД неотсинхронизирована)
+                row)
         del rows
         return data

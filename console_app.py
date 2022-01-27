@@ -8,14 +8,35 @@ from pathlib import Path
 from __init__ import __version__
 
 
-def get_argv_prms(additional_longopts: typing.List[str] = []):
+def print_version_screen():
+    print('q.industrialist {ver} - (c) 2020 qandra.si@gmail.com\n'
+          'Released under the GNU GPL.\n'.format(ver=__version__))
+
+
+def print_help_screen(exit_code: typing.Optional[int] = None):
+    print('\n'
+          '-h --help                   Print this help screen\n'
+          '   --pilot=NAME             Character name previously signed in\n'
+          '   --signup                 Signup new character\n'
+          '   --offline                Flag which says that we are working offline\n'
+          '   --online                 Flag which says that we are working online (default)\n'
+          '   --cache_dir=PATH         Directory where esi/auth cache files stored\n'
+          '   --verbose                Show additional information while working (verbose mode)'
+          '-v --version                Print version info\n'
+          '\n'
+          'Usage: {app} --pilot="Qandra Si" --offline --cache_dir=/tmp\n'.
+          format(app=sys.argv[0]))
+    if exit_code is not None and isinstance(exit_code, int):
+        sys.exit(exit_code)
+
+
+def get_argv_prms(additional_longopts: typing.List[str] = None):
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     res = {
         "character_names": [],
         "signup_new_character": False,
         "offline_mode": False,
-        "database_mode": False,
         "workspace_cache_files_dir": '{}/.q_industrialist'.format(str(Path.home())),
         "verbose_mode": False,
     }
@@ -27,14 +48,17 @@ def get_argv_prms(additional_longopts: typing.List[str] = []):
                 res[opt[:-1]]: typing.List[str] = []
             else:  # category
                 res[opt]: bool = False
+    # парсинг входных параметров командной строки
     exit_or_wrong_getopt = None
     print_version_only = False
     try:
-        longopts = ["help", "version", "pilot=", "signup", "offline", "online", "database", "cache_dir=", "verbose"]
-        longopts.extend(additional_longopts)
+        longopts = ["help", "version", "pilot=", "signup", "offline", "online", "cache_dir=", "verbose"]
+        if additional_longopts:
+            longopts.extend(additional_longopts)
         opts, args = getopt.getopt(sys.argv[1:], "hv", longopts)
     except getopt.GetoptError:
         exit_or_wrong_getopt = 2
+
     if exit_or_wrong_getopt is None:
         for opt, arg in opts:  # noqa
             if opt in ('-h', "--help"):
@@ -52,8 +76,6 @@ def get_argv_prms(additional_longopts: typing.List[str] = []):
                 res["offline_mode"] = True
             elif opt in "--online":
                 res["offline_mode"] = False
-            elif opt in "--database":
-                res["database_mode"] = True
             elif opt in "--verbose":
                 res["verbose_mode"] = True
             elif opt in "--cache_dir":
@@ -63,26 +85,13 @@ def get_argv_prms(additional_longopts: typing.List[str] = []):
             elif opt.startswith('--') and opt[2:] in additional_longopts:
                 res[opt[2:]] = True
         # д.б. либо указано имя, либо флаг регистрации нового пилота
-        if (len(res["character_names"]) == 0) == (res["signup_new_character"] == False):
-            exit_or_wrong_getopt = 0
-    if not (exit_or_wrong_getopt is None):
-        print('q.industrialist {ver} - (c) 2020 qandra.si@gmail.com\n'
-              'Released under the GNU GPL.\n'.format(ver=__version__))
+        # упразднено: if (len(res["character_names"]) == 0) == (res["signup_new_character"] == False):
+        # упразднено:     exit_or_wrong_getopt = 0
+
+    if exit_or_wrong_getopt is not None:
+        print_version_screen()
         if print_version_only:
             sys.exit(exit_or_wrong_getopt)
-        print('\n'
-              '-h --help                   Print this help screen\n'
-              '   --pilot=NAME             Character name previously signed in\n'
-              '   --signup                 Signup new character\n'
-              '   --offline                Flag which says that we are working offline\n'
-              '   --online                 Flag which says that we are working online (default)\n'
-              '   --database               Flag which says that we are working with database instead esi\n'
-              '   --cache_dir=PATH         Directory where esi/auth cache files stored\n'
-              '   --verbose                Show additional information while working (verbose mode)'
-              '-v --version                Print version info\n'
-              '\n'
-              'Usage: {app} --pilot="Qandra Si" --offline --cache_dir=/tmp\n'.
-            format(app=sys.argv[0]))
-        sys.exit(exit_or_wrong_getopt)
+        print_help_screen(exit_or_wrong_getopt)
 
     return res

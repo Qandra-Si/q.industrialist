@@ -26,59 +26,131 @@ Requires application scopes:
     * esi-assets.read_corporation_assets.v1 - Requires role(s): Director
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
-import sys
-import requests
 import typing
 import re
 
-import eve_esi_tools
-import eve_sde_tools
 import console_app
-import render_html_conveyor
 import q_industrialist_settings
 import q_conveyor_settings
 
-import eve_esi_interface as esi
 import postgresql_interface as db
 
 from __init__ import __version__
 
 
+class ConveyorSettings:
+    def __init__(self):
+        self.corporation_ids: typing.List[int] = []
+        self.fixed_number_of_runs: typing.Optional[int] = None
+        self.same_stock_container: bool = False
+        self.activities: typing.List[str] = ['manufacturing']
+        self.conveyor_with_reactions: bool = False
+        self.containers_with_blueprints: typing.List[str] = []
+        self.containers_with_stock: typing.List[str] = []
+        self.containers_with_formulas: typing.Optional[typing.List[str]] = None
+        self.containers_with_reactions_stock: typing.Optional[typing.List[str]] = None
+        self.manufacturing_groups: typing.Optional[typing.List[int]] = []
+
+
 def main():
-    # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
-    # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
-    argv_prms = console_app.get_argv_prms()
+    # работа с параметрами командной строки, получение настроек запуска программы
+    argv_prms = console_app.get_argv_prms(['corporation='])
 
-    if argv_prms["database_mode"]:
-        corporation_name: str = 'R Industry'
+    if not argv_prms["corporation"]:
+        console_app.print_version_screen()
+        console_app.print_help_screen(0)
+        return
 
-        qidb = db.QIndustrialistDatabase("conveyor", debug=argv_prms["verbose_mode"])
-        qidb.connect(q_industrialist_settings.g_database)
-        dbtranslator = db.QSwaggerTranslator(qidb)
-        # загрузка справочников
-        sde_market_groups: typing.Dict[int, db.QSwaggerMarketGroup] = dbtranslator.get_market_groups()
-        sde_type_ids: typing.Dict[int, db.QSwaggerTypeId] = dbtranslator.get_published_type_ids()
-        sde_blueprints: typing.Dict[int, db.QSwaggerBlueprint] = dbtranslator.get_blueprints(sde_type_ids)
+    qidb: db.QIndustrialistDatabase = db.QIndustrialistDatabase("conveyor", debug=argv_prms.get("verbose_mode", False))
+    qidb.connect(q_industrialist_settings.g_database)
+    qit: db.QSwaggerTranslator = db.QSwaggerTranslator(qidb)
+    qid: db.QSwaggerDictionary = db.QSwaggerDictionary(qit)
+    # загрузка справочников
+    qid.load_market_groups()
+    qid.load_published_type_ids()
+    qid.load_blueprints()
+    # загрузка информации, связанной с корпорациями
+    for corporation_name in argv_prms['corporation']:
+        # публичные сведения (пилоты, структуры, станции, корпорации)
+        corporation: db.QSwaggerCorporation = qid.load_corporation(corporation_name)
         # загрузка корпоративных ассетов
-        corporation_id: int = dbtranslator.get_corporation_id(corporation_name)
-        if not corporation_id:
-            raise Exception("There are no corporation '{}' in the database, please preload data".format(corporation_name))
-        corporation_assets: typing.Dict[int, db.QSwaggerCorporationAssetsItem] = dbtranslator.get_corporation_assets(
-            corporation_id,
-            sde_type_ids,
-            load_unknown_type_assets=False,
-            load_asseted_blueprints=False)
-        corporation_blueprints: typing.Dict[int, db.QSwaggerCorporationBlueprint] = dbtranslator.get_corporation_blueprints(
-            corporation_id,
-            sde_blueprints,
-            load_unknown_type_blueprints=False)
-        del qidb
-    else:
-        sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
-        sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
-        sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
-        sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
-        sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+        qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=False)
+        qid.load_corporation_blueprints(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_industry_jobs(corporation, load_unknown_type_blueprints=True)
+        """
+        for job in corporation.industry_jobs.values():
+            if not job.installer.character_name or not job.blueprint_type or not job.product_type or \
+               not job.facility or not job.blueprint_location or not job.output_location:
+                print("{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
+                    job.job_id,
+                    job.installer.character_name if job.installer else '?',
+                    job.blueprint_type.blueprint_type.name if job.blueprint_type else '?',
+                    job.product_type.name if job.product_type else '?',
+                    job.blueprint_location.name if job.blueprint_location else '?',
+                    job.output_location.name if job.output_location else '?',
+                    job.facility.station_name if job.facility else '?'))
+        """
+    qid.disconnect_from_translator()
+    del qit
+    del qidb
+
+    # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
+    for entity in q_conveyor_settings.g_entities:
+        # пропускаем отключенные группы настроек (остались для архива?)
+        if not entity.get('enabled', False) or not entity.get('conveyors'):
+            continue
+        # инициализируем настройки запуска конвейера
+        settings: ConveyorSettings = ConveyorSettings()
+        # собираем список корпораций к которым относятся настройки
+        corporation_name: str = entity.get('corporation')
+        if corporation_name:
+            corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(corporation_name)
+            if not corporation:
+                continue
+            settings.corporation_ids = [corporation.corporation_id]
+        else:
+            settings.corporation_ids = [corporation_id for corporation_id in qid.corporations.keys()]
+        # собираем списки контейнеров, к которым относятся настройки
+        for conveyor in entity['conveyors']:
+            # пропускаем некорректные настройки (остались для архива?)
+            if not conveyor.get('blueprints'):
+                continue
+            if conveyor.get('reactions') and not conveyor['reactions'].get('formulas'):
+                continue
+            # читаем настройки производственной активности
+            settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
+            settings.same_stock_container = conveyor.get('same_stock_container', True)
+            settings.activities = conveyor.get('activities', ['manufacturing'])
+            settings.conveyor_with_reactions = conveyor.get('reactions', False)
+            # читаем названия контейнеров
+            settings.containers_with_blueprints = conveyor['blueprints']
+            if settings.same_stock_container:
+                settings.containers_with_stock = conveyor.get('stock', [])
+            else:
+                settings.containers_with_stock = settings.containers_with_blueprints
+            if settings.conveyor_with_reactions:
+                settings.containers_with_formulas = conveyor['reactions']['formulas']
+                settings.containers_with_reactions_stock = conveyor['reactions'].get('stock', [])
+                settings.manufacturing_groups = conveyor['reactions'].get('manufacturing_groups', [])
+            # превращаем названия (шаблоны названий) в номера контейнеров
+
+        for tmplt in __manuf_dict["conveyor_container_names"]:
+            blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
+        # ---
+
+
+    del qid
+
+    # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
+    print("\nConveyor v{} done".format(__version__))
+
+
+"""
+    sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+    sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
+    sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
+    sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
 
     # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
     for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
@@ -355,10 +427,7 @@ def main():
         # данные, полученные в результате анализа и перекомпоновки входных списков
         conveyor_data
     )
-
-    # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
-    print("\nDone")
-
+"""
 
 if __name__ == "__main__":
     main()
