@@ -2796,11 +2796,10 @@ tr.qind-em th
               if (!(td.attr('class') === undefined))
                 start_row = undefined;
               else {
-                if (data_copy) data_copy += "\\n"; 
-                data_copy += td.attr('data-nm') + "\\t" + (
-                  parseInt($(this).find('td').eq(1).attr('data-q'),10) +
-                  parseInt($(this).find('td').eq(2).attr('data-q'),10)
-                );
+                var qq = parseInt($(this).find('td').eq(1).attr('data-q'),10) + parseInt($(this).find('td').eq(2).attr('data-q'),10);
+                if (qq == 0) return;
+                if (data_copy) data_copy += "\\n";
+                data_copy += td.attr('data-nm') + "\\t" + qq;
               }
             }
           });
