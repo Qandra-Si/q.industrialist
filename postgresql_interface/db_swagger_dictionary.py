@@ -15,7 +15,6 @@ class QSwaggerDictionary:
         self.stations: typing.Dict[int, QSwaggerStation] = {}
         # корпоративные ассеты и данные
         self.corporations: typing.Dict[int, QSwaggerCorporation] = {}
-        pass
 
     def __del__(self):
         # корпоративные ассеты и данные
@@ -136,6 +135,8 @@ class QSwaggerDictionary:
             # настройки
             load_unknown_type_assets=load_unknown_type_assets,
             load_asseted_blueprints=load_asseted_blueprints)
+        # поиск Secure Containers, Audit Log Containers, Freight Containers, Standard Containers, Station Containers
+        corporation.container_ids = [int(a.item_id) for a in corporation.assets.values() if a.item_type and a.item_type.market_group_id in {1651, 1652, 1653, 1657, 1658}]
         return corporation.assets
 
     def load_corporation_blueprints(

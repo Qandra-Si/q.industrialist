@@ -683,8 +683,12 @@ class QSwaggerCorporation:
         self.assets: typing.Dict[int, QSwaggerCorporationAssetsItem] = {}
         self.blueprints: typing.Dict[int, QSwaggerCorporationBlueprint] = {}
         self.industry_jobs: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
+        # идентификаторы корпоративных контейнеров
+        self.container_ids: typing.List[int] = []
 
     def __del__(self):
+        # идентификаторы корпоративных контейнеров
+        del self.container_ids
         # наборы данных (взаимосвязаны друг с другом, ВАЖЕН ПОРЯДОК уничтожения!)
         del self.industry_jobs
         del self.blueprints

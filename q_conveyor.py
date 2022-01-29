@@ -40,15 +40,18 @@ from __init__ import __version__
 
 class ConveyorSettings:
     def __init__(self):
-        self.corporation_ids: typing.List[int] = []
+        # параметры работы конвейера
+        self.corporation_id: int = -1
         self.fixed_number_of_runs: typing.Optional[int] = None
         self.same_stock_container: bool = False
         self.activities: typing.List[str] = ['manufacturing']
         self.conveyor_with_reactions: bool = False
-        self.containers_with_blueprints: typing.List[str] = []
-        self.containers_with_stock: typing.List[str] = []
-        self.containers_with_formulas: typing.Optional[typing.List[str]] = None
-        self.containers_with_reactions_stock: typing.Optional[typing.List[str]] = None
+        # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
+        self.containers_blueprints: typing.List[int] = []
+        self.containers_stock: typing.List[int] = []
+        self.containers_exclude: typing.List[int] = []
+        self.containers_react_formulas: typing.List[int] = []
+        self.containers_react_stock: typing.List[int] = []
         self.manufacturing_groups: typing.Optional[typing.List[int]] = []
 
 
@@ -95,50 +98,84 @@ def main():
     del qidb
 
     # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
+    settings_of_conveyors: typing.List[ConveyorSettings] = []
     for entity in q_conveyor_settings.g_entities:
         # пропускаем отключенные группы настроек (остались для архива?)
         if not entity.get('enabled', False) or not entity.get('conveyors'):
             continue
-        # инициализируем настройки запуска конвейера
-        settings: ConveyorSettings = ConveyorSettings()
         # собираем список корпораций к которым относятся настройки
         corporation_name: str = entity.get('corporation')
         if corporation_name:
             corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(corporation_name)
             if not corporation:
                 continue
-            settings.corporation_ids = [corporation.corporation_id]
+            corporation_ids: typing.List[int] = [corporation.corporation_id]
         else:
-            settings.corporation_ids = [corporation_id for corporation_id in qid.corporations.keys()]
+            corporation_ids: typing.List[int] = [corporation_id for corporation_id in qid.corporations.keys()]
         # собираем списки контейнеров, к которым относятся настройки
         for conveyor in entity['conveyors']:
-            # пропускаем некорректные настройки (остались для архива?)
+            # пропускаем некорректные настройки (не зависят от корпорации, просто правильность синтаксиса настроек)
             if not conveyor.get('blueprints'):
                 continue
             if conveyor.get('reactions') and not conveyor['reactions'].get('formulas'):
                 continue
-            # читаем настройки производственной активности
-            settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
-            settings.same_stock_container = conveyor.get('same_stock_container', True)
-            settings.activities = conveyor.get('activities', ['manufacturing'])
-            settings.conveyor_with_reactions = conveyor.get('reactions', False)
-            # читаем названия контейнеров
-            settings.containers_with_blueprints = conveyor['blueprints']
-            if settings.same_stock_container:
-                settings.containers_with_stock = conveyor.get('stock', [])
-            else:
-                settings.containers_with_stock = settings.containers_with_blueprints
-            if settings.conveyor_with_reactions:
-                settings.containers_with_formulas = conveyor['reactions']['formulas']
-                settings.containers_with_reactions_stock = conveyor['reactions'].get('stock', [])
-                settings.manufacturing_groups = conveyor['reactions'].get('manufacturing_groups', [])
-            # превращаем названия (шаблоны названий) в номера контейнеров
-
-        for tmplt in __manuf_dict["conveyor_container_names"]:
-            blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
-        # ---
-
-
+            # собираем список корпоративных контейнеров по указанным названиям
+            for corporation_id in corporation_ids:
+                corporation = qid.get_corporation(corporation_id)
+                # инициализируем настройки запуска конвейера
+                settings: ConveyorSettings = ConveyorSettings()
+                settings.corporation_id = corporation_id
+                # читаем настройки производственной активности
+                settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
+                settings.same_stock_container = conveyor.get('same_stock_container', True)
+                settings.activities = conveyor.get('activities', ['manufacturing'])
+                settings.conveyor_with_reactions = conveyor.get('reactions', False)
+                # получаем информацию по реакциям (если включены)
+                if settings.conveyor_with_reactions:
+                    settings.manufacturing_groups = conveyor['reactions'].get('manufacturing_groups', [])
+                for container_id in corporation.container_ids:
+                    container: db.QSwaggerCorporationAssetsItem = corporation.assets.get(container_id)
+                    if not container:
+                        continue
+                    container_name: str = container.name
+                    if not container_name:
+                        continue
+                    # превращаем названия (шаблоны названий) в номера контейнеров
+                    if next((1 for tmplt in conveyor['blueprints'] if re.search(tmplt, container_name)), None):
+                        settings.containers_blueprints.append(container_id)
+                        if settings.same_stock_container:
+                            settings.containers_stock.append(container_id)
+                    if not settings.same_stock_container:
+                        if next((1 for tmplt in conveyor['stock'] if re.search(tmplt, container_name)), None):
+                            settings.containers_blueprints.append(container_id)
+                    # получаем информацию по реакциям (если включены)
+                    if settings.conveyor_with_reactions:
+                        if next((1 for tmplt in conveyor['reactions']['formulas'] if re.search(tmplt, container_name)), None):
+                            settings.containers_react_formulas.append(container_id)
+                        if 'stock' in conveyor['reactions']:
+                            if next((1 for tmplt in conveyor['reactions']['stock'] if re.search(tmplt, container_name)), None):
+                                settings.containers_react_stock.append(container_id)
+                # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
+                if not settings.containers_blueprints:
+                    continue
+                # сохраняем полученные настройки, обрабатывать будем потом
+                settings_of_conveyors.append(settings)
+    # вывод на экран того, что получилось
+    for (idx, s) in enumerate(settings_of_conveyors):
+        corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
+        if idx > 0:
+            print()
+        print('corporation: ', corporation.corporation_name)
+        print('activities:  ', s.activities)
+        print('blueprints:  ', [corporation.assets.get(x).name for x in s.containers_blueprints])
+        print('stock:       ', [corporation.assets.get(x).name for x in s.containers_stock])
+        print('exclude:     ', [corporation.assets.get(x).name for x in s.containers_exclude])
+        if s.fixed_number_of_runs is not None:
+            print('fixed runs:  ', s.fixed_number_of_runs)
+        if s.conveyor_with_reactions:
+            print('formulas:    ', [corporation.assets.get(x).name for x in s.containers_react_formulas])
+            print('react stock: ', [corporation.assets.get(x).name for x in s.containers_react_stock])
+    # ---
     del qid
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
