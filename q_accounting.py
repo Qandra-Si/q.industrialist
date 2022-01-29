@@ -27,9 +27,10 @@ Required application scopes:
     * esi-contracts.read_corporation_contracts.v1 - Requires: access token
     * esi-corporations.read_corporation_membership.v1 - Requires: access token
 """
-import json
+import typing
 import sys
 import requests
+import re
 
 import console_app
 import eve_esi_interface as esi
@@ -813,6 +814,14 @@ def main():
         print("\n'{}' corporation has {} custom asset's names".format(corporation_name, len(corp_ass_names_data)))
         sys.stdout.flush()
         del corp_ass_named_ids
+
+        # TODO: Получение идентификаторов коробок, в которых хранятся персональные ассеты (хардкодим тут)
+        pers_ass_location_ids: typing.List[int] = [int(an['item_id']) for an in corp_ass_names_data
+                                                   if re.search(r"^{pers}.+$", an['name']) or re.search(r"^\.{pers}.+$", an['name'])]
+        # для того, чтобы сильно не переделывать алгоритм - просто удаляем из корпассетов личные предметы
+        pers_ass_location_ids: typing.Set[int] = set(pers_ass_location_ids)
+        corp_assets_data = [a for a in corp_assets_data if int(a['location_id']) not in pers_ass_location_ids]
+        del pers_ass_location_ids
 
         # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
         foreign_structures_data = {}

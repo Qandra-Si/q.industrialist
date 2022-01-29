@@ -2242,10 +2242,12 @@ function getSdeItemName(t) {
       if (!(td.attr('class') === undefined))
        start_row = undefined;
       else {
-       if (data_copy) data_copy += "\\n"; 
        var q1 = tr.find('td').eq(1).data('q'); q1 = (q1==undefined)?0:parseInt(q1,10);
        var q2 = tr.find('td').eq(2).data('q'); q2 = (q2==undefined)?0:parseInt(q2,10);
-       data_copy += td.data('nm') + "\\t" + (q1+q2);
+       var qq = q1 + q2;
+       if (qq == 0) return;
+       if (data_copy) data_copy += "\\n";
+       data_copy += td.attr('data-nm') + "\\t" + qq;
       }
      }
     });
