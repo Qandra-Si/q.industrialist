@@ -61,7 +61,7 @@ function __dump_pilots_involved(&$active_jobs, &$industry_stat)
 {
     if ($industry_stat)
     {
-        ?><p>The information is current as of: <mark><?=$industry_stat[0]['dt1']?></mark> (<?=$industry_stat[0]['dt2']?>)</p><?php
+        ?><p>The information is current as of: <mark><?=$industry_stat[0]['dt1']?> (MSK)</mark> &times; <?=$industry_stat[0]['dt2']?></p><?php
     }
     $pilots = array();
     if ($active_jobs)
