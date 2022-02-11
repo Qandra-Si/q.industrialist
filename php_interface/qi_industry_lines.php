@@ -48,6 +48,11 @@ body {
  font-size: 66%;
  font-weight: unset;
 }
+mark {
+ background-color: #1a302e;
+ color: #d8dada;
+ padding: .3em .3em .3em;
+}
 </style>
 EOD;
 
@@ -56,7 +61,7 @@ function __dump_pilots_involved(&$active_jobs, &$industry_stat)
 {
     if ($industry_stat)
     {
-        ?><p>The information is current as of: <?=$industry_stat[0]['dt1']?> (<?=$industry_stat[0]['dt2']?>)</p><?php
+        ?><p>The information is current as of: <mark><?=$industry_stat[0]['dt1']?></mark> (<?=$industry_stat[0]['dt2']?>)</p><?php
     }
     $pilots = array();
     if ($active_jobs)
