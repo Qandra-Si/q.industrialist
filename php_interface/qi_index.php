@@ -61,6 +61,12 @@ EOD;
  <a class="btn btn-primary" href="/qi_industry_cost.php" role="button">Industry Cost</a>
  </p>
 
+ <p>
+ Отслеживание занятости производственных линий.<br>
+ <a class="btn btn-default" href="/qi_industry_ash.php" role="button">Ash Hakoke</a>
+ <a class="btn btn-default" href="/qi_industry_qandra.php" role="button">Qandra Si</a>
+ </p>
+
 <h2>Специальные алгоритмы и специфические задачи</h2>
  <p>
  Текущее состояние рынка в <strong>Querious</strong> и <strong>Nisuwa</strong>. Список продаваемых товаров, оценка количества в операциях закупки (ежедневно и на недельном интервале), отслеживание стоимости товаров по ценам в Jita, в Amarr, и в University, расчёт профита. Учёт количества товаров, имеющихся на складе, не выствленных на продажу.<br>

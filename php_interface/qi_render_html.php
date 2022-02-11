@@ -15,7 +15,7 @@ function __get_img_src($tp, $sz, $use_filesystem_resources)
 // --------------------------------------------------------------------------------------------------------------
 // __dump_header
 // --------------------------------------------------------------------------------------------------------------
-function __dump_header($header_name, $use_filesystem_resources)
+function __dump_header($header_name, $use_filesystem_resources, $html_style="")
 {
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
@@ -87,6 +87,7 @@ function __dump_header($header_name, $use_filesystem_resources)
  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
  <!-- Manifest.json  -->
  <link rel="manifest" href="manifest.webmanifest">
+<?=$html_style?>
 </head>
 <body>
  <div class="page-header"><h1>Q.Industrialist <small><?=$header_name?></small></h1></div>
