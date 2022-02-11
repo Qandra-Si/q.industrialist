@@ -72,9 +72,9 @@ function __dump_pilots_involved(&$active_jobs)
                 $p = array($job['inm'], 0, 0, 0);
                 switch ($job['aid'])
                 {
-                case 1: $pilot[1]++; break;
-                case 3: case 4: case 5: case 7: case 8: $pilot[2]++; break;
-                case 9: case 11: $pilot[3]++; break;
+                case 1: $p[1]++; break;
+                case 3: case 4: case 5: case 7: case 8: $p[2]++; break;
+                case 9: case 11: $p[3]++; break;
                 }
                 array_push($pilots, $p);
             }
