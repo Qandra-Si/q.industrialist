@@ -43,6 +43,9 @@ import q_market_analyzer_settings
 from __init__ import __version__
 
 
+# TODO: временная мера (preloader не должен влиять на работу q_universe_preloader.py, и пользоваться тем, что закачано до него)
+PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER: bool = True
+
 def main():
     try:
         # работа с параметрами командной строки, получение настроек запуска программы, как то: имена пилотов ранее
@@ -100,7 +103,9 @@ def main():
             if eve_market_prices_data is None:
                 try:
                     # Public information about market prices
-                    eve_market_prices_data = interface.get_esi_data("markets/prices/")
+                    eve_market_prices_data = interface.get_esi_data(
+                        "markets/prices/",
+                        fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER)
                     print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
                     sys.stdout.flush()
                 except requests.exceptions.HTTPError as err:
@@ -116,7 +121,8 @@ def main():
             try:
                 # Requires role(s): Accountant, Junior_Accountant
                 corp_wallets_data = interface.get_esi_paged_data(
-                    "corporations/{}/wallets/".format(corporation_id))
+                    "corporations/{}/wallets/".format(corporation_id),
+                    fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER and corporation_id in [98553333,98615601,98677876])
                 print("'{}' corporation has {} wallet divisions\n".format(corporation_name, len(corp_wallets_data)))
                 sys.stdout.flush()
             except requests.exceptions.HTTPError as err:
@@ -135,7 +141,8 @@ def main():
                 division = w["division"]
                 try:
                     corp_wallet_journal_data[division-1] = interface.get_esi_paged_data(
-                        "corporations/{}/wallets/{}/journal/".format(corporation_id, division))
+                        "corporations/{}/wallets/{}/journal/".format(corporation_id, division),
+                        fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER and corporation_id in [98553333,98615601,98677876])
                     print("'{}' corporation has {} wallet#{} transactions\n".format(corporation_name, len(corp_wallet_journal_data[division-1]), division))
                     sys.stdout.flush()
                 except requests.exceptions.HTTPError as err:
@@ -214,19 +221,22 @@ def main():
 
             # Requires role(s): Director
             corp_assets_data = interface.get_esi_paged_data(
-                "corporations/{}/assets/".format(corporation_id))
+                "corporations/{}/assets/".format(corporation_id),
+                fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER and corporation_id in [98553333,98615601,98677876])
             print("'{}' corporation has {} assets\n".format(corporation_name, len(corp_assets_data)))
             sys.stdout.flush()
 
             # Requires role(s): Director
             corp_blueprints_data = interface.get_esi_paged_data(
-                "corporations/{}/blueprints/".format(corporation_id))
+                "corporations/{}/blueprints/".format(corporation_id),
+                fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER and corporation_id in [98553333,98615601,98677876])
             print("'{}' corporation has {} blueprints\n".format(corporation_name, len(corp_blueprints_data)))
             sys.stdout.flush()
 
             # Requires role(s): Factory_Manager
             corp_industry_jobs_data = interface.get_esi_paged_data(
-                "corporations/{}/industry/jobs/".format(corporation_id))
+                "corporations/{}/industry/jobs/".format(corporation_id),
+                fully_trust_cache=PRELOADER_STARTS_AFTER_UNIVERSE_PRELOADER and corporation_id in [98553333,98615601,98677876])
             print("'{}' corporation has {} industry jobs\n".format(corporation_name, len(corp_industry_jobs_data)))
             sys.stdout.flush()
 
