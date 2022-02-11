@@ -52,8 +52,12 @@ body {
 EOD;
 
 
-function __dump_pilots_involved(&$active_jobs)
+function __dump_pilots_involved(&$active_jobs, &$industry_stat)
 {
+    if ($industry_stat)
+    {
+        ?><p>The information is current as of: <?=$industry_stat[0]['dt1']?> (<?=$industry_stat[0]['dt2']?>)</p><?php
+    }
     $pilots = array();
     if ($active_jobs)
         foreach ($active_jobs as &$job)
@@ -143,6 +147,20 @@ function __dump_industry_jobs(&$active_jobs) { ?>
     //---
     $query = <<<EOD
 select
+ date_trunc('seconds', j.udt+'3:00:00') as dt1,
+ date_trunc('seconds', CURRENT_TIMESTAMP AT TIME ZONE 'GMT'-j.udt) as dt2
+from (
+ select max(ecj_updated_at) udt
+ from esi_corporation_industry_jobs
+ where ecj_corporation_id = 98677876
+) j;
+EOD;
+    $industry_stat_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $industry_stat = pg_fetch_all($industry_stat_cursor);
+    //---
+    $query = <<<EOD
+select
  -- ecj_installer_id as iid,
  c.ech_name as inm,
  -- ecj_facility_id,
@@ -178,7 +196,7 @@ EOD;
 ?>
 <div class="container-fluid">
 <h2>Pilots involved in Industry</h2>
-<?php __dump_pilots_involved($industry_jobs); ?>
+<?php __dump_pilots_involved($industry_jobs, $industry_stat); ?>
 <h2>Industry jobs list</h2>
 <?php __dump_industry_jobs($industry_jobs); ?>
 </div> <!--container-fluid-->
