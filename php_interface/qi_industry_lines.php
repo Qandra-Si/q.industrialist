@@ -169,7 +169,7 @@ EOD;
     //---
     $query = <<<EOD
 select
- iids.id,
+ -- iids.id,
  -- ecj_installer_id as iid,
  c.ech_name as inm,
  -- ecj_facility_id,
