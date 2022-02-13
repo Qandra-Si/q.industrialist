@@ -658,11 +658,11 @@ class ConveyorMaterials:
                 # - uaem : used and exist materials
                 # - cnem : current not enough materials
                 # - not_enough_materials__again['M'] : составлен в ходе планирования reaction-работ, расчёт
-                #   достаточного кол-ва этих материалов надо провести на производственной станке (Сотия, а не Татара)
+                #   достаточного кол-ва этих материалов надо провести на станке реакций (Татара, а не Сотия)
                 # подготовка списка недостающих материалов к текущей итерации этого цикла
                 (uaem, cnem) = self.calc_materials_availability(
                     not_enough_materials__again['M'],
-                    'M')
+                    'R')
                 # сохраняем в промежуточный список материалы, которые уже есть в стоке
                 if uaem:
                     self.calc_materials_summary(uaem, used_and_exist_materials)
@@ -683,7 +683,7 @@ class ConveyorMaterials:
                             cnem,
                             not_enough_materials__intermediate,
                             check_where_flag=False)
-                    # итератор цикла устанавливаем в начальную позицию where=arain
+                    # итератор цикла устанавливаем в начальную позицию where=again
                     where = 'A'
                 # уничтожаем списки, чтобы случайно к ним не обратиться (в т.ч. более ненужный список
                 # стартовых потребностей)
