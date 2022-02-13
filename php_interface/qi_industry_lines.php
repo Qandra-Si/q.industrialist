@@ -72,12 +72,13 @@ function __dump_pilots_involved(&$active_jobs, &$industry_stat)
             {
                 if ($pilot[0] == $job['inm'])
                 {
-                    switch ($job['aid'])
-                    {
-                    case 1: $pilot[1]++; break;
-                    case 3: case 4: case 5: case 7: case 8: $pilot[2]++; break;
-                    case 9: case 11: $pilot[3]++; break;
-                    }
+                    if (!is_null($job['aid']))
+                        switch ($job['aid'])
+                        {
+                        case 1: $pilot[1]++; break;
+                        case 3: case 4: case 5: case 7: case 8: $pilot[2]++; break;
+                        case 9: case 11: $pilot[3]++; break;
+                        }
                     $found = true;
                     break;
                 }
@@ -85,12 +86,13 @@ function __dump_pilots_involved(&$active_jobs, &$industry_stat)
             if (!$found)
             {
                 $p = array($job['inm'], 0, 0, 0);
-                switch ($job['aid'])
-                {
-                case 1: $p[1]++; break;
-                case 3: case 4: case 5: case 7: case 8: $p[2]++; break;
-                case 9: case 11: $p[3]++; break;
-                }
+                if (!is_null($job['aid']))
+                    switch ($job['aid'])
+                    {
+                    case 1: $p[1]++; break;
+                    case 3: case 4: case 5: case 7: case 8: $p[2]++; break;
+                    case 9: case 11: $p[3]++; break;
+                    }
                 array_push($pilots, $p);
             }
         }
@@ -123,6 +125,7 @@ function __dump_industry_jobs(&$active_jobs) { ?>
     if ($active_jobs)
         foreach ($active_jobs as &$job)
         {
+            if (is_null($job['aid'])) continue;
             $progress = 100.0 * $job['sec2'] / $job['sec1'];
             ?>
 <tr>
@@ -166,6 +169,7 @@ EOD;
     //---
     $query = <<<EOD
 select
+ iids.id,
  -- ecj_installer_id as iid,
  c.ech_name as inm,
  -- ecj_facility_id,
@@ -180,16 +184,21 @@ select
  extract(epoch from ecj_end_date-ecj_start_date)::int as sec1,
  extract(epoch from ecj_end_date-CURRENT_TIMESTAMP AT TIME ZONE 'GMT')::int as sec2,
  ecj_status as st
-from
- esi_corporation_industry_jobs j
-  left outer join esi_characters c on (ecj_installer_id=c.ech_character_id)
+from (
+ select distinct ecj_installer_id as id
+ from esi_corporation_industry_jobs
+ where
+  ecj_end_date > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '7 days') and
+  ecj_installer_id = any($1)
+ ) iids
+  left outer join esi_corporation_industry_jobs j on (
+   j.ecj_installer_id=iids.id and
+   j.ecj_status <> 'delivered'and
+   j.ecj_end_date > CURRENT_TIMESTAMP AT TIME ZONE 'GMT')
+  left outer join esi_characters c on (iids.id=c.ech_character_id)
   left outer join esi_corporation_assets ab on (ecj_blueprint_location_id=ab.eca_item_id)
   left outer join esi_corporation_assets ao on (ecj_output_location_id=ao.eca_item_id)
   left outer join eve_sde_type_ids tp on (ecj_product_type_id=tp.sdet_type_id)
-where
- ecj_status <> 'delivered'and
- ecj_end_date > CURRENT_TIMESTAMP AT TIME ZONE 'GMT' and
- ecj_installer_id = any($1)
 order by ecj_end_date;
 EOD;
     $params = array('{'.implode(',',$PILOT_IDs).'}');
