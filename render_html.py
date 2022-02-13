@@ -56,6 +56,10 @@ def __get_icon_src(icon_id, sde_icon_ids):
         return ""
 
 
+def get_span_glyphicon(icon: str) -> str:
+    return '<span class="glyphicon glyphicon-{}" aria-hidden="true"></span>'.format(icon)
+
+
 def __dump_header(glf, header_name):
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
@@ -198,22 +202,27 @@ def __dump_any_into_modal_footer(glf):
 def __dump_sde_type_ids_to_js(glf, sde_type_ids):
     type_id_keys = sde_type_ids.keys()
     sorted_type_id_keys = sorted(type_id_keys, key=lambda x: int(x))
-    glf.write('<script>\nvar g_sde_max_type_id={max};\nvar g_sde_type_ids=['.format(max=sorted_type_id_keys[-1]))
-    for type_id in sorted_type_id_keys:
+    glf.write('<script>\n'
+              'var g_sde_max_type_id={max};\n'
+              'var g_sde_type_len={len};\n'
+              'var g_sde_type_ids=['.format(max=sorted_type_id_keys[-1], len=len(sorted_type_id_keys)))
+    for (idx, type_id) in enumerate(sorted_type_id_keys):
         # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
         glf.write('{end}[{id},"{nm}"]'.format(
             id=type_id,
             nm=sde_type_ids[str(type_id)]["name"]["en"].replace('"', '\\\"'),
-            end="\n" if type_id == "0" else ","))
+            end=',' if idx else "\n"))
     glf.write("""
 ];
-function getSdeItemName(id) {
- if ((id < 0) || (id > g_sde_max_type_id)) return null;
- for (var i=0; i<=g_sde_max_type_id; ++i)
-  if (id == g_sde_type_ids[i][0])
-   return g_sde_type_ids[i][1];
+function getSdeItemName(t) {
+ if ((t < 0) || (t > g_sde_max_type_id)) return null;
+ for (var i=0; i<g_sde_type_len; ++i) {
+  var ti = g_sde_type_ids[i][0];
+  if (t == ti) return g_sde_type_ids[i][1];
+  if (ti >= g_sde_max_type_id) break;
+ }
  return null;
-};
+}
 </script>
 """)
 
@@ -295,16 +304,14 @@ def __dump_converted_fits_items(
             ' <div class="media-body">\n'
             '  <div class="row">\n'
             '   <div class="col-md-6">\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" {fitk}="{num}"><span'
-            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" {fitk}="{num}">{gly1}&nbsp;<span>T2</span></button>\n'
             '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
-            '     data-target="#modalEFT{num}"><span class="glyphicon glyphicon-th-list"'
-            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
+            '     data-target="#modalEFT{num}">{gly2}&nbsp;EFT</button>\n'
             '   </div>\n'
             '  </div>\n'
             ' </div>\n'
             '</div>\n'.
-            format(fitk=fit_keyword, num=num_id)
+            format(fitk=fit_keyword, num=num_id, gly1=get_span_glyphicon("eye-close"), gly2=get_span_glyphicon("th-list"))
         )
     else:
         __available_txt = ""
@@ -322,11 +329,9 @@ def __dump_converted_fits_items(
             '  <h4 class="media-heading">{aq}{q}x {nm}</h4>\n'
             '  <div class="row">\n'
             '   <div class="col-md-6">\n'
-            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" {fitk}="{num}"><span'
-            '     class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>&nbsp;<span>T2</span></button>\n'
+            '    <button type="button" class="btn btn-default btn-xs qind-btn-t2" {fitk}="{num}">{gly1}&nbsp;<span>T2</span></button>\n'
             '    <button type="button" class="btn btn-default btn-xs qind-btn-eft" data-toggle="modal"'
-            '     data-target="#modalEFT{num}"><span class="glyphicon glyphicon-th-list"'
-            '     aria-hidden="true"></span>&nbsp;EFT</button>\n'
+            '     data-target="#modalEFT{num}">{gly2}&nbsp;EFT</button>\n'
             '   </div>\n'
             '  </div>\n'
             ' </div>\n'
@@ -337,7 +342,9 @@ def __dump_converted_fits_items(
                 nm=__ship_name,
                 src=__get_img_src(__ship_type_id if not (__ship_type_id is None) else 0, 32),
                 aq=__available_txt,
-                q=__total_quantity
+                q=__total_quantity,
+                gly1=get_span_glyphicon("eye-close"),
+                gly2=get_span_glyphicon("th-list"),
             )
         )
     # добавление окна, в котором можно просматривать и копировать EFT

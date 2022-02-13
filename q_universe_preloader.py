@@ -20,7 +20,7 @@ run the following command from this directory:
 $ chcp 65001 & @rem on Windows only!
 $ python eve_sde_tools.py --cache_dir=~/.q_industrialist
 $ python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
-$ python q_universe_preloader.py --pilot1="Qandra Si" --pilot2="Your Name" --online --cache_dir=~/.q_industrialist
+$ python q_universe_preloader.py --category=all --pilot="Qandra Si" --pilot="Your Name" --online --cache_dir=~/.q_industrialist
 
 Attention, the first launch takes about 4 hours of work!
 Usually single launch for one corporation takes 1.5-2 minutes, but in case of a long
@@ -83,15 +83,6 @@ def main():
         'once',
     ]
 
-    # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
-    dbtools = eve_db_tools.QDatabaseTools(
-        "universe_structures",
-        q_industrialist_settings.g_client_scope,
-        q_industrialist_settings.g_database,
-        debug=False
-    )
-    first_time = True
-
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms(['category='])
@@ -105,6 +96,15 @@ def main():
     del possible_categories
     # подготовка набора категорий, заданных пользователем к использованию
     categories = set(argv_prms['category'])
+
+    # подключаемся к БД для сохранения данных, которые будут получены из ESI Swagger Interface
+    dbtools = eve_db_tools.QDatabaseTools(
+        "universe_structures",
+        q_industrialist_settings.g_client_scope,
+        q_industrialist_settings.g_database,
+        debug=argv_prms['verbose_mode']
+    )
+    first_time = True
 
     for pilot_num, pilot_name in enumerate(argv_prms["character_names"]):
         # настройка Eve Online ESI Swagger interface
@@ -258,15 +258,11 @@ def main():
             # тысяч предметов - долго)
             if categories & {'all', 'public', 'once', 'goods'}:
                 # Public information about type_id
-                actualized_type_ids = dbtools.actualize_type_ids()
-                if actualized_type_ids is None:
+                actualized: int = dbtools.actualize_type_ids(full_database_upgrade=True)
+                if actualized == 0:
                     print("No new items found in the Universe")
                 else:
-                    print("{} Universe' items actualized in database:".format(len(actualized_type_ids)))
-                    if len(actualized_type_ids) < 100:  # в случае массового обновления, названия не показываем
-                        for item in actualized_type_ids:
-                            print(" * {} with type_id={}".format(item['name'], item['type_id']))
-                    del actualized_type_ids
+                    print("{} Universe' items actualized in database".format(actualized))
 
             # загрузка исторических цен по регионам (ОЧЕНЬ МЕДЛЕННО из-за большого кол-ва данных), как
             # правило загрузка рыночных данных одного крупного региона, например The Forge, занимает

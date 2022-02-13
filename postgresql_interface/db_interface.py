@@ -107,7 +107,10 @@ class QIndustrialistDatabase:
 
     def select_one_row(self, query, *args):
         with self.__conn.cursor() as cur:
-            cur.execute(query, args)
+            if isinstance(args, tuple) and (len(args) == 1) and isinstance(args[0], dict):
+                cur.execute(query, args[0])
+            else:
+                cur.execute(query, args)
             if self.debug:
                 print(cur.query)
             records = cur.fetchone()

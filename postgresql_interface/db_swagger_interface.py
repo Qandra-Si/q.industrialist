@@ -30,14 +30,17 @@ class QSwaggerInterface:
             return False
         return True
 
-    def get_exist_ids(self, table, field, updated):
+    def get_exist_ids(self, table, field, updated=None):
         """
         :param table: table name
         :param field: field name of identity
         :param updated: field name of updated_at
         :return: list of unique identities stored in the database
         """
-        aids = self.db.select_all_rows("SELECT {f},{u} FROM {t};".format(t=table, f=field, u=updated))
+        if not updated:
+            aids = self.db.select_all_rows("SELECT {f} FROM {t};".format(t=table, f=field))
+        else:
+            aids = self.db.select_all_rows("SELECT {f},{u} FROM {t};".format(t=table, f=field, u=updated))
         return aids
 
     def get_absent_ids(self, ids, table, field):
@@ -2135,9 +2138,201 @@ class QSwaggerInterface:
         )
 
     # -------------------------------------------------------------------------
+    # /universe/categories/
+    # /universe/categories/{category_id}/
+    # -------------------------------------------------------------------------
+
+    def is_exist_category_id(self, id: int):
+        return self.is_exist_something(id, 'eve_sde_category_ids', 'sdec_category_id')
+
+    def get_exist_category_ids(self):
+        return self.get_exist_ids('eve_sde_category_ids', 'sdec_category_id')
+
+    def insert_or_update_category_id(self, data):
+        """ inserts category_id' data into database
+        """
+        # { "category_id": 17,
+        #   "groups": [267, 280, ... 4165],
+        #   "name": "Commodity",
+        #   "published": true
+        # }
+        self.db.execute(
+            "INSERT INTO eve_sde_category_ids("
+            " sdec_category_id,"
+            " sdec_category_name,"
+            " sdec_published) "
+            "VALUES ("
+            " %(c)s,"
+            " %(nm)s,"
+            " %(p)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdec DO UPDATE SET"
+            " sdec_category_name=%(nm)s,"
+            " sdec_published=%(p)s;",
+            {'c': data['category_id'],
+             'nm': data['name'],
+             'p': data['published'],
+             }
+        )
+
+    def update_category_id_as_not_published(self, category_id: int):
+        """ mark category_id as unpublished
+        """
+        self.db.execute(
+            "UPDATE eve_sde_category_ids SET"
+            " sdec_published=false "
+            "WHERE sdec_category_id=%s;",
+            category_id
+        )
+
+    # -------------------------------------------------------------------------
+    # /universe/groups/
+    # /universe/groups/{group_id}/
+    # -------------------------------------------------------------------------
+
+    def is_exist_group_id(self, id: int):
+        return self.is_exist_something(id, 'eve_sde_group_ids', 'sdecg_group_id')
+
+    def get_exist_group_ids(self):
+        return self.get_exist_ids('eve_sde_group_ids', 'sdecg_group_id')
+
+    def insert_or_update_group_id(self, data):
+        """ inserts group_id' data into database
+        """
+        # { "category_id": 17,
+        #   "group_id": 4145,
+        #   "name": "Warp Matrix Filaments",
+        #   "published": true,
+        #   "types": [60633, 61654, 61655, 61656, 62055, 62056, 62057]
+        # }
+        self.db.execute(
+            "INSERT INTO eve_sde_group_ids("
+            " sdecg_group_id,"
+            " sdecg_category_id,"
+            " sdecg_group_name,"
+            " sdecg_published) "
+            "VALUES ("
+            " %(g)s,"
+            " %(c)s,"
+            " %(nm)s,"
+            " %(p)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdecg DO UPDATE SET"
+            " sdecg_category_id=%(c)s,"
+            " sdecg_group_name=%(nm)s,"
+            " sdecg_published=%(p)s;",
+            {'g': data['group_id'],
+             'c': data['category_id'],
+             'nm': data['name'],
+             'p': data['published'],
+             }
+        )
+
+    def update_group_id_as_not_published(self, group_id: int):
+        """ mark group_id as unpublished
+        """
+        self.db.execute(
+            "UPDATE eve_sde_group_ids SET"
+            " sdecg_published=false "
+            "WHERE sdecg_group_id=%s;",
+            group_id
+        )
+
+    # -------------------------------------------------------------------------
+    # /markets/groups/
+    # /markets/groups/{market_group_id}/
+    # -------------------------------------------------------------------------
+
+    def is_exist_market_group_id(self, id: int):
+        return self.is_exist_something(id, 'eve_sde_market_groups', 'sdeg_group_id')
+
+    def get_exist_market_group_ids(self):
+        return self.get_exist_ids('eve_sde_market_groups', 'sdeg_group_id')
+
+    def insert_or_update_market_group_id(self, data):
+        """ inserts market_group_id' data into database
+        """
+        # { "description": "Filaments connected to Abyssal pockets with Exotic Particle Storms",
+        #   "market_group_id": 2457,
+        #   "name": "Exotic Filaments",
+        #   "parent_group_id": 2456,
+        #   "types": [56133, 47889, 62056, 62057, 62055, 56141, 47888, 47761, 47890, 47891, 61654, 61655, 61656, 60633]
+        # }
+        self.db.execute(
+            "INSERT INTO eve_sde_market_groups("
+            " sdeg_group_id,"
+            " sdeg_parent_id,"
+            " sdeg_semantic_id,"  # TODO: доделать импорт идентификатора семантики
+            " sdeg_group_name) "
+            "VALUES ("
+            " %(g)s,"
+            " %(p)s,"
+            " %(g)s,"
+            " %(nm)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdeg DO UPDATE SET"
+            " sdeg_parent_id=%(p)s,"
+            " sdeg_group_name=%(nm)s;",
+            {'g': data['market_group_id'],
+             'p': data.get('parent_group_id'),
+             'nm': data['name'],
+             }
+        )
+
+    # -------------------------------------------------------------------------
     # /universe/types/
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
+
+    def is_exist_type_id(self, id: int):
+        return self.is_exist_something(id, 'eve_sde_type_ids', 'sdet_type_id')
+
+    def get_exist_type_ids(self):
+        return self.get_exist_ids('eve_sde_type_ids', 'sdet_type_id')
+
+    def get_universe_items_with_names(self):
+        # выбираем (пока) только идентификаторы предметов типа 379 Cargo Containers
+        """
+        # 2233,  # Customs Office
+        3293,  # Medium Standard Container
+        3296,  # Large Standard Container
+        3297,  # Small Standard Container
+        3465,  # Large Secure Container
+        3466,  # Medium Secure Container
+        3467,  # Small Secure Container
+        11488,  # Huge Secure Container
+        11489,  # Giant Secure Container
+        17363,  # Small Audit Log Secure Container
+        17364,  # Medium Audit Log Secure Container
+        17365,  # Large Audit Log Secure Container
+        17366,  # Station Container
+        17367,  # Station Vault Container
+        17368,  # Station Warehouse Container
+        24445,  # Giant Freight Container
+        33003,  # Enormous Freight Container
+        33005,  # Huge Freight Container
+        33007,  # Large Freight Container
+        33009,  # Medium Freight Container
+        33011,  # Small Freight Container
+        # 35825,  # Raitaru
+        # 35826,  # Azbel
+        # 35827,  # Sotiyo
+        # 35828,  # Medium Laboratory
+        # 35829,  # Large Laboratory
+        # 35830,  # X-Large Laboratory
+        # 35832,  # Astrahus
+        # 35833,  # Fortizar
+        # 35834,  # Keepstar
+        # 35835,  # Athanor
+        # 35836,  # Tatara
+        """
+        tids = self.db.select_all_rows(
+            "SELECT sdet_type_id "
+            "FROM eve_sde_type_ids "
+            "WHERE sdet_market_group_id IN ("
+            " SELECT sdeg_group_id"
+            " FROM eve_sde_market_groups"
+            " WHERE sdeg_parent_id=379"
+            ");"
+        )
+        return tids
 
     def remove_obsolete_type_ids_marker_from_dictionary(self):
         """ removes type_id=-1 from database (Waiting automatic data update from ESI)
@@ -2194,7 +2389,7 @@ class QSwaggerInterface:
         return [int(r[0]) for r in rows]
 
     def update_type_id_as_not_published(self, type_id: int):
-        """ inserts type_id' data into database
+        """ mark type_id as unpublished
         """
         self.db.execute(
             "UPDATE eve_sde_type_ids SET"
@@ -2226,6 +2421,7 @@ class QSwaggerInterface:
             "INSERT INTO eve_sde_type_ids("
             " sdet_type_id,"
             " sdet_type_name,"
+            " sdet_group_id,"
             " sdet_volume,"
             " sdet_capacity,"
             # не передаётся: " sdet_base_price,"
@@ -2238,6 +2434,7 @@ class QSwaggerInterface:
             "VALUES ("
             " %(t)s,"
             " %(nm)s,"
+            " %(g)s,"
             " %(v)s,"
             " %(c)s,"
             # не передаётся: " %(bp)s,"
@@ -2249,6 +2446,7 @@ class QSwaggerInterface:
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
             "ON CONFLICT ON CONSTRAINT pk_sdet DO UPDATE SET"
             " sdet_type_name=%(nm)s,"
+            " sdet_group_id=%(g)s,"
             " sdet_volume=%(v)s,"
             " sdet_capacity=%(c)s,"
             " sdet_published=%(p)s,"
@@ -2258,6 +2456,7 @@ class QSwaggerInterface:
             " sdet_packaged_volume=%(pv)s;",
             {'t': type_id,
              'nm': data['name'],
+             'g': data['group_id'],
              'v': data.get('volume', None),
              'c': data.get('capacity', None),
              # не передаётся: 'bp': None,

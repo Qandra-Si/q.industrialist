@@ -193,7 +193,7 @@ CREATE TABLE qi.eve_sde_group_ids
     CONSTRAINT fk_sdecg_category_id FOREIGN KEY (sdecg_category_id)
         REFERENCES qi.eve_sde_category_ids(sdec_category_id) MATCH SIMPLE
         ON UPDATE NO ACTION
-        ON DELETE CASCADE
+        ON DELETE NO ACTION
 )
 TABLESPACE pg_default;
 
@@ -207,47 +207,6 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdecg_category_id
     ON qi.eve_sde_group_ids USING btree
     (sdecg_category_id ASC NULLS LAST)
-TABLESPACE pg_default;
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
--- EVE Static Data Interface (typeIDs)
--- сведения о параметрах типах присутствующих в игре элементов, из typeIDs.yaml
---------------------------------------------------------------------------------
-CREATE TABLE qi.eve_sde_type_ids
-(
-    sdet_type_id INTEGER NOT NULL,
-    sdet_type_name CHARACTER VARYING(255),
-    sdet_volume DOUBLE PRECISION,
-    sdet_capacity DOUBLE PRECISION,
-    sdet_base_price BIGINT,
-    sdet_published BOOLEAN,
-    sdet_market_group_id INTEGER,
-    sdet_meta_group_id SMALLINT,
-    sdet_icon_id INTEGER,
-    -- sdet_group_id INTEGER,
-    -- sdet_portion_size INTEGER,
-    sdet_packaged_volume DOUBLE PRECISION,
-    sdet_created_at TIMESTAMP DEFAULT (current_timestamp at time zone 'GMT'),
-    CONSTRAINT pk_sdet PRIMARY KEY (sdet_type_id)
-)
-TABLESPACE pg_default;
-
-ALTER TABLE qi.eve_sde_type_ids OWNER TO qi_user;
-
-CREATE UNIQUE INDEX idx_sdet_pk
-    ON qi.eve_sde_type_ids USING btree
-    (sdet_type_id ASC NULLS LAST)
-TABLESPACE pg_default;
-
-CREATE INDEX idx_sdet_market_group_id
-    ON qi.eve_sde_type_ids USING btree
-    (sdet_market_group_id ASC NULLS LAST)
-TABLESPACE pg_default;
-
-CREATE INDEX idx_sdet_created_at
-    ON qi.eve_sde_type_ids USING btree
-    (sdet_created_at ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
@@ -324,6 +283,60 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdeg_group_semantic_ids
     ON qi.eve_sde_market_groups USING btree
     (sdeg_group_id ASC NULLS LAST, sdeg_semantic_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (typeIDs)
+-- сведения о параметрах типах присутствующих в игре элементов, из typeIDs.yaml
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_type_ids
+(
+    sdet_type_id INTEGER NOT NULL,
+    sdet_type_name CHARACTER VARYING(255),
+    sdet_group_id INTEGER NOT NULL,
+    sdet_volume DOUBLE PRECISION,
+    sdet_capacity DOUBLE PRECISION,
+    sdet_base_price BIGINT,
+    sdet_published BOOLEAN,
+    sdet_market_group_id INTEGER,
+    sdet_meta_group_id SMALLINT,
+    sdet_icon_id INTEGER,
+    -- sdet_portion_size INTEGER,
+    sdet_packaged_volume DOUBLE PRECISION,
+    sdet_created_at TIMESTAMP DEFAULT (current_timestamp at time zone 'GMT'),
+    CONSTRAINT pk_sdet PRIMARY KEY (sdet_type_id),
+    CONSTRAINT fk_sdet_market_group_id FOREIGN KEY (sdet_market_group_id)
+        REFERENCES qi.eve_sde_market_groups(sdeg_group_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+    CONSTRAINT fk_sdet_group_id FOREIGN KEY (sdet_group_id)
+        REFERENCES qi.eve_sde_group_ids(sdecg_group_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_type_ids OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdet_pk
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdet_group_id
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdet_market_group_id
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_market_group_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdet_created_at
+    ON qi.eve_sde_type_ids USING btree
+    (sdet_created_at ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
