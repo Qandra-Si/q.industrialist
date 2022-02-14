@@ -21,22 +21,22 @@ from .error import EveOnlineClientError
 
 
 class EveESIClient:
-    def __init__(self, auth_cache, debug=False, logger=True, user_agent=None):
+    def __init__(self, auth_cache, keep_alive: bool, debug: bool = False, logger: bool = True, user_agent=None):
         """ constructor
 
         :param EveESIAuth auth_cache: authz tokens storage
         :param debug: flag which says that we are in debug mode
         :param logger: flag which says that we are in logger mode
         """
-        self.__client_callback_url = 'https://localhost/callback/'
-        self.__content_type = 'application/x-www-form-urlencoded'
-        # self.__eve_server = 'tranquility'  # eveonline' server
-        self.__login_host = 'login.eveonline.com'
-        self.__base_auth_url = 'https://login.eveonline.com/v2/oauth/authorize/'
-        self.__token_req_url = 'https://login.eveonline.com/v2/oauth/token'
-        self.__attempts_to_reconnect = 5
-        self.__debug = debug
-        self.__logger = logger
+        self.__client_callback_url: str = 'https://localhost/callback/'
+        self.__content_type: str = 'application/x-www-form-urlencoded'
+        # self.__eve_server: str = 'tranquility'  # eveonline' server
+        self.__login_host: str = 'login.eveonline.com'
+        self.__base_auth_url: str = 'https://login.eveonline.com/v2/oauth/authorize/'
+        self.__token_req_url: str = 'https://login.eveonline.com/v2/oauth/token'
+        self.__attempts_to_reconnect: int = 5
+        self.__debug: bool = debug
+        self.__logger: bool = logger
 
         # экземпляр объекта, кеширующий аутентификационные токену и хранящий их в указанной директории
         if not isinstance(auth_cache, EveESIAuth):
@@ -45,13 +45,22 @@ class EveESIClient:
 
         # используется, если не пользователь не будет указаывать свой собственный идентификатор
         # Application: R Initiative 4 Q.Industrialist
-        self.__default_ri4_client_id = "022ea197e3f2414f913b789e016990c8"
+        self.__default_ri4_client_id: str = "022ea197e3f2414f913b789e016990c8"
 
         # для корректной работы с ESI Swagger Interface следует указать User-Agent в заголовках запросов
         self.__user_agent = user_agent
 
         # данные-состояния, которые были получены во время обработки http-запросов
         self.__last_modified = None
+
+        # резервируем session-объект, для того чтобы не заниматься переподключениями, а пользоваться keep-alive
+        self.__keep_alive: bool = keep_alive
+        self.__session = None
+
+    def __del__(self):
+        # закрываем сессию
+        if self.__session is not None:
+            del self.__session
 
     @property
     def auth_cache(self):
@@ -117,6 +126,19 @@ class EveESIClient:
     def __combine_client_scopes(scopes):
         return " ".join(scopes)
 
+    def __establish(self) -> requests.Session:
+        if self.__session is not None:
+            del self.__session
+        if self.__logger:
+            print("starting new HTTPS connection: {}:443".format(self.__login_host))
+        self.__session = requests.Session()
+        return self.__session
+
+    def __keep_connection(self) -> requests.Session:
+        if self.__session is None:
+            self.__session = requests.Session()
+        return self.__session
+
     def __print_auth_url(self, client_id, client_scopes, code_challenge=None):
         """Prints the URL to redirect users to.
 
@@ -159,10 +181,11 @@ class EveESIClient:
         if not (add_headers is None):
             headers.update(add_headers)
 
-        res = requests.post(
-            self.__token_req_url,
-            data=form_values,
-            headers=headers)
+        if self.__keep_alive:
+            s: requests.Session = self.__establish()  # s может меняться, важно переиспользовать self.__session
+            res = s.post(self.__token_req_url, data=form_values, headers=headers)
+        else:
+            res = requests.post(self.__token_req_url, data=form_values, headers=headers)
 
         if self.__debug:
             print("Request sent to URL {} with headers {} and form values: "
@@ -187,11 +210,11 @@ class EveESIClient:
                 "scope": self.__combine_client_scopes(client_scopes)  # OPTIONAL
             })
 
-        res = requests.post(
-            self.__token_req_url,
-            data=form_values,
-            headers=headers,
-        )
+        if self.__keep_alive:
+            s: requests.Session = self.__establish()  # s может меняться, важно переиспользовать self.__session
+            res = s.post(self.__token_req_url, data=form_values, headers=headers)
+        else:
+            res = requests.post(self.__token_req_url, data=form_values, headers=headers)
 
         if self.__debug:
             print("Request sent to URL {} with headers {} and form values: "
@@ -228,7 +251,12 @@ class EveESIClient:
                                 # метод get, и висит бесконечно - добавил таймауты на переподключения, которые
                                 # подобрал экспериментально, см. также https://ru.stackoverflow.com/a/1189363
                                 requests_get_times += 1
-                                res = requests.get(uri, headers=headers, timeout=(timeout_connect, timeout_read))
+                                if self.__keep_alive:
+                                    # s может меняться, важно переиспользовать self.__session
+                                    s: requests.Session = self.__keep_connection()
+                                    res = s.get(uri, headers=headers, timeout=(timeout_connect, timeout_read))
+                                else:
+                                    res = requests.get(uri, headers=headers, timeout=(timeout_connect, timeout_read))
                             except (requests.ConnectionError, requests.Timeout):
                                 continue
                             else:
@@ -244,7 +272,12 @@ class EveESIClient:
                                          res.encoding))
                     else:
                         headers.update({"Content-Type": "application/json"})
-                        res = requests.post(uri, data=body, headers=headers)
+                        if self.__keep_alive:
+                            # s может меняться, важно переиспользовать self.__session
+                            s: requests.Session = self.__keep_connection()
+                            res = s.post(uri, data=body, headers=headers)
+                        else:
+                            res = requests.post(uri, data=body, headers=headers)
                         if self.__debug:
                             print("\nMade POST request to {} with data {} and headers: "
                                   "{}\nAnd the answer {} was received with "
