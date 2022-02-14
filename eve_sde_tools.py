@@ -182,7 +182,7 @@ def get_item_name_by_type_id(type_ids, type_id):
             en_name = name_dict.get('en')
             if en_name is not None:
                 return en_name
-    return type_id
+    return str(type_id)
 
 
 def convert_sde_type_ids(type_ids):
