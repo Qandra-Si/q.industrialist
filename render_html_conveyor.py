@@ -1742,9 +1742,10 @@ def __dump_blueprints_list_with_materials(
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
                 # ---
-                stat__all_blueprints += quantity_or_runs  # эт д.б. не раны, а кол-во чертежей в статистике
-                stat__runned_blueprints += (quantity_or_runs if blueprint_status is not None else 0)
-                stat__overstocked_blueprints += (quantity_or_runs if blueprint_status is None and overstock_in_market else 0)
+                stat__count_blueprints = len(bp["itm"])
+                stat__all_blueprints += stat__count_blueprints  # эт д.б. не раны, а кол-во чертежей в статистике
+                stat__runned_blueprints += (stat__count_blueprints if blueprint_status is not None else 0)
+                stat__overstocked_blueprints += (stat__count_blueprints if blueprint_status is None and overstock_in_market else 0)
                 # ---
                 market_overstock_html = ''
                 if blueprint_status is None and overstock_in_market:
@@ -1866,7 +1867,7 @@ def __dump_blueprints_list_with_materials(
                     if something_else:
                         glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(",".join(manufacturing_activities)))
                     else:
-                        stat__runnable_blueprints += quantity_or_runs
+                        stat__runnable_blueprints += stat__count_blueprints
                         if enable_copy_to_clipboard:
                             glf.write(
                                 '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"'
@@ -1909,7 +1910,7 @@ def __dump_blueprints_list_with_materials(
                         stock_resources,
                         {})
                     if not not_enough_materials:
-                        stat__runnable_blueprints += quantity_or_runs
+                        stat__runnable_blueprints += stat__count_blueprints
 
                     # вывод наименования ресурсов (материалов)
                     glf.write('<div class="qind-materials-used qind-tid hiddend">\n')  # div(materials)
