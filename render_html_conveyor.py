@@ -935,6 +935,7 @@ def __dump_blueprints_list_with_materials(
     blueprint_station_ids = [conveyor_entity["station_id"]]
     react_stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["react_stock"]])
     react_station_ids = set([int(ces["loc"]["station_id"]) for ces in conveyor_entity["react_stock"]])
+    products_to_exclude: typing.List[int] = conveyor_entity.get('products_to_exclude', [])
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
@@ -997,14 +998,17 @@ def __dump_blueprints_list_with_materials(
         fixed_number_of_runs = loc["box"]["fixed_number_of_runs"]
         manufacturing_activities = loc["box"]["manufacturing_activities"]
         __bp2 = corp_bp_loc_data[str(loc_id)]
-        runnable_blueprints = 0
+        stat__runnable_blueprints = 0
+        stat__overstocked_blueprints = 0
+        stat__runned_blueprints = 0
+        stat__all_blueprints = 0
         glf.write(
             ' <div class="panel panel-default">\n'
             '  <div class="panel-heading" role="tab" id="headingB{id}">\n'
             '   <h4 class="panel-title">\n'
             '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
             '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>'
-            '    <span class="badge"><span id="rnblB{id}">0</span> of {bps}</span>\n'
+            '    <span class="badge"><span id="rnblB{id}">&times;</span></span>\n'
             '   </h4>\n'
             '  </div>\n'
             '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
@@ -1013,7 +1017,6 @@ def __dump_blueprints_list_with_materials(
                 id=loc_id,
                 station=conveyor_entity["station"],
                 nm=loc_name,
-                bps=len(__bp2)
             )
         )
         # сортировка чертежей по их названиям
@@ -1043,6 +1046,11 @@ def __dump_blueprints_list_with_materials(
             show_me_te = 'manufacturing' in manufacturing_activities or \
                          'research_material' in manufacturing_activities or \
                          'research_time' in manufacturing_activities
+            # ---
+            overstock_in_market: bool = False
+            if products_to_exclude and ('manufacturing' in manufacturing_activities):
+                product_id, product_quantity, product_materials = eve_sde_tools.get_product_by_blueprint_type_id(type_id, 1, sde_bp_materials)
+                overstock_in_market = product_id in products_to_exclude
             # ---
             max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
@@ -1083,8 +1091,16 @@ def __dump_blueprints_list_with_materials(
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
                 # ---
+                stat__all_blueprints += quantity_or_runs  # эт д.б. не раны, а кол-во чертежей в статистике
+                stat__runned_blueprints += (quantity_or_runs if blueprint_status is not None else 0)
+                stat__overstocked_blueprints += (quantity_or_runs if blueprint_status is None and overstock_in_market else 0)
+                # ---
+                market_overstock_html = ''
+                if blueprint_status is None and overstock_in_market:
+                    market_overstock_html = '&nbsp;<span class="label label-overstock">overstock</span>'
+                # ---
                 bpk_time_html = ''
-                if (blueprint_status is None) and not (max_activity_time is None):
+                if (blueprint_status is None) and not (max_activity_time is None) and not overstock_in_market:
                     bpk_time_max = None
                     bpk_time_min = None
                     for itm in bp["itm"]:
@@ -1148,14 +1164,15 @@ def __dump_blueprints_list_with_materials(
                     '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
                     '&nbsp;<span class="badge">{qr}{fnr}</span>'
-                    '{time}\n'.format(
+                    '{time}{overstock}\n'.format(
                         qr=quantity_or_runs,
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
                         me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if show_me_te else "",
                         status=blueprint_status if not (blueprint_status is None) else "",
-                        time=bpk_time_html
+                        time=bpk_time_html,
+                        overstock=market_overstock_html,
                     )
                 )
                 # если чертёж запущен в работу, то ограчиниваемся выводом его состояния добавив в строку с инфорацией
@@ -1187,6 +1204,8 @@ def __dump_blueprints_list_with_materials(
                         del materials_list_with_efficiency
                     # ---
                     glf.write('</br></span>')  # qind-blueprints-?
+                elif overstock_in_market:
+                    glf.write('</br></span>')  # qind-blueprints-?
                 elif activity_blueprint_materials is None:
                     something_else: bool = False
                     for ma in manufacturing_activities:
@@ -1196,7 +1215,7 @@ def __dump_blueprints_list_with_materials(
                     if something_else:
                         glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(",".join(manufacturing_activities)))
                     else:
-                        runnable_blueprints += 1
+                        stat__runnable_blueprints += quantity_or_runs
                         if enable_copy_to_clipboard:
                             glf.write(
                                 '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn"'
@@ -1237,7 +1256,7 @@ def __dump_blueprints_list_with_materials(
                         stock_resources,
                         {})
                     if not not_enough_materials:
-                        runnable_blueprints += 1
+                        stat__runnable_blueprints += quantity_or_runs
 
                     # вывод наименования ресурсов (материалов)
                     glf.write('<div class="qind-materials-used qind-tid hiddend">\n')  # div(materials)
@@ -1420,11 +1439,25 @@ def __dump_blueprints_list_with_materials(
   </div> <!--panel-collapse-->
  </div> <!--panel-->
 """)
-        glf.write(
-            "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('{bps}'); "
-            "el.parent().css('background-color', '{cl}'); }});</script>".
-            format(id=loc_id, bps=runnable_blueprints, cl='darkgreen' if runnable_blueprints else 'maroon')
-        )
+        if stat__all_blueprints == stat__runned_blueprints:
+            glf.write(
+                "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('{all} in progress'); "
+                "el.parent().css('background-color', '#337ab7'); }});</script>".
+                format(id=loc_id, all=stat__all_blueprints))
+        elif stat__all_blueprints == (stat__overstocked_blueprints + stat__runned_blueprints):
+            glf.write(
+                "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('all of {all} in overstock'); "
+                "el.parent().css('background-color', '#131313'); }});</script>".
+                format(id=loc_id, all=stat__all_blueprints))
+        else:
+            glf.write(
+                "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('{bps} on {all}'); "
+                "el.parent().css('background-color', '{cl}'); }});</script>".
+                format(id=loc_id,
+                       bps=stat__runnable_blueprints,
+                       all=stat__all_blueprints,
+                       cl='darkgreen' if stat__runnable_blueprints else 'maroon',
+            ))
 
     return stock_not_enough_materials
 
@@ -1597,6 +1630,7 @@ def __dump_corp_conveyors_stock_all(
 .label-not-enough { color: #fff; background-color: #f0ad4e; }
 .label-impossible { color: #fff; background-color: #d9534f; }
 .label-impossible-ntier { color: #fff; background-color: #e89694; }
+.label-overstock { color: # eee; background-color: #131313; }
 .label-not-available { color: #fff; background-color: #b7b7b7; }
 .text-material-industry-ntier { color: #aaa; }
 .text-material-buy-ntier { color: #a67877; }
@@ -2099,7 +2133,20 @@ function getSdeItemName(t) {
             visible = true;
           }
         })
-        if (non_danger) visible = true;
+        if (non_danger) {
+          var non_overstock = true;
+          bp_block.find('span.label-overstock').each(function() {
+            non_overstock = false;
+            //alert(mbody.find('h4.media-heading').html() + " " + $(this).text());
+            if (show_impossible == 0)
+              bp_block.addClass('hidden');
+            else {
+              bp_block.removeClass('hidden');
+              visible = true;
+            }
+          })
+          if (non_overstock) visible = true;
+        }
       }
     })
     if (visible)
