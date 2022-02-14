@@ -16,11 +16,11 @@ g_entities = [
             {
                 # шаблоны названий контейнеров, в которых находятся чертежи для запуска конвейеров
                 "blueprints":  [
-                    r"^\[PROD\] .+$",    # "[PROD] conveyor 1"
-                    r"^\.\[PROD\] .+$",  # ".[PROD] conveyor gp invent"
+                    r"^\[PROD\] .+$",    # [PROD] conveyor 1
+                    r"^\.\[PROD\] .+$",  # .[PROD] conveyor gp invent
                 ],
                 # опционально: названия контейнеров, в которых хранятся материалы для работы конвейеров
-                "stock": [r"^\.\.\[STOCK\] manufacture$"],  # "..[STOCK] manufacture"
+                "stock": [r"^\.\.\[STOCK\] manufacture$"],  # ..[STOCK] manufacture
                 # опционально: признак того, что контейнер с чертежами является также стоком материалов, если не
                 # задан, то используется значение stock, даже если пусто
                 "same_stock_container": False,
@@ -53,7 +53,7 @@ g_entities = [
                 # реакциями, но производство которых по blueprints ведётся на reaction-станции.
                 "reactions": {
                     "formulas": [r"^\.\[PROD\] formulas$"],   # .[PROD] formulas
-                    "stock": [r"^\.\.\[STOCK\] composite$"],  # "..[STOCK] composite"
+                    "stock": [r"^\.\.\[STOCK\] composite$"],  # ..[STOCK] composite
                     "manufacturing_groups": [1870],  # market-group:1870 это Fuel Blocks, которые варятся на Athanor
                 },
                 # опционально: настройки, определяющие поведение конвейера (действия, которые надо предпринять
@@ -69,7 +69,7 @@ g_entities = [
                         # алгоритму конвейера должен быть подключен нужный персонаж).
                         # настройка влияет на activity типа manufacturing (чертежи, продукты которых уже
                         # находятся в стоке на продажу исключаются из плана производства и расчёт для них
-                        # отключается) и на activity типа invent (исключается инвент чертежей, продукты
+                        # отключается) и на activity типа invention (исключается инвент чертежей, продукты
                         # которых также находятся в стоке на продажу)
                         "exclude_overstock": [r"^\[SALE] stock$"],  # [SALE] stock
                     },
@@ -77,7 +77,7 @@ g_entities = [
             },
             # Инвенты Утамы на Азбеле
             {
-                "blueprints": [r"^\.\[SCIENCE\] invention$"],  # "[SCIENCE] invention"
+                "blueprints": [r"^\.\[SCIENCE\] invention$"],  # [SCIENCE] invention
                 "same_stock_container": True,
                 "activities": ["invention"],
             },
@@ -87,7 +87,7 @@ g_entities = [
     {
         "enabled": True,
         "conveyors": [{
-            "blueprints": [r"^\.\[SCIENCE\] research$"],  # "[SCIENCE] research$"
+            "blueprints": [r"^\.\[SCIENCE\] research$"],  # [SCIENCE] research$
             "same_stock_container": True,
             "activities": ["research_material", "research_time"],
         }],
@@ -96,7 +96,7 @@ g_entities = [
     {
         "enabled": True,
         "conveyors": [{
-            "blueprints": [r"^\[order\] \d{3}.+$"],  # "[order] 123", "[order] 1000 не трогать"
+            "blueprints": [r"^\[order\] \d{3}.+$"],  # [order] 123, [order] 1000 не трогать
             "same_stock_container": True,
         }],
     },
@@ -105,7 +105,7 @@ g_entities = [
         "enabled": False,
         "corporation": "Your Industry Corp",
         "conveyors": [{
-            "blueprints": [r"^REACTIONS$"],  # "REACTIONS"
+            "blueprints": [r"^REACTIONS$"],  # REACTIONS
             "same_stock_container": True,
             "fixed_number_of_runs": 50,
             "activities": ["reaction"],
