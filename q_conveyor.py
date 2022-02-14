@@ -27,6 +27,8 @@ Requires application scopes:
     * esi-corporations.read_blueprints.v1 - Requires role(s): Director
 """
 import sys
+import typing
+
 import requests
 import re
 
@@ -62,6 +64,12 @@ def main():
     # индексация списка продуктов, которые ПОЯВЛЯЮТСЯ в результате производства
     products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="manufacturing"))
     reaction_products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="reaction"))
+
+    # подготовка списка контейнеров (их содержимого, которое будет исключено из плана производства)
+    products_to_exclude: typing.List[typing.Tuple[typing.Tuple[str, str], typing.List[int]]] = []
+    for manuf_dict in [m for m in q_conveyor_settings.g_manufacturing if 'market_storage_to_exclude' in m]:
+        for ms2e in manuf_dict['market_storage_to_exclude']:
+            products_to_exclude.append((ms2e, []))
 
     conveyor_data = []
     for pilot_name in argv_prms["character_names"]:
@@ -129,14 +137,24 @@ def main():
 
         # Построение иерархических списков БПО и БПЦ, хранящихся в корпоративных ангарах
         corp_bp_loc_data = eve_esi_tools.get_corp_bp_loc_data(corp_blueprints_data, corp_industry_jobs_data)
-        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data", corp_bp_loc_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_bp_loc_data.{}".format(corporation_name), corp_bp_loc_data)
 
         del corp_blueprints_data
 
         # Построение списка модулей и ресуров, которые имеются в распоряжении корпорации и
         # которые предназначены для использования в чертежах
         corp_ass_loc_data = eve_esi_tools.get_corp_ass_loc_data(corp_assets_data, containers_filter=None)
-        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data", corp_ass_loc_data)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_ass_loc_data.{}".format(corporation_name), corp_ass_loc_data)
+
+        # Выявление предметов, которые хранятся в контейнерах корпорации, и которые следует исключить из
+        # плана производства
+        for p2e in [p for p in products_to_exclude if p[0][0] == corporation_name]:
+            market_overstock_loc_ids = [n["item_id"] for n in corp_ass_names_data if re.search(p2e[0][1], n['name'])]
+            for ass_loc in corp_ass_loc_data.values():
+                for loc_id in market_overstock_loc_ids:
+                    items: typing.Dict[str, int] = ass_loc.get(str(loc_id))
+                    if items:
+                        p2e[1].extend([int(itm) for itm in items.keys()])
 
         # Поиск тех станций, которые не принадлежат корпорации (на них имеется офис, но самой станции в ассетах нет)
         foreign_structures_data = {}
@@ -169,7 +187,7 @@ def main():
         # { location1: {items:[item1,item2,...],type_id,location_id},
         #   location2: {items:[item3],type_id} }
         corp_assets_tree = eve_esi_tools.get_assets_tree(corp_assets_data, foreign_structures_data, sde_inv_items, virtual_hierarchy_by_corpsag=False)
-        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree", corp_assets_tree)
+        eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "corp_assets_tree.{}".format(corporation_name), corp_assets_tree)
 
         # Поиск контейнеров, которые участвуют в производстве
         corp_conveyour_entities = []
@@ -178,6 +196,8 @@ def main():
             blueprint_loc_ids = []
             for tmplt in __manuf_dict["conveyor_container_names"]:
                 blueprint_loc_ids.extend([n["item_id"] for n in corp_ass_names_data if re.search(tmplt, n['name'])])
+            # строим список названий контейнеров, содержимое которых исключается из плана производства (copy as is)
+            market_storage_to_exclude: typing.List[typing.Tuple[str, str]] = __manuf_dict.get('market_storage_to_exclude')
             # кешируем признак того, что контейнеры являются стоком материалов
             same_stock_container = __manuf_dict.get("same_stock_container", False)
             fixed_number_of_runs = __manuf_dict.get("fixed_number_of_runs", None)
@@ -204,6 +224,7 @@ def main():
                         "react_stock": [],
                         "exclude": [],
                         "num": __manuf_dict_num,
+                        'market_storage_to_exclude': market_storage_to_exclude,  # впоследствии будет найден и заменён
                     })
                     corp_conveyour_entities.append(__conveyor_entity)
                     # на этой же станции находим контейнер со стоком материалов
@@ -282,6 +303,24 @@ def main():
         del corp_bp_loc_data
         del corp_assets_tree
 
+    # постобработка списка конвейеров (из списка удаляются корпорации без коробок контейнеров), поскольку не все
+    # корпорации подключаемые к конвейеру спользуют его (например, торговая корпа в Jita имеет лишь
+    # ящик с market оверстоком)
+    conveyor_data = [c for c in conveyor_data if c['corp_conveyour_entities']]
+
+    # после того, как информация по всем корпорациям была загружена, перекомпонуем список с названиями контейнеров
+    # в новый список с идентификаторами продуктов, расчёты по которым следует пропустить
+    for cc in conveyor_data:
+        for c in [c for c in cc['corp_conveyour_entities'] if 'market_storage_to_exclude' in c]:
+            if isinstance(c['market_storage_to_exclude'], list):
+                p2e: typing.List[int] = []
+                for ms2e in c['market_storage_to_exclude']:
+                    for p in [p[1] for p in products_to_exclude if p[0] == ms2e]:
+                        p2e.extend(p)
+                c.update({'products_to_exclude': p2e})
+            del c['market_storage_to_exclude']
+    del products_to_exclude
+
     # перечисляем станции и контейнеры, которые были найдены
     print('\nFound conveyor containters and station ids...')
     for cd in conveyor_data:
@@ -303,6 +342,10 @@ def main():
                 print('     exclude containers:')
                 for cee in ce["exclude"]:
                     print('       {} = {}'.format(cee["id"], cee["name"]))
+            if ce.get('products_to_exclude'):
+                print('     market overstock:')
+                for type_id in ce['products_to_exclude']:
+                    print('       {} = {}'.format(type_id, eve_sde_tools.get_item_name_by_type_id(sde_type_ids, type_id)))
     sys.stdout.flush()
 
     print("\nBuilding report...")

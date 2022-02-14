@@ -1620,6 +1620,7 @@ def __dump_blueprints_list_with_materials(
     blueprint_station_ids = [conveyor_entity["station_id"]]
     react_stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["react_stock"]])
     react_station_ids = set([int(ces["loc"]["station_id"]) for ces in conveyor_entity["react_stock"]])
+    products_to_exclude: typing.List[int] = conveyor_entity.get('products_to_exclude', [])
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
@@ -1695,6 +1696,11 @@ def __dump_blueprints_list_with_materials(
                          'research_material' in manufacturing_activities or \
                          'research_time' in manufacturing_activities
             # ---
+            overstock_in_market: bool = False
+            if products_to_exclude and ('manufacturing' in manufacturing_activities):
+                product_id, product_quantity, product_materials = eve_sde_tools.get_product_by_blueprint_type_id(type_id, 1, sde_bp_materials)
+                overstock_in_market = product_id in products_to_exclude
+            # ---
             max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
             for bpk in bp_keys:
@@ -1734,8 +1740,12 @@ def __dump_blueprints_list_with_materials(
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
                 # ---
+                market_overstock_html = ''
+                if blueprint_status is None and overstock_in_market:
+                    market_overstock_html = '&nbsp;<span class="label label-overstock">overstock</span>'
+                # ---
                 bpk_time_html = ''
-                if (blueprint_status is None) and not (max_activity_time is None):
+                if (blueprint_status is None) and not (max_activity_time is None) and not overstock_in_market:
                     bpk_time_max = None
                     bpk_time_min = None
                     for itm in bp["itm"]:
@@ -1799,14 +1809,15 @@ def __dump_blueprints_list_with_materials(
                     '<div class="qind-bp-block"><span class="qind-blueprints-{status}">'
                     '<span class="label label-{cpc}">{cpn}</span>{me_te}'
                     '&nbsp;<span class="badge">{qr}{fnr}</span>'
-                    '{time}\n'.format(
+                    '{time}{overstock}\n'.format(
                         qr=quantity_or_runs,
                         fnr=' x{}'.format(fixed_number_of_runs) if not (fixed_number_of_runs is None) else "",
                         cpc='default' if is_blueprint_copy else 'info',
                         cpn='copy' if is_blueprint_copy else 'original',
                         me_te='&nbsp;<span class="label label-success">{me} {te}</span>'.format(me=material_efficiency, te=time_efficiency) if show_me_te else "",
                         status=blueprint_status if not (blueprint_status is None) else "",
-                        time=bpk_time_html
+                        time=bpk_time_html,
+                        overstock=market_overstock_html,
                     )
                 )
                 # если чертёж запущен в работу, то ограчиниваемся выводом его состояния добавив в строку с инфорацией
@@ -1837,6 +1848,8 @@ def __dump_blueprints_list_with_materials(
                         calc_materials_summary__obsolete(materials_list_with_efficiency, global_materials_used)
                         del materials_list_with_efficiency
                     # ---
+                    glf.write('</br></span>')  # qind-blueprints-?
+                elif overstock_in_market:
                     glf.write('</br></span>')  # qind-blueprints-?
                 elif activity_blueprint_materials is None:
                     something_else: bool = False
@@ -2242,6 +2255,7 @@ def __dump_corp_conveyors_stock_all(
 .label-not-enough { color: #fff; background-color: #f0ad4e; }
 .label-impossible { color: #fff; background-color: #d9534f; }
 .label-impossible-ntier { color: #fff; background-color: #e89694; }
+.label-overstock { color: # eee; background-color: #131313; }
 .label-not-available { color: #fff; background-color: #b7b7b7; }
 .text-material-industry-ntier { color: #aaa; }
 .text-material-buy-ntier { color: #a67877; }
