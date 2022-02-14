@@ -156,8 +156,9 @@ class ConveyorItem:
             raise Exception('Unable to get product quantity information')
         self.products_per_single_run = self.blueprint_activity_dict['products'][0]['quantity']
         # определяем какой группе принадлежит производимый продукт и корректируем использование чертежей
-        if self.market_group == 1870:  # Fuel Blocks -> Tatara
-            self.where = 'R'
+        # TODO: оформить это как настройку
+        # if self.market_group == 1870:  # Fuel Blocks -> Tatara
+        #     self.where = 'R'
 
     # получаем список работ, которые ведутся с этим материалом, а результаты сбрасываются в сток
     def setup_industry_jobs(
@@ -481,6 +482,7 @@ class ConveyorMaterials:
         not_enough_materials__market = []
         not_enough_materials__intermediate = []
         not_enough_materials__cycled = {'M': [], 'R': []}
+        not_enough_materials__again = {'M': []}
         # проверка наличия имеющихся ресурсов с учётом запаса в стоке
         # (эта версия расчётов конвейера в качестве "старта расчёта" имеет только manufacturing-план)
         if True:
@@ -513,7 +515,16 @@ class ConveyorMaterials:
         # На второй итерации все работы на Татаре рассчитываются аналогично тому, как это делалось на предыдущем шаге,
         # но расчёт продолжается до тех пор, пока не будут спланированы вообще все работы, потому как даже зависимое
         # производство Fuel-блоков выполняется на Татаре.
-        for where in ['M', 'R']:
+        # ---
+        # готовим итератор типов расчётов: 'A' - again, 'M' - manuf, 'R' - reaction
+        where = 'A'
+        while True:
+            if where == 'A':
+                where = 'M'
+            elif where == 'M':
+                where = 'R'
+            elif where == 'R':
+                break
             ntier: int = 0
             while not_enough_materials__cycled[where]:
                 # Расчёт списка материалов, предыдущего уровня вложенности (по информации о ресурсах, которых не
@@ -551,9 +562,16 @@ class ConveyorMaterials:
                         check_where_flag=False)
                 # далее подготавливаем список тех материалов, которые будут крафтиться на текущем типе станции
                 next_tier__plan = [make_m(m) for m in next_tier if m['w'] is None or m['w'] == where]
+                # в случае обработки reaction-списка  может быть повторно сформирован manufacturing-заказ (Fuel Blocks)
+                if where == 'R':
+                    manuf_again = [make_m(m) for m in next_tier if m['w'] == 'M']
+                    if manuf_again:
+                        self.calc_materials_summary(manuf_again, not_enough_materials__again['M'], check_where_flag=False)
+                        # вывод отладочной информации (временная мера для отслеживания справочников)
+                        if self.calc_run_debug:
+                            self.show_debug_list("#{}-{}{}'tier AGAIN at SOTIYO".format(self.calc_run_times, ntier + 1, where), manuf_again)
+                    del manuf_again
                 # уничтожаем список, чтобы случайно к нему не обратиться
-                if where == 'R' and [1 for m in next_tier if m['w'] == 'M']:
-                    raise Exception('Unable to apply manufacturing plan at station for reactions')
                 del next_tier
                 # uaem - used and exist materials
                 # подготовка списка недостающих материалов к следующей итерации этого цикла
@@ -610,11 +628,14 @@ class ConveyorMaterials:
                         not_enough_materials__cycled['R'],
                         check_where_flag=False)
                     # в этот список также войдёт содержимое initial-списка для reaction-производства, но без
-                    # вызова метода calc_materials_availability, ктоорый для initial-списка ранее уже вызывался
-                    self.calc_materials_summary(
-                        [make_m(m) for m in not_enough_materials__initial if m['w'] == 'R'],
-                        not_enough_materials__cycled['R'],
-                        check_where_flag=False)
+                    # вызова метода calc_materials_availability, который для initial-списка ранее уже вызывался
+                    if not_enough_materials__initial:
+                        # возможная ситуация, когда цикл проходит цепочкой: 'M', 'R', 'A' -> 'M', 'R' и в этой точке
+                        # можно оказаться повторно (исключаем подобное)
+                        self.calc_materials_summary(
+                            [make_m(m) for m in not_enough_materials__initial if m['w'] == 'R'],
+                            not_enough_materials__cycled['R'],
+                            check_where_flag=False)
                     # сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
                     cnem = [m for m in cnem if self.get(m['id']).blueprint_type_id is not None]
                     if cnem:
@@ -626,7 +647,49 @@ class ConveyorMaterials:
                 # стартовых потребностей)
                 del uaem
                 del cnem
-                del not_enough_materials__initial
+                not_enough_materials__initial.clear()
+            # --
+            # На втором запуске цикла reaction-производства могут быть снова получены материалы manufacture-производства
+            # (например Fuel Blocks) надо зарегистрировать эти требования с помощью calc_materials_availability и
+            # повторить итерацию с where='A'
+            elif where == 'R':
+                if not not_enough_materials__again['M']:
+                    continue
+                # - uaem : used and exist materials
+                # - cnem : current not enough materials
+                # - not_enough_materials__again['M'] : составлен в ходе планирования reaction-работ, расчёт
+                #   достаточного кол-ва этих материалов надо провести на станке реакций (Татара, а не Сотия)
+                # подготовка списка недостающих материалов к текущей итерации этого цикла
+                (uaem, cnem) = self.calc_materials_availability(
+                    not_enough_materials__again['M'],
+                    'R')
+                # сохраняем в промежуточный список материалы, которые уже есть в стоке
+                if uaem:
+                    self.calc_materials_summary(uaem, used_and_exist_materials)
+                # если всех материалов в стоке достаточно, то выходим; иначе продолжаем вычислять
+                # производственные цепочки
+                if cnem:
+                    # заново компонуем cycled-список для manufacture-производства (и ранее уничтоженный reaction)
+                    not_enough_materials__cycled = {'M': [], 'R': []}
+                    cnem = [make_m(m) for m in cnem]
+                    self.calc_materials_summary(
+                        cnem,
+                        not_enough_materials__cycled['M'],
+                        check_where_flag=False)
+                    # сохраняем информацию о недостающих материалах текущего (промежуточного) уровня вложенности
+                    cnem = [m for m in cnem if self.get(m['id']).blueprint_type_id is not None]
+                    if cnem:
+                        self.calc_materials_summary(
+                            cnem,
+                            not_enough_materials__intermediate,
+                            check_where_flag=False)
+                    # итератор цикла устанавливаем в начальную позицию where=again
+                    where = 'A'
+                # уничтожаем списки, чтобы случайно к ним не обратиться (в т.ч. более ненужный список
+                # стартовых потребностей)
+                del uaem
+                del cnem
+                not_enough_materials__again['M'].clear()
 
 
 # ConveyorReference - долговременный справочник материала конвейера, хранится долго и накапливает информацию из
