@@ -606,14 +606,16 @@ def __build_industry_jobs_stat(
         if __activity_id == 8:
             continue
         # получаем информацию о работе и делаем вывод о продукте, который будет получен в результате
-        __product_type_id, __quantity, __dummy1 = eve_sde_tools.get_product_by_blueprint_type_id(
+        __products = eve_sde_tools.get_products_by_blueprint_type_id(
             __blueprint_type_id,
             __activity_id,
             sde_bp_materials)
         # пропускаем me, te, copying и проч. работы, продукты которых не приводят к получению продуктов
         # которые можно посчитать
-        if __product_type_id is None:
+        if not __products or len(__products) > 1:
             continue
+        __product_type_id: int = int(__products[0][0])
+        __quantity: int = int(__products[0][1])
         __type_dict = sde_type_ids.get(str(__product_type_id))
         # рассчитываем стоимость продукта
         __price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(__product_type_id)), None)
