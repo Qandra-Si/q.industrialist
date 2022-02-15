@@ -2427,7 +2427,8 @@ class QSwaggerInterface:
             # не передаётся: " sdet_base_price,"
             " sdet_published,"
             " sdet_market_group_id,"
-            " sdet_meta_group_id,"
+            # не передаётся: " sdet_meta_group_id,"  # этот параметр получаем из sde (esi его не выдаёт)
+            " sdet_tech_level,"  # этот параметр получаем только по esi (из sde его надо читать из атрибутов)
             " sdet_icon_id,"
             " sdet_packaged_volume,"
             " sdet_created_at) "
@@ -2440,7 +2441,8 @@ class QSwaggerInterface:
             # не передаётся: " %(bp)s,"
             " %(p)s,"
             " %(mkg)s,"
-            " %(mtg)s,"
+            # не передаётся: " %(mtg)s,"  # этот параметр получаем из sde (esi его не выдаёт)
+            " %(tl)s,"
             " %(i)s,"
             " %(pv)s,"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
@@ -2451,7 +2453,8 @@ class QSwaggerInterface:
             " sdet_capacity=%(c)s,"
             " sdet_published=%(p)s,"
             " sdet_market_group_id=%(mkg)s,"
-            " sdet_meta_group_id=%(mtg)s,"
+            # " sdet_meta_group_id=%(mtg)s,"  # этот параметр получаем из sde (esi его не выдаёт)
+            " sdet_tech_level=%(tl)s,"
             " sdet_icon_id=%(i)s,"
             " sdet_packaged_volume=%(pv)s;",
             {'t': type_id,
@@ -2462,7 +2465,7 @@ class QSwaggerInterface:
              # не передаётся: 'bp': None,
              'p': data['published'],
              'mkg': data.get('market_group_id', None),
-             'mtg': next((x['value'] for x in data.get('dogma_attributes', []) if x['attribute_id'] == 422), None),
+             'tl': next((x['value'] for x in data.get('dogma_attributes', []) if x['attribute_id'] == 422), None),
              'i': data.get('icon_id', None),
              'pv': data.get('packaged_volume', None),
              'at': updated_at

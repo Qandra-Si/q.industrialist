@@ -46,7 +46,7 @@ function __dump_new_items_tree(&$new_items) { ?>
             // item info
             $item_type_id = $itm['tid'];
             $item_name = $itm['name'];
-            $item_meta = $itm['meta'];
+            $item_tech = $itm['tech'];
 
             if ($prev_market_group != $market_group_name)
             {
@@ -76,7 +76,7 @@ function __dump_new_items_tree(&$new_items) { ?>
             ?>
 <tr>
  <td><img class="icn32" src="<?=__get_img_src($item_type_id,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$item_name?><br><span class="text-muted"><?=$item_type_id?></span><?php if (!is_null($item_meta) && ($item_meta != 1)) { ?><span class="label label-warning">meta <?=$$item_meta?></span><?php } ?></td>
+ <td><?=$item_name?><br><span class="text-muted"><?=$item_type_id?></span><?php if (!is_null($item_tech) && ($item_tech != 1)) { ?><span class="label label-warning">tech <?=$$item_tech?></span><?php } ?></td>
  <td><?=$itm['at']?></td>
  <td><?=($itm['pub'] == 't')?"yes":"no"?></td>
  <td><?=$itm['pv']?></td>
@@ -107,7 +107,7 @@ select
   rrr.id as mgi, -- market group id
   x.tid, -- type id
   x.name, -- name
-  x.meta, -- meta group id
+  x.tech, -- tech-level
   x.pub, -- published
   x.pv, -- packed volume
   x.at, -- date added
@@ -155,7 +155,7 @@ from (
     sdet_type_name as name,
     sdet_published as pub,
     coalesce(sdet_market_group_id,-1) as mg,
-    sdet_meta_group_id as meta,
+    sdet_tech_level as tech,
     sdet_packaged_volume as pv,
     sdet_created_at::date as at
    from eve_sde_type_ids

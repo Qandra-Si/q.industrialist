@@ -301,6 +301,7 @@ CREATE TABLE qi.eve_sde_type_ids
     sdet_published BOOLEAN,
     sdet_market_group_id INTEGER,
     sdet_meta_group_id SMALLINT,
+    sdet_tech_level SMALLINT,
     sdet_icon_id INTEGER,
     -- sdet_portion_size INTEGER,
     sdet_packaged_volume DOUBLE PRECISION,
@@ -316,6 +317,10 @@ CREATE TABLE qi.eve_sde_type_ids
         ON DELETE NO ACTION
 )
 TABLESPACE pg_default;
+
+COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_meta_group_id IS 'meta-группа, получаем из sde';
+COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_tech_level IS 'технологический уровень 1..5, получаем из esi';
+COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_packaged_volume IS 'm3 в упакованном виде, получаем из esi';
 
 ALTER TABLE qi.eve_sde_type_ids OWNER TO qi_user;
 

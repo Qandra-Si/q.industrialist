@@ -55,6 +55,7 @@ class QSwaggerTranslator:
             " sdet_base_price,"
             " sdet_market_group_id,"
             " sdet_meta_group_id,"
+            " sdet_tech_level,"
             " sdet_icon_id,"
             " sdet_packaged_volume "
             "FROM eve_sde_type_ids "
