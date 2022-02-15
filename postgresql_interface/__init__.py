@@ -9,4 +9,4 @@ from .db_swagger_cache import *  # noqa
 from .db_swagger_translator import QSwaggerTranslator  # noqa
 from .db_swagger_dictionary import QSwaggerDictionary
 
-__version__ = '0.10.0'
+__version__ = '0.10.1'

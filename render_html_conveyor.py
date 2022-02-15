@@ -114,6 +114,7 @@ def get_industry_activity_details(
         # Добавляем декрипторы (замечения и ограничения):
         # - всегда все хулы запускаются с декриптором Accelerant Decryptor
         # - всегда все риги запускаются с декриптором Symmetry Decryptor
+        # - всегда все T3 технологии запускаются с декриптором Parity Decryptor
         # - всегда все модули запускаются без декрипторов
         # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
         # в 3 и выше. Если ваши скилы меньше - лучше запускайте ресерч или ждите задач по копирке. Будьте
@@ -124,6 +125,12 @@ def get_industry_activity_details(
                 activity_blueprint_materials.append({'quantity': 1, 'typeID': 34201})  # Accelerant Decryptor
             elif 943 in groups_chain:  # Ship Modifications
                 activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
+            elif 1909 in groups_chain:  # Ancient Relics
+                """ вот так можно проверить чертёж для T3-хулов:
+                type_dict = sde_type_ids.get(str(blueprint_type_id)) :
+                if type_dict.get("groupID", -1) == 997: ... # Hull
+                """
+                activity_blueprint_materials.append({'quantity': 1, 'typeID': 34204})  # Parity Decryptor
     # ---
     del activity_dict
     return activity_time, activity_blueprint_materials
@@ -490,8 +497,12 @@ def __dump_not_available_materials_list_rows(
             # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
             if not group_diplayed:
                 group_dict = in_cache.basis_market_group_dict
-                __grp_name = group_dict["nameID"]["en"]
-                __icon_id = group_dict.get("iconID", 0)
+                if not group_dict:
+                    __grp_name = "Unknown"
+                    __icon_id = 0
+                else:
+                    __grp_name = group_dict["nameID"]["en"]
+                    __icon_id = group_dict.get("iconID", 0)
                 # подготовка элементов управления копирования данных в clipboard
                 __copy2clpbrd = '' if not with_copy_to_clipboard__blueprints else \
                     '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
@@ -720,10 +731,11 @@ def __dump_not_available_materials_list(
         if group_with_are_enough__initial:
             glf.write('<div class="qind-em hidden">')
         glf.write("""
-<h4 class="text-primary">End-level manufacturing</h4>
-<div class="table-responsive">
-<table class="table table-condensed table-hover qind-end-level-manuf qind-table-materials">
- <tbody>
+<div class="qind-endlvl-manuf-block">
+ <h4 class="text-primary">End-level manufacturing</h4>
+ <div class="table-responsive">
+  <table class="table table-condensed table-hover qind-end-level-manuf qind-table-materials">
+  <tbody>
 """)
         __dump_not_available_materials_list_rows(
             glf,
@@ -742,9 +754,10 @@ def __dump_not_available_materials_list(
             with_copy_to_clipboard,
             {'runs', 'planned', 'consumed', 'exist', 'progress'})
         glf.write("""
- </tbody>
-</table>
+  </tbody>
+  </table>
  </div>
+</div> <!-- qind-endlvl-manuf-block -->
 """)
         if group_with_are_enough__initial:
             glf.write('</div>')
@@ -754,10 +767,11 @@ def __dump_not_available_materials_list(
         if group_with_are_enough__market:
             glf.write('<div class="qind-em hidden">')
         glf.write("""
-<h4 class="text-primary">Entry-level purchasing</h4>
-<div class="table-responsive">
-<table class="table table-condensed table-hover qind-entry-level-purch qind-table-materials">
- <tbody>
+<div class="qind-entry-purch-block hidden">
+ <h4 class="text-primary">Entry-level purchasing</h4>
+ <div class="table-responsive">
+  <table class="table table-condensed table-hover qind-entry-level-purch qind-table-materials">
+  <tbody>
 """)
         __dump_not_available_materials_list_rows(
             glf,
@@ -776,9 +790,10 @@ def __dump_not_available_materials_list(
             with_copy_to_clipboard,
             {'planned', 'exist'})
         glf.write("""
- </tbody>
-</table>
-</div>
+  </tbody>
+  </table>
+ </div>
+</div> <!-- qind-entry-purch-block -->
 """)
         if group_with_are_enough__market:
             glf.write('</div')
@@ -788,10 +803,11 @@ def __dump_not_available_materials_list(
         if group_with_are_enough__intermediate:
             glf.write('<div class="qind-em hidden">')
         glf.write("""
-<h4 class="text-primary">Intermediate manufacturing</h4>
-<div class="table-responsive">
-<table class="table table-condensed table-hover qind-intermediate-manuf qind-table-materials">
- <tbody>
+<div class="qind-interm-manuf-block">
+ <h4 class="text-primary">Intermediate manufacturing</h4>
+ <div class="table-responsive">
+  <table class="table table-condensed table-hover qind-intermediate-manuf qind-table-materials">
+  <tbody>
 """)
         # поиск и вывод групп, которым принадлежат материалы, которых не хватает для завершения производства по списку
         # чертеже в этом контейнере (планетарка отдельно, композиты отдельно, запуск работ отдельно)
@@ -812,9 +828,10 @@ def __dump_not_available_materials_list(
             with_copy_to_clipboard,
             {'runs', 'planned', 'consumed', 'exist', 'progress'})
         glf.write("""
- </tbody>
-</table>
-</div>
+  </tbody>
+  </table>
+ </div>
+</div> <!-- qind-interm-manuf-block -->
 """)
         if group_with_are_enough__intermediate:
             glf.write('</div>')
@@ -935,7 +952,7 @@ def __dump_blueprints_list_with_materials(
     blueprint_station_ids = [conveyor_entity["station_id"]]
     react_stock_all_loc_ids = set([int(ces["id"]) for ces in conveyor_entity["react_stock"]])
     react_station_ids = set([int(ces["loc"]["station_id"]) for ces in conveyor_entity["react_stock"]])
-    products_to_exclude: typing.List[int] = conveyor_entity.get('products_to_exclude', [])
+    products_to_exclude: typing.Set[int] = set(conveyor_entity.get('products_to_exclude', []))
     # инициализация списка материалов, которых не хватает в производстве
     stock_not_enough_materials = []
     # формирование списка ресурсов, которые используются в производстве
@@ -1048,9 +1065,30 @@ def __dump_blueprints_list_with_materials(
                          'research_time' in manufacturing_activities
             # ---
             overstock_in_market: bool = False
-            if products_to_exclude and ('manufacturing' in manufacturing_activities):
-                product_id, product_quantity, product_materials = eve_sde_tools.get_product_by_blueprint_type_id(type_id, 1, sde_bp_materials)
-                overstock_in_market = product_id in products_to_exclude
+            overstocked_invent_ids: typing.List[int] = []
+            if products_to_exclude:
+                if 'manufacturing' in manufacturing_activities:
+                    product_ids = eve_sde_tools.get_products_by_blueprint_type_id(type_id, 1, sde_bp_materials)
+                    if product_ids:
+                        p2e: typing.Set[int] = set([p[0] for p in product_ids])
+                        overstock_in_market = len(products_to_exclude.intersection(p2e)) > 0
+                        del p2e
+                        del product_ids
+                elif 'invention' in manufacturing_activities:
+                    product_ids = eve_sde_tools.get_products_by_blueprint_type_id(type_id, 8, sde_bp_materials)
+                    if product_ids:  # м.б. None
+                        p2e: typing.List[int] = [p[0] for p in product_ids]
+                        for p2e_id in p2e:  # идентификаторы чертежей -> преобразуем в идентификаторы продуктов
+                            p3e = eve_sde_tools.get_products_by_blueprint_type_id(p2e_id, 1, sde_bp_materials)
+                            if p3e:  # м.б. None
+                                p4e: typing.Set[int] = set([p[0] for p in p3e])
+                                if len(products_to_exclude.intersection(p4e)) > 0:
+                                    overstocked_invent_ids.append(p2e_id)
+                                del p4e
+                                del p3e
+                        overstock_in_market = len(overstocked_invent_ids) == len(product_ids)
+                        del p2e
+                        del product_ids
             # ---
             max_activity_time = None  # "огрызков" чертежей с малым кол-вом ранов как правило меньше
             bp_keys = __bp2[type_id].keys()
@@ -1091,9 +1129,10 @@ def __dump_blueprints_list_with_materials(
                 time_efficiency = bp["te"]
                 blueprint_status = bp["st"]
                 # ---
-                stat__all_blueprints += quantity_or_runs  # эт д.б. не раны, а кол-во чертежей в статистике
-                stat__runned_blueprints += (quantity_or_runs if blueprint_status is not None else 0)
-                stat__overstocked_blueprints += (quantity_or_runs if blueprint_status is None and overstock_in_market else 0)
+                stat__count_blueprints = len(bp["itm"])
+                stat__all_blueprints += stat__count_blueprints  # эт д.б. не раны, а кол-во чертежей в статистике
+                stat__runned_blueprints += (stat__count_blueprints if blueprint_status is not None else 0)
+                stat__overstocked_blueprints += (stat__count_blueprints if blueprint_status is None and overstock_in_market else 0)
                 # ---
                 market_overstock_html = ''
                 if blueprint_status is None and overstock_in_market:
@@ -1215,7 +1254,7 @@ def __dump_blueprints_list_with_materials(
                     if something_else:
                         glf.write('&nbsp;<span class="label label-warning">{} impossible</span>'.format(",".join(manufacturing_activities)))
                     else:
-                        stat__runnable_blueprints += quantity_or_runs
+                        stat__runnable_blueprints += stat__count_blueprints
                         if enable_copy_to_clipboard:
                             glf.write(
                                 '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn"'
@@ -1231,6 +1270,12 @@ def __dump_blueprints_list_with_materials(
                             ' data-toggle="tooltip">{gly}</a>'.
                             format(tid=type_id, gly=glyphicon("copy"))
                         )
+                    if overstocked_invent_ids:
+                        for o in overstocked_invent_ids:
+                            glf.write(
+                                '&nbsp;<span class="label label-invent-overstocked">{}</span>'.
+                                format(eve_sde_tools.get_item_name_by_type_id(sde_type_ids, o))
+                            )
                     glf.write('</br></span>')  # qind-blueprints-?
 
                     # расчёт материалов по информации о чертеже с учётом ME
@@ -1256,7 +1301,7 @@ def __dump_blueprints_list_with_materials(
                         stock_resources,
                         {})
                     if not not_enough_materials:
-                        stat__runnable_blueprints += quantity_or_runs
+                        stat__runnable_blueprints += stat__count_blueprints
 
                     # вывод наименования ресурсов (материалов)
                     glf.write('<div class="qind-materials-used qind-tid hiddend">\n')  # div(materials)
@@ -1396,8 +1441,6 @@ def __dump_blueprints_list_with_materials(
 """)
 
         # отображение в отчёте summary-информации по недостающим материалам
-        __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', 'qind-materials-used hidden', materials_used, True, True)
-        __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', 'qind-summary-block hidden', materials_summary, False, True)
         # построение справочника материалов, используемых в производстве и производство которых предполагается
         conveyor_materials = eve_conveyor_tools.ConveyorMaterials(
             # sde данные, загруженные из .converted_xxx.json файлов
@@ -1441,7 +1484,7 @@ def __dump_blueprints_list_with_materials(
 """)
         if stat__all_blueprints == stat__runned_blueprints:
             glf.write(
-                "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('{all} in progress'); "
+                "<script> $(document).ready(function(){{ var el=$('#rnblB{id}'); el.html('all of {all} in progress'); "
                 "el.parent().css('background-color', '#337ab7'); }});</script>".
                 format(id=loc_id, all=stat__all_blueprints))
         elif stat__all_blueprints == (stat__overstocked_blueprints + stat__runned_blueprints):
@@ -1631,6 +1674,7 @@ def __dump_corp_conveyors_stock_all(
 .label-impossible { color: #fff; background-color: #d9534f; }
 .label-impossible-ntier { color: #fff; background-color: #e89694; }
 .label-overstock { color: # eee; background-color: #131313; }
+.label-invent-overstocked { color: # eee; background-color: #131313; }
 .label-not-available { color: #fff; background-color: #b7b7b7; }
 .text-material-industry-ntier { color: #aaa; }
 .text-material-buy-ntier { color: #a67877; }
@@ -1797,8 +1841,10 @@ tr.qind-em th
        <li><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleUsedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUsedMaterials"></span> Show used materials</a></li>
-       <li><a id="btnToggleSummary" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowSummary"></span> Show summary materials</a></li>
        <li><a id="btnToggleNotAvailable" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowNotAvailable"></span> Show not available materials</a></li>
+       <li><a id="btnToggleEndLevelManuf" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowEndLevelManuf"></span> Show end-level manufacturing</a></li>
+       <li><a id="btnToggleEntryLevelPurchasing" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowManufIntermediate"></span> Show entry-level purchasing</a></li>
+       <li><a id="btnToggleIntermediateManuf" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowIntermediateManuf"></span> Show intermediate manufacturing</a></li>
        <li><a id="btnToggleAssetsMovement" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAssetsMovement"></span> Show list of assets movement</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleRecommendedRuns" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowRecommendedRuns"></span> Show recommended runs</a></li>
@@ -1882,9 +1928,7 @@ tr.qind-em th
         if corp_conveyors["corp_conveyour_entities"]:
             glf.write("<div>")  # <h3>Summary</h3>
 
-            # Внимание! нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
-            __dump_materials_list(glf, 'glyphicon-info-sign', 'Used materials in progress', 'qind-materials-used hidden', global_materials_used, True, True)
-            __dump_materials_list(glf, 'glyphicon-question-sign', 'Summary materials', 'qind-summary-block hidden', global_materials_summary, False, True)
+            # TODO: нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
 
             # получение списков контейнеров и станок из экземпляра контейнера
             global_stock_all_loc_ids = []
@@ -2066,8 +2110,10 @@ function getSdeItemName(t) {
   // Conveyor Options storage (init)
   function resetOptionsMenuToDefault() {
     resetOptionToDefault('Show Legend', 0);
-    resetOptionToDefault('Show Summary', 0);
     resetOptionToDefault('Show Not Available', 1);
+    resetOptionToDefault('Show End Level Manuf', 1);
+    resetOptionToDefault('Show Entry Level Purchasing', 0);
+    resetOptionToDefault('Show Intermediate Manuf', 1);
     resetOptionToDefault('Show Assets Movement', 0);
     resetOptionToDefault('Show Impossible', 1);
     resetOptionToDefault('Show Active', 1);
@@ -2082,8 +2128,10 @@ function getSdeItemName(t) {
   // Conveyor Options storage (rebuild menu components)
   function rebuildOptionsMenu() {
     displayOptionInMenu('Show Legend', $('#imgShowLegend'));
-    displayOptionInMenu('Show Summary', $('#imgShowSummary'));
     displayOptionInMenu('Show Not Available', $('#imgShowNotAvailable'));
+    displayOptionInMenu('Show End Level Manuf', $('#imgShowEndLevelManuf'));
+    displayOptionInMenu('Show Entry Level Purchasing', $('#imgShowManufIntermediate'));
+    displayOptionInMenu('Show Intermediate Manuf', $('#imgShowIntermediateManuf'));
     displayOptionInMenu('Show Assets Movement', $('#imgShowAssetsMovement'));
     displayOptionInMenu('Show Impossible', $('#imgShowImpossible'));
     displayOptionInMenu('Show Active', $('#imgShowActive'));
@@ -2184,17 +2232,35 @@ function getSdeItemName(t) {
       return _res;
     }).appendTo(tbody);
   }
-  // Conveyor Options applier
+  // Conveyor Options applier (by value)
+  function applyOptionVal(show, selector) {
+    $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
+  }
+  // Conveyor Options applier (by name)
   function applyOption(option, selector) {
     show = ls.getItem(option);
-    $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
+    applyOptionVal(show, selector);
   }
   // Conveyor Options storage (rebuild body components)
   function rebuildBody() {
-    applyOption('Show Legend', '#legend-block');
-    applyOption('Show Summary', 'div.qind-summary-block');
-    applyOption('Show Not Available', 'div.qind-not-available-block');
-    applyOption('Show Assets Movement', 'div.qind-assets-move-block');
+    show_not_avail = ls.getItem('Show Not Available');
+    show_endlvl_manuf = ls.getItem('Show End Level Manuf');
+    show_entry_purch = ls.getItem('Show Entry Level Purchasing');
+    show_interm_manuf = ls.getItem('Show Intermediate Manuf');
+    if ((show_not_avail==1) && ((show_endlvl_manuf==1) || (show_entry_purch==1) || (show_interm_manuf==1))) {
+      applyOptionVal(1, 'div.qind-not-available-block');
+      applyOptionVal(show_endlvl_manuf,'div.qind-endlvl-manuf-block');
+      applyOptionVal(show_entry_purch, 'div.qind-entry-purch-block');
+      applyOptionVal(show_interm_manuf, 'div.qind-interm-manuf-block');
+      $('#btnToggleEndLevelManuf').parent().removeClass('disabled');
+      $('#btnToggleEntryLevelPurchasing').parent().removeClass('disabled');
+      $('#btnToggleIntermediateManuf').parent().removeClass('disabled');
+    } else {
+      applyOptionVal(0, 'div.qind-not-available-block');
+      $('#btnToggleEndLevelManuf').parent().addClass('disabled');
+      $('#btnToggleEntryLevelPurchasing').parent().addClass('disabled');
+      $('#btnToggleIntermediateManuf').parent().addClass('disabled');
+    }
     //-
     show_impossible = ls.getItem('Show Impossible');
     show_active = ls.getItem('Show Active');
@@ -2205,6 +2271,7 @@ function getSdeItemName(t) {
       $('div.media').each(function() { toggleMediaVisibility($(this), show_impossible, show_active); })
     }
     //-
+    applyOption('Show Assets Movement', 'div.qind-assets-move-block');
     applyOption('Show Used Materials', '.qind-materials-used');
     applyOption('Show Exist In Stock', '.qind-me');
     applyOption('Show Planned Materials', '.qind-mp');
@@ -2212,6 +2279,7 @@ function getSdeItemName(t) {
     applyOption('Show Recommended Runs', '.qind-rr');
     applyOption('Show In Progress', '.qind-ip');
     applyOption('Show Enough Materials', '.qind-em');
+    applyOption('Show Legend', '#legend-block');
     //-
     sort_by = ls.getItem('Sort By');
     sort_by = (sort_by === null) ? 0 : sort_by;
@@ -2341,8 +2409,10 @@ function getSdeItemName(t) {
   }
   $(document).ready(function(){
     $('#btnToggleLegend').on('click', function () { toggleMenuOption('Show Legend'); });
-    $('#btnToggleSummary').on('click', function () { toggleMenuOption('Show Summary'); });
     $('#btnToggleNotAvailable').on('click', function () { toggleMenuOption('Show Not Available'); });
+    $('#btnToggleEndLevelManuf').on('click', function () { toggleMenuOption('Show End Level Manuf'); });
+    $('#btnToggleEntryLevelPurchasing').on('click', function () { toggleMenuOption('Show Entry Level Purchasing'); });
+    $('#btnToggleIntermediateManuf').on('click', function () { toggleMenuOption('Show Intermediate Manuf'); });
     $('#btnToggleAssetsMovement').on('click', function () { toggleMenuOption('Show Assets Movement'); });
     $('#btnToggleImpossible').on('click', function () { toggleMenuOption('Show Impossible'); });
     $('#btnToggleActive').on('click', function () { toggleMenuOption('Show Active'); });
