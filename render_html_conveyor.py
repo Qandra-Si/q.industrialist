@@ -793,6 +793,7 @@ def get_industry_activity_details(
         # Добавляем декрипторы (замечения и ограничения):
         # - всегда все хулы запускаются с декриптором Accelerant Decryptor
         # - всегда все риги запускаются с декриптором Symmetry Decryptor
+        # - всегда все T3 технологии запускаются с декриптором Parity Decryptor
         # - всегда все модули запускаются без декрипторов
         # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
         # в 3 и выше. Если ваши скилы меньше - лучше запускайте ресерч или ждите задач по копирке. Будьте
@@ -803,6 +804,12 @@ def get_industry_activity_details(
                 activity_blueprint_materials.append({'quantity': 1, 'typeID': 34201})  # Accelerant Decryptor
             elif 943 in groups_chain:  # Ship Modifications
                 activity_blueprint_materials.append({'quantity': 1, 'typeID': 34206})  # Symmetry Decryptor
+            elif 1909 in groups_chain:  # Ancient Relics
+                """ вот так можно проверить чертёж для T3-хулов:
+                type_dict = sde_type_ids.get(str(blueprint_type_id)) :
+                if type_dict.get("groupID", -1) == 997: ... # Hull
+                """
+                activity_blueprint_materials.append({'quantity': 1, 'typeID': 34204})  # Parity Decryptor
     # ---
     del activity_dict
     return activity_time, activity_blueprint_materials
