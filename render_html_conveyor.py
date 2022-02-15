@@ -1169,8 +1169,12 @@ def __dump_not_available_materials_list_rows(
             # выводим название группы материалов (Ship Equipment, Materials, Components, ...)
             if not group_diplayed:
                 group_dict = in_cache.basis_market_group_dict
-                __grp_name = group_dict["nameID"]["en"]
-                __icon_id = group_dict.get("iconID", 0)
+                if not group_dict:
+                    __grp_name = "Unknown"
+                    __icon_id = 0
+                else:
+                    __grp_name = group_dict["nameID"]["en"]
+                    __icon_id = group_dict.get("iconID", 0)
                 # подготовка элементов управления копирования данных в clipboard
                 __copy2clpbrd = '' if not with_copy_to_clipboard__blueprints else \
                     '&nbsp;<a data-target="#" role="button" class="qind-copy-btn" data-source="table"' \
