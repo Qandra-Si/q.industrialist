@@ -47,12 +47,15 @@ class ConveyorSettings:
         self.activities: typing.List[str] = ['manufacturing']
         self.conveyor_with_reactions: bool = False
         # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
-        self.containers_blueprints: typing.List[int] = []
+        self.containers_source: typing.List[int] = []
         self.containers_stock: typing.List[int] = []
-        self.containers_exclude: typing.List[int] = []
+        self.containers_blueprints: typing.List[int] = []
         self.containers_react_formulas: typing.List[int] = []
         self.containers_react_stock: typing.List[int] = []
         self.manufacturing_groups: typing.Optional[typing.List[int]] = []
+        # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу произвдства)
+        self.trade_corporation_id: typing.Optional[int] = None
+        self.trade_sale_stock: typing.List[int, int] = []
 
 
 def main():
@@ -104,9 +107,9 @@ def main():
         if not entity.get('enabled', False) or not entity.get('conveyors'):
             continue
         # собираем список корпораций к которым относятся настройки
-        corporation_name: str = entity.get('corporation')
-        if corporation_name:
-            corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(corporation_name)
+        industry_corporation_name: str = entity.get('corporation')
+        if industry_corporation_name:
+            corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(industry_corporation_name)
             if not corporation:
                 continue
             corporation_ids: typing.List[int] = [corporation.corporation_id]
@@ -114,7 +117,7 @@ def main():
             corporation_ids: typing.List[int] = [corporation_id for corporation_id in qid.corporations.keys()]
         # собираем списки контейнеров, к которым относятся настройки
         for conveyor in entity['conveyors']:
-            # пропускаем некорректные настройки (не зависят от корпорации, просто правильность синтаксиса настроек)
+            # пропускаем некорректные настройки (просто правильность синтаксиса настроек)
             if not conveyor.get('blueprints'):
                 continue
             if conveyor.get('reactions') and not conveyor['reactions'].get('formulas'):
@@ -140,41 +143,98 @@ def main():
                     container_name: str = container.name
                     if not container_name:
                         continue
+                    container_hangar: str = container.location_flag
+                    if container_hangar[:-1] != 'CorpSAG':
+                        continue
+                    # определяем признаки категорий, к которым принадлежала коробка
+                    source_box: bool = False
+                    stock_box: bool = False
+                    formulas_box: bool = False
                     # превращаем названия (шаблоны названий) в номера контейнеров
                     if next((1 for tmplt in conveyor['blueprints'] if re.search(tmplt, container_name)), None):
-                        settings.containers_blueprints.append(container_id)
+                        settings.containers_source.append(container_id)
+                        source_box = True
                         if settings.same_stock_container:
                             settings.containers_stock.append(container_id)
+                            stock_box = True
                     if not settings.same_stock_container:
                         if next((1 for tmplt in conveyor['stock'] if re.search(tmplt, container_name)), None):
-                            settings.containers_blueprints.append(container_id)
+                            settings.containers_stock.append(container_id)
+                            stock_box = True
+                    # if next((0 for tmplt in conveyor['blueprints'] if re.search(tmplt, container_name)), 1):
                     # получаем информацию по реакциям (если включены)
                     if settings.conveyor_with_reactions:
                         if next((1 for tmplt in conveyor['reactions']['formulas'] if re.search(tmplt, container_name)), None):
                             settings.containers_react_formulas.append(container_id)
+                            formulas_box = True
                         if 'stock' in conveyor['reactions']:
                             if next((1 for tmplt in conveyor['reactions']['stock'] if re.search(tmplt, container_name)), None):
                                 settings.containers_react_stock.append(container_id)
+                                stock_box = True
+                    # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например сток T1)
+                    if 'manufacturing' in settings.activities:
+                        blueprints_box: bool = True
+                        if source_box or stock_box or formulas_box:
+                            blueprints_box = False
+                        else:
+                            if conveyor.get('exclude_hangars') and int(container_hangar[-1:]) in conveyor['exclude_hangars']:
+                                blueprints_box = False
+                            if conveyor.get('exclude'):
+                                if next((1 for tmplt in conveyor['exclude'] if re.search(tmplt, container_name)), None):
+                                    blueprints_box = False
+                        if blueprints_box:
+                            settings.containers_blueprints.append(container_id)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
-                if not settings.containers_blueprints:
+                if not settings.containers_source:
                     continue
+                # уточняем настройки поведения конвейера (секция behavior)
+                if 'behavior' in conveyor:
+                    behavior_market = conveyor['behavior'].get('market')
+                    if behavior_market:
+                        # пропускаем некорректные настройки (просто правильность синтаксиса настроек)
+                        trade_corporation_name: str = behavior_market.get('corporation')
+                        if not trade_corporation_name:
+                            continue
+                        # поиск корпорации, которая торгует (видимо в Jita? но это не обязательно)
+                        trade_corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(trade_corporation_name)
+                        if trade_corporation:
+                            settings.trade_corporation_id = trade_corporation.corporation_id
+                            for container_id in trade_corporation.container_ids:
+                                container: db.QSwaggerCorporationAssetsItem = trade_corporation.assets.get(container_id)
+                                if not container:
+                                    continue
+                                container_name: str = container.name
+                                if not container_name:
+                                    continue
+                                container_hangar: str = container.location_flag
+                                if container_hangar[:-1] != 'CorpSAG':
+                                    continue
+                                # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
+                                if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
+                                    settings.trade_sale_stock.append(container_id)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
     # вывод на экран того, что получилось
-    for (idx, s) in enumerate(settings_of_conveyors):
+    for (idx, __s) in enumerate(settings_of_conveyors):
+        s: ConveyorSettings = __s
         corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
+        trade_corporation: typing.Optional[db.QSwaggerCorporation] = qid.get_corporation(s.trade_corporation_id) if s.trade_corporation_id else None
         if idx > 0:
             print()
-        print('corporation: ', corporation.corporation_name)
-        print('activities:  ', s.activities)
-        print('blueprints:  ', [corporation.assets.get(x).name for x in s.containers_blueprints])
-        print('stock:       ', [corporation.assets.get(x).name for x in s.containers_stock])
-        print('exclude:     ', [corporation.assets.get(x).name for x in s.containers_exclude])
+        print('industry corp: ', corporation.corporation_name)
+        print('activities:    ', ','.join(s.activities))
+        print('source:        ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_source], key=lambda x: x)))
+        print('stock:         ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_stock], key=lambda x: x)))
+        if 'manufacturing' in s.activities:
+            print('blueprints:    ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_blueprints], key=lambda x: x)))
         if s.fixed_number_of_runs is not None:
-            print('fixed runs:  ', s.fixed_number_of_runs)
+            print('fixed runs:    ', s.fixed_number_of_runs)
         if s.conveyor_with_reactions:
-            print('formulas:    ', [corporation.assets.get(x).name for x in s.containers_react_formulas])
-            print('react stock: ', [corporation.assets.get(x).name for x in s.containers_react_stock])
+            print('formulas:      ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_formulas], key=lambda x: x)))
+            print('react stock:   ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_stock], key=lambda x: x)))
+        if trade_corporation:
+            print('trader corp:   ', trade_corporation.corporation_name)
+            print('sale stock:    ', ';'.join(sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x)))
     # ---
     del qid
 
