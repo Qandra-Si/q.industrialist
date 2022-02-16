@@ -1504,7 +1504,7 @@ def __dump_not_available_materials_list(
 </div> <!-- qind-entry-purch-block -->
 """)
         if group_with_are_enough__market:
-            glf.write('</div')
+            glf.write('</div>')
     del not_enough_materials__market
 
     if not_enough_materials__intermediate:
@@ -1676,7 +1676,7 @@ def __dump_blueprints_list_with_materials(
             '   <h4 class="panel-title">\n'
             '    <a role="button" data-toggle="collapse" data-parent="#accordion" '
             '       href="#collapseB{id}" aria-expanded="true" aria-controls="collapseB{id}">{station} <mark>{nm}</mark></a>'
-            '    <span class="badge"><span id="rnblB{id}">&times;</span></span>\n'
+            '    <span class="badge" id="rnblB{id}">&times;</span>\n'
             '   </h4>\n'
             '  </div>\n'
             '  <div id="collapseB{id}" class="panel-collapse collapse" role="tabpanel" '
