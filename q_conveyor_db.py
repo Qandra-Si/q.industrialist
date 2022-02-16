@@ -32,30 +32,11 @@ import re
 import console_app
 import q_industrialist_settings
 import q_conveyor_settings
+import render_html_conveyor_db
 
 import postgresql_interface as db
 
 from __init__ import __version__
-
-
-class ConveyorSettings:
-    def __init__(self):
-        # параметры работы конвейера
-        self.corporation_id: int = -1
-        self.fixed_number_of_runs: typing.Optional[int] = None
-        self.same_stock_container: bool = False
-        self.activities: typing.List[str] = ['manufacturing']
-        self.conveyor_with_reactions: bool = False
-        # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
-        self.containers_source: typing.List[int] = []
-        self.containers_stock: typing.List[int] = []
-        self.containers_blueprints: typing.List[int] = []
-        self.containers_react_formulas: typing.List[int] = []
-        self.containers_react_stock: typing.List[int] = []
-        self.manufacturing_groups: typing.Optional[typing.List[int]] = []
-        # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу произвдства)
-        self.trade_corporation_id: typing.Optional[int] = None
-        self.trade_sale_stock: typing.List[int, int] = []
 
 
 def main():
@@ -101,7 +82,7 @@ def main():
     del qidb
 
     # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
-    settings_of_conveyors: typing.List[ConveyorSettings] = []
+    settings_of_conveyors: typing.List[render_html_conveyor_db.ConveyorSettings] = []
     for entity in q_conveyor_settings.g_entities:
         # пропускаем отключенные группы настроек (остались для архива?)
         if not entity.get('enabled', False) or not entity.get('conveyors'):
@@ -126,7 +107,7 @@ def main():
             for corporation_id in corporation_ids:
                 corporation = qid.get_corporation(corporation_id)
                 # инициализируем настройки запуска конвейера
-                settings: ConveyorSettings = ConveyorSettings()
+                settings: render_html_conveyor_db.ConveyorSettings = render_html_conveyor_db.ConveyorSettings()
                 settings.corporation_id = corporation_id
                 # читаем настройки производственной активности
                 settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
@@ -214,9 +195,10 @@ def main():
                                     settings.trade_sale_stock.append(container_id)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
+
     # вывод на экран того, что получилось
     for (idx, __s) in enumerate(settings_of_conveyors):
-        s: ConveyorSettings = __s
+        s: render_html_conveyor_db.ConveyorSettings = __s
         corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
         trade_corporation: typing.Optional[db.QSwaggerCorporation] = qid.get_corporation(s.trade_corporation_id) if s.trade_corporation_id else None
         if idx > 0:
@@ -235,11 +217,20 @@ def main():
         if trade_corporation:
             print('trader corp:   ', trade_corporation.corporation_name)
             print('sale stock:    ', ';'.join(sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x)))
+
+    # вывод в отчёт результатов работы конвейера(ов)
+    render_html_conveyor_db.dump_conveyor2_into_report(
+        # путь, где будет сохранён отчёт
+        argv_prms["workspace_cache_files_dir"],
+        # настройки генерации отчёта
+        settings_of_conveyors
+    )
     # ---
     del qid
 
     # Вывод в лог уведомления, что всё завершилось (для отслеживания с помощью tail)
     print("\nConveyor v{}-db done".format(__version__))
+
 
 if __name__ == "__main__":
     main()

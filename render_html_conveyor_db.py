@@ -2513,3 +2513,97 @@ def dump_conveyor_into_report(
         render_html.__dump_footer(glf)
     finally:
         glf.close()
+
+
+class ConveyorSettings:
+    def __init__(self):
+        # параметры работы конвейера
+        self.corporation_id: int = -1
+        self.fixed_number_of_runs: typing.Optional[int] = None
+        self.same_stock_container: bool = False
+        self.activities: typing.List[str] = ['manufacturing']
+        self.conveyor_with_reactions: bool = False
+        # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
+        self.containers_source: typing.List[int] = []
+        self.containers_stock: typing.List[int] = []
+        self.containers_blueprints: typing.List[int] = []
+        self.containers_react_formulas: typing.List[int] = []
+        self.containers_react_stock: typing.List[int] = []
+        self.manufacturing_groups: typing.Optional[typing.List[int]] = []
+        # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу произвдства)
+        self.trade_corporation_id: typing.Optional[int] = None
+        self.trade_sale_stock: typing.List[int, int] = []
+
+
+def dump_nav_menu(glf) -> None:
+    glf.write("""
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Toggle navigation</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-tasks" aria-hidden="true"></span></a>
+  </div>
+
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки таблицы <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a data-target="#" role="button" id="btn-qind-showlabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать цветные маркеры</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" id="btn-qind-showordervolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём сделок (неделя/ордер)</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" id="qind-btn-reset">Сбросить настройки</a></li>
+      </ul>
+    </li>
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Фильтрация <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="all"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Все ордера</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="active"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Активные ордера</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="sold"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Всё продано</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="very-few"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар заканчивается</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="need-delivery"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Требуется доставка</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="high-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена завышена</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="low-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена занижена</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="interrupt"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Обновить ордера (конкуренты)</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="place-an-order"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Выставить на продажу (довоз)</a></li>
+      </ul>
+    </li>
+   </ul>
+   <form class="navbar-form navbar-right">
+    <label>Sort:&nbsp;</label>
+    <div class="btn-group" role="group" aria-label="Sort">
+     <button id="btnSortByName" type="button" class="btn btn-default active">Name</button>
+    </div>
+   </form>
+  </div>
+ </div>
+</nav>
+""")
+
+
+def dump_conveyor2_into_report(
+        # путь, где будет сохранён отчёт
+        ws_dir: str,
+        # настройки генерации отчёта
+        settings: typing.List[ConveyorSettings]) -> None:
+    glf = open('{dir}/conveyor2.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    try:
+        render_html.__dump_header(glf, 'Conveyor', '0.10')
+        dump_nav_menu(glf)
+        glf.write('<div class="container-fluid">\n')
+        """__dump_corp_conveyors(
+            glf,
+            settings)"""
+        glf.write('</div><!--container-fluid-->\n')
+        render_html.__dump_footer(glf)
+    finally:
+        glf.close()
