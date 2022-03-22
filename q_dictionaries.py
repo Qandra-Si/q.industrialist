@@ -172,7 +172,7 @@ def main():
             semantic_id = eve_sde_tools.get_basis_market_group_by_group_id(sde_market_groups, group_id)
             mg.update({'semanticGroupID': semantic_id if semantic_id else group_id})
         del sde_market_groups_keys
-        qidbdics.clean_market_groups()
+        #qidbdics.clean_market_groups()
         qidbdics.actualize_market_groups(sde_market_groups)
         del sde_market_groups
 
