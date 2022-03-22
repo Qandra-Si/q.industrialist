@@ -153,13 +153,13 @@ def main():
 
     if category in ['all', 'categories']:
         sde_categories = eve_sde_tools.read_converted(workspace_cache_files_dir, "categoryIDs")
-        qidbdics.clean_categories()
+        #qidbdics.clean_categories()
         qidbdics.actualize_categories(sde_categories)
         del sde_categories
 
     if category in ['all', 'groups']:
         sde_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "groupIDs")
-        qidbdics.clean_groups()
+        #qidbdics.clean_groups()
         qidbdics.actualize_groups(sde_groups)
         del sde_groups
 
