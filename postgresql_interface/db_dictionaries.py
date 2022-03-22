@@ -404,12 +404,18 @@ class QDictionaries:
             " sdeg_semantic_id,"
             " sdeg_group_name,"
             " sdeg_icon_id) "
-            "VALUES (%s,%s,%s,%s,%s);",
-            market_group_id,
-            market_group_dict.get('parentGroupID', None),
-            market_group_dict.get('semanticGroupID', None),
-            market_group_dict['nameID']['en'],
-            market_group_dict.get('iconID', None)
+            "VALUES (%(g)s,%(p)s,%(s)s,%(n)s,%(i)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdeg DO UPDATE SET"
+            " sdeg_parent_id=%(p)s,"
+            " sdeg_semantic_id=%(s)s,"
+            " sdeg_group_name=%(n)s,"
+            " sdeg_icon_id=%(i)s;",
+            {'g': market_group_id,
+             'p': market_group_dict.get('parentGroupID', None),
+             's': market_group_dict.get('semanticGroupID', None),
+             'n': market_group_dict['nameID']['en'],
+             'i': market_group_dict.get('iconID', None),
+             }
         )
 
     def actualize_market_groups(self, sde_market_groups):
