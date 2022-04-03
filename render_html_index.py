@@ -1,5 +1,6 @@
 ﻿import sys
 import getopt
+import typing
 
 import q_capital_settings
 import q_market_analyzer_settings
@@ -90,9 +91,42 @@ def __dump_index(glf):
     </ul>
   </div>
 """)
-    for ro in q_capital_settings.g_report_options:
-        glf.write('<a href="{fnm}.html" class="btn btn-primary btn-lg btn-block" role="button">{nm}</a>\n'.
-                  format(fnm=render_html.__camel_to_snake(ro['product'], True), nm=ro['product']))
+    if q_capital_settings.g_report_options:
+        products: typing.List[str] = sorted([p for p in set([ro['product'] for ro in q_capital_settings.g_report_options])])
+        for product in products:
+            report_options = [ro for ro in q_capital_settings.g_report_options if ro['product'] == product]
+            if len(report_options) == 1:
+                ro = report_options[0]
+                fname: str = ro.get('assignment', ro['product'])
+                glf.write('<a href="{fnm}.html" class="btn btn-primary btn-lg btn-block" role="button">{nm}</a>\n'.format(
+                    fnm=render_html.__camel_to_snake(fname, True),
+                    nm=product
+                ))
+            else:
+                ro_first = report_options[0]
+                fname_first: str = ro_first.get('assignment', ro_first['product'])
+                glf.write(
+                    '<div class="btn-group btn-block">\n'
+                    '<a href="{fnm}.html" '
+                    'class="btn btn-primary btn-lg" role="button" style="width:320px;">{nm}</a>\n'.
+                    format(fnm=render_html.__camel_to_snake(fname_first, True),
+                           nm=product,
+                ))
+                glf.write("""<button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+  <span class="caret"></span>
+  <span class="sr-only">Variants</span>
+</button>
+<ul class="dropdown-menu" style="left:201px;">
+""")
+                for ro in report_options:
+                    fname: str = ro.get('assignment', ro['product'])
+                    glf.write(
+                        "<li><a href='{fnm}.html'>{nm}</a></li>\n".
+                        format(fnm=render_html.__camel_to_snake(fname, True),
+                               nm=fname,
+                    ))
+                glf.write("</ul>\n</div>\n")
+
     glf.write("""
 </div>
 """)

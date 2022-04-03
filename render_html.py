@@ -21,10 +21,10 @@ __g_bootstrap_js_external = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/
 
 
 def __camel_to_snake(name, trim_spaces=False):  # https://stackoverflow.com/a/1176023
-  name = __g_pattern_c2s1.sub(r'\1_\2', name)
-  if trim_spaces:
-      name = name.replace(" ", "")
-  return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
+    name = __g_pattern_c2s1.sub(r'\1_\2', name)
+    if trim_spaces:
+        name = name.replace(" ", "")
+    return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
 
 
 def __get_render_datetime():
