@@ -426,9 +426,9 @@ class ConveyorMaterials:
             # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
             # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
             if in_cache.is_reaction:
-                blueprints: int = ceil(m['q'] / (in_cache.products_per_single_run * 50))
+                blueprints: int = ceil(m['q'] / (in_cache.products_per_single_run * 15))
                 ntier_set_of_blueprints = [{'r': -1, 'q': blueprints}]
-                in_cache.schedule_job_launches(blueprints, 50)
+                in_cache.schedule_job_launches(blueprints, 15)
             else:
                 runs: int = ceil(m['q'] / in_cache.products_per_single_run)
                 ntier_set_of_blueprints = [{'r': runs}]
@@ -441,7 +441,7 @@ class ConveyorMaterials:
                 # по-хорошему тут надо слазить в библиотеку чертежей...
                 0 if in_cache.is_reaction else 10,
                 is_blueprint_copy=not in_cache.is_reaction,
-                fixed_number_of_runs=50 if in_cache.is_reaction else None)
+                fixed_number_of_runs=15 if in_cache.is_reaction else None)
             # получение сведений о материалах, находящемся (или пока ещё нет) в справочнике конвейера
             for m2 in nemlwe:
                 type_id2: int = m2['id']
