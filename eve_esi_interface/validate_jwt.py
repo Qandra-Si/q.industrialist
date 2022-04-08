@@ -18,20 +18,33 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError, JWTClaimsError
 
 
-def validate_eve_jwt(jwt_token):
+SSO_META_DATA_URL = "https://login.eveonline.com/.well-known/oauth-authorization-server"
+JWK_ALGORITHM = "RS256"
+JWK_ISSUERS = ("login.eveonline.com", "https://login.eveonline.com")
+JWK_AUDIENCE = "EVE Online"
+
+def validate_eve_jwt(jwt_token: str) -> dict:
     """Validate a JWT token retrieved from the EVE SSO.
 
     :param jwt_token: Aa JWT token originating from the EVE SSO
     :returns dict: the contents of the validated JWT token if there are no validation errors
     """
 
-    jwk_set_url = "https://login.eveonline.com/oauth/jwks"
-
-    res = requests.get(jwk_set_url)
+    # fetch JWKs URL from meta data endpoint
+    res = requests.get(SSO_META_DATA_URL)
     res.raise_for_status()
-
     data = res.json()
+    try:
+        jwks_uri = data["jwks_uri"]
+    except KeyError:
+        raise RuntimeError(
+            f"Invalid data received from the SSO meta data endpoint: {data}"
+        ) from None
 
+    # fetch JWKs from endpoint
+    res = requests.get(jwks_uri)
+    res.raise_for_status()
+    data = res.json()
     try:
         jwk_sets = data["keys"]
     except KeyError as e:
@@ -40,20 +53,21 @@ def validate_eve_jwt(jwt_token):
               "from the SSO looks like: {}".format(e, data))
         sys.exit(1)
 
-    jwk_set = next((item for item in jwk_sets if item["alg"] == "RS256"))
+    jwk_set = [item for item in jwk_sets if item["alg"] == JWK_ALGORITHM].pop()
 
     try:
         return jwt.decode(
-            jwt_token,
-            jwk_set,
+            token=jwt_token,
+            key=jwk_set,
             algorithms=jwk_set["alg"],
-            issuer="login.eveonline.com"
+            issuer=JWK_ISSUERS,
+            audience=JWK_AUDIENCE,
         )
     except ExpiredSignatureError:
-        print("The JWT token has expired: {}")
+        print("The JWT token has expired")
         sys.exit(1)
     except JWTError as e:
-        print("The JWT signature was invalid: {}").format(str(e))
+        print(f"The JWT token was invalid: {e}")
         sys.exit(1)
     except JWTClaimsError as e:
         try:

@@ -29,7 +29,6 @@ class EveESIClient:
         :param logger: flag which says that we are in logger mode
         """
         self.__client_callback_url: str = 'https://localhost/callback/'
-        self.__content_type: str = 'application/x-www-form-urlencoded'
         # self.__eve_server: str = 'tranquility'  # eveonline' server
         self.__login_host: str = 'login.eveonline.com'
         self.__base_auth_url: str = 'https://login.eveonline.com/v2/oauth/authorize/'
@@ -166,37 +165,53 @@ class EveESIClient:
               "have logged in as a character you will get redirected to "
               "{}.".format(full_auth_url, self.__client_callback_url))
 
-    def __send_token_request(self, form_values, add_headers=None):
+    def __send_token_request(self, client_id: str, auth_code: str, app_secret: str):
         """Sends a request for an authorization token to the EVE SSO.
 
         :param form_values: a dict containing the form encoded values that should be sent with the request
         :param add_headers: a dict containing additional headers to send
         :returns: requests.Response: A requests Response object
         """
+
+        user_pass = "{}:{}".format(client_id, app_secret)
+        basic_auth = base64.urlsafe_b64encode(user_pass.encode('utf-8')).decode()
+        auth_header: str = "Basic {}".format(basic_auth)
+
         headers = {
-            "Content-Type": self.__content_type,
-            "Host": self.__login_host}
-        if self.__user_agent:
-            headers.update({"User-Agent": self.__user_agent})
-        if not (add_headers is None):
-            headers.update(add_headers)
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Host": self.__login_host,
+            "Authorization": auth_header,
+        }
+
+        # if self.__user_agent:
+        #     headers.update({"User-Agent": self.__user_agent})
+
+        # code_verifier = random
+
+        # интерфейс авторизации устарел: https://developers.eveonline.com/blog/article/sso-endpoint-deprecations-2
+        form_encoded_values = {
+            "grant_type": "authorization_code",
+            "code": auth_code,
+            # "client_id": client_id,
+            # "code_verifier": code_verifier,
+        }
 
         if self.__keep_alive:
             s: requests.Session = self.__establish()  # s может меняться, важно переиспользовать self.__session
-            res = s.post(self.__token_req_url, data=form_values, headers=headers)
+            res = s.post(self.__token_req_url, data=form_encoded_values, headers=headers)
         else:
-            res = requests.post(self.__token_req_url, data=form_values, headers=headers)
+            res = requests.post(self.__token_req_url, data=form_encoded_values, headers=headers)
 
         if self.__debug:
             print("Request sent to URL {} with headers {} and form values: "
-                  "{}\n".format(res.url, headers, form_values))
+                  "{}, {}\n".format(res.url, headers, client_id, auth_code))
         res.raise_for_status()
 
         return res
 
     def __send_token_refresh(self, refresh_token, client_id, client_scopes=None):
         headers = {
-            "Content-Type": self.__content_type,
+            "Content-Type": 'application/x-www-form-urlencoded',
             "Host": self.__login_host}
         if self.__user_agent:
             headers.update({"User-Agent": self.__user_agent})
@@ -390,11 +405,11 @@ class EveESIClient:
         print("Follow the prompts and enter the info asked for.")
 
         # Generate the PKCE code challenge
-        random = base64.urlsafe_b64encode(secrets.token_bytes(32))
-        m = hashlib.sha256()
-        m.update(random)
-        d = m.digest()
-        code_challenge = base64.urlsafe_b64encode(d).decode().replace("=", "")
+        # не используется: random = base64.urlsafe_b64encode(secrets.token_bytes(32))
+        # не используется: m = hashlib.sha256()
+        # не используется: m.update(random)
+        # не используется: d = m.digest()
+        # не используется: code_challenge = base64.urlsafe_b64encode(d).decode().replace("=", "")
 
         if not client_id:
             client_id = input("Copy your SSO application's client ID and enter it "
@@ -411,18 +426,10 @@ class EveESIClient:
         # Notice that the query parameter of the following URL will contain this
         # code challenge.
 
-        self.__print_auth_url(client_id, client_scopes, code_challenge=code_challenge)
+        self.__print_auth_url(client_id, client_scopes) # не используется: , code_challenge=code_challenge)
 
         auth_code = input("Copy the \"code\" query parameter and enter it here: ")
-
-        code_verifier = random
-
-        form_values = {
-            "grant_type": "authorization_code",
-            "client_id": client_id,
-            "code": auth_code,
-            "code_verifier": code_verifier
-        }
+        app_secret = input("Copy your SSO application's secret key and enter it here: ")
 
         # Because this is using PCKE protocol, your application never has
         # to share its secret key with the SSO. Instead, this next request
@@ -432,7 +439,7 @@ class EveESIClient:
         # of this process. The code verifier generated for this program is
         # ${code_verifier} derived from the raw string ${random}
 
-        sso_auth_response = self.__send_token_request(form_values)
+        sso_auth_response = self.__send_token_request(client_id, auth_code, app_secret)
 
         if sso_auth_response.status_code == 200:
             data = sso_auth_response.json()
