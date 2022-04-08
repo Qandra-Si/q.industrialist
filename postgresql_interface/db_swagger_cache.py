@@ -42,8 +42,9 @@ class QSwaggerTypeId:
         self.__published: bool = True
         self.__market_group_id: typing.Optional[int] = row[5]
         self.__meta_group_id: typing.Optional[int] = row[6]
-        self.__icon_id: typing.Optional[int] = row[7]
-        self.__packaged_volume: typing.Optional[float] = row[8]
+        self.__tech_level: typing.Optional[int] = row[7]
+        self.__icon_id: typing.Optional[int] = row[8]
+        self.__packaged_volume: typing.Optional[float] = row[9]
 
     @property
     def type_id(self) -> int:
@@ -76,6 +77,10 @@ class QSwaggerTypeId:
     @property
     def meta_group_id(self) -> typing.Optional[int]:
         return self.__meta_group_id
+
+    @property
+    def tech_level(self) -> typing.Optional[int]:
+        return self.__tech_level
 
     @property
     def icon_id(self) -> typing.Optional[int]:

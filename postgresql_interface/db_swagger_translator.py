@@ -55,6 +55,7 @@ class QSwaggerTranslator:
             " sdet_base_price,"
             " sdet_market_group_id,"
             " sdet_meta_group_id,"
+            " sdet_tech_level,"
             " sdet_icon_id,"
             " sdet_packaged_volume "
             "FROM eve_sde_type_ids "
@@ -442,21 +443,23 @@ class QSwaggerTranslator:
             return {}
         # получаем список пилотов, которые запустили работы, обычно 100 уникальных пилотов на 3000 работах
         unique_installer_ids: typing.List[int] = list(set([r[1] for r in rows]))
-        unknown_installer_ids: typing.List[int] = [c_id for c_id in unique_installer_ids if not characters.get(c_id)]
-        unknown_job_installers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_installer_ids)
-        for (character_id, cached_character) in unknown_job_installers.items():
-            characters[character_id] = cached_character
-        del unknown_job_installers
-        del unknown_installer_ids
+        if unique_installer_ids:
+            unknown_installer_ids: typing.List[int] = [c_id for c_id in unique_installer_ids if not characters.get(c_id)]
+            unknown_job_installers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_installer_ids)
+            for (character_id, cached_character) in unknown_job_installers.items():
+                characters[character_id] = cached_character
+            del unknown_job_installers
+            del unknown_installer_ids
         del unique_installer_ids
         # получаем список фабрик, на которых запущены работы, обычно единицы уникальных станций/структур
         unique_facility_ids: typing.List[int] = list(set([r[2] for r in rows]))
-        unknown_facility_ids: typing.List[int] = [c_id for c_id in unique_facility_ids if not stations.get(c_id)]
-        unknown_job_facilities: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_facility_ids, type_ids)
-        for (facility_id, cached_facility) in unknown_job_facilities.items():
-            stations[facility_id] = cached_facility
-        del unknown_job_facilities
-        del unknown_facility_ids
+        if unique_facility_ids:
+            unknown_facility_ids: typing.List[int] = [c_id for c_id in unique_facility_ids if not stations.get(c_id)]
+            unknown_job_facilities: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_facility_ids, type_ids)
+            for (facility_id, cached_facility) in unknown_job_facilities.items():
+                stations[facility_id] = cached_facility
+            del unknown_job_facilities
+            del unknown_facility_ids
         del unique_facility_ids
         # обработка данных по корпоративным работам и связывание их с другими кешированными объектами
         data = {}

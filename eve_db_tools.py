@@ -835,7 +835,7 @@ class QDatabaseTools:
         if location_flag[:-1] != 'CorpSAG':  # and location_flag != 'Unlocked' and location_flag != 'AutoFit':
             return False
         type_id: int = item_data['type_id']
-        return type_id in self.universe_items_with_names
+        return type_id in self.__universe_items_with_names
 
     def load_corporation_assets_names_from_esi(self, corporation_id: int):
         # получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame

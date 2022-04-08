@@ -308,7 +308,8 @@ class QDictionaries:
             " sdet_base_price,"
             " sdet_published,"
             " sdet_market_group_id,"
-            " sdet_meta_group_id,"
+            " sdet_meta_group_id,"  # этот параметр получаем из sde (esi его не выдаёт)
+            " sdet_tech_level,"  # этот параметр получаем только по esi (из sde его надо читать из атрибутов)
             " sdet_icon_id) "
             "VALUES ("
             " %(t)s,"
@@ -320,6 +321,7 @@ class QDictionaries:
             " %(p)s,"
             " %(mg)s,"
             " %(meg)s,"
+            " null,"
             " %(i)s) "
             "ON CONFLICT ON CONSTRAINT pk_sdet DO UPDATE SET"
             " sdet_type_name=%(n)s,"
@@ -329,7 +331,7 @@ class QDictionaries:
             " sdet_base_price=%(bp)s,"
             " sdet_published=%(p)s,"
             " sdet_market_group_id=%(mg)s,"
-            " sdet_meta_group_id=%(meg)s,"
+            " sdet_meta_group_id=%(meg)s,"  # этот параметр получаем из sde (esi его не выдаёт)
             " sdet_icon_id=%(i)s;",
             {'t': type_id,
              'n': type_name,
@@ -402,12 +404,18 @@ class QDictionaries:
             " sdeg_semantic_id,"
             " sdeg_group_name,"
             " sdeg_icon_id) "
-            "VALUES (%s,%s,%s,%s,%s);",
-            market_group_id,
-            market_group_dict.get('parentGroupID', None),
-            market_group_dict.get('semanticGroupID', None),
-            market_group_dict['nameID']['en'],
-            market_group_dict.get('iconID', None)
+            "VALUES (%(g)s,%(p)s,%(s)s,%(n)s,%(i)s) "
+            "ON CONFLICT ON CONSTRAINT pk_sdeg DO UPDATE SET"
+            " sdeg_parent_id=%(p)s,"
+            " sdeg_semantic_id=%(s)s,"
+            " sdeg_group_name=%(n)s,"
+            " sdeg_icon_id=%(i)s;",
+            {'g': market_group_id,
+             'p': market_group_dict.get('parentGroupID', None),
+             's': market_group_dict.get('semanticGroupID', None),
+             'n': market_group_dict['nameID']['en'],
+             'i': market_group_dict.get('iconID', None),
+             }
         )
 
     def actualize_market_groups(self, sde_market_groups):

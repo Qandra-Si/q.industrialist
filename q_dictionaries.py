@@ -153,13 +153,13 @@ def main():
 
     if category in ['all', 'categories']:
         sde_categories = eve_sde_tools.read_converted(workspace_cache_files_dir, "categoryIDs")
-        qidbdics.clean_categories()
+        #qidbdics.clean_categories()
         qidbdics.actualize_categories(sde_categories)
         del sde_categories
 
     if category in ['all', 'groups']:
         sde_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "groupIDs")
-        qidbdics.clean_groups()
+        #qidbdics.clean_groups()
         qidbdics.actualize_groups(sde_groups)
         del sde_groups
 
@@ -172,7 +172,7 @@ def main():
             semantic_id = eve_sde_tools.get_basis_market_group_by_group_id(sde_market_groups, group_id)
             mg.update({'semanticGroupID': semantic_id if semantic_id else group_id})
         del sde_market_groups_keys
-        qidbdics.clean_market_groups()
+        #qidbdics.clean_market_groups()
         qidbdics.actualize_market_groups(sde_market_groups)
         del sde_market_groups
 

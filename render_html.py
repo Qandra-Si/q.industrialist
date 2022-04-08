@@ -21,10 +21,10 @@ __g_bootstrap_js_external = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/
 
 
 def __camel_to_snake(name, trim_spaces=False):  # https://stackoverflow.com/a/1176023
-  name = __g_pattern_c2s1.sub(r'\1_\2', name)
-  if trim_spaces:
-      name = name.replace(" ", "")
-  return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
+    name = __g_pattern_c2s1.sub(r'\1_\2', name)
+    if trim_spaces:
+        name = name.replace(" ", "")
+    return __g_pattern_c2s2.sub(r'\1_\2', name).lower()
 
 
 def __get_render_datetime():
@@ -60,7 +60,7 @@ def get_span_glyphicon(icon: str) -> str:
     return '<span class="glyphicon glyphicon-{}" aria-hidden="true"></span>'.format(icon)
 
 
-def __dump_header(glf, header_name):
+def __dump_header(glf, header_name, qind_ver=None):
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
     # рекомендуемый набор favicon-ок, см. https://stackoverflow.com/a/52322368
@@ -127,6 +127,14 @@ def __dump_header(glf, header_name):
  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
  <!-- Manifest.json  -->
  <link rel="manifest" href="manifest.webmanifest">
+""")
+    if qind_ver:
+        glf.write(
+            ' <!-- Q.Industrialist -->\n'
+            ' <link rel="stylesheet" href="q.industrialist/{ver}/css/bootstrapped.css">\n'.
+            format(ver=qind_ver)
+        )
+    glf.write("""
 </head>
 <body>
 """)
@@ -148,13 +156,16 @@ def __dump_header(glf, header_name):
 
 def __dump_footer(glf, show_generated_datetime=True):
     if show_generated_datetime:
-        glf.write('<p><small><small>Generated {dt}</small></br>\n'.format(dt=__get_render_datetime()))
+        glf.write('<p style="font-size:85%;"><small>Generated {dt}</small></p>\n'.format(dt=__get_render_datetime()))
     # Don't remove line below !
-    glf.write("""</br>
-&copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a></br>
-</br>
-<small>EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.</small>
-</small></p>""")
+    glf.write("""
+<p style="font-size:85%;">
+&copy; 2020 Qandra Si &middot; <a class="inert" href="https://github.com/Qandra-Si/q.industrialist">GitHub</a> &middot; Data provided by <a class="inert" href="https://esi.evetech.net/">ESI</a> and <a class="inert" href="https://zkillboard.com/">zKillboard</a> &middot; Tips go to <a class="inert" href="https://zkillboard.com/character/2116129465/">Qandra Si</a>
+</p>
+<p style="line-height:1;font-size:75%;">
+EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf.
+</p>
+""")
     # Don't remove line above !
     glf.write("</body></html>")
 
