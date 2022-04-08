@@ -342,10 +342,10 @@ def get_ntier_materials_list_of_not_available__obsolete(
         # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
         # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
         if is_reaction_blueprint:
-            __blueprints = ceil(m["q"] / (quantity_of_single_run * 50))
+            __blueprints = ceil(m["q"] / (quantity_of_single_run * 15))
             ntier_set_of_blueprints = [{"r": -1, "q": __blueprints}]
             m.update({"bp": {"q": __blueprints,
-                             "runs": 50,
+                             "runs": 15,
                              "id": blueprint_type_id,
                              "a": ntier_activity,
                              "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
@@ -371,7 +371,7 @@ def get_ntier_materials_list_of_not_available__obsolete(
             # по хорошему тут надо слазить в библиотеку чертежей...
             0 if is_reaction_blueprint else 10,
             is_blueprint_copy=not is_reaction_blueprint,
-            fixed_number_of_runs=50 if is_reaction_blueprint else None)
+            fixed_number_of_runs=15 if is_reaction_blueprint else None)
         if not is_reaction_blueprint:
             calc_materials_summary__obsolete(nemlwe, ntier_materials_list_for_next_itr__sotiyo)
         else:
