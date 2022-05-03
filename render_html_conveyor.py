@@ -342,10 +342,10 @@ def get_ntier_materials_list_of_not_available__obsolete(
         # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
         # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
         if is_reaction_blueprint:
-            __blueprints = ceil(m["q"] / (quantity_of_single_run * 15))
+            __blueprints = ceil(m["q"] / (quantity_of_single_run * 15))  # TODO: надо использовать in_cache.runs_number_per_day
             ntier_set_of_blueprints = [{"r": -1, "q": __blueprints}]
             m.update({"bp": {"q": __blueprints,
-                             "runs": 15,
+                             "runs": 15,  # TODO: надо использовать in_cache.runs_number_per_day
                              "id": blueprint_type_id,
                              "a": ntier_activity,
                              "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
@@ -371,7 +371,7 @@ def get_ntier_materials_list_of_not_available__obsolete(
             # по хорошему тут надо слазить в библиотеку чертежей...
             0 if is_reaction_blueprint else 10,
             is_blueprint_copy=not is_reaction_blueprint,
-            fixed_number_of_runs=15 if is_reaction_blueprint else None)
+            fixed_number_of_runs=15 if is_reaction_blueprint else None)  # TODO: надо использовать in_cache.runs_number_per_day
         if not is_reaction_blueprint:
             calc_materials_summary__obsolete(nemlwe, ntier_materials_list_for_next_itr__sotiyo)
         else:
@@ -476,6 +476,16 @@ def __dump_not_available_materials_list_rows(
             ms_blueprint_products = in_cache.products_per_single_run
             is_reaction = in_cache.is_reaction
             ms_where = in_cache.where
+            # получаем информацию по кол-ву ранов, которое можно выполнить при имеющемся кол-ве ресурсов
+            ms_runs_number_per_day: typing.Optional[int] = in_cache.runs_number_per_day
+            ms_possible_jobs: typing.Optional[int] = None
+            if ms_runs is not None and ms_runs_number_per_day is not None:
+                ms_possible_jobs = conveyor_materials.check_possible_job_runs(in_cache)
+                if (ms_runs_number_per_day * ms_possible_jobs) > (ms_runs * ms_blueprints):
+                    if ms_runs == ms_runs_number_per_day:
+                        ms_possible_jobs = ms_blueprints
+                    else:
+                        ms_possible_jobs = ceil((ms_runs * ms_blueprints) / ms_runs_number_per_day)
             # считаем остатки и потребности кол-ва материалов в стоке
             ms_planned__manuf: int = in_cache.reserved_in_manuf_stock
             ms_planned__react: int = in_cache.reserved_in_react_stock
@@ -534,7 +544,10 @@ def __dump_not_available_materials_list_rows(
                            prfx='Required<br>' if __high_group_header else '',
                            ))
                 if 'runs' in dump_listed_table_cells:
-                    glf.write('<th class="active qind-rr hidden">To launch</th>\n')
+                    glf.write(
+                        '<th class="active qind-rr hidden">To launch</th>\n'
+                        '<th class="active qind-pr hidden">Possible</th>\n'
+                    )
                 if 'planned' in dump_listed_table_cells:
                     glf.write(
                         '<th class="active qind-mp hidden">{prfx}Sotiyo</th>\n'
@@ -610,6 +623,7 @@ def __dump_not_available_materials_list_rows(
                     format(nm=ms_item_name, gly=glyphicon("copy"))
             # конструируем строку со сведениями о способе получения материала (кол-во ранов)
             __runs = "{} &times; {:,d}".format(ms_blueprints, ms_runs) if ms_blueprints and ms_runs else ''
+            __possible_jobs = "{} &times; {:,d}".format(ms_possible_jobs, ms_runs_number_per_day) if ms_possible_jobs and ms_runs_number_per_day else ''
             # вывод сведений в отчёт
             glf.write(
                 '<tr{em}>\n'
@@ -631,7 +645,11 @@ def __dump_not_available_materials_list_rows(
                        em='' if ms_not_available__manuf or ms_not_available__react else ' class="qind-em hidden"'
                        ))
             if 'runs' in dump_listed_table_cells:
-                glf.write(' <td class="qind-rr hidden">{r}</td>\n'.format(r=__runs))
+                glf.write(
+                    ' <td class="qind-rr hidden">{r}</td>\n'
+                    ' <td class="qind-pr hidden">{pr}</td>\n'.
+                    format(r=__runs, pr=__possible_jobs)
+                )
             if 'planned' in dump_listed_table_cells:
                 glf.write(
                     ' <td class="qind-mp hidden">{pm}</td>\n'
@@ -1746,6 +1764,7 @@ td.qind-mr, /* materials required */
 td.qind-mp, /* materials planned */
 td.qind-mc, /* materials consumed */
 td.qind-rr, /* recommended runs */
+td.qind-pr, /* possible runs */
 td.qind-me, /* materials exist */
 td.qind-ip /* materials in progress */
 { text-align: right; }
@@ -2181,6 +2200,7 @@ tr.qind-em th
     applyOption('Show Planned Materials', '.qind-mp');
     applyOption('Show Consumed Materials', '.qind-mc');
     applyOption('Show Recommended Runs', '.qind-rr');
+    applyOption('Show Recommended Runs', '.qind-pr');
     applyOption('Show In Progress', '.qind-ip');
     applyOption('Show Enough Materials', '.qind-em');
     applyOption('Show Legend', '#legend-block');

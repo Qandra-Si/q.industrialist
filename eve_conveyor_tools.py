@@ -2,6 +2,7 @@
 """
 import typing
 from math import ceil
+from math import floor
 
 import eve_sde_tools
 import eve_efficiency
@@ -58,6 +59,7 @@ class ConveyorItem:
         self.where = None
         # сведения о запуске чертежа/ей
         self.products_per_single_run = None
+        self.runs_number_per_day = None
         # настраиваем запуски чертежей: списка запусков (план по имеющимся в наличие чертежам)
         self.runs_and_jobs = []
         # настраиваем справочник для сохранения "пользовательских" данных в объекте (очищается методом clear)
@@ -155,6 +157,14 @@ class ConveyorItem:
         if len(self.blueprint_activity_dict['products']) != 1:
             raise Exception('Unable to get product quantity information')
         self.products_per_single_run = self.blueprint_activity_dict['products'][0]['quantity']
+        if self.is_reaction:
+            self.runs_number_per_day = 15
+        else:
+            tm: int = self.blueprint_activity_dict['time']
+            if tm >= (5*60*60*24):
+                self.runs_number_per_day = 1
+            elif tm > 0:
+                self.runs_number_per_day = ceil(5*60*60*24 / tm)
         # определяем какой группе принадлежит производимый продукт и корректируем использование чертежей
         # TODO: оформить это как настройку
         # if self.market_group == 1870:  # Fuel Blocks -> Tatara
@@ -376,6 +386,42 @@ class ConveyorMaterials:
         # вывод материалов в стоке имеющихся и помеченным использованными, а также список недостающего кол-ва
         return used_and_exist_materials, not_enough_materials
 
+    def check_possible_job_runs(self, item: ConveyorItem) -> typing.Optional[int]:
+        # проверяем, можно ли произвести данный ресурс (материал)?
+        if item.blueprint_type_id is None:
+            return None
+        # расчёт материалов по информации о чертеже с учётом ME
+        # TODO: добавить авторасчёт необходимых чертежей в список конвейера
+        ntier_set_of_blueprints = [{'r': item.runs_number_per_day}]
+        nemlwe = item.get_materials_list_for_set_of_blueprints(
+            ntier_set_of_blueprints,
+            # мы не знаем с какой эффективностью будет делаться вложенная работа, наверное 10?
+            # по-хорошему тут надо слазить в библиотеку чертежей...
+            0 if item.is_reaction else 10,
+            is_blueprint_copy=True,
+            fixed_number_of_runs=None)
+        # пытаемся расчитать кол-во чертежей, которое запустить с указанным кол-вом ранов
+        possible_job_runs: int = 0
+        # перебираем все ресурсы (материалы) чертежа
+        for (idx, m) in enumerate(nemlwe):
+            in_cache: ConveyorItem = self.get(m['id'])
+            quantity: int = m['q']
+            if item.where == 'M':
+                exist_in_stock = in_cache.exist_in_manuf_stock
+            elif item.where == 'R':
+                exist_in_stock = in_cache.exist_in_react_stock
+            else:
+                exist_in_stock = 0
+            # считаем минимально возможное кол-во запусков
+            if idx == 0:
+                possible_job_runs = floor(exist_in_stock / quantity)
+            else:
+                possible_job_runs = min(possible_job_runs, floor(exist_in_stock / quantity))
+            # если уже выяснили, что материалов не хватает - ответ 0
+            if possible_job_runs == 0:
+                return 0
+        return possible_job_runs
+
     # объединение двух списков типа ['id':?,'q':?] таким образом, чтобы в результирующий не содержал повторения по id
     # возможна работа со списками ['id':?,'q':?,'w':?] с проверкой флага 'w' в src и dst (с пом. check_where_flag)
     @staticmethod
@@ -426,9 +472,9 @@ class ConveyorMaterials:
             # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
             # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
             if in_cache.is_reaction:
-                blueprints: int = ceil(m['q'] / (in_cache.products_per_single_run * 15))
+                blueprints: int = ceil(m['q'] / (in_cache.products_per_single_run * in_cache.runs_number_per_day))
                 ntier_set_of_blueprints = [{'r': -1, 'q': blueprints}]
-                in_cache.schedule_job_launches(blueprints, 15)
+                in_cache.schedule_job_launches(blueprints, in_cache.runs_number_per_day)
             else:
                 runs: int = ceil(m['q'] / in_cache.products_per_single_run)
                 ntier_set_of_blueprints = [{'r': runs}]
@@ -441,7 +487,7 @@ class ConveyorMaterials:
                 # по-хорошему тут надо слазить в библиотеку чертежей...
                 0 if in_cache.is_reaction else 10,
                 is_blueprint_copy=not in_cache.is_reaction,
-                fixed_number_of_runs=15 if in_cache.is_reaction else None)
+                fixed_number_of_runs=in_cache.runs_number_per_day if in_cache.is_reaction else None)
             # получение сведений о материалах, находящемся (или пока ещё нет) в справочнике конвейера
             for m2 in nemlwe:
                 type_id2: int = m2['id']
