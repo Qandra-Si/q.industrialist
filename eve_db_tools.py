@@ -939,7 +939,13 @@ class QDatabaseTools:
 
         # Requires role(s): Director
         url: str = self.get_corporation_assets_url(corporation_id)
-        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        try:
+            data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+        except requests.exceptions.HTTPError as err:
+            status_code = err.response.status_code
+            if status_code == 404:  # это нормально, CCP используют 404-ответ при удалении route из swagger
+                return None
+            raise
 
         if data is None:
             return None
