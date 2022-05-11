@@ -5,6 +5,7 @@ run the following command from this directory as the root:
 $ chcp 65001 & @rem on Windows only!
 $ python eve_sde_tools.py --cache_dir=~/.q_industrialist
 $ python q_dictionaries.py --category=all --cache_dir=~/.q_industrialist
+$ python q_universe_preloader.py --category=all --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
 """
 import typing
 import sys
