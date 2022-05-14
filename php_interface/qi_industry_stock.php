@@ -136,9 +136,10 @@ from (
       else bpc.q*trunc(((mat.sdebm_quantity*bpc.r*(100-bpc.me)/100.0)*0.99)*0.958+0.99)
      end m_calc
     from (
-     select x.t, sum(x.q) q, x.r, x.me from (
+     select x.t, x.q, x.r, x.me
+     from (
       -- список корпоративных чертежей в конвейере (их раны)
-      select ecb_type_id t, 1 q, ecb_runs r, ecb_material_efficiency me
+      select ecb_type_id t, count(1) q, ecb_runs r, ecb_material_efficiency me
       from qi.esi_corporation_blueprints
       where ecb_quantity=-2 and ecb_location_id in (
        select eca_item_id
@@ -149,8 +150,9 @@ from (
          eca_name like '[order]%' or
          eca_name like '.[prod]%')
       )
+      group by 1,3,4
       union
-      select ecj_product_type_id, ecj_runs, ecj_licensed_runs, coalesce(ecb.me,10)
+      select ecj_product_type_id, sum(ecj_runs), ecj_licensed_runs, coalesce(ecb.me,10)
       from qi.esi_corporation_industry_jobs
        left outer join (
         select ecb_item_id id,ecb_material_efficiency me
@@ -169,8 +171,9 @@ from (
           eca_name like '[order]%' or
           eca_name like '.[prod]%')
        )
+      group by 1,3,4
      ) x
-     group by 1,3,4
+     --group by 1,3,4
     ) bpc
      -- материалы, из которых производится продукция по чертежу
      left outer join qi.eve_sde_blueprint_materials mat on (mat.sdebm_activity=1 and mat.sdebm_blueprint_type_id=bpc.t)

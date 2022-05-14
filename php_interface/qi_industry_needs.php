@@ -149,9 +149,10 @@ select
  m.sdet_type_name m_name,
  mat.sdebm_quantity m_qty
 from (
- select x.t, sum(x.q) q, x.r, x.me from (
+ select x.t, x.q, x.r, x.me
+ from (
   -- список корпоративных чертежей в конвейере (их раны)
-  select ecb_type_id t, 1 q, ecb_runs r, ecb_material_efficiency me
+  select ecb_type_id t, count(1) q, ecb_runs r, ecb_material_efficiency me
   from qi.esi_corporation_blueprints
   where ecb_quantity=-2 and ecb_location_id in (
    select eca_item_id
@@ -162,8 +163,9 @@ from (
      eca_name like '[order]%' or
      eca_name like '.[prod]%')
   )
+  group by 1,3,4
   union
-  select ecj_product_type_id, ecj_runs, ecj_licensed_runs, coalesce(ecb.me,10)
+  select ecj_product_type_id, sum(ecj_runs), ecj_licensed_runs, coalesce(ecb.me,10)
   from qi.esi_corporation_industry_jobs
    left outer join (
     select ecb_item_id id,ecb_material_efficiency me
@@ -182,8 +184,9 @@ from (
       eca_name like '[order]%' or
       eca_name like '.[prod]%')
    )
+  group by 1,3,4
  ) x
- group by 1,3,4
+ --group by 1,3,4
 ) bpc
  -- подробности о чертеже
  left outer join qi.eve_sde_type_ids bp on (bp.sdet_type_id=bpc.t)
