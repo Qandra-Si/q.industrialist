@@ -120,6 +120,13 @@ from (
 ) stock
  -- сведения о компоненте
  left outer join qi.eve_sde_type_ids t on (t.sdet_type_id=stock.t)
+ -- кол-во чертежей, в которых данный компонент является продуктом (производится ли?)
+ left outer join (
+  select sdebp_product_id p, count(1) c
+  from qi.eve_sde_blueprint_products, qi.eve_sde_type_ids
+  where sdebp_blueprint_type_id=sdet_type_id and sdet_published
+  group by 1
+ ) prod on (stock.t=prod.p)
  -- кол-во чертежей, в которых компонент используется как материал (место ли ему в стоке?)
  left outer join (
   select sdebm_material_id m, count(1) c
@@ -203,6 +210,7 @@ from (
    group by 1
   ) y
  ) needs on (needs.t=stock.t)
+where prod.p is not null
 order by 6 desc, 7, 4, 5, 3;
 EOD;
     $materials_cursor = pg_query($conn, $query)
