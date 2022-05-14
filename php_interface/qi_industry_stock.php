@@ -23,7 +23,11 @@ table.qind-materials > tbody > tr > td:nth-child(3),
 table.qind-materials > thead > tr > th:nth-child(4),
 table.qind-materials > tbody > tr > td:nth-child(4),
 table.qind-materials > thead > tr > th:nth-child(5),
-table.qind-materials > tbody > tr > td:nth-child(5)
+table.qind-materials > tbody > tr > td:nth-child(5),
+table.qind-materials > thead > tr > th:nth-child(6),
+table.qind-materials > tbody > tr > td:nth-child(6),
+table.qind-materials > thead > tr > th:nth-child(7),
+table.qind-materials > tbody > tr > td:nth-child(7)
 { text-align: right; }
 </style><?php
 
@@ -37,6 +41,8 @@ function __dump_materials_tree(&$materials) { ?>
   <th>Tech Level</th>
   <th>Quantity</th>
   <th>Calculated</th>
+  <th>Overstock</th>
+  <th>Understock</th>
   <!--<th>Variants</th>-->
  </tr>
 </thead>
@@ -49,9 +55,11 @@ function __dump_materials_tree(&$materials) { ?>
             $material_name = $m['mnm'];
             $material_qty = $m['q'];
             $material_calc = $m['calc'];
-            $material_options = $m['opts']; // кол-во чертежей, в которых упоминается материал
+            //$material_options = $m['opts']; // кол-во чертежей, в которых упоминается материал
             $material_out_off = $m['out_off'];
             $material_tech_level = $m['tech'];
+            $in_progress = $m['in_progress'];
+            $overstock = ($material_qty + $in_progress) - $material_calc;
             ?>
 <tr>
  <td><img class="icn24" src="<?=__get_img_src($material_id,32,FS_RESOURCES)?>"></td>
@@ -64,9 +72,10 @@ function __dump_materials_tree(&$materials) { ?>
     }
 ?></td>
  <td><?=$material_tech_level?></td>
- <td><?=$material_qty?></td>
+ <td><?=$material_qty?><?=($in_progress>0)?'<mark>+'.$in_progress.'</mark>':''?></td>
  <td><?=$material_calc?></td>
- <!--<td><?=$material_options?></td>-->
+ <td><?=($overstock>0)?$overstock:''?></td>
+ <td><?=($overstock<0)?-$overstock:''?></td>
 </tr>
             <?php
         }
@@ -92,7 +101,8 @@ select
  needs.calc,
  opts.c as opts,
  (opts.c is null) as out_off,
- t.sdet_tech_level as tech
+ t.sdet_tech_level as tech,
+ coalesce(jobs.r,0) in_progress
 from (
  select eca_type_id t, sum(eca_quantity) q
  from qi.esi_corporation_assets
@@ -112,6 +122,13 @@ from (
   where sdebm_blueprint_type_id=sdet_type_id and sdet_published and sdebm_activity=1
   group by 1
  ) opts on (stock.t=opts.m)
+ -- производственные работы, в результате которых появляются компоненты
+ left outer join (
+  select ecj_product_type_id t,sum(ecj_runs) r
+  from qi.esi_corporation_industry_jobs
+  where ecj_corporation_id=98677876 and ecj_status<>'delivered'
+  group by 1
+ ) jobs on (jobs.t=stock.t)
  -- подсчёт подтребностей данного компонента с учётом имеющихся копий
  left outer join (
   select
