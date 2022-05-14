@@ -44,10 +44,10 @@ function __dump_materials_tree(&$materials) { ?>
   <th></th>
   <th>Material</th>
   <th>Tech Level</th>
-  <th>In stock</th>
-  <th>Calculated</th>
-  <th>Overstock</th>
-  <th>Understock</th>
+  <th>In stock<br>Sotiyo</th>
+  <th>Calculated<br>by BP Copies</th>
+  <th>Overstock<br>Sotiyo</th>
+  <th>Required<br>Sotiyo</th>
   <!--<th>Variants</th>-->
  </tr>
 </thead>
