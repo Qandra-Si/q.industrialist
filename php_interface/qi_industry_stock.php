@@ -29,6 +29,11 @@ table.qind-materials > tbody > tr > td:nth-child(6),
 table.qind-materials > thead > tr > th:nth-child(7),
 table.qind-materials > tbody > tr > td:nth-child(7)
 { text-align: right; }
+
+table.qind-materials > tbody > tr > td:nth-child(4)
+{ background-color: #f1f7ff; }
+table.qind-materials > tbody > tr > td:nth-child(6)
+{ background-color: #fffbf1; }
 </style><?php
 
 
@@ -39,7 +44,7 @@ function __dump_materials_tree(&$materials) { ?>
   <th></th>
   <th>Material</th>
   <th>Tech Level</th>
-  <th>Quantity</th>
+  <th>In stock</th>
   <th>Calculated</th>
   <th>Overstock</th>
   <th>Understock</th>
