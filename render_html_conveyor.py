@@ -503,7 +503,6 @@ def __dump_not_available_materials_list_rows(
             ms_in_progress = in_cache.in_progress
             # считаем признак того, что материала произведено (или УЖЕ производится) достаточное кол-во
             ms_not_available: bool = (ms_not_available__manuf + ms_not_available__react) > ms_in_progress
-            print(ms_item_name, ms_not_available__manuf+ms_not_available__react, ms_in_progress, ms_not_available)
             # TODO: вывести таблицу со сводной информацией о необходимости транспортировки накопленного между станциями
             ms_need_stock_transfer__manuf: bool = in_cache.need_transfer_into_manuf_stock()
             ms_need_stock_transfer__react: bool = in_cache.need_transfer_into_react_stock()
