@@ -110,8 +110,10 @@ EOD;
  </p>
 
  <p>
- Учёт наличия материалов в стоке в <strong>Malpais</strong>, автоматический расчёт достаточности их количества. Поиск потерянных товаров, случайно оказавшихся в стоке, поиск товаров, которые не используются в работах иди которые надо уварить, потратить или продать.
- <br><a class="btn btn-success" href="/qi_obsolete_stock.php" role="button">Obsolete Stock</a>
+ Учёт наличия материалов в стоке в <strong>Malpais</strong>, автоматический расчёт достаточности их количества. Поиск потерянных товаров, случайно оказавшихся в стоке, поиск товаров, которые не используются в работах иди которые надо уварить, потратить или продать.<br>
+ <a class="btn btn-success" href="/qi_obsolete_stock.php" role="button">Obsolete Stock</a>
+ <a class="btn btn-success" href="/qi_industry_needs.php" role="button">Needs of Industry</a>
+ <a class="btn btn-success" href="/qi_industry_stock.php" role="button">Stock of Industry</a>
  </p>
 
  <p>
