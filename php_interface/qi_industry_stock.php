@@ -126,7 +126,7 @@ from (
  left outer join (
   select ecj_product_type_id t,sum(ecj_runs) r
   from qi.esi_corporation_industry_jobs
-  where ecj_corporation_id=98677876 and ecj_status<>'delivered'
+  where ecj_corporation_id=98677876 and ecj_end_date>CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
   group by 1
  ) jobs on (jobs.t=stock.t)
  -- подсчёт подтребностей данного компонента с учётом имеющихся копий
