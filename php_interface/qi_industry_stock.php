@@ -70,7 +70,7 @@ function __dump_materials_tree(&$materials) { ?>
  <td><img class="icn24" src="<?=__get_img_src($material_id,32,FS_RESOURCES)?>"></td>
  <td><?php
     /*if ($material_qty > 1) { ?><strong><?=$material_qty?>x</strong> <?php }*/
-    ?><?=$material_name?>&nbsp;&nbsp;<span class="text-muted">(<?=$material_id?>)</span><?php
+    ?><?=$material_name.get_clipboard_copy_button($material_name)?>&nbsp;&nbsp;<span class="text-muted">(<?=$material_id?>)</span><?php
     if ($material_out_off=='t')
     {
         ?>&nbsp;<span class="label label-warning">out off</span><?php
@@ -79,7 +79,7 @@ function __dump_materials_tree(&$materials) { ?>
  <td><?=$material_tech_level?></td>
  <td><?=$material_qty?><?=($in_progress>0)?'<mark>+'.$in_progress.'</mark>':''?></td>
  <td><?=$material_calc?></td>
- <td><?=($overstock>0)?$overstock:''?></td>
+ <td><?=($overstock>0)?$overstock.get_clipboard_copy_button($overstock):''?></td>
  <td><?=($overstock<0)?-$overstock:''?></td>
 </tr>
             <?php
