@@ -144,7 +144,7 @@ function __dump_materials_tree(&$materials, &$sale) { ?>
 ?></td>
  <td><?=$material_tech_level?></td>
  <td><?=$material_qty?><?=($in_progress>0)?'<mark>+'.$in_progress.'</mark>':''?></td>
- <td><?=$material_calc.' '.$sale_now.' '.$sold_30_days?></td>
+ <td><?=$material_calc?></td>
  <td><?=($overstock>0)?$overstock.get_clipboard_copy_button($overstock):''?></td>
  <td><?=($overstock<0)?-$overstock:''?></td>
  <td><?=$sale_now?$sale_now:''?></td>
