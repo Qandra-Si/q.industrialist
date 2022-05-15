@@ -492,7 +492,7 @@ from (
   ecor_location_id,
   ceil(avg((ecor_volume_total-ecor_volume_remain)*ecor_price)) price_close,
   ceil(avg((case when ecor_history then 0 else ecor_volume_remain end)*ecor_price)) price_remain,
-  sum((case when ecor_history then 0 else ecor_escrow end)*ecor_price) escrow,
+  sum(case when ecor_history then 0 else ecor_escrow end) escrow,
   sum(ecor_volume_total-ecor_volume_remain) volume_close,
   sum(case when ecor_history then 0 else ecor_volume_remain end) volume_remain,
   sum(case when ecor_history then 0 else 1 end) orders_remain
