@@ -117,6 +117,16 @@ EOD;
  </p>
 
  <p>
+ Искалочка всевозможных предметов, работ, ордеров, коробок, фабрик, торговых хабов, действий персонажей по числовым идентификаторам<br>
+ <a class="btn btn-warning" href="/qi_google.php?id=34,11396,11399" role="button">Googler</a>
+ <a class="btn btn-default" href="/qi_google.php?id=1042" role="button">Планетарка</a>
+ <a class="btn btn-default" href="/qi_google.php?id=60003760" role="button">Jita 4-4</a>
+ <a class="btn btn-default" href="/qi_google.php?id=1036612408249" role="button">..stock ALL</a>
+ <a class="btn btn-default" href="/qi_google.php?id=37296,41073,41068,37290" role="button">Big Bada Boom</a>
+ <a class="btn btn-default" href="/qi_google.php?id=29987,29991,29989,29985,29986,29990,29988,29984" role="button">Strategic Cruiser</a>
+ </p>
+
+ <p>
  Текущий список закупок и продаж по всем корпорациям, объёмы реализации, сравнение цен с Jita.<br>
  <a class="btn btn-success" href="/qi_market_orders.php" role="button">Market Orders (без Querious)</a>
  <a class="btn btn-success" href="/qi_market_orders.php?buy_only=1" role="button">Buy Market Orders</a>
