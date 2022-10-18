@@ -48,6 +48,7 @@ def __dump_blueprint_materials(
         corp_assets_data,
         corp_industry_jobs_data,
         corp_blueprints_data):
+    allowed_container_ids = blueprint_containter_ids + blueprint_containter_ids
     for m1 in enumerate(bpmm0_materials, start=1):
         row1_num: int = int(m1[0])
         bpmm1_tid = int(m1[1]["typeID"])
@@ -79,8 +80,12 @@ def __dump_blueprint_materials(
                 __type_id = j["product_type_id"]
                 if bpmm1_tid != __type_id:
                     continue
-                __runs = int(j["runs"])
-                bpmm1_in_progress += __runs
+                __blueprint_location_id = j["blueprint_location_id"]
+                __output_location_id = j["output_location_id"]
+                __found = {__blueprint_location_id, __output_location_id} & set(allowed_container_ids)
+                if __found:
+                    __runs = int(j["runs"])
+                    bpmm1_in_progress += __runs
             industry_jobs_cache[bpmm1_tid] = bpmm1_in_progress
         # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
         # например с использованием BPO)
