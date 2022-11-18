@@ -132,7 +132,7 @@ function __dump_industry_jobs(&$active_jobs) { ?>
  <td><img class="icn32" src="<?=__get_img_src($job['pid'],32,FS_RESOURCES)?>" width="32px" height="32px"></td>
  <td><?=$job['pnm']?><br><span class="text-muted"><?=$job['pid']?></span></td>
  <td><?=$job['inm']?></td>
- <td><?=$job['left']?><br><div class="progress"><div class="progress-bar activity<?=$job['aid']?>" role="progressbar" aria-valuenow="<?=round($progress)?>" aria-valuemin="0" aria-valuemax="100" style="width: <?=round($progress,1)?>%;"></div></div></td>
+ <td><?=$job['left']?><br><div class="progress"><div class="progress-bar activity<?=$job['aid']?>" role="progressbar" aria-valuenow="<?=round(100-$progress)?>" aria-valuemin="0" aria-valuemax="100" style="width: <?=round(100-$progress,1)?>%;"></div></div></td>
  <td><?=$job['abnm']?></td>
  <td><?=$job['aonm']?></td>
  <td><?=$job['edt']?></td>
