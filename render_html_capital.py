@@ -586,7 +586,10 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         "b": [__capital_blueprint_dict] if not (__capital_blueprint_dict["id"] is None) else [],
         "j": 0}  # не показываем, что строим титан
     materials_summary.append(__capital_blueprint)
-    material_groups["2"].append(__capital_blueprint)  # Blueprints & Reactions
+    if material_groups.get("2"):
+        material_groups["2"].append(__capital_blueprint)  # Blueprints & Reactions
+    else:
+        material_groups.update({"2": [__capital_blueprint]})
 
     # вывод окончательного summary-списка материалов для постройки по чертежу
     ms_groups = material_groups.keys()
