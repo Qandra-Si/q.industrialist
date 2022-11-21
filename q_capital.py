@@ -165,7 +165,7 @@ def main():
         # перечисляем станции и контейнеры, которые были найдены
         print('\nFound report containters and station ids for {}...'.format(ro["product"]))
         for bpl in ro["blueprints"]:
-            print('  {} = {} (blueprints)'.format(bpl["id"], bpl["name"]))
+            print('  {} = {} (blueprints)'.format(bpl["id"], bpl.get("name", bpl.get("flag"))))
         for stk in ro["stock"]:
             print('  {} = {} (stock)'.format(stk["id"], stk.get("name", stk.get("flag"))))
 

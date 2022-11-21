@@ -485,7 +485,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     for bp in report_options["blueprints"]:
         if str_bp_cont_names:
             str_bp_cont_names = str_bp_cont_names + ', '
-        str_bp_cont_names += '<mark>' + bp['name'] + '</mark>'
+        str_bp_cont_names += '<mark>' + bp.get('name', bp.get('flag')) + '</mark>'
     if not str_bp_cont_names:
         str_bp_cont_names = '<mark></mark>'
     glf.write('<p>The number of Blueprints is considered based on the presence of blueprints in container(s) {}.</p>\n'.
