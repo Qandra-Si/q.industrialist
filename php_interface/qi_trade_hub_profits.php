@@ -154,7 +154,9 @@ from
   ) querious on (querious.ethp_type_id = irmalin.ethp_type_id)
 where
  jita.ethp_type_id = irmalin.ethp_type_id and
- irmalin.ethp_sell < jita.ethp_buy
+ irmalin.ethp_sell < jita.ethp_buy and
+ irmalin.ethp_sell_volume > 0 and
+ jita.ethp_buy_volume > 0
 order by 9 desc;
 EOD;
     $params = array($trade_hub_id);

@@ -315,3 +315,5 @@ EOD;
 ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
+
+<?php __dump_copy_to_clipboard_javascript() ?>
