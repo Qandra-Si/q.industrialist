@@ -319,7 +319,7 @@ CREATE TABLE qi.eve_sde_type_ids
 TABLESPACE pg_default;
 
 COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_meta_group_id IS 'meta-группа, получаем из sde';
-COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_tech_level IS 'технологический уровень 1..5, получаем из esi';
+COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_tech_level IS 'технологический уровень 1..5, получаем из esi'; -- при tech=1 различная meta (abyssal,faction,tech1...)
 COMMENT ON COLUMN qi.eve_sde_type_ids.sdet_packaged_volume IS 'm3 в упакованном виде, получаем из esi';
 
 ALTER TABLE qi.eve_sde_type_ids OWNER TO qi_user;
