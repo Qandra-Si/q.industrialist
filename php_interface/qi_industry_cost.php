@@ -298,6 +298,10 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV)?>">Percent</a></th>
                 $curr_market_group[$pkey]['jprct'] = $jita_sell ? (100.0 * (1 - $jita_materials_cost / $jita_sell)) : 0;
             }
         }
+    if ($curr_market_group)
+    {
+        __dump_industry_group($curr_market_group, $AM, $MV);
+    }
 ?>
 </tbody>
 </table>
@@ -444,14 +448,14 @@ EOD;
 EOD;
   }
     $query .= "\n".<<<EOD
-    --where
-      --m.sdebm_blueprint_type_id=42883 and
-      --m.sdebm_activity = 1
+    where
+      --m.sdebm_blueprint_type_id=11564 and -- m.sdebm_blueprint_type_id<=11664 and
+      m.sdebm_activity in (1,9,11)
     group by m.sdebm_blueprint_type_id
   ) as cost
 where
   product.sdebp_blueprint_type_id = cost.sdebm_blueprint_type_id and
-  --product.sdebp_activity = 1 and
+  product.sdebp_activity in (1,9,11) and
   product_bp.sdet_published and
   tid.sdet_type_id = product.sdebp_product_id and
   tid.sdet_published and
