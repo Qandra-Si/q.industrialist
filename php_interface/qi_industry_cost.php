@@ -14,6 +14,7 @@ const T3_ONLY_DEFAULT = 0;
 const AMARR_MARKET_DEFAULT = 0;
 const MARKET_VOLUME_DEFAULT = 1;
 const PROFIT_BY_SELL_DEFAULT = 1;
+const HIDE_UNPROFITABLE_DEFAULT = 1;
 
 $SORT = SORT_PRFT_ASC;
 $GRPs = null;
@@ -23,6 +24,7 @@ $T3 = T3_ONLY_DEFAULT;
 $AMARR_MARKET = AMARR_MARKET_DEFAULT;
 $MARKET_VOLUME = MARKET_VOLUME_DEFAULT;
 $PROFIT_BY_SELL = PROFIT_BY_SELL_DEFAULT;
+$HIDE_UNPROFITABLE = HIDE_UNPROFITABLE_DEFAULT;
 
 
 function cmp($a, $b)
@@ -38,7 +40,7 @@ function cmp($a, $b)
     }
 }
 
-function get_actual_url($s, $grp, $t1, $t2, $t3, $am, $mv, $pbs)
+function get_actual_url($s, $grp, $t1, $t2, $t3, $am, $mv, $pbs, $hu)
 {
     $url = strtok($_SERVER[REQUEST_URI], '?').'?s='.$s;
     if ($t1!=T1_ONLY_DEFAULT) $url = $url.'&t1='.($t1?1:0);
@@ -48,6 +50,7 @@ function get_actual_url($s, $grp, $t1, $t2, $t3, $am, $mv, $pbs)
     if ($am!=AMARR_MARKET_DEFAULT) $url = $url.'&am='.($am?1:0);
     if ($mv!=MARKET_VOLUME_DEFAULT) $url = $url.'&mv='.($mv?1:0);
     if ($pbs!=PROFIT_BY_SELL_DEFAULT) $url = $url.'&pbs='.($pbs?1:0);
+    if ($hu!=HIDE_UNPROFITABLE_DEFAULT) $url = $url.'&hu='.($hu?1:0);
     return $url;
 }
 
@@ -171,7 +174,7 @@ function __dump_industry_group(&$industry_group, $AM, $MV) {
         }
 }
 
-function __dump_industry_links(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS) {
+function __dump_industry_links(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS, $HU) {
     ?>Filters: <?php
 
     $no_filters =
@@ -182,34 +185,38 @@ function __dump_industry_links(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM
         ($AM==AMARR_MARKET_DEFAULT) &&
         ($MV==MARKET_VOLUME_DEFAULT);
     if ($no_filters) { ?><b><?php }
-    ?><a href="<?=get_actual_url($SORT, null, T1_ONLY_DEFAULT, T2_ONLY_DEFAULT, T3_ONLY_DEFAULT, AMARR_MARKET_DEFAULT, MARKET_VOLUME_DEFAULT, $PBS)?>">ALL</a><?php
+    ?><a href="<?=get_actual_url($SORT, null, T1_ONLY_DEFAULT, T2_ONLY_DEFAULT, T3_ONLY_DEFAULT, AMARR_MARKET_DEFAULT, MARKET_VOLUME_DEFAULT, $PBS, 0)?>">ALL</a><?php
     if ($no_filters) { ?></b><?php }
 
     if ($T1==1) { ?><b><?php }
-    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1?0:1, 0, 0, $AM, $MV, $PBS)?>">T1 only</a><?php
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1?0:1, 0, 0, $AM, $MV, $PBS, $HU)?>">T1 only</a><?php
     if ($T1==1) { ?></b><?php }
 
     if ($T2==1) { ?><b><?php }
-    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, $T2?0:1, 0, $AM, $MV, $PBS)?>">T2 only</a><?php
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, $T2?0:1, 0, $AM, $MV, $PBS, $HU)?>">T2 only</a><?php
     if ($T2==1) { ?></b><?php }
 
     if ($T3==1) { ?><b><?php }
-    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, 0, $T3?0:1, $AM, $MV, $PBS)?>">T3 only</a><?php
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, 0, $T3?0:1, $AM, $MV, $PBS, $HU)?>">T3 only</a><?php
     if ($T3==1) { ?></b><?php }
 
     ?><br>Settings: <?php
 
     if ($AM==1) { ?><b><?php }
-    ?><a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM?0:1, $MV, $PBS)?>">Amarr market</a><?php
+    ?><a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM?0:1, $MV, $PBS, $HU)?>">Amarr market</a><?php
     if ($AM==1) { ?></b><?php }
 
     if ($MV==1) { ?><b><?php }
-    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM, $MV?0:1, $PBS)?>">Sell / Buy volume</a><?php
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM, $MV?0:1, $PBS, $HU)?>">Sell / Buy volume</a><?php
     if ($MV==1) { ?></b><?php }
 
     if ($PBS==1) { ?><b><?php }
-    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS?0:1)?>">Calculate sales profit</a><?php
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS?0:1, $HU)?>">Calculate sales profit</a><?php
     if ($PBS==1) { ?></b><?php }
+
+    if ($HU==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS, $HU?0:1)?>">Hide unprofitable</a><?php
+    if ($HU==1) { ?></b><?php }
 
     $first = true;
     $prev_market_group = null;
@@ -227,13 +234,13 @@ function __dump_industry_links(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM
                 if ($not_found) array_push($grp, $market_group_id); else unset($grp[$key]);
                 if ($first) { $first = false; ?><br>Categories: <?php } else { ?>, <?php }
                 if (!$not_found) { ?><b><?php }
-                ?><a href="<?=get_actual_url($SORT, $grp, $T1, $T2, $T3, $AM, $MV, $PBS)?>"><?=$market_group?></a><?php
+                ?><a href="<?=get_actual_url($SORT, $grp, $T1, $T2, $T3, $AM, $MV, $PBS, $HU)?>"><?=$market_group?></a><?php
                 if (!$not_found) { ?></b><?php }
             }
         }
 }
 
-function __dump_industry_cost(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS) { ?>
+function __dump_industry_cost(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM, $MV, $PBS, $HU) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -241,11 +248,11 @@ function __dump_industry_cost(&$industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AM,
   <th width="100%">Items</th>
   <th style="text-align: right;"><a href="<?=
 ($SORT==SORT_PRFT_ASC)?
-get_actual_url(SORT_PRFT_DESC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS):
-get_actual_url(SORT_PRFT_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS)?>">Jita Profit</a><br><a href="<?=
+get_actual_url(SORT_PRFT_DESC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS,$HU):
+get_actual_url(SORT_PRFT_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS,$HU)?>">Jita Profit</a><br><a href="<?=
 ($SORT==SORT_PERC_ASC)?
-get_actual_url(SORT_PERC_DESC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS):
-get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS)?>">Percent</a></th>
+get_actual_url(SORT_PERC_DESC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS,$HU):
+get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS,$HU)?>">Percent</a></th>
   <th style="text-align: right;">Jita Materials<br>Cost</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
   <?php if ($MV) { ?>
@@ -291,36 +298,38 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$AM,$MV,$PBS)?>">Percent</a></th>
                 if (array_search($market_group_id, $GRPs) === false) continue;
             }
 
-            $curr_market_group[$pkey] = $product;
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $jita_materials_cost = $product['jsmp'];
+            $jprft = null;
+            $jprct = null;
+
             if ($PBS == 1)
             {
                 if (is_null($jita_materials_cost) || is_null($jita_sell))
-                {
-                    $curr_market_group[$pkey]['jprft'] = null;
-                    $curr_market_group[$pkey]['jprct'] = null;
-                }
+                    ;
                 else
                 {
-                    $curr_market_group[$pkey]['jprft'] = $jita_sell - $jita_materials_cost;
-                    $curr_market_group[$pkey]['jprct'] = $jita_sell ? (100.0 * (1 - $jita_materials_cost / $jita_sell)) : 0;
+                    $jprft = $jita_sell - $jita_materials_cost;
+                    $jprct = $jita_sell ? (100.0 * (1 - $jita_materials_cost / $jita_sell)) : 0;
                 }
             }
             else // if ($PBS == 0)
             {
                 if (is_null($jita_materials_cost) || is_null($jita_buy))
-                {
-                    $curr_market_group[$pkey]['jprft'] = null;
-                    $curr_market_group[$pkey]['jprct'] = null;
-                }
+                    ;
                 else
                 {
-                    $curr_market_group[$pkey]['jprft'] = $jita_buy - $jita_materials_cost;
-                    $curr_market_group[$pkey]['jprct'] = $jita_buy ? (100.0 * (1 - $jita_materials_cost / $jita_buy)) : 0;
+                    $jprft = $jita_buy - $jita_materials_cost;
+                    $jprct = $jita_buy ? (100.0 * (1 - $jita_materials_cost / $jita_buy)) : 0;
                 }
             }
+
+            if ($HU && (is_null($jprct) || ($jprct <= 0))) continue;
+
+            $curr_market_group[$pkey] = $product;
+            $curr_market_group[$pkey]['jprft'] = $jprft;
+            $curr_market_group[$pkey]['jprct'] = $jprct;
         }
     if ($curr_market_group)
     {
@@ -381,6 +390,12 @@ if (!isset($_GET['pbs'])) $PROFIT_BY_SELL = PROFIT_BY_SELL_DEFAULT; else {
   $_get_pbs = htmlentities($_GET['pbs']);
   if (is_numeric($_get_pbs)) $PROFIT_BY_SELL = get_numeric($_get_pbs);
   else $PROFIT_BY_SELL = PROFIT_BY_SELL_DEFAULT;
+}
+
+if (!isset($_GET['hu'])) $HIDE_UNPROFITABLE = HIDE_UNPROFITABLE_DEFAULT; else {
+  $_get_hu = htmlentities($_GET['hu']);
+  if (is_numeric($_get_hu)) $HIDE_UNPROFITABLE = get_numeric($_get_hu);
+  else $HIDE_UNPROFITABLE = HIDE_UNPROFITABLE_DEFAULT;
 }
 
 
@@ -501,8 +516,8 @@ EOD;
 
 <div class="container-fluid">
 <?php
-  __dump_industry_links($industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AMARR_MARKET, $MARKET_VOLUME, $PROFIT_BY_SELL);
-  __dump_industry_cost($industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AMARR_MARKET, $MARKET_VOLUME, $PROFIT_BY_SELL);
+  __dump_industry_links($industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AMARR_MARKET, $MARKET_VOLUME, $PROFIT_BY_SELL, $HIDE_UNPROFITABLE);
+  __dump_industry_cost($industry_cost, $SORT, $GRPs, $T1, $T2, $T3, $AMARR_MARKET, $MARKET_VOLUME, $PROFIT_BY_SELL, $HIDE_UNPROFITABLE);
 ?>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
