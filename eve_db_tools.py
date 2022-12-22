@@ -113,7 +113,10 @@ class QDatabaseTools:
     corporation_asset_diff = ['quantity', 'location_id', 'location_type', 'location_flag', 'is_singleton']
     corporation_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
                                   'material_efficiency', 'runs']
+    character_blueprint_diff = ['type_id', 'location_id', 'location_flag', 'quantity', 'time_efficiency',
+                                'material_efficiency', 'runs']
     corporation_industry_job_diff = ['status']
+    character_industry_job_diff = ['status']
     market_order_diff = ['price', 'volume_remain']
     markets_prices_diff = ['adjusted_price', 'average_price']
 
@@ -141,7 +144,9 @@ class QDatabaseTools:
         self.__cached_corporation_assets: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_assets_names: typing.Dict[int,  typing.Dict[int, str]] = {}
         self.__cached_corporation_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_character_blueprints: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
+        self.__cached_character_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_markets_prices: typing.Dict[int, QEntity] = {}
         self.__cached_category_ids: typing.Set[int] = set()
@@ -165,7 +170,9 @@ class QDatabaseTools:
         del self.__cached_category_ids
         del self.__cached_markets_prices
         del self.__cached_corporation_orders
+        del self.__cached_character_industry_jobs
         del self.__cached_corporation_industry_jobs
+        del self.__cached_character_blueprints
         del self.__cached_corporation_blueprints
         del self.__cached_corporation_assets_names
         del self.__cached_corporation_assets
@@ -338,6 +345,34 @@ class QDatabaseTools:
             print(' == new_ids     ', new_ids)
             print(' == deleted_ids ', deleted_ids)
         return ids_from_esi, ids_in_cache, new_ids, deleted_ids
+
+    @staticmethod
+    def get_pers_cache(cache, character_id):
+        pers_cache = cache.get(character_id)
+        if not pers_cache:
+            cache[character_id] = {}
+            pers_cache = cache.get(character_id)
+        return pers_cache
+
+    def prepare_pers_cache(self, rows, cache, row_key, datetime_keys):
+        for row in rows:
+            row_id: int = int(row[row_key])
+            ext = row['ext']
+            updated_at = ext['updated_at'].replace(tzinfo=pytz.UTC)
+            character_id: int = int(ext['character_id'])
+            del ext['updated_at']
+            del ext['character_id']
+            del row['ext']
+            if datetime_keys:
+                for dtkey in datetime_keys:
+                    if dtkey in row:
+                        row[dtkey].replace(tzinfo=pytz.UTC)
+            pers_cache = self.get_pers_cache(cache, character_id)
+            pers_cache[row_id] = QEntity(True, False, row, updated_at)
+            if ext == {}:
+                del ext
+            else:
+                pers_cache[row_id].store_ext(ext)
 
     # -------------------------------------------------------------------------
     # e v e   s w a g g e r   i n t e r f a c e
@@ -1119,6 +1154,114 @@ class QDatabaseTools:
         return known_blueprints
 
     # -------------------------------------------------------------------------
+    # /characters/{character_id}/blueprints/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_character_blueprints_url(character_id: int) -> str:
+        # Requires: access token
+        return "characters/{character_id}/blueprints/".format(
+            character_id=character_id
+        )
+
+    def actualize_character_blueprint_item_details(self, item_data, need_data=False):
+        # location_flag: str = item_data['location_flag']
+        # if location_flag == 'CorpDeliveries':  # Station or Structure
+        #     location_id: int = int(item_data['location_id'])
+        #     self.actualize_station_or_structure(location_id, need_data=need_data)
+        pass
+
+    def actualize_character_blueprint_item(self, character_id: int, item_data, updated_at):
+        item_id: int = int(item_data['item_id'])
+        pers_cache = self.get_pers_cache(self.__cached_character_blueprints, character_id)
+        in_cache = pers_cache.get(item_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
+        #    если данные изменились, то надо также обновить их в БД
+        data_equal: bool = False
+        if not in_cache:
+            pass
+        elif in_cache.obj:
+            data_equal = in_cache.is_obj_equal_by_keys(item_data, self.character_blueprint_diff)
+        # ---
+        # из соображений о том, что корпоративные чертежи может читать только пилот с ролью корпорации,
+        # выполняем обновление сведений как о структурах и станциях, где расположены офисы (и т.п.), а в случае
+        # необходимости подгружаем данные из БД
+        self.actualize_character_blueprint_item_details(item_data, need_data=not data_equal)
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
+        self.dbswagger.insert_or_update_character_blueprints(item_data, character_id, updated_at)
+        # сохраняем данные в кеше
+        if not in_cache:
+            pers_cache[item_id] = QEntity(True, True, item_data, updated_at)
+            in_cache = pers_cache.get(item_id)
+            in_cache.store_ext({'just_added': True})  # добавлен в кеш и в БД (ранее отсутствовал)
+        else:
+            in_cache.store(True, True, item_data, updated_at)
+            in_cache.store_ext({'changed': True})  # был в кеше, а значит и в БД (обновлён и там и тут)
+
+    def actualize_character_blueprints(self, _character_id):
+        character_id: int = int(_character_id)
+
+        # Requires role(s): access token
+        url: str = self.get_character_blueprints_url(character_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+        if data is None:
+            return None
+        elif self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+        self.prepare_pers_cache(
+            self.dbswagger.get_exist_character_blueprints(character_id),
+            self.__cached_character_blueprints,
+            'item_id',
+            None
+        )
+
+        # список чертежей имеющихся у пилота, хранящихся в БД, в кеше, а также новых и исчезнувших
+        pers_cache = self.__cached_character_blueprints.get(character_id)
+        ids_from_esi, ids_in_cache, new_ids, deleted_ids = self.get_cache_status(
+            pers_cache,
+            data, 'item_id',
+            debug=False
+        )
+        if not ids_from_esi:
+            del data
+            del pers_cache
+            return None
+
+        # важно убедиться, что перед добавлением данных в БД, в связанной таблице есть пилот
+        self.actualize_character(character_id, need_data=True)
+
+        known_blueprints: int = len(data)
+        if self.depth.push(url):
+            for item_data in data:
+                self.actualize_character_blueprint_item(character_id, item_data, updated_at)
+            self.depth.pop()
+        del data
+
+        # параметр updated_at меняется в случае, если меняются данные коробки, т.ч. не
+        # использует массовое обновление всех коробок, а лишь удаляем исчезнувшие
+        self.dbswagger.delete_obsolete_character_blueprints(deleted_ids)
+        self.qidb.commit()
+
+        # отмечаем, что часть данных в кеше осталась, но из БД уже удалена (т.е. ранее информация была
+        # считана из БД, но с серверов ССР чертежи исчезли) - их могут удалить, могут переложить в
+        # корп ангар, могут использовать и т.п. (т.е. быть может в будущем эти чертежи снова появятся
+        # в личных коробках)
+        for item_id in deleted_ids:
+            in_cache = pers_cache.get(int(item_id))
+            if in_cache:
+                in_cache.store_ext({'deleted': True})
+
+        return known_blueprints
+
+    # -------------------------------------------------------------------------
     # corporations/{corporation_id}/industry/jobs/
     # -------------------------------------------------------------------------
 
@@ -1228,6 +1371,97 @@ class QDatabaseTools:
 
         self.dbswagger.link_blueprint_invents_with_jobs()
         self.qidb.commit()
+
+    # -------------------------------------------------------------------------
+    # characters/{character_id}/industry/jobs/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_character_industry_jobs_url(character_id: int) -> str:
+        # Requires role(s): access token
+        return "characters/{character_id}/industry/jobs/?include_completed=true".format(character_id=character_id)
+
+    def actualize_character_industry_job_item_details(self, job_data, need_data=False):
+        self.actualize_station_or_structure(job_data['facility_id'], need_data=need_data)
+        self.actualize_character(job_data['installer_id'], need_data=need_data)
+        completed_character_id = job_data.get('completed_character_id')
+        if completed_character_id:
+            self.actualize_character(job_data['completed_character_id'], need_data=need_data)
+
+    def actualize_character_industry_job_item(self, character_id: int, job_data, updated_at):
+        job_id: int = int(job_data['job_id'])
+        pers_cache = self.get_pers_cache(self.__cached_character_industry_jobs, character_id)
+        in_cache = pers_cache.get(job_id)
+        # 1. либо данных нет в кеше
+        # 2. если данные с таким id существуют, то проверяем изменились ли они в кеше
+        #    если данные изменились, то надо также обновить их в БД
+        data_equal: bool = False
+        if not in_cache:
+            pass
+        elif in_cache.obj:
+            if in_cache.obj['status'] in ('delivered', 'cancelled'):
+                data_equal = True  # в БД уже хранятся актуальные данные!
+            else:
+                data_equal = in_cache.is_obj_equal_by_keys(job_data, self.character_industry_job_diff)
+        # ---
+        # выполняем обновление сведений как о структурах и станциях, так и у частниках производства, а в случае
+        # необходимости подгружаем данные из БД
+        self.actualize_character_industry_job_item_details(job_data, need_data=not data_equal)
+        # данные с серверов CCP уже загружены, в случае необходимости обновляем данные в БД
+        if data_equal:
+            return
+        self.dbswagger.insert_or_update_character_industry_jobs(job_data, character_id, updated_at)
+        # сохраняем данные в кеше
+        if not in_cache:
+            pers_cache[job_id] = QEntity(True, True, job_data, updated_at)
+            in_cache = pers_cache.get(job_id)
+            in_cache.store_ext({'just_added': True})  # добавлен в кеш и в БД (ранее отсутствовал)
+        else:
+            in_cache.store(True, True, job_data, updated_at)
+            in_cache.store_ext({'changed': True})  # был в кеше, а значит и в БД (обновлён и там и тут)
+
+    def actualize_character_industry_jobs(self, _character_id):
+        character_id: int = int(_character_id)
+
+        # Requires role(s): access token
+        url: str = self.get_character_industry_jobs_url(character_id)
+        data, updated_at, is_updated = self.load_from_esi_paged_data(url)
+
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
+        oldest_delivered_job = None
+        for job_data in data:
+            if job_data['status'] in ('delivered', 'cancelled'):
+                job_id: int = int(job_data['job_id'])
+                if not oldest_delivered_job:
+                    oldest_delivered_job = job_id
+                elif oldest_delivered_job > job_id:
+                    oldest_delivered_job = job_id
+
+        self.prepare_pers_cache(
+            self.dbswagger.get_exist_character_industry_jobs(character_id, oldest_delivered_job),
+            self.__cached_character_industry_jobs,
+            'job_id',
+            ['start_date', 'end_date', 'completed_date', 'pause_date']
+        )
+
+        # актуализация (добавление и обновление) производственных работ
+        known_industry_jobs: int = len(data)
+        active_industry_jobs: int = len([j for j in data if j['status'] == 'active'])
+        if self.depth.push(url):
+            for job_data in data:
+                self.actualize_character_industry_job_item(character_id, job_data, updated_at)
+            self.depth.pop()
+        self.qidb.commit()
+        del data
+
+        return known_industry_jobs, active_industry_jobs
 
     # -------------------------------------------------------------------------
     # /corporations/{corporation_id}/wallets/{division}/journal/
