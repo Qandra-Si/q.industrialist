@@ -167,7 +167,7 @@ def __dump_blueprint_materials(
             materials_summary.append(__summary_dict)
         else:
             # меняем запланированное кол-во материалов (использованное)
-            __summary_dict["q"] += (__summary_dict["rest"] - bpmm1_rest)
+            __summary_dict["q"] += bpmm1_not_enough + (__summary_dict["rest"] - bpmm1_rest)
         # считаем, сколько материалов останется в неизрасходованном виде,
         # как результат текущего запуска производства
         if bpmm1_not_enough > 0 and bpmm1_product_quantity is not None and bpmm1_product_quantity > 1:
