@@ -35,8 +35,8 @@ import q_industrialist_settings
 import q_capital_settings
 import eve_esi_tools
 import eve_sde_tools
+import eve_industry_cost
 import console_app
-import render_html_capital
 
 from __init__ import __version__
 
@@ -172,7 +172,9 @@ def main():
         print("\nBuilding report...")
         sys.stdout.flush()
 
-        render_html_capital.dump_capital_into_report(
+        eve_industry_cost.calc_industry_cost(
+            # результаты расчёта: какие ресурсы (и сколько) надо потратить, чтобы получить желаемый продукт
+            None,
             # путь, где будет сохранён отчёт
             argv_prms["workspace_cache_files_dir"],
             # настройки генерации отчёта
