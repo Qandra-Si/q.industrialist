@@ -158,7 +158,7 @@ def __dump_blueprint_materials(
             __summary_dict = {"id": bpmm1_tid,
                               "bid": bpmm1_blueprint_type_id,
                               "nm": bpmm1_tnm,
-                              "q": 0,  # bpmm1_not_enough (bpmm1_quantity_with_efficiency?)
+                              "q": bpmm1_not_enough,
                               "a": bpmm1_available,
                               "j": bpmm1_in_progress,
                               "portion": 1 if bpmm1_product_quantity is None else bpmm1_product_quantity,
@@ -168,13 +168,12 @@ def __dump_blueprint_materials(
         else:
             # меняем запланированное кол-во материалов (использованное)
             __summary_dict["q"] += (__summary_dict["rest"] - bpmm1_rest)
-            # считаем, сколько материалов останется в неизрасходованном виде,
-            # как результат текущего запуска производства
-            if bpmm1_not_enough > 0 and bpmm1_product_quantity is not None and bpmm1_product_quantity > 1:
-                __summary_dict["rest"] = bpmm1_product_quantity - bpmm1_not_enough % bpmm1_product_quantity
-            else:
-                __summary_dict["rest"] = bpmm1_rest
-        __summary_dict["q"] += bpmm1_not_enough
+        # считаем, сколько материалов останется в неизрасходованном виде,
+        # как результат текущего запуска производства
+        if bpmm1_not_enough > 0 and bpmm1_product_quantity is not None and bpmm1_product_quantity > 1:
+            __summary_dict["rest"] = bpmm1_product_quantity - bpmm1_not_enough % bpmm1_product_quantity
+        else:
+            __summary_dict["rest"] = bpmm1_rest
         # считаем, сколько не хватает (в пропорциях) метариала текущего уровня вложенности
         bpmm1_rate = (bpmm0_rate * bpmm1_not_enough) if bpmm1_product_quantity is None else (bpmm0_rate * (bpmm1_not_enough / bpmm1_product_quantity))
         __summary_dict["rate"] += bpmm1_rate
