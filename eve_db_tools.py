@@ -1849,6 +1849,9 @@ class QDatabaseTools:
         # накопленных данных, по сведениям из таблицы esi_corporation_orders)
         self.dbswagger.sync_market_location_history_with_corp_orders_by_corp(corporation_id)
 
+        # удаление устаревших ордеров
+        self.dbswagger.discard_obsolete_contracts()
+
         return corp_has_active_orders, corp_has_finished_orders
 
     # -------------------------------------------------------------------------

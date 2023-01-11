@@ -2172,6 +2172,18 @@ class QSwaggerInterface:
             data.append(row[0])
         return data
 
+    def discard_obsolete_contracts(self):
+        self.db.execute(
+            "UPDATE esi_corporation_orders "
+            "SET ecor_history=true "
+            "FROM ("
+            " SELECT ecor_corporation_id cid, ecor_order_id oid"
+            " FROM esi_corporation_orders"
+            " WHERE NOT ecor_history AND current_date > (ecor_issued+1) + ecor_duration * interval '1 day'"
+            ") o "
+            "WHERE ecor_corporation_id=cid and ecor_order_id=oid;"
+        )
+
     # -------------------------------------------------------------------------
     # /markets/prices/
     # -------------------------------------------------------------------------
