@@ -483,7 +483,8 @@ select
  escrow,
  volume_close,
  volume_remain,
- orders_remain
+ orders_remain,
+ last_price
 from (
  select
   ecor_is_buy_order,
@@ -495,9 +496,28 @@ from (
   sum(case when ecor_history then 0 else ecor_escrow end) escrow,
   sum(ecor_volume_total-ecor_volume_remain) volume_close,
   sum(case when ecor_history then 0 else ecor_volume_remain end) volume_remain,
-  sum(case when ecor_history then 0 else 1 end) orders_remain
+  sum(case when ecor_history then 0 else 1 end) orders_remain,
+  max(last_price.price) as last_price
  from esi_corporation_orders
-  left outer join eve_sde_type_ids itm on (itm.sdet_type_id=ecor_type_id) 
+  left outer join eve_sde_type_ids itm on (itm.sdet_type_id=ecor_type_id)
+  left outer join (
+   select t1.*, t2.ecwt_unit_price as price
+   from (
+    select
+     ecwt_type_id as id,
+     ecwt_corporation_id as co,
+     ecwt_location_id as lo,
+     ecwt_is_buy as buy,
+     max(ecwt_transaction_id) as tr
+    from esi_corporation_wallet_transactions
+    where ecwt_date > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '100 days')
+    group by 1, 2, 3, 4
+   ) t1
+    left outer join esi_corporation_wallet_transactions as t2 on (t1.tr=t2.ecwt_transaction_id)
+  ) as last_price on (last_price.id=ecor_type_id and
+                      last_price.co=ecor_corporation_id and
+                      last_price.lo=ecor_location_id and
+                      last_price.buy=ecor_is_buy_order)
  where
   ((not ecor_history and (ecor_updated_at > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '100 days'))) or
    (ecor_updated_at > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '30 days'))) and
@@ -550,13 +570,14 @@ EOD;
   <th>Кол-во<br>ордеров</th>
   <th>Цена, ISK<br>(остатки<?=($is_buy_order=='t')?'+escrow':''?>)</th>
   <th>Объём<br>(остатки)</th>
+  <th>Цена, ISK<br>(последняя)</th>
  </tr>
 </thead>
 <tbody><?php
         }
         if ($prev_corporation_id != $corporation_id || $prev_trade_hub_name != $trade_hub_name)
         {
-            ?><tr><td class="active" colspan="7"><strong>Corporation # <?=$corporation_id?> » <?=$trade_hub_name?> <span class="text-muted">(<?=$o['ecor_location_id']?>)</span></strong></td><?php
+            ?><tr><td class="active" colspan="8"><strong>Corporation # <?=$corporation_id?> » <?=$trade_hub_name?> <span class="text-muted">(<?=$o['ecor_location_id']?>)</span></strong></td><?php
             $prev_corporation_id = $corporation_id;
             $prev_trade_hub_name = $trade_hub_name;
         }
@@ -577,6 +598,7 @@ EOD;
  <td><?=number_format($o['volume_remain'],0,'.',',')?></td><?php
     }
  ?>
+ <td><?=is_null($o['last_price'])?'':number_format($o['last_price'],2,'.',',')?></td>
 </tr><?php
     }
     if ($body_printed) { ?></tbody></table><?php }
