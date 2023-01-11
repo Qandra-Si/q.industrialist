@@ -79,8 +79,10 @@ EOD;
  <a class="btn btn-success" href="/qi_market_nisuwa.php" role="button">Nisuwa Market</a>
  <a class="btn btn-success" href="/qi_market_nsimw.php" role="button">Malpais Market</a>
  <a class="btn btn-success" href="/qi_market_4hwwf.php" role="button">4H-WWF Market</a>
- <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a><br>
- <br>
+ <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a>
+ <a class="btn btn-success" href="qi_market_mj5f9.php" role="button">MJ-5F9 Market</a>
+ <a class="btn btn-success" href="qi_market_b2j5n.php" role="button">B2J-5N Market</a><br>
+<br>
 <?php
     $query = <<<EOD
 select distinct
