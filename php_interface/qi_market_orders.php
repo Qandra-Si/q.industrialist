@@ -4,7 +4,7 @@ include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 ?>
 
-<?php function __dump_market_orders(&$market_orders, $is_buy_orders) { ?>
+<?php function __dump_market_orders(&$market_orders, $is_buy_orders, &$summary_jita_sell, &$summary_jita_buy) { ?>
 <table class="table table-condensed" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
@@ -156,14 +156,32 @@ EOD;
     pg_close($conn);
 ?>
 <div class="container-fluid">
+<?php
+  $sell_summary_jita_sell = 0;
+  $sell_summary_jita_buy = 0;
+  $buy_summary_jita_sell = 0;
+  $buy_summary_jita_buy = 0;
+?>
 <?php if (!$buy_only) { ?>
   <h2>Sell Orders</h2>
-  <?php __dump_market_orders($market, 'f'); ?>
+  <?php __dump_market_orders($market, 'f', $sell_summary_jita_sell, $sell_summary_jita_buy); ?>
 <?php } ?>
 
 <?php if (!$sell_only) { ?>
   <h2>Buy Orders</h2>
-  <?php __dump_market_orders($market, 't'); ?>
+  <?php __dump_market_orders($market, 't', $buy_summary_jita_sell, $buy_summary_jita_buy); ?>
 <?php } ?>
+
+<h2>Итог</h2>
+<p>Стоимость всех ордеров на продажу:</p>
+<ul>
+<li> по Jita Sell: <b><?=number_format($sell_summary_jita_sell,0,'.',',')?></b>
+<li> по Jita Buy: <b><?=number_format($sell_summary_jita_buy,0,'.',',')?></b>
+</ul>
+<p>Стоимость всех ордеров на покупку:</p>
+<ul>
+<li> по Jita Sell: <b><?=number_format($buy_summary_jita_sell,0,'.',',')?></b>
+<li> по Jita Buy: <b><?=number_format($buy_summary_jita_buy,0,'.',',')?></b>
+</ul>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
