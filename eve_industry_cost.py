@@ -21,6 +21,95 @@ def get_pseudographics_prefix(levels, is_last):
     return prfx
 
 
+def get_optimized_runs_quantity(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # параметры чертежа
+        blueprint_activity_dict,
+        # кол-во продуктов, которые будут получены за один раз чертежа
+        products_per_single_run: int,
+        # признак - формула ли, или реакция продукта?
+        is_reaction_formula: bool,
+        # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
+        customized_optimizations) -> typing.Tuple[int, int]:
+    # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
+    runs_number_per_day = None
+    if is_reaction_formula:
+        # если не None, то настроенное кол-во ранов для реакций
+        customized_reaction_runs = customized_optimizations.get("reaction_runs") if customized_optimizations else None
+        if customized_reaction_runs:
+            runs_number_per_day = customized_reaction_runs
+    else:
+        # если не None, то длительность запуска производственных работ
+        customized_industry_time = customized_optimizations.get("industry_time") if customized_optimizations else None
+        if customized_industry_time:
+            tm: int = blueprint_activity_dict['time']
+            if tm >= customized_industry_time:
+                runs_number_per_day = 1
+            elif tm > 0:
+                runs_number_per_day = math.ceil(customized_industry_time / tm)
+    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
+    if runs_number_per_day:
+        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
+        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
+        blueprints_or_runs: int = math.ceil(need_quantity / (products_per_single_run * runs_number_per_day))
+        optimized_runs_quantity: int = blueprints_or_runs * runs_number_per_day
+        return optimized_runs_quantity, products_per_single_run * runs_number_per_day
+    # если настройки оптимизации не заданы, то считаем кол-во чертежей/ранов с учётом лишь только потребностей
+    else:
+        blueprints_or_runs: int = math.ceil(need_quantity / products_per_single_run)
+        optimized_runs_quantity: int = blueprints_or_runs
+        return optimized_runs_quantity, products_per_single_run
+
+
+def recalc_industry_rest(
+        quantity_with_efficiency: int,
+        available: int,
+        in_progress: int,
+        not_enough: int,
+        rest: int,
+        tid: int, assets_cache, industry_jobs_cache) -> int:
+    # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
+    if (available + in_progress + rest) <= quantity_with_efficiency:
+        # считаем, сколько материалов останется в неизрасходованном виде,
+        # как результат текущего запуска производства
+        rest = \
+            quantity_with_efficiency - \
+            not_enough - \
+            assets_cache[tid] - \
+            industry_jobs_cache[tid]
+        # минусуем остатки на складе и в производстве
+        assets_cache[tid] = 0
+        industry_jobs_cache[tid] = 0
+    else:
+        __left = quantity_with_efficiency - not_enough
+        # минусуем остатки на складе
+        if available >= __left:
+            assets_cache[tid] -= __left
+            __left = 0
+        else:
+            __left -= available
+            assets_cache[tid] = 0
+        # минусуем остатки в производстве
+        if __left > 0 and in_progress:
+            if in_progress >= __left:
+                industry_jobs_cache[tid] -= __left
+                __left = 0
+            else:
+                __left -= industry_jobs_cache[tid]
+                industry_jobs_cache[tid] = 0
+        # считаем, сколько материалов останется в неизрасходованном виде,
+        # как результат текущего запуска производства
+        if __left > 0 and rest > 0:
+            if rest >= __left:
+                rest -= __left
+                __left = 0
+            else:
+                __left -= rest
+                rest = 0
+    return rest
+
+
 def __dump_blueprint_materials(
         glf,
         row0_prefix,
@@ -29,7 +118,7 @@ def __dump_blueprint_materials(
         bpmm0_rate: float,  # пропорция от продукта, требуемая (с учётом предыдущей вложенности)
         bpmm0_quantity: int,  # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
         bpmm0_materials,  # материалы, для постройки продукта
-        bpmm0_material_efficiency,  # me чертежа продукта
+        bpmm0_material_efficiency,  # me чертежа продукта (валидно только для manufacturing)
         bpmm0_is_reaction_formula,  # признак - формула ли, или реакция продукта?
         # ...
         # сводная статистика (формируется в процессе работы метода)
@@ -51,6 +140,7 @@ def __dump_blueprint_materials(
         corp_assets_data,
         corp_industry_jobs_data,
         corp_blueprints_data):
+    # список контейнеров, в которых будет выполняться поиск ассетов (чертежей)
     allowed_container_ids = blueprint_containter_ids + blueprint_containter_ids
     for m1 in enumerate(bpmm0_materials, start=1):
         row1_num: int = int(m1[0])
@@ -59,6 +149,7 @@ def __dump_blueprint_materials(
         bpmm1_quantity = int(m1[1]["quantity"])
         # заранее готовим summary-dict справочник с информацией по плану использования текущего продукта
         __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm1_tid), None)
+        bpmm1_rest: int = __summary_dict.get('rest', 0) if __summary_dict else 0
         # поиск чертежа для этого типа продукта (которого может и не быть, например если возможен только закуп)
         bpmm1_blueprint_type_id, bpmm1_blueprint_data = \
             eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "manufacturing")
@@ -68,16 +159,19 @@ def __dump_blueprint_materials(
                 eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "reaction")
             bpmm1_is_reaction_formula = bpmm1_blueprint_type_id is not None
         if bpmm1_blueprint_type_id is None:
-            bpmm1_product_quantity = None
+            bpmm1_blueprint_activity_dict = None
+            bpmm1_products_per_single_run = None
             bpmm1_blueprint_materials = None
         else:
+            # см. также eve_conveyor_tools.py : setup_blueprint_details
             activity: str = 'reaction' if bpmm1_is_reaction_formula else 'manufacturing'
-            bpmm1_blueprint_materials = bpmm1_blueprint_data["activities"][activity]["materials"]
-            bpmm1_blueprint_products = bpmm1_blueprint_data["activities"][activity]["products"]
+            bpmm1_blueprint_activity_dict = bpmm1_blueprint_data["activities"][activity]
+            bpmm1_blueprint_materials = bpmm1_blueprint_activity_dict["materials"]
+            bpmm1_blueprint_products = bpmm1_blueprint_activity_dict["products"]
             if len(bpmm1_blueprint_products) == 1:
-                bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
+                bpmm1_products_per_single_run = bpmm1_blueprint_products[0]['quantity']
             else:  # здесь непонятно что делать, т.к. явно надо выбрать правильный продукт? с иным кол-вом на выходе?
-                bpmm1_product_quantity = bpmm1_blueprint_products[0]['quantity']
+                bpmm1_products_per_single_run = bpmm1_blueprint_products[0]['quantity']
         # помечаем использованными материалы и работы, чтобы на следующих элементах использовалось ОСТАВШЕЕСЯ кол-во
         # подсчёт кол-ва имеющихся в наличии материалов
         bpmm1_available = assets_cache.get(bpmm1_tid)
@@ -114,68 +208,120 @@ def __dump_blueprint_materials(
             industry_jobs_cache[bpmm1_tid] = bpmm1_in_progress
         # подсчёт кол-ва материалов, учитываемых как "остатки" от предыдущих циклов производства (неиспользованные
         # остатки от ещё незапущенных, но спланированных работ)
-        bpmm1_rest: int = 0
-        if __summary_dict is not None:
-            bpmm1_rest = __summary_dict["rest"]
-        # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
-        # например с использованием BPO)
-        bpmm1_quantity_with_efficiency = eve_efficiency.get_industry_material_efficiency(
-            'reaction' if bpmm0_is_reaction_formula else 'manufacturing',
-            bpmm0_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
-            bpmm1_quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
-            bpmm0_material_efficiency)  # me-параметр чертежа предыдущего уровня
-        # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
+        if bpmm1_blueprint_type_id is None:
+            # материалы, которые не производятся, а закупаются, считаются as is
+            bpmm1_quantity_with_efficiency: int = eve_efficiency.get_industry_material_efficiency(
+                'reaction' if bpmm0_is_reaction_formula else 'manufacturing',
+                bpmm0_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+                bpmm1_quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
+                0 if bpmm0_is_reaction_formula else bpmm0_material_efficiency)  # me-параметр чертежа предыдущего уровня
+            bpmm1_runs_quantity: int = bpmm0_quantity * bpmm1_quantity
+            # bpmm1_quantity_multiplicator: int = 1
+        else:
+            # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
+            # например с использованием BPO)
+            if bpmm0_is_reaction_formula:
+                # расчёт кол-ва ранов для данного чертежа (учёт эффективности производства)
+                bpmm1_runs_quantity, bpmm1_quantity_multiplicator = get_optimized_runs_quantity(
+                    # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+                    bpmm0_quantity * bpmm1_quantity,
+                    # параметры чертежа
+                    bpmm1_blueprint_activity_dict,
+                    # кол-во продуктов, которые будут получены за один ран чертежа
+                    bpmm1_products_per_single_run,
+                    # признак - формула ли, или реакция продукта?
+                    bpmm1_is_reaction_formula,
+                    # настройки генерации отчёта
+                    None)
+                bpmm1_quantity_with_efficiency: int = eve_efficiency.get_industry_material_efficiency(
+                    'reaction',
+                    bpmm1_runs_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+                    bpmm1_quantity_multiplicator,  # кол-во из исходного чертежа (до учёта всех бонусов)
+                    0)  # me-параметр чертежа предыдущего уровня
+            else:
+                bpmm1_quantity_with_efficiency: int = eve_efficiency.get_industry_material_efficiency(
+                    'manufacturing',
+                    bpmm0_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+                    bpmm1_quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
+                    bpmm0_material_efficiency)  # me-параметр чертежа предыдущего уровня
+        # расчёт кол-ва материалов, которых не хватает
         bpmm1_not_enough = bpmm1_quantity_with_efficiency - bpmm1_available - bpmm1_in_progress - bpmm1_rest
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
-        if (bpmm1_available + bpmm1_in_progress + bpmm1_rest) <= bpmm1_quantity_with_efficiency:
-            assets_cache[bpmm1_tid] = 0
-            bpmm1_rest = 0
-            if bpmm1_in_progress:
-                industry_jobs_cache[bpmm1_tid] = 0
+        # если какого-то материала не хватает, то считаем его производство по другой формуле (считываем настройки
+        # оптимизации производства) в результате производства будут сформированы излишки, производство которых
+        # будет учтено на следующих вложенностях при наличии потребностей
+        if bpmm1_not_enough == 0 or bpmm1_blueprint_type_id is None:
+            # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
+            # материалы, которые не производятся, а закупаются, считаются as is
+            bpmm1_rest: int = recalc_industry_rest(
+                bpmm1_quantity_with_efficiency,
+                bpmm1_available,
+                bpmm1_in_progress,
+                bpmm1_not_enough,
+                bpmm1_rest,
+                bpmm1_tid, assets_cache, industry_jobs_cache
+            )
+            bpmm1_optimized_runs_quantity = None
+            bpmm1_quantity_with_efficiency_optimized = None
+            bpmm1_optimized_quantity_multiplicator: int = 1
+            bpmm1_industry_planned: bool = False
         else:
-            __left = bpmm1_quantity_with_efficiency
-            if bpmm1_available >= __left:
-                assets_cache[bpmm1_tid] -= __left
-                __left = 0
+            # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
+            bpmm1_optimized_runs_quantity, bpmm1_optimized_quantity_multiplicator = get_optimized_runs_quantity(
+                # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+                bpmm1_not_enough,
+                # параметры чертежа
+                bpmm1_blueprint_activity_dict,
+                # кол-во продуктов, которые будут получены за один ран чертежа
+                bpmm1_products_per_single_run,
+                # признак - формула ли, или реакция продукта?
+                bpmm1_is_reaction_formula,
+                # настройки генерации отчёта
+                report_options.get("optimization", None))
+            # расчёт кол-ва материала с учётом эффективности производства (с учётом заданного кол-ва ранов,
+            # например с использованием BPO)
+            if bpmm0_is_reaction_formula:
+                bpmm1_quantity_with_efficiency_optimized = eve_efficiency.get_industry_material_efficiency(
+                    'reaction',
+                    bpmm1_optimized_runs_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+                    bpmm1_optimized_quantity_multiplicator,  # кол-во из исходного чертежа (до учёта всех бонусов)
+                    0)  # me-параметр чертежа предыдущего уровня
             else:
-                __left -= bpmm1_available
-                assets_cache[bpmm1_tid] = 0
-            if __left > 0 and bpmm1_rest > 0:
-                if bpmm1_rest >= __left:
-                    bpmm1_rest -= __left
-                    __left = 0
-                else:
-                    __left -= bpmm1_rest
-                    bpmm1_rest = 0
-            if __left > 0 and bpmm1_in_progress:
-                if bpmm1_in_progress >= __left:
-                    industry_jobs_cache[bpmm1_tid] -= __left
-                else:
-                    industry_jobs_cache[bpmm1_tid] = 0
+                bpmm1_quantity_with_efficiency_optimized = eve_efficiency.get_industry_material_efficiency(
+                    'manufacturing',
+                    bpmm1_optimized_runs_quantity,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
+                    bpmm1_products_per_single_run, # bpmm1_optimized_quantity_multiplicator,  # кол-во из исходного чертежа (до учёта всех бонусов)
+                    bpmm0_material_efficiency)  # me-параметр чертежа предыдущего уровня
+            # расчёт материалов, которые предстоит построить (с учётом уже имеющихся запасов)
+            bpmm1_rest: int = recalc_industry_rest(
+                bpmm1_quantity_with_efficiency_optimized,
+                bpmm1_available,
+                bpmm1_in_progress,
+                bpmm1_not_enough,
+                bpmm1_rest,
+                bpmm1_tid, assets_cache, industry_jobs_cache
+            )
+            bpmm1_industry_planned: bool = True
         # сохраняем материалы для производства в список их суммарного кол-ва
         if __summary_dict is None:
             __summary_dict = {"id": bpmm1_tid,
                               "bid": bpmm1_blueprint_type_id,
                               "nm": bpmm1_tnm,
-                              "q": bpmm1_not_enough,
+                              "q": 0,
                               "a": bpmm1_available,
                               "j": bpmm1_in_progress,
-                              "portion": 1 if bpmm1_product_quantity is None else bpmm1_product_quantity,
+                              "portion": 1 if bpmm1_products_per_single_run is None else bpmm1_products_per_single_run,
                               "rate": 0.0,
-                              "rest": bpmm1_rest}
+                              "rest": 0}
             materials_summary.append(__summary_dict)
-        else:
-            # меняем запланированное кол-во материалов (использованное)
-            __summary_dict["q"] += bpmm1_not_enough + (__summary_dict["rest"] - bpmm1_rest)
-        # считаем, сколько материалов останется в неизрасходованном виде,
-        # как результат текущего запуска производства
-        if bpmm1_not_enough > 0 and bpmm1_product_quantity is not None and bpmm1_product_quantity > 1:
-            __summary_dict["rest"] = bpmm1_product_quantity - bpmm1_not_enough % bpmm1_product_quantity
-        else:
-            __summary_dict["rest"] = bpmm1_rest
+        # меняем запланированное кол-во материалов (использованное)
+        # bpmm1_summary_rest_quantity: int = __summary_dict["rest"] - bpmm1_rest
+        bpmm1_summary_quantity: int = bpmm1_quantity_with_efficiency_optimized if bpmm1_industry_planned else bpmm1_not_enough
+        __summary_dict["q"] += bpmm1_summary_quantity
+        __summary_dict["rest"] = bpmm1_rest
         # считаем, сколько не хватает (в пропорциях) метариала текущего уровня вложенности
-        bpmm1_rate = (bpmm0_rate * bpmm1_not_enough) if bpmm1_product_quantity is None else (bpmm0_rate * (bpmm1_not_enough / bpmm1_product_quantity))
+        bpmm1_rate = bpmm0_rate * (bpmm1_quantity_with_efficiency / bpmm1_optimized_quantity_multiplicator)
         __summary_dict["rate"] += bpmm1_rate
 
         # генерация символов для рисования псевдографикой
@@ -186,38 +332,46 @@ def __dump_blueprint_materials(
         glf.write(
             '<tr{tr_class}>\n'
             ' <th scope="row"><span class="text-muted">{num_prfx}</span>{num}</th>\n'
-            ' <td><img class="icn24" src="{src}"> <tt><span class="text-muted">{nm_prfx}</span></tt> {nm}{bpq}</td>\n'
+            ' <td><img class="icn24" src="{src}"> <tt><span class="text-muted">{nm_prfx}</span></tt> {nm}{qm}{bpq}{bpr}</td>\n'
             ' <td>{qa:,d}{qip}</td>\n'
             ' <td>{qs:,d}</td>\n'
             ' <td>{qe:,d}</td>\n'
             ' <td>{qne:,d}</td>\n'
+            ' <td>{qo}</td>\n'
             ' <td>{qr}</td>\n'
-            ' <td>{srat1:.6f}%=<sup>{srat0:.6f}+{rat:.6f}*{rat0:.6f}</sup></td>\n'
-            ' <td>{sne1:,d}=<sup>{sne0:,d}+{qne:,d}</sup></td>\n'
+            ' <td>{srat1:.8f}%=<sup>{srat0:.8f}+{ratW:.8f}*({ratX}/{ratY})</sup></td>\n'
+            ' <td>{sne1:,d}=<sup>{sne0}+{sneX}</sup></td>\n'
             '</tr>'.
             format(
                 tr_class=' class="active"' if not row0_prefix else '',
                 num_prfx=row0_prefix, num=row1_num,
-                nm_prfx=nm_prfx, nm=bpmm1_tnm,
-                bpq='' if bpmm1_product_quantity is None or bpmm1_product_quantity == 1 else " <strong>x{}</strong>".format(bpmm1_product_quantity),
+                nm_prfx=nm_prfx,
+                nm=bpmm1_tnm,
+                qm="<sup> <strong style='color:darkblue;'>x{}</strong></sup>".format(bpmm1_quantity),
+                bpq='' if bpmm1_products_per_single_run is None or bpmm1_products_per_single_run == 1 else " <strong>x{}</strong>".format(bpmm1_products_per_single_run),
+                bpr='' if bpmm1_optimized_runs_quantity is None else " <strong style='color:maroon;'>x{}</strong>".format(bpmm1_optimized_runs_quantity),
                 src=render_html.__get_img_src(bpmm1_tid, 32),
                 qs=bpmm1_quantity * bpmm0_quantity,
                 qe=bpmm1_quantity_with_efficiency,
+                qo='' if bpmm1_quantity_with_efficiency_optimized is None else '{:,d}'.format(bpmm1_quantity_with_efficiency_optimized),
                 qa=bpmm1_available,
                 qip='' if bpmm1_in_progress == 0 else '<mark>+ {}</mark>'.format(bpmm1_in_progress),
                 qne=bpmm1_not_enough,
-                qr='' if bpmm1_product_quantity is None else '{:,d}'.format(__summary_dict["rest"]),
+                qr='' if bpmm1_products_per_single_run is None else '{:,d}'.format(__summary_dict["rest"]),
                 srat1=__summary_dict["rate"],
                 srat0=__summary_dict["rate"]-bpmm1_rate,
-                rat=bpmm1_not_enough if bpmm1_product_quantity is None else bpmm1_not_enough / bpmm1_product_quantity,
-                rat0=bpmm0_rate,
+                ratW=bpmm0_rate,
+                ratX=bpmm1_quantity_with_efficiency,
+                ratY=bpmm1_optimized_quantity_multiplicator,
+                #
                 sne1=__summary_dict["q"],
-                sne0=__summary_dict["q"]-bpmm1_not_enough
-        )
+                sne0=__summary_dict["q"]-bpmm1_summary_quantity,
+                sneX=bpmm1_summary_quantity
+            )
         )
 
         # если все материалы собраны, то переходим к следующим компонентам
-        if bpmm1_not_enough == 0:
+        if bpmm1_not_enough == 0 or bpmm1_optimized_runs_quantity is None:
             continue
         # определяем, можно ли строить этот продукт, или возможен только его закуп?
         if bpmm1_blueprint_type_id is None:
@@ -246,16 +400,14 @@ def __dump_blueprint_materials(
                     "qr": b["runs"] if __is_blueprint_copy else (1 if __quantity == -1 else __quantity)
                 }
                 bpmm1_blueprints.append(__bp_dict)
-            bpmm1_blueprints.sort(key=lambda bp: (100000*int(bp["cp"]) + 10000*bp["cp"] + bp["qr"]), reverse=True)
+            bpmm1_blueprints.sort(key=lambda bp: (100000*int(bp["cp"]) + 10000*bp["me"] + bp["qr"]), reverse=True)
             blueprints_cache[bpmm1_blueprint_type_id] = bpmm1_blueprints
 
         # спускаемся на уровень ниже и выводим необходимое количество материалов для производства текущего
         # проверяем, что для текущего материала существуют чертежи для производства
 
         # вывод списка материалов для постройки по чертежу (следующий уровень)
-        bpmm2_bp_runs = bpmm1_not_enough if bpmm1_product_quantity is None else math.ceil(bpmm1_not_enough / bpmm1_product_quantity)
-        # debug : print(bpmm1_tnm, bpmm1_not_enough, bpmm1_product_quantity, bpmm2_bp_runs)
-        # ...
+        bpmm2_bp_runs = bpmm1_optimized_runs_quantity
 
         # добавление в список материалов чертежей с известным кол-вом run-ов
         __summary_dict = next((ms for ms in materials_summary if ms['id'] == bpmm1_blueprint_type_id), None)
@@ -452,6 +604,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
   <th>Standard</th>
   <th>Efficiency</th>
   <th>Required<br/>(Not enough)</th>
+  <th>Optimized</th>
   <th>Rest<br/>(Industry)</th>
   <th>Ratio<br/>(Part of the whole)</th>
   <th>Summary</th>
@@ -474,7 +627,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
         [],
         # сведения о чертеже, его материалах, эффективности и т.п.
         1.0,
-        1,
+        __capital_quantity_or_runs,
         __capital_blueprint_materials["activities"]["manufacturing"]["materials"],
         __capital_material_efficiency,
         __is_reaction_formula,
@@ -938,7 +1091,8 @@ def main():
             "container_templates": [],
             "blueprints": [],
             "stock": [],
-            "missing_blueprints": { "material_efficiency": 10, },
+            "missing_blueprints": {"material_efficiency": 10},
+            "optimization": {"reaction_runs": 15, "industry_time": 5*60*60*24},  # см. также eve_conveyor_tools.py : setup_blueprint_details
         },
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,

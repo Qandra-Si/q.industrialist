@@ -152,6 +152,7 @@ class ConveyorItem:
             self.where = 'M'
             self.blueprint_activity = 'manufacturing'
         # получаем прочую справочную информацию о чертеже и методе производства материала
+        # см. также eve_industry_cost.py : __dump_blueprint_materials
         self.blueprint_name = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, self.blueprint_type_id)
         self.blueprint_activity_dict = activity_dict['activities'][self.blueprint_activity]
         if len(self.blueprint_activity_dict['products']) != 1:
