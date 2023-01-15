@@ -303,9 +303,13 @@ class QIndustryMaterialsRepository:
 
 
 class QIndustryPlanCustomization:
-    def __init__(self, reaction_runs: typing.Optional[int], industry_time: typing.Optional[int]):
+    def __init__(self,
+                 reaction_runs: typing.Optional[int],
+                 industry_time: typing.Optional[int],
+                 min_probability: typing.Optional[float]):
         self.__reaction_runs: typing.Optional[int] = reaction_runs
         self.__industry_time: typing.Optional[int] = industry_time
+        self.__min_probability: typing.Optional[float] = min_probability
 
     @property
     def reaction_runs(self) -> typing.Optional[int]:
@@ -314,6 +318,10 @@ class QIndustryPlanCustomization:
     @property
     def industry_time(self) -> typing.Optional[int]:
         return self.__industry_time
+
+    @property
+    def min_probability(self) -> typing.Optional[float]:
+        return self.__min_probability
 
 
 class QIndustryPlan:

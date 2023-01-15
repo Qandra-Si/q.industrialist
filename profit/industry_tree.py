@@ -1,5 +1,6 @@
 # -*- encoding: utf-8 -*-
 import typing
+import enum
 
 
 class QBaseMaterial:
@@ -67,13 +68,20 @@ class QMaterial(QBaseMaterial):
         self.__industry = industry
 
 
+class QIndustryAction(enum.Enum):
+    manufacturing = 1
+    copying = 5
+    invent = 8
+    reaction = 9
+
+
 class QIndustryTree:
     def __init__(self,
                  blueprint_type_id: int,
                  blueprint_name: str,
                  product_type_id: int,
                  product_name: str,
-                 formula: bool,
+                 action: QIndustryAction,
                  products_per_single_run: int,
                  single_run_time: int):
         self.__blueprint_type_id: int = blueprint_type_id
@@ -82,9 +90,13 @@ class QIndustryTree:
         self.__product_name: str = product_name
         self.__products_per_single_run: int = products_per_single_run
         self.__single_run_time: int = single_run_time
-        self.__is_formula: bool = formula
+        self.__action: QIndustryAction = action
         self.__materials: typing.List[QMaterial] = []
-        self.__me: int = 0 if formula else 10  # TODO: переместить этот параметр в QPlannedActivity
+        # базовые, исходные сведения (даны в самом начале расчёта), во всех остальных случаях (подбор имеющихся в
+        # ассетах чертежей), данные параметры должны быть упомянуты в QPlannedActivity
+        self.__me: int = 10 if action.value == QIndustryAction.manufacturing else 0
+        self.__blueprint_runs_per_single_copy: typing.Optional[int] = None
+        self.__probability: typing.Optional[float] = None
 
     @property
     def blueprint_type_id(self) -> int:
@@ -103,8 +115,8 @@ class QIndustryTree:
         return self.__product_name
 
     @property
-    def is_formula(self) -> bool:
-        return self.__is_formula
+    def action(self) -> QIndustryAction:
+        return self.__action
 
     @property
     def products_per_single_run(self) -> int:
@@ -127,3 +139,17 @@ class QIndustryTree:
 
     def set_me(self, me: int):
         self.__me = me
+
+    @property
+    def blueprint_runs_per_single_copy(self) -> typing.Optional[int]:
+        return self.__blueprint_runs_per_single_copy
+
+    def set_blueprint_runs_per_single_copy(self, blueprint_runs_per_single_copy: int):
+        self.__blueprint_runs_per_single_copy = blueprint_runs_per_single_copy
+
+    @property
+    def probability(self) -> typing.Optional[float]:
+        return self.__probability
+
+    def set_probability(self, probability: float):
+        self.__probability = probability

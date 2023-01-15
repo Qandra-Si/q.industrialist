@@ -3,6 +3,7 @@
 
 from .industry_tree import QBaseMaterial  # noqa
 from .industry_tree import QMaterial  # noqa
+from .industry_tree import QIndustryAction  # noqa
 from .industry_tree import QIndustryTree  # noqa
 from .industry_plan import QPlannedMaterial  # noqa
 from .industry_plan import QPlannedActivity  # noqa
