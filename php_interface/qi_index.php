@@ -68,6 +68,7 @@ EOD;
  <a class="btn btn-default" href="/qi_industry_glorden.php" role="button">Samurai Fruitblow</a>
  <a class="btn btn-default" href="/qi_industry_imine.php" role="button">Imine Mc'Gowan</a>
  <a class="btn btn-default" href="/qi_industry_alicegrimsdottier.php" role="button">Alice Grimsdottier</a>
+ <a class="btn btn-default" href="/qi_industry_svintus.php" role="button">VanoEG</a>
  </p>
 
 <h2>Специальные алгоритмы и специфические задачи</h2>

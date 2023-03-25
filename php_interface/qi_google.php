@@ -156,8 +156,8 @@ where (eca_type_id=any($1) or
        eca_location_id=any($2) or
        tid.sdet_market_group_id=any($1) or
        tid.sdet_group_id=any($1))
-group by eca_corporation_id, eca_type_id, tid.sdet_type_name, eca_name, eca_location_flag, eca_location_id, loc.nm, eca_location_type
-order by eca_corporation_id, tid.sdet_type_name, eca_location_flag, eca_location_id;
+group by eca_corporation_id, tid.sdet_group_id, eca_type_id, tid.sdet_type_name, eca_name, eca_location_flag, eca_location_id, loc.nm, eca_location_type
+order by eca_corporation_id, tid.sdet_group_id, tid.sdet_type_name, eca_location_flag, eca_location_id;
 EOD;
     $params = array('{'.implode(',',$sys_ids).'}', '{'.implode(',',$user_ids).'}');
     $assets_cursor = pg_query_params($conn, $query, $params)
@@ -534,7 +534,7 @@ from (
 ) x
  left outer join esi_known_stations hub on (hub.location_id=ecor_location_id)
  left outer join eve_sde_type_ids itm on (itm.sdet_type_id=ecor_type_id) 
-order by ecor_is_buy_order, ecor_corporation_id, ecor_location_id, itm.sdet_type_name;
+order by ecor_is_buy_order, ecor_corporation_id, ecor_location_id, itm.sdet_group_id, itm.sdet_type_name;
 EOD;
     $params = array('{'.implode(',',$sys_ids).'}','{'.implode(',',$ids).'}');
     $orders_cursor = pg_query_params($conn, $query, $params)
