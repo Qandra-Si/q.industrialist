@@ -2715,7 +2715,7 @@ class QSwaggerInterface:
         )
         if rows is None:
             return None
-        return [int(r[0]) for r in rows]
+        return [int(r[0]) for r in rows if r[0] is not None]
 
     def update_type_id_as_not_published(self, type_id: int):
         """ mark type_id as unpublished
