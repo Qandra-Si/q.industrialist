@@ -5,7 +5,7 @@ include_once '.settings.php';
 
 
 function __dump_trade_hub_orders(&$trade_hub_orders, $trade_hub_system) { ?>
-<table class="table table-condensed" style="padding:1px;font-size:smaller;">
+<table class="table table-condensed" style="padding:1px;font-size:smaller;" id="tblMarket">
 <thead>
  <tr>
   <th></th>
@@ -178,6 +178,19 @@ EOD;
   }
 ?>
 <?php __dump_trade_hub_orders($trade_hub_orders, $trade_hub_system); ?>
+<button class="btn btn-default" type="button" id="btn-copyAllItemsIntoClipboard">Copy all items into Clipboard</button>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 <?php __dump_copy_to_clipboard_javascript() ?>
+
+<script>
+$('#btn-copyAllItemsIntoClipboard').on('click', function () {
+ var data_copy = '';
+ $('#tblMarket tbody tr td:nth-child(2) a').each(function() {
+  var nm = $(this).attr('data-copy');
+  if (nm === null) return;
+  if (data_copy) data_copy += nm + "\n"; else data_copy = nm;
+ });
+ doCopyToClpbrd($(this), data_copy);
+});
+</script>

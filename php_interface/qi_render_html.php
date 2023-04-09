@@ -189,6 +189,35 @@ function get_clipboard_copy_button(&$data_copy) {
 // --------------------------------------------------------------------------------------------------------------
 function __dump_copy_to_clipboard_javascript() {
 ?><script>
+function doCopyToClpbrd(self, data_copy) {
+ if (data_copy) {
+  if (window.isSecureContext && navigator.clipboard) {
+   navigator.clipboard.writeText(data_copy).then(() => {
+    self.trigger('copied', ['Copied!']);
+   }, (e) => {
+    self.trigger('copied', ['Data not copied!']);
+   });
+   document.execCommand("copy");
+  }
+  else {
+   var $temp = $("<textarea>");
+   $("body").append($temp);
+   $temp.val(data_copy).select();
+   try {
+    success = document.execCommand("copy");
+    if (success)
+     self.trigger('copied', ['Copied!']);
+    else
+     self.trigger('copied', ['Data not copied!']);
+   } finally {
+    $temp.remove();
+   }
+  }
+ }
+ else {
+  self.trigger('copied', ['Nothing no copy!']);
+ }
+}
 $(document).ready(function(){
  // Working with clipboard
  $('a.qind-copy-btn').each(function() {
@@ -237,33 +266,7 @@ $(document).ready(function(){
     });
    }
   }
-  if (data_copy) {
-   if (window.isSecureContext && navigator.clipboard) {
-    navigator.clipboard.writeText(data_copy).then(() => {
-     $(this).trigger('copied', ['Copied!']);
-    }, (e) => {
-     $(this).trigger('copied', ['Data not copied!']);
-    });
-    document.execCommand("copy");
-   }
-   else {
-    var $temp = $("<textarea>");
-    $("body").append($temp);
-    $temp.val(data_copy).select();
-    try {
-     success = document.execCommand("copy");
-     if (success)
-      $(this).trigger('copied', ['Copied!']);
-     else
-      $(this).trigger('copied', ['Data not copied!']);
-    } finally {
-     $temp.remove();
-    }
-   }
-  }
-  else {
-   $(this).trigger('copied', ['Nothing no copy!']);
-  }
+  doCopyToClpbrd($(this), data_copy);
  });
  $('a.qind-copy-btn').bind('copied', function(event, message) {
    $(this).attr('title', message)
