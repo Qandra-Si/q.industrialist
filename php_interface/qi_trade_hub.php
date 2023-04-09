@@ -1243,6 +1243,9 @@ var g_purchase_types = [<?php
       var show = false;
       if (show_group == 'all')
         show = true;
+      else if (show_group == 'active')
+        show = (0 == tr.find('td').eq(1).find('span.label-qind-noordersreal').length) &&
+               (0 == tr.find('td').eq(1).find('span.label-qind-noorders').length);
       else if (show_group == 'sold')
         show = tr.find('td').eq(1).find('span.label-qind-noordersreal').length ||
                tr.find('td').eq(1).find('span.label-qind-noorders').length;

@@ -68,6 +68,7 @@ EOD;
  <a class="btn btn-default" href="/qi_industry_glorden.php" role="button">Samurai Fruitblow</a>
  <a class="btn btn-default" href="/qi_industry_imine.php" role="button">Imine Mc'Gowan</a>
  <a class="btn btn-default" href="/qi_industry_alicegrimsdottier.php" role="button">Alice Grimsdottier</a>
+ <a class="btn btn-default" href="/qi_industry_svintus.php" role="button">VanoEG</a>
  </p>
 
 <h2>Специальные алгоритмы и специфические задачи</h2>
@@ -77,10 +78,12 @@ EOD;
  <a class="btn btn-success" href="/qi_querious_industry_request.php" role="button">Querious Industry</a><br>
  <br>
  <a class="btn btn-success" href="/qi_market_nisuwa.php" role="button">Nisuwa Market</a>
- <a class="btn btn-success" href="/qi_market_nsimw.php" role="button">Malpais Market</a>
+ <a class="btn btn-success" href="/qi_market_nsimw.php" role="button">NSI-MW Market</a>
  <a class="btn btn-success" href="/qi_market_4hwwf.php" role="button">4H-WWF Market</a>
- <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a><br>
- <br>
+ <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a>
+ <a class="btn btn-success" href="qi_market_mj5f9.php" role="button">MJ-5F9 Market</a>
+ <a class="btn btn-success" href="qi_market_b2j5n.php" role="button">B2J-5N Market</a><br>
+<br>
 <?php
     $query = <<<EOD
 select distinct
