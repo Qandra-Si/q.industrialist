@@ -132,16 +132,45 @@ class QPlannedMaterial:
         self.__summary_ratio_after = after
 
 
+class QPlannedBlueprint(QPlannedMaterial):
+    def __init__(self,
+                 blueprint: QMaterial,
+                 usage_chain: float,
+                 planned_quantity: int,
+                 planned_runs: int,
+                 planned_me: int,
+                 planned_te: int):
+        super().__init__(blueprint, None, 1, usage_chain)
+        self.__products_per_single_run: int = planned_quantity
+        self.__runs: int = planned_runs
+        self.__me: int = planned_me
+        self.__te: int = planned_te
+
+    @property
+    def products_per_single_run(self) -> int:
+        return self.__products_per_single_run
+
+    @property
+    def runs(self) -> int:
+        return self.__runs
+
+    @property
+    def me(self) -> int:
+        return self.__me
+
+    @property
+    def te(self) -> int:
+        return self.__te
+
+
 class QPlannedActivity:
     def __init__(self,
                  industry: QIndustryTree,
-                 planned_blueprints: int,
-                 planned_runs: int,
-                 planned_quantity: int):
+                 planned_blueprint: QPlannedBlueprint,
+                 planned_blueprints: int):k
         self.__industry: QIndustryTree = industry
+        self.__planned_blueprint: QPlannedBlueprint = planned_blueprint
         self.__planned_blueprints: int = planned_blueprints
-        self.__planned_runs: int = planned_runs
-        self.__planned_quantity: int = planned_quantity
         self.__planned_materials: typing.List[QPlannedMaterial] = []
 
     @property
@@ -149,16 +178,28 @@ class QPlannedActivity:
         return self.__industry
 
     @property
+    def planned_blueprint(self) -> QPlannedBlueprint:
+        return self.__planned_blueprint
+
+    @property
     def planned_blueprints(self) -> int:
         return self.__planned_blueprints
 
     @property
     def planned_runs(self) -> int:
-        return self.__planned_runs
+        return self.__planned_blueprint.runs
+
+    @property
+    def planned_me(self) -> int:
+        return self.__planned_blueprint.me
+
+    @property
+    def planned_te(self) -> int:
+        return self.__planned_blueprint.te
 
     @property
     def planned_quantity(self) -> int:
-        return self.__planned_quantity
+        return self.__planned_blueprint.products_per_single_run
 
     @property
     def planned_materials(self) -> typing.List[QPlannedMaterial]:
