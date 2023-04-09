@@ -178,7 +178,7 @@ EOD;
   }
 ?>
 <?php __dump_trade_hub_orders($trade_hub_orders, $trade_hub_system); ?>
-<button class="btn btn-default" type="button" id="btn-copyAllItemsIntoClipboard">Copy all items into Clipboard</button>
+<button class="btn btn-default" type="button" id="btn-copyAllItemsIntoClipboard">Скопировать весь список в Clipboard</button>
 </div> <!--container-fluid-->
 <?php __dump_footer(); ?>
 <?php __dump_copy_to_clipboard_javascript() ?>
@@ -192,5 +192,13 @@ $('#btn-copyAllItemsIntoClipboard').on('click', function () {
   if (data_copy) data_copy += nm + "\n"; else data_copy = nm;
  });
  doCopyToClpbrd($(this), data_copy);
+ //$(this).tooltip();
+});
+$('#btn-copyAllItemsIntoClipboard').bind('copied', function(event, message) {
+ $(this).attr('title', message)
+  .tooltip('fixTitle')
+  .tooltip('show')
+  .attr('title', "Copy to clipboard")
+  .tooltip('fixTitle');
 });
 </script>
