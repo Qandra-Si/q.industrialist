@@ -2179,7 +2179,7 @@ class QSwaggerInterface:
             "FROM ("
             " SELECT ecor_corporation_id cid, ecor_order_id oid"
             " FROM esi_corporation_orders"
-            " WHERE NOT ecor_history AND current_date > (ecor_issued+1) + ecor_duration * interval '1 day'"
+            " WHERE NOT ecor_history AND current_date > (ecor_issued+interval '1 day') + ecor_duration * interval '1 day'"
             ") o "
             "WHERE ecor_corporation_id=cid and ecor_order_id=oid;"
         )
