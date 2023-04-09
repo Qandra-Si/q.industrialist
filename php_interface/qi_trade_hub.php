@@ -908,6 +908,7 @@ EOD;
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки таблицы <span class="caret"></span></a>
       <ul class="dropdown-menu">
        <li><a data-target="#" role="button" id="btn-qind-showlabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать цветные маркеры</a></li>
+       <li><a data-target="#" role="button" id="btn-qind-hidednotbuylabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Не показывать don't buy маркеры</a></li>
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" id="btn-qind-showordervolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём сделок (неделя/ордер)</a></li>
        <li role="separator" class="divider"></li>
@@ -1306,6 +1307,20 @@ var g_purchase_types = [<?php
     else
       $('#dtlsSellVar_import').parent().addClass('hidden');
   }
+  function rebuildLabelsVisibility() {
+   var turn_off=isMenuActivated($('#btn-qind-showlabels'));
+   var hide_dontbuy=isMenuActivated($('#btn-qind-hidednotbuylabels'));
+   $('*[class*=label-qind-]').each(function(){
+    if(turn_off) {
+     if (hide_dontbuy && $(this).hasClass('label-qind-dontbuy'))
+      $(this).addClass('hidden');
+     else
+      $(this).removeClass('hidden');
+    }
+    else
+     $(this).addClass('hidden');
+   });
+  }
 //-----------
 // работа с пунктами меню
 //-----------
@@ -1346,12 +1361,13 @@ $('a.qind-btn-filter').on('click', function () {
 $('#btn-qind-showlabels').on('click', function () {
  var turn_off=!isMenuActivated($(this));
  toggleMenuMarker($(this),turn_off);
- $('*[class*=label-qind-]').each(function(){
-  if(turn_off)
-   $(this).removeClass('hidden');
-  else
-   $(this).addClass('hidden');
- });
+ rebuildLabelsVisibility();
+});
+//-----------
+$('#btn-qind-hidednotbuylabels').on('click', function () {
+ var hide_dontbuy=!isMenuActivated($(this));
+ toggleMenuMarker($(this),hide_dontbuy);
+ rebuildLabelsVisibility();
 });
 //-----------
 $('#btn-qind-showordervolumes').on('click', function () {
@@ -1374,7 +1390,9 @@ $('#btn-qind-showordervolumes').on('click', function () {
 $(document).ready(function(){
  rebuildFilterMenu('all');
  toggleMenuMarker($('#btn-qind-showlabels'), true);
+ toggleMenuMarker($('#btn-qind-hidednotbuylabels'), true);
  toggleMenuMarker($('#btn-qind-showordervolumes'), <?=MARKET_TABLE_DEFAULT_order_volume_visible?1:0?>);
+ rebuildLabelsVisibility();
  
 
 
