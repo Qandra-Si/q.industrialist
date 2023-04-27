@@ -69,6 +69,7 @@ EOD;
  <a class="btn btn-default" href="/qi_industry_imine.php" role="button">Imine Mc'Gowan</a>
  <a class="btn btn-default" href="/qi_industry_alicegrimsdottier.php" role="button">Alice Grimsdottier</a>
  <a class="btn btn-default" href="/qi_industry_svintus.php" role="button">VanoEG</a>
+ <a class="btn btn-default" href="/qi_industry_malorik.php" role="button">Antonuo Audeles</a>
  </p>
 
 <h2>Специальные алгоритмы и специфические задачи</h2>
@@ -82,7 +83,8 @@ EOD;
  <a class="btn btn-success" href="/qi_market_4hwwf.php" role="button">4H-WWF Market</a>
  <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a>
  <a class="btn btn-success" href="qi_market_mj5f9.php" role="button">MJ-5F9 Market</a>
- <a class="btn btn-success" href="qi_market_b2j5n.php" role="button">B2J-5N Market</a><br>
+ <a class="btn btn-success" href="qi_market_b2j5n.php" role="button">B2J-5N Market</a>
+ <a class="btn btn-success" href="qi_market_f9fuv.php" role="button">F9-FUV Market</a><br>
 <br>
 <?php
     $query = <<<EOD
