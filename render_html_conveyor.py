@@ -1489,6 +1489,7 @@ def __dump_blueprints_list_with_materials(
 def __dump_corp_conveyors_stock_all(
         glf,
         conveyor_data,
+        priority: int,
         corp_industry_jobs_data,
         sde_type_ids,
         sde_market_groups,
@@ -1499,7 +1500,7 @@ def __dump_corp_conveyors_stock_all(
 
     for corp_conveyors in conveyor_data:
         # группируются по солнечным системам, поэтому попадаем сюда для каждой системы раз за разом
-        for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+        for conveyor_entity in corp_conveyors["corp_conveyour_entities_by_priority"].get(priority):
             # группируются по контейнерам с чертежами
             if len(conveyor_entity["stock"]) == 0:
                 continue
@@ -1740,7 +1741,8 @@ def __dump_corp_conveyors(
         # настройки генерации отчёта
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        conveyor_data):
+        conveyor_data,
+        priority: int):
     glf.write("""
 <style>
 table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
@@ -1870,7 +1872,7 @@ tr.qind-em th
 <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
 """)
 
-        for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+        for conveyor_entity in corp_conveyors["corp_conveyour_entities_by_priority"].get(priority):
             stock_not_enough_materials = __dump_blueprints_list_with_materials(
                 glf,
                 conveyor_entity,
@@ -1893,7 +1895,7 @@ tr.qind-em th
  <!-- END: collapsable group (locations) -->
 """)
 
-        if corp_conveyors["corp_conveyour_entities"]:
+        if corp_conveyors["corp_conveyour_entities_by_priority"].get(priority):
             glf.write("<div>")  # <h3>Summary</h3>
 
             # TODO: нельзя в кучу сваливать все чертежи материалы, нужно их разделить на группы по станциям
@@ -1905,7 +1907,7 @@ tr.qind-em th
             global_blueprint_loc_ids: typing.Set[int] = set()
             global_blueprint_station_ids = []
             global_react_station_ids = []
-            for conveyor_entity in corp_conveyors["corp_conveyour_entities"]:
+            for conveyor_entity in corp_conveyors["corp_conveyour_entities_by_priority"].get(priority):
                 for id in [int(ces["id"]) for ces in conveyor_entity["stock"]]:
                     if not (id in global_stock_all_loc_ids):
                         global_stock_all_loc_ids.append(id)
@@ -1970,6 +1972,7 @@ tr.qind-em th
     __dump_corp_conveyors_stock_all(
         glf,
         conveyor_data,
+        priority,
         [],
         sde_type_ids,
         sde_market_groups,
@@ -2399,19 +2402,40 @@ def dump_conveyor_into_report(
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
         conveyor_data):
-    glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    priorities = []
+    for priority in range(10):
+        for c in conveyor_data:
+            if c['corp_conveyour_entities_by_priority'].get(priority):
+                priorities.append(priority)
+                break
+    priority_names = ['High', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']
+
+    glf_main = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    render_html.__dump_header(glf_main, "Conveyor")
+    glf_main.write('<div class="well center-block" style="max-width: 400px;">\n')
     try:
-        render_html.__dump_header(glf, "Conveyor")
-        __dump_corp_conveyors(
-            glf,
-            sde_type_ids,
-            sde_bp_materials,
-            sde_market_groups,
-            materials_for_bps,
-            research_materials_for_bps,
-            products_for_bps,
-            reaction_products_for_bps,
-            conveyor_data)
-        render_html.__dump_footer(glf)
+        for priority in priorities:
+            fname: str = 'conveyor{prior}.html'.format(prior=priority)
+            title: str = '{prior} priority Conveyor'.format(prior=priority_names[priority])
+            glf_main.write('<a href="{fnm}" class="btn btn-primary btn-lg btn-block" role="button">{t}</a>\n'.format(fnm=fname,t=title))
+            glf = open('{dir}/{fnm}'.format(dir=ws_dir, fnm=fname), "wt+", encoding='utf8')
+            try:
+                render_html.__dump_header(glf, title)
+                __dump_corp_conveyors(
+                    glf,
+                    sde_type_ids,
+                    sde_bp_materials,
+                    sde_market_groups,
+                    materials_for_bps,
+                    research_materials_for_bps,
+                    products_for_bps,
+                    reaction_products_for_bps,
+                    conveyor_data,
+                    priority)
+                render_html.__dump_footer(glf)
+            finally:
+                glf.close()
+        glf_main.write('</div>\n')
+        render_html.__dump_footer(glf_main)
     finally:
-        glf.close()
+        glf_main.close()

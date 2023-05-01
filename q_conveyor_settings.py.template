@@ -127,12 +127,12 @@ g_manufacturing = [
     # которых нельзя доставать чертежи для производства материалов "[SCIENCE] invention",
     # "[SCIENCE] copy", ...)
     {
-        # названия контейнеров, в которых находятся чертежи для запуска конвейеров
-        "conveyor_container_names": [
-            r"^\[prod\] conveyor .+$",  # [prod] conveyor 1, [prod] conveyor 2
-            # r"^WORK ../..$"           # WORK 06/09
-            # r"^PRODUCTION ../..$"     # PRODUCTION 06/09
-        ],
+        # названия контейнеров, в которых находятся чертежи для запуска конвейеров (0й..9й приоритеты)
+        "conveyor_container_names": {
+            0: [r"^\[prod\] conveyor .+$"],  # [prod] conveyor 1, [prod] conveyor 2
+            # 1: [r"^WORK ../..$"],           # WORK 06/09
+            # 9: [r"^PRODUCTION ../..$"]     # PRODUCTION 06/09
+        },
         # названия контейнеров, в которых хранятся материалы для работы конвейеров
         "stock_container_names": [
             r"^\.\.\[STOCK\] manufacture$",  # ..[STOCK] manufacture
@@ -173,10 +173,10 @@ g_manufacturing = [
     # запуск БПО из контейнеров "REACTIONS" на Татарах, при этом сток берётся из того же
     # онтейнера "REACTIONS" на те же станках
     {
-        # названия контейнеров, в которых находятся чертежи для запуска конвейеров
-        "conveyor_container_names": [
-            r"^REACTIONS$"  # REACTIONS
-        ],
+        # названия контейнеров, в которых находятся чертежи для запуска конвейеров (0й..9й приоритеты)
+        "conveyor_container_names": {
+            0: [r"^REACTIONS$"]  # REACTIONS
+        },
         # названия контейнеров, в которых хранятся материалы для работы конвейеров
         # "stock_container_names": [
         #     r"^REACTIONS$"
