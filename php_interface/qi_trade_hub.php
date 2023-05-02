@@ -921,6 +921,7 @@ EOD;
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="all"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Все ордера</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="active"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Активные ордера</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="sold"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Всё продано</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="out-of-market"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Отсутствует на рынке</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="very-few"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар заканчивается</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="need-delivery"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Требуется доставка</a></li>
        <li role="separator" class="divider"></li>
@@ -1250,6 +1251,8 @@ var g_purchase_types = [<?php
       else if (show_group == 'sold')
         show = tr.find('td').eq(1).find('span.label-qind-noordersreal').length ||
                tr.find('td').eq(1).find('span.label-qind-noorders').length;
+      else if (show_group == 'out-of-market')
+        show = tr.find('td').eq(1).find('span.label-qind-noordersreal').length;
       else if (show_group == 'low-price')
         show = tr.find('td').eq(1).find('span.label-qind-lowprice').length;
       else if (show_group == 'high-price')
