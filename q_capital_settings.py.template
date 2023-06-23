@@ -33,3 +33,39 @@ g_report_options = [
 		}
 	}
 ]
+
+g_night_factory_rest_ships = [
+    'Bane',
+    'Karura',
+    'Hubris',
+    'Valravn',
+]
+
+def init_night_factory_rest_ships(ships):
+    for ship in ships:
+        g_report_options.append({
+            "product": ship,
+            "base_blueprint": {"cp": True, "qr": 1, "me": 0, "te": 0, "st": None, "id": None},
+            # доп. необязательное поле : назначение стройки (можно строить несколько
+            # одинаковых капиталов указав разных заказчиков, если присутствует в
+            # настройке, то из значения формируется название файла)
+            "assignment": "{s} For Night Factory".format(s=ship),
+            # доп. необязательное поле : шаблон имени контейнеров, где могут лежать
+            # БПО, и БПС и ассеты для постройки корабля
+            "container_templates": [r"^\.{{nf}} {s}$".format(s=ship)],  # r"^\.\.stock ALL$", r"^\.\.stock ALL composite$"],
+            # контейнеры, в которых находятся БПО и БПЦ для постройки корабля:
+            #   {'id': container_id}
+            # м.б. пусто, если задан параметр container_templates
+            "blueprints": [],
+            # ангары офисов, в которых находится сток для постройки корабля:
+            #   {'id': office_id, 'flag': 'CorpSAG1'}
+            # контейнеры, в которых находится сток для постройки корабля:
+            #   {'id': container_id}
+            # м.б. пусто, если задан параметр container_templates
+            "stock": [],
+            # me чертежей, которых "нет", но которые будут инвентиться для постройки корабля
+            "missing_blueprints": {
+                "material_efficiency": 10,
+            }
+        })
+

@@ -151,6 +151,9 @@ def main():
         if corp_ass_names_data:
             total_ass_names_data.extend(corp_ass_names_data)
 
+    # инициализируем корабли Ночного цеха
+    q_capital_settings.init_night_factory_rest_ships(q_capital_settings.g_night_factory_rest_ships)
+
     # находим контейнеры по заданным названиям
     for ro in q_capital_settings.g_report_options:
         if "container_templates" in ro:

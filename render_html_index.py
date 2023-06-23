@@ -91,6 +91,25 @@ def __dump_index(glf):
     </ul>
   </div>
 """)
+    if q_capital_settings.g_night_factory_rest_ships:
+        glf.write("""
+  <div class="btn-group btn-block">
+    <a href="/" class="btn btn-primary btn-lg" role="button" style="width:320px;">Night Factory</a>
+    <button type="button" class="btn btn-primary btn-lg dropdown-toggle" style="width:39px; float:right;" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+      <span class="caret"></span>
+      <span class="sr-only">Variants</span>
+    </button>
+    <ul class="dropdown-menu" style="left:201px;">
+""")
+        ships: typing.List[str] = sorted([s for s in q_capital_settings.g_night_factory_rest_ships])
+        for ship in ships:
+            glf.write('      <li><a href="{fnm}.html">{s}</a></li>\n'.
+                      format(s=ship, fnm=render_html.__camel_to_snake('{s} For Night Factory'.format(s=ship), True)))
+        glf.write("""
+    </ul>
+  </div>
+""")
+
     if q_capital_settings.g_report_options:
         products: typing.List[str] = sorted([p for p in set([ro['product'] for ro in q_capital_settings.g_report_options])])
         for product in products:
@@ -155,6 +174,8 @@ def main():
 
     glf = open('{dir}/index.html'.format(dir=workspace_cache_files_dir), "wt+", encoding='utf8')
     try:
+        # инициализируем корабли Ночного цеха
+        #не требуется:q_capital_settings.init_night_factory_rest_ships(q_capital_settings.g_night_factory_rest_ships)
         render_html.__dump_header(glf, None)
         __dump_index(glf)
         render_html.__dump_footer(glf, show_generated_datetime=False)
