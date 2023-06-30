@@ -785,7 +785,7 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities"])
+    __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities", "maxProductionLimit"])
 
     print("Rebuilding categoryIDs.yaml file...")
     sys.stdout.flush()

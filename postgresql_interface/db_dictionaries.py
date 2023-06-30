@@ -1,4 +1,5 @@
 ﻿# -*- encoding: utf-8 -*-
+import typing
 
 
 class QDictionaries:
@@ -103,7 +104,14 @@ class QDictionaries:
     def clean_blueprints(self):
         self.db.execute("DELETE FROM eve_sde_blueprints;")
 
-    def insert_blueprint_activity(self, blueprint_id: int, activity_id: int, time: int, materials, products):
+    def insert_blueprint_activity(
+            self,
+            blueprint_id: int,
+            activity_id: int,
+            time: int,
+            materials,
+            products,
+            max_production_limit: typing.Optional[int] = None):
         self.db.execute(
             "INSERT INTO eve_sde_blueprints("
             " sdeb_blueprint_type_id,"
@@ -122,13 +130,15 @@ class QDictionaries:
                     " sdebp_activity,"
                     " sdebp_product_id,"
                     " sdebp_quantity,"
-                    " sdebp_probability) "
-                    "VALUES (%s,%s,%s,%s,%s);",
+                    " sdebp_probability,"
+                    " sdebp_max_production_limit) "
+                    "VALUES (%s,%s,%s,%s,%s,%s);",
                     int(blueprint_id),
                     int(activity_id),
                     int(p["typeID"]),
                     int(p["quantity"]),
-                    p.get("probability", None)
+                    p.get("probability", None),
+                    max_production_limit if max_production_limit else None
                 )
         if materials:
             for m in materials:
@@ -156,7 +166,17 @@ class QDictionaries:
                     materials = copying.get("materials")
                     products = copying.get("products")
                     time = copying["time"]
-                    self.insert_blueprint_activity(int(blueprint_id), activity_id, time, materials, products)
+                    max_production_limit: typing.Optional[int] = sde_bp_materials[bp].get("maxProductionLimit", None)
+                    # в копирке продуктом всегда является сам чертёж с тем же идентификатором продукта, что и оригинал
+                    # за исключением всего одного чертежа Taipan Blueprint 33082, который копируется в 33081 Taipan
+                    self.insert_blueprint_activity(
+                        int(blueprint_id),
+                        activity_id,
+                        time,
+                        materials,
+                        products if products else [{"typeID": int(blueprint_id), "quantity": 1}],
+                        max_production_limit=max_production_limit
+                    )
                 manufacturing = activities.get("manufacturing")
                 if manufacturing:
                     activity_id = 1

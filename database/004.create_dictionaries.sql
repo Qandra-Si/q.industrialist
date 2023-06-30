@@ -118,6 +118,7 @@ CREATE TABLE qi.eve_sde_blueprint_products
     sdebp_product_id INTEGER NOT NULL,
     sdebp_quantity INTEGER NOT NULL,
     sdebp_probability DOUBLE PRECISION,
+    sdebp_max_production_limit INTEGER,
     CONSTRAINT fk_sdebp FOREIGN KEY (sdebp_blueprint_type_id,sdebp_activity)
         REFERENCES qi.eve_sde_blueprints(sdeb_blueprint_type_id,sdeb_activity) MATCH SIMPLE
         ON UPDATE NO ACTION
