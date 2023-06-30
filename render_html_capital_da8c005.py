@@ -393,6 +393,16 @@ def __dump_corp_capital(
     glf.write("""
 <p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,<br/>
 where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.</p>
+
+<div class="panel-group" id="capital-accordion" role="tablist" aria-multiselectable="true">
+ <div class="panel panel-default">
+  <div class="panel-heading" role="tab" id="headingComponents">
+   <h4 class="panel-title">
+    <a role="button" data-toggle="collapse" data-parent="#capital-accordion" href="#collapseComponents" aria-expanded="true" aria-controls="collapseComponents">Full list of components involved</a>
+   </h4>
+  </div>
+  <div id="collapseComponents" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingComponents">
+   <div class="panel-body">
 <style>
 .table-borderless > tbody > tr > td,
 .table-borderless > tbody > tr > th,
@@ -459,6 +469,11 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
     glf.write("""
 </tbody>
 </table>
+   </div> <!-- panel-body -->
+  </div> <!-- "panel-collapse -->
+ </div> <!-- panel -->
+</div> <!-- panel-group -->
+
   </div> <!--media-body-->
  </div> <!--media-->
 <hr>
