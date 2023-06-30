@@ -3,6 +3,7 @@ import typing
 import render_html
 import eve_sde_tools
 import eve_efficiency
+from render_html import get_span_glyphicon as glyphicon
 
 
 def get_pseudographics_prefix(levels, is_last):
@@ -624,8 +625,8 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
             # подготовка элементов управления копирования данных в clipboard
             __copy2clpbrd = '' if not enable_copy_to_clipboard else \
                 '&nbsp;<a data-target="#" role="button" class="qind-copy-btn"' \
-                '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs"><span' \
-                '  class="glyphicon glyphicon-copy" aria-hidden="true"></span> Export to multibuy</button></a>'
+                '  data-toggle="tooltip"><button type="button" class="btn btn-default btn-xs">{gly}' \
+                ' Export to multibuy</button></a>'.format(gly=glyphicon("copy"))
             glf.write('<tr>\n'
                       ' <td class="active" colspan="8"><strong>{nm}</strong><!--{id}-->{clbrd}</td>\n'
                       '</tr>'.
@@ -686,11 +687,16 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 bpmm3_progress = 100
             else:
                 bpmm3_progress = float(100 * bpmm3_available / bpmm3_q)
+            # подготовка кнопки копирования названия в буфер обмена
+            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                ' data-toggle="tooltip">{gly}</a>'. \
+                format(nm=bpmm3_tnm, gly=glyphicon("copy"))
             # вывод наименования ресурса
             glf.write(
                 '<tr>\n'
                 ' <th scope="row">{num}</th>\n'
-                ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{me_te}</td>\n'
+                ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{me_te}</td>\n'
                 ' <td>{qa}{qip}</td>\n'
                 ' <td quantity="{qneed}">{qr:,d}</td>\n'
                 ' <td><div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}" role="progressbar"'
@@ -702,6 +708,7 @@ where <var>material_efficiency</var> for unknown and unavailable blueprint is 0.
                 format(
                     num=row3_num,
                     nm=bpmm3_tnm,
+                    clbrd=__copy2clpbrd,
                     me_te=me_te_tags,
                     src=render_html.__get_img_src(bpmm3_tid, 32),
                     qr=bpmm3_q,
