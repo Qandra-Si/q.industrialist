@@ -125,6 +125,11 @@ EOD;
  </p>
 
  <p>
+ Список предметов, производство которых рекомендуется запускать на сутки и дольше (т.к. материалы используются во множестве разных продуктов).<br>
+ <a class="btn btn-default" href="/qi_optimized_by_industry_time.php?times=5" role="button">Optimized by Industry Time</a>
+ </p>
+
+ <p>
  Искалочка всевозможных предметов, работ, ордеров, коробок, фабрик, торговых хабов, действий персонажей по числовым идентификаторам<br>
  <a class="btn btn-warning" href="/qi_google.php?id=34,11396,11399" role="button">Googler</a>
  <a class="btn btn-default" href="/qi_google.php?id=1042" role="button">Планетарка</a>

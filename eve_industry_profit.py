@@ -337,6 +337,7 @@ def generate_industry_tree(
     return base_industry
 
 
+# TODO: см. также get_optimized_runs_quantity
 def get_optimized_runs_quantity(
         # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
         need_quantity: int,
@@ -1293,10 +1294,9 @@ def main():
     # однако это не относится к другим типам activity !!!
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
-        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
-        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
-        {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
+        # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
     ]

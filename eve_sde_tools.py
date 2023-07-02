@@ -722,6 +722,151 @@ def __clean_positions(ws_dir, name):
     del positions
 
 
+def __generate_long_term_industry(ws_dir, name):
+    """
+    :param ws_dir: каталог, где хранятся все кешированные .json файлы
+    :param name: название файла, которые будет сгенерирован
+    :return: None
+
+    Информация была получена следующим образом:
+
+select
+ x.cnt,
+ x.id,
+ t.sdet_type_name as name,
+ g.sdecg_group_name as group,
+ c.sdec_category_name as category,
+ g.sdecg_group_id as g_id,
+ c.sdec_category_id as c_id,
+ x.min,
+ x.max,
+ jita.sell as js,
+ jita.buy as jb,
+ tm.time
+from (
+ select
+  x.sdebm_material_id as id,
+  count(1) as cnt,
+  min(x.sdebm_quantity) as min,
+  max(x.sdebm_quantity) as max
+ from eve_sde_blueprint_materials x
+ where
+  x.sdebm_activity in (1,9,11) and
+  x.sdebm_material_id in (select z.sdebp_product_id from eve_sde_blueprint_products z where z.sdebp_activity=1)
+ group by 1
+) x
+   left outer join qi.eve_sde_type_ids t on (t.sdet_type_id=x.id)
+   left outer join qi.eve_sde_group_ids g on (t.sdet_group_id=g.sdecg_group_id)
+   left outer join qi.eve_sde_category_ids c on (g.sdecg_category_id=c.sdec_category_id)
+   -- цены в жите прямо сейчас
+   left outer join (
+    select ethp_type_id, ethp_sell as sell, ethp_buy as buy
+    from qi.esi_trade_hub_prices
+    where ethp_location_id = 60003760
+   ) jita on (x.id = jita.ethp_type_id)
+   -- длительность производства продукта
+   left outer join (
+    select
+     --p.sdebp_blueprint_type_id,
+     --p.sdebp_activity,
+     p.sdebp_product_id as id,
+     min(b.sdeb_time) as time
+    from qi.eve_sde_blueprint_products p, qi.eve_sde_blueprints b
+    where
+     b.sdeb_blueprint_type_id=p.sdebp_blueprint_type_id and
+     b.sdeb_activity=p.sdebp_activity and
+     b.sdeb_activity=1
+    group by 1
+    having count(1)=1) tm on (x.id=tm.id)
+where
+ x.cnt >= 5 and
+ g.sdecg_group_id not in (
+  873, -- Capital Construction Components
+  536, -- Structure Components
+  913 -- Advanced Capital Construction Components
+ ) and
+ c.sdec_category_id not in (
+  6, -- Ship
+  23, -- Starbase
+  18, -- Drone
+  8, -- Charge
+  66 -- Structure Module
+ )
+order by x.cnt;
+    """
+
+    sde_type_ids = read_converted(ws_dir, "typeIDs")
+    sde_bp_materials = read_converted(ws_dir, "blueprints")
+    sde_group_ids = read_converted(ws_dir, "groupIDs")
+
+    manufacturing_products = set()
+    manufacturing_materials = {}
+    for bpid in sde_bp_materials:
+        bp = sde_bp_materials.get(bpid)
+        if not bp: continue
+        aa = bp.get('activities')
+        if not aa: continue
+        m = aa.get('manufacturing')
+        if m:
+            p = m.get('products')
+            if p:
+                t = p[0].get('typeID')
+                if t: manufacturing_products.add(int(t))
+        for a in aa:
+            if a == 'manufacturing' or a == 'reaction':
+                cc = aa[a].get('materials')
+                if not cc: continue
+                for c in cc:
+                    t = int(c['typeID'])
+                    tt = manufacturing_materials.get(t)
+                    if tt:
+                        manufacturing_materials[t] += 1
+                    else:
+                        manufacturing_materials.update({t: 1})
+
+    # print(manufacturing_products)
+    # print(manufacturing_materials)
+    # print(len([x for x in manufacturing_materials if x in manufacturing_products and manufacturing_materials[x]>=5]))
+
+    # всего материалов, которые можно произвести и которые используются в производстве минимум в 5 разных продуктах,
+    # в июле 2023 года было 123 шт, из них 87 шт не являются капитальными компонентами, из них 78 не являются дронами,
+    # кораблями, патронами и прочими материалами, которые плодят оверсток
+    long_term_industry = []
+    for x in manufacturing_materials:
+        if x in manufacturing_products and manufacturing_materials[x] >= 5:
+            t = sde_type_ids.get(str(x))
+            if not t: continue
+            g = t.get('groupID')
+            if not g: continue
+            if g in [873,  # Capital Construction Components
+                     536,  # Structure Components
+                     913]: continue  # Advanced Capital Construction Components]:
+            gg = sde_group_ids.get(str(g))
+            if not gg: continue
+            c = gg.get('categoryID')
+            if not c: continue
+            if c in [6,  # Ship
+                     23,  # Starbase
+                     18,  # Drone
+                     8,  # Charge
+                     66]: continue  # Structure Module]
+            # print(sde_type_ids[str(x)]['name']['en'])
+            long_term_industry.append(int(x))
+
+    # json
+    f_name_json = __get_converted_name(ws_dir, name)
+    s = json.dumps(long_term_industry, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+", encoding='utf8')
+    f.write(s)
+
+    del long_term_industry
+    del manufacturing_materials
+    del manufacturing_products
+    del sde_group_ids
+    del sde_bp_materials
+    del sde_type_ids
+
+
 def main():  # rebuild .yaml files
     exit_or_wrong_getopt = None
     workspace_cache_files_dir = None
@@ -794,6 +939,8 @@ def main():  # rebuild .yaml files
     print("Rebuilding groupIDs.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "groupIDs", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
+
+    __generate_long_term_industry(workspace_cache_files_dir, "longTermIndustry")
 
 
 def test():

@@ -18,6 +18,7 @@ class ConveyorItem:
                  sde_type_ids,
                  sde_bp_materials,
                  sde_market_groups,
+                 sde_long_term_industry,
                  # esi данные, загруженные с серверов CCP
                  corp_industry_jobs_data,
                  # списки контейнеров и станок из экземпляра контейнера
@@ -66,6 +67,8 @@ class ConveyorItem:
         self.user_data = {}
         # сводные сведения о работах
         self.in_progress: int = 0
+        # признак, является ли продукт (материал) изделием, на которое распространяются настройки оптимизации по времени
+        self.long_term_industry: bool = type_id in sde_long_term_industry
         # ---
         # получаем информацию о чертежах и способе производства материала
         # настройка запусков чертежей
@@ -160,6 +163,8 @@ class ConveyorItem:
         self.products_per_single_run = self.blueprint_activity_dict['products'][0]['quantity']
         if self.is_reaction:
             self.runs_number_per_day = 15
+        elif not self.long_term_industry:
+            self.runs_number_per_day = 1
         else:
             tm: int = self.blueprint_activity_dict['time']
             if tm >= (5*60*60*24):
@@ -268,6 +273,7 @@ class ConveyorMaterials:
                  sde_type_ids,
                  sde_bp_materials,
                  sde_market_groups,
+                 sde_long_term_industry,
                  # esi данные, загруженные с серверов CCP
                  corp_industry_jobs_data,
                  # списки контейнеров и станок из экземпляра контейнера
@@ -280,6 +286,7 @@ class ConveyorMaterials:
         self.__sde_type_ids = sde_type_ids
         self.__sde_bp_materials = sde_bp_materials
         self.__sde_market_groups = sde_market_groups
+        self.__sde_long_term_industry = sde_long_term_industry
         self.__corp_industry_jobs_data = corp_industry_jobs_data
         self.__manufacturing_stock_loc_ids = manufacturing_stock_loc_ids
         self.__manufacturing_blueprint_loc_ids = manufacturing_blueprint_loc_ids
@@ -302,6 +309,7 @@ class ConveyorMaterials:
                 self.__sde_type_ids,
                 self.__sde_bp_materials,
                 self.__sde_market_groups,
+                self.__sde_long_term_industry,
                 # esi данные, загруженные с серверов CCP
                 self.__corp_industry_jobs_data,
                 # списки контейнеров и станок из экземпляра контейнера
@@ -327,6 +335,7 @@ class ConveyorMaterials:
                         self.__sde_type_ids,
                         self.__sde_bp_materials,
                         self.__sde_market_groups,
+                        self.__sde_long_term_industry,
                         self.__manufacturing_stock_resources,
                         self.__reaction_stock_resources)
 
