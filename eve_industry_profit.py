@@ -161,6 +161,9 @@ def generate_materials_tree(
 def schedule_industry_job__invent(
         # идентификатор чертежа, для которого производится планирование производственной работы
         blueprint_type_id: int,
+        blueprint_runs: int,
+        blueprint_me: int,
+        blueprint_te: int,
         # выходной список со всеми возможными материалами, задействованными в производстве
         curr_industry: profit.QIndustryTree,
         # sde данные, загруженные из .converted_xxx.json файлов
@@ -203,7 +206,7 @@ def schedule_industry_job__invent(
     # получаем параметры инвента: (1) кол-во прогонов Т2 чертежа?
     blueprint_runs_per_single_copy: int = invent_product_dict['quantity']
     invent_run_time: int = invent_dict['time']
-    invent_materials = invent_dict['materials']
+    _invent_materials = invent_dict['materials']
     invent_probability: float = invent_product_dict['probability']
 
     # инициализируем базовый объект-справочник со сведениями о производстве
@@ -218,6 +221,49 @@ def schedule_industry_job__invent(
     invent_industry.set_blueprint_runs_per_single_copy(blueprint_runs_per_single_copy)
     invent_industry.set_probability(invent_probability)
     invented_material.set_industry(invent_industry)
+
+    # в список материалов подкладываем чертёж, который должен скопироваться N раз
+    #invent_materials = _invent_materials[:]
+    invent_materials = []
+    invent_materials.append({'typeID': source_blueprint_type_id, 'quantity': 1})
+    invent_materials.extend(_invent_materials)
+
+    if blueprint_me == 2 and blueprint_te == 4:  # and blueprint_runs == blueprint_runs_per_single_copy:
+        pass
+    elif blueprint_me == (2+2) and blueprint_te == (4+10) and blueprint_runs == (blueprint_runs_per_single_copy+1):
+        # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
+        invent_materials.append({'typeID': 34201, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 + 0.2))
+    elif blueprint_me == (2-1) and blueprint_te == (4+4) and blueprint_runs == (blueprint_runs_per_single_copy+4):
+        # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
+        invent_materials.append({'typeID': 34202, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 + 0.8))
+    elif blueprint_me == (2-2) and blueprint_te == (4+2) and blueprint_runs == (blueprint_runs_per_single_copy+9):
+        # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
+        invent_materials.append({'typeID': 34203, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 - 0.4))
+    elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+2):
+        # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
+        invent_materials.append({'typeID': 34207, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 + 0.9))
+    elif blueprint_me == (2+2) and blueprint_te == (4+0) and blueprint_runs == (blueprint_runs_per_single_copy+7):
+        # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
+        invent_materials.append({'typeID': 34208, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 - 0.1))
+    elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+3):
+        # Parity Decryptor : probability +50%, runs +3, me +1, te -2
+        invent_materials.append({'typeID': 34204, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 + 0.5))
+    elif blueprint_me == (2+3) and blueprint_te == (4+6) and blueprint_runs == (blueprint_runs_per_single_copy+0):
+        # Process Decryptor : probability +10%, runs +0, me +3, te +6
+        invent_materials.append({'typeID': 34205, 'quantity': 1})
+        invent_industry.set_probability(invent_probability * (1.0 + 0.1))
+    elif blueprint_me == (2+1) and blueprint_te == (4+8) and blueprint_runs == (blueprint_runs_per_single_copy+2):
+        # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
+        invent_materials.append({'typeID': 34206, 'quantity': 1})
+        # не меняется: invent_industry.set_probability(invent_probability * (1.0 + 0))
+    else:
+        assert 0
 
     # составляем дерево материалов, которые будут использоваться для инвента
     generate_materials_tree(
@@ -279,11 +325,14 @@ def generate_industry_tree(
         profit.QIndustryAction.manufacturing,
         single_run_quantity,
         bp0_dict['time'])
-    base_industry.set_me(calc_input.get('me', 1))
+    base_industry.set_me(calc_input.get('me', 2))
 
     # планируем работу (инвент если потребуется)
     schedule_industry_job__invent(
         blueprint_type_id,
+        calc_input.get('qr', 10),
+        calc_input.get('me', 2),
+        calc_input.get('te', 4),
         base_industry,
         sde_type_ids,
         sde_bp_materials,
@@ -1258,8 +1307,9 @@ def main():
     # однако это не относится к другим типам activity !!!
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
-        {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
+        {'bptid': 10632, 'qr': 11, 'me': 4, 'te': 14},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
