@@ -161,9 +161,6 @@ def generate_materials_tree(
 def schedule_industry_job__invent(
         # идентификатор чертежа, для которого производится планирование производственной работы
         blueprint_type_id: int,
-        blueprint_runs: int,
-        blueprint_me: int,
-        blueprint_te: int,
         # выходной список со всеми возможными материалами, задействованными в производстве
         curr_industry: profit.QIndustryTree,
         # sde данные, загруженные из .converted_xxx.json файлов
@@ -206,7 +203,7 @@ def schedule_industry_job__invent(
     # получаем параметры инвента: (1) кол-во прогонов Т2 чертежа?
     blueprint_runs_per_single_copy: int = invent_product_dict['quantity']
     invent_run_time: int = invent_dict['time']
-    _invent_materials = invent_dict['materials']
+    invent_materials = invent_dict['materials']
     invent_probability: float = invent_product_dict['probability']
 
     # инициализируем базовый объект-справочник со сведениями о производстве
@@ -222,49 +219,6 @@ def schedule_industry_job__invent(
     invent_industry.set_probability(invent_probability)
     invented_material.set_industry(invent_industry)
 
-    # в список материалов подкладываем чертёж, который должен скопироваться N раз
-    #invent_materials = _invent_materials[:]
-    invent_materials = []
-    invent_materials.append({'typeID': source_blueprint_type_id, 'quantity': 1})
-    invent_materials.extend(_invent_materials)
-
-    if blueprint_me == 2 and blueprint_te == 4:  # and blueprint_runs == blueprint_runs_per_single_copy:
-        pass
-    elif blueprint_me == (2+2) and blueprint_te == (4+10) and blueprint_runs == (blueprint_runs_per_single_copy+1):
-        # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
-        invent_materials.append({'typeID': 34201, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.2))
-    elif blueprint_me == (2-1) and blueprint_te == (4+4) and blueprint_runs == (blueprint_runs_per_single_copy+4):
-        # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
-        invent_materials.append({'typeID': 34202, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.8))
-    elif blueprint_me == (2-2) and blueprint_te == (4+2) and blueprint_runs == (blueprint_runs_per_single_copy+9):
-        # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
-        invent_materials.append({'typeID': 34203, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 - 0.4))
-    elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-        # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
-        invent_materials.append({'typeID': 34207, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.9))
-    elif blueprint_me == (2+2) and blueprint_te == (4+0) and blueprint_runs == (blueprint_runs_per_single_copy+7):
-        # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
-        invent_materials.append({'typeID': 34208, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 - 0.1))
-    elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+3):
-        # Parity Decryptor : probability +50%, runs +3, me +1, te -2
-        invent_materials.append({'typeID': 34204, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.5))
-    elif blueprint_me == (2+3) and blueprint_te == (4+6) and blueprint_runs == (blueprint_runs_per_single_copy+0):
-        # Process Decryptor : probability +10%, runs +0, me +3, te +6
-        invent_materials.append({'typeID': 34205, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.1))
-    elif blueprint_me == (2+1) and blueprint_te == (4+8) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-        # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
-        invent_materials.append({'typeID': 34206, 'quantity': 1})
-        # не меняется: invent_industry.set_probability(invent_probability * (1.0 + 0))
-    else:
-        assert 0
-
     # составляем дерево материалов, которые будут использоваться для инвента
     generate_materials_tree(
         invent_materials,
@@ -273,6 +227,20 @@ def schedule_industry_job__invent(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data)
+
+    # в список материалов подкладываем чертёж, который должен скопироваться N раз
+    copy_material_volume: float = sde_type_ids[str(source_blueprint_type_id)].get('volume', 0.0)
+    copy_material_price: typing.Optional[float] = get_material_price(
+        source_blueprint_type_id, sde_type_ids, eve_market_prices_data)
+    copied_material: profit.QMaterial = profit.QMaterial(
+        source_blueprint_type_id,
+        1,
+        copied_blueprint_name,
+        blueprints_market_group,
+        blueprints_group_name,
+        copy_material_volume,
+        copy_material_price)
+    invent_industry.append_material(copied_material)
     # работу с материалами для этого типа копирки не считаем и не запускаем, потому как копирка с материалами существует
     # только для T2 BPO (есть и такие в Евке), а для копирки обычных T1 материалы не нужны, только иски
     # ...
@@ -311,14 +279,11 @@ def generate_industry_tree(
         profit.QIndustryAction.manufacturing,
         single_run_quantity,
         bp0_dict['time'])
-    base_industry.set_me(calc_input.get('me', 2))
+    base_industry.set_me(calc_input.get('me', 1))
 
     # планируем работу (инвент если потребуется)
     schedule_industry_job__invent(
         blueprint_type_id,
-        calc_input.get('qr', 10),
-        calc_input.get('me', 2),
-        calc_input.get('te', 4),
         base_industry,
         sde_type_ids,
         sde_bp_materials,
@@ -445,7 +410,6 @@ def copy_reused_industry_plan__internal(
     reused_activity: profit.QPlannedActivity = planned_material.obtaining_plan.activity_plan
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
-        profit.QPlannedBlueprint(),
         reused_activity.planned_blueprints,
         reused_activity.planned_runs,
         reused_activity.planned_quantity)
@@ -841,20 +805,20 @@ def render_report(
               ' <div class="media-body">\n'
               '  <h4 class="media-heading">{nm1}</h4>\n'
               '<p>\n'
-              'EveUniversity {nm2} wiki: <a href="https://wiki.eveuniversity.org/{nm2}">https://wiki.eveuniversity.org/{nm2}</a><br/>\n'
-              'EveMarketer {nm2} tradings: <a href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a><br/>\n'
-              'EveMarketer {nm2} Blueprint tradings: <a href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a><br/>\n'
-              'Adam4EVE {nm2} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a><br/>\n'
-              'Adam4EVE {nm2} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a><br/>\n'
-              'Adam4EVE {nm2} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>\n'
+              'EveUniversity {nm2} wiki: <a class="url" href="https://wiki.eveuniversity.org/{nm2}">https://wiki.eveuniversity.org/{nm2}</a><br/>\n'
+              'EveMarketer {nm2} tradings: <a class="url" href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a><br/>\n'
+              'EveMarketer {nm2} Blueprint tradings: <a class="url" href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a><br/>\n'
+              'Adam4EVE {nm2} manufacturing calculator: <a class="url" href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a><br/>\n'
+              'Adam4EVE {nm2} price history: <a class="url" href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a><br/>\n'
+              'Adam4EVE {nm2} Blueprint price history: <a class="url" href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>\n'
               '</p>\n'
               ' </div> <!--media-body-->\n'
               '</div> <!--media-->\n'
               '<hr>\n'
               '<div class="media">\n'
-              ' <div class="media-left"><img class="media-object icn64" src="{src2}" alt="Требуемые комплектующие"></div>\n'
+              ' <div class="media-left"><img class="media-object icn64" src="{src2}" alt="Список материалов для постройки"></div>\n'
               ' <div class="media-body">\n'
-              '  <h4 class="media-heading">Организация производства <small>Требуемые комплектующие</small></h4>\n'
+              '  <h4 class="media-heading">Организация производства <small>Список материалов для постройки</small></h4>\n'
               '  {mml}'
               ' </div> <!--media-body-->\n'
               '</div> <!--media-->\n'
@@ -1262,7 +1226,7 @@ def dump_industry_plan(
     file_name_c2s: str = render_html.__camel_to_snake(product_name, True)
     ghf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=file_name_c2s), "wt+", encoding='utf8')
     try:
-        render_html.__dump_header(ghf, product_name)
+        render_html.__dump_header(ghf, product_name, use_dark_mode=True)
         render_report(
             ghf,
             industry_plan,
