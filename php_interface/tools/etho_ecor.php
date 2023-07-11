@@ -71,6 +71,8 @@ if (!isset($_POST['tid'])) return; else {
   $PRODUCT_TYPE_ID = get_numeric($_get_tid);
 }
 
+//$PRODUCT_TYPE_ID = 20185; // Charon
+
 if (!extension_loaded('pgsql')) return;
 $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
         or die('pg_connect err: '.pg_last_error());
