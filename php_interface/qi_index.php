@@ -70,6 +70,7 @@ EOD;
  <a class="btn btn-default" href="/qi_industry_alicegrimsdottier.php" role="button">Alice Grimsdottier</a>
  <a class="btn btn-default" href="/qi_industry_svintus.php" role="button">VanoEG</a>
  <a class="btn btn-default" href="/qi_industry_malorik.php" role="button">Antonuo Audeles</a>
+ <a class="btn btn-default" href="/qi_industry_xsen.php" role="button">xsen</a>
  </p>
 
 <h2>Специальные алгоритмы и специфические задачи</h2>
