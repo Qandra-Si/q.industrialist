@@ -72,7 +72,6 @@ where ecb_location_id in (
 """
 
 
-
 # получение цены материала
 def get_material_price(type_id: int, sde_type_ids, eve_market_prices_data) -> typing.Optional[float]:
     price: typing.Optional[float] = None
@@ -276,19 +275,6 @@ def schedule_industry_job__invent(
         sde_market_groups,
         eve_market_prices_data)
 
-    # в список материалов подкладываем чертёж, который должен скопироваться N раз
-    copy_material_volume: float = sde_type_ids[str(source_blueprint_type_id)].get('volume', 0.0)
-    copy_material_price: typing.Optional[float] = get_material_price(
-        source_blueprint_type_id, sde_type_ids, eve_market_prices_data)
-    copied_material: profit.QMaterial = profit.QMaterial(
-        source_blueprint_type_id,
-        1,
-        copied_blueprint_name,
-        blueprints_market_group,
-        blueprints_group_name,
-        copy_material_volume,
-        copy_material_price)
-    invent_industry.append_material(copied_material)
     # работу с материалами для этого типа копирки не считаем и не запускаем, потому как копирка с материалами существует
     # только для T2 BPO (есть и такие в Евке), а для копирки обычных T1 материалы не нужны, только иски
     # ...
@@ -631,7 +617,10 @@ def generate_industry_plan__internal(
         10,
         20)
 
-    current_level_activity: typing.Optional[profit.QPlannedActivity] = None
+    current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
+        industry,
+        planned_blueprint,
+        planned_blueprints)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -656,12 +645,6 @@ def generate_industry_plan__internal(
                 planned_runs,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
                 m.quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
                 industry.me if industry.action == profit.QIndustryAction.manufacturing else 0)  # me предыдущего чертежа
-
-        if current_level_activity is None:
-            current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
-                industry,
-                planned_blueprint,
-                planned_blueprints)
 
         # планируем закуп материала, если его производство невозможно, для этого считаем требуемое кол-во материала
         # с учётом текущего чертежа
