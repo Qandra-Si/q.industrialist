@@ -5,6 +5,7 @@ import json
 from memory_profiler import profile
 
 import render_html
+from render_html import get_span_glyphicon as glyphicon
 import eve_sde_tools
 import eve_efficiency
 import console_app
@@ -69,6 +70,7 @@ where ecb_location_id in (
  where eca_name like '[prod] conveyor%'
 );
 """
+
 
 
 # получение цены материала
@@ -456,12 +458,20 @@ def copy_reused_industry_plan__internal(
     assert planned_material.obtaining_plan.activity_plan is not None
 
     # создаём activity plan, как копию ранее существующей, с теми же параметрами и настройками производства
+    # создаём чертёж, которые будет включён в activity plan
     reused_activity: profit.QPlannedActivity = planned_material.obtaining_plan.activity_plan
+    blueprint_as_material: profit.QMaterial = None  # TODO
+    planned_blueprint: profit.QPlannedBlueprint = profit.QPlannedBlueprint(
+        blueprint_as_material,
+        usage_chain,
+        reused_activity.planned_quantity,
+        reused_activity.planned_runs,
+        reused_activity.planned_me,
+        reused_activity.planned_te)
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
-        reused_activity.planned_blueprints,
-        reused_activity.planned_runs,
-        reused_activity.planned_quantity)
+        planned_blueprint,
+        reused_activity.planned_blueprints)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -612,11 +622,16 @@ def generate_industry_plan__internal(
     assert planned_runs > 0
     assert planned_quantity > 0
 
-    current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
-        industry,
-        planned_blueprints,
+    blueprint_as_material: profit.QMaterial = None  # TODO
+    planned_blueprint: profit.QPlannedBlueprint = profit.QPlannedBlueprint(
+        blueprint_as_material,
+        usage_chain,
+        planned_quantity,
         planned_runs,
-        planned_quantity)
+        10,
+        20)
+
+    current_level_activity: typing.Optional[profit.QPlannedActivity] = None
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -641,6 +656,12 @@ def generate_industry_plan__internal(
                 planned_runs,  # кол-во run-ов (кол-во продуктов, которые требует предыдущий уровень)
                 m.quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
                 industry.me if industry.action == profit.QIndustryAction.manufacturing else 0)  # me предыдущего чертежа
+
+        if current_level_activity is None:
+            current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
+                industry,
+                planned_blueprint,
+                planned_blueprints)
 
         # планируем закуп материала, если его производство невозможно, для этого считаем требуемое кол-во материала
         # с учётом текущего чертежа
@@ -837,7 +858,9 @@ def render_report(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids):
+        sde_icon_ids,
+        with_current_industry_progress: bool,
+        enable_copy_to_clipboard: bool):
     base_industry: profit.QIndustryTree = industry_plan.base_industry
 
     def generate_manuf_materials_list(__it157: profit.QIndustryTree):
@@ -884,7 +907,16 @@ def render_report(
               'Бонус профиля сооружения: -1.0%<br>\n'
               'Длительность производственных работ: {mtm}<br>\n'
               'Длительность запуска формул и реакций: {ftm}<br>\n'
-              'Минимальная вероятность успеха по навыкам и имплантам: {mip}</p>'
+              'Минимальная вероятность успеха по навыкам и имплантам: {mip}</p>\n'
+              '<ul>\n'
+              '{tbla}\n'
+              '<li>S - стандартное кол-во материалов без учёта ME (ME=0)\n'
+              '<li>ME - кол-во материалов с учётом ME чертежей\n'
+              '<li>O - выход производства, рассчитанный с учётом правил оптимизации\n'
+              '{tbln}\n'
+              '<li>O - кол-во материалов, рассчитанное с учётом правил оптимизации (раны длительностью в сутки и т.п.)\n'
+              '<li>R - кол-во материалов, которое останется невостребованным после завершения работы (остаток производства)\n'
+              '</ul>\n'
               '<hr>\n'.
               format(bid=base_industry.blueprint_type_id,
                      nm1=base_industry.blueprint_name,
@@ -904,20 +936,22 @@ def render_report(
                          '{} прогонов'.format(industry_plan.customization.reaction_runs),
                      mip='(настройка не задана)' if not industry_plan.customization or
                                                     not industry_plan.customization.min_probability else
-                         '{:.1f}%'.format(industry_plan.customization.min_probability)
+                         '{:.1f}%'.format(industry_plan.customization.min_probability),
+                     tbla='<li>A - доступное кол-во материалов, в наличии в стоке (<mark>+ производится в настоящее время</mark>)\n' if with_current_industry_progress else '',
+                     tbln='<li>N - требуемое количество материалов (не хватает)\n' if with_current_industry_progress else ''
               ))
 
-    def generate_components_header(with_current_industry_progress: bool):
+    def generate_components_header():
         glf.write('<tr>\n'
                   '<th style="width:50px;">#</th>\n'
                   '<th>Материалы</th>\n'
-                  + ('<th>Имеется +<br/>Производится</th>\n' if with_current_industry_progress else '')
-                  + '<th>Без<br/>ME</th>\n'
-                  + '<th>Учёт<br/>ME</th>\n'
-                  + '<th>Выход<br/>(произв.)</th>\n'
-                  + ('<th>Требуется<br/>(недостаточно)</th>\n' if with_current_industry_progress else '')
+                  + ('<th>A</th>\n' if with_current_industry_progress else '')
+                  + '<th>S</th>\n'
+                  + '<th>ME</th>\n'
+                  + '<th>O</th>\n'
+                  + ('<th>N</th>\n' if with_current_industry_progress else '')
                   + '<th>План<br/>(произв.)</th>\n'
-                  '<th>Остаток<br/>(произв.)</th>\n'
+                  '<th>R</th>\n'
                   '<th>Соотношение<br/>(как часть целого)</th>\n'
                   '<th>Итог<br/>(закуп.)</th>\n'
                   '<th>Итог<br/>(рентаб.)</th>\n'
@@ -937,7 +971,6 @@ def render_report(
         return prfx
 
     def generate_components_list(
-            with_current_industry_progress: bool,
             row0_prefix: str,
             row0_levels,
             __ap344: profit.QPlannedActivity):
@@ -965,9 +998,29 @@ def render_report(
                     return ''
                 return '<span style="color:lightgray;">' if before else '</span>'
 
+            def generate_zeroed_summary_quantity(before: int, after: int):
+                if after == before:
+                    txt_summary = '{}<z0>+0</z0>'.format(before)
+                elif before == 0:  # первое слагаемое не изменилось
+                    txt_summary = '<z0>0+</z0>{}'.format(after)
+                else:
+                    txt_summary = '{}+{}'.format(before, after-before)
+                return '{:,d}{}=<sup>{}</sup>{}'.format(
+                    after,  # sum
+                    generate_grayed_reused_duplicate(True),  # before =
+                    txt_summary,  # 1+2
+                    generate_grayed_reused_duplicate(False))  # after =
+
+            def generate_zeroed_summary_ratio(before: float, after: float):
+                if before == 0:
+                    txt_summary = '<z0>0.0000+</z0>{:.4f}'.format(after)
+                else:
+                    txt_summary = '{:.4f}+{:.4f}'.format(before, after - before)
+                return '{:.8f}=<sup>{}</sup>'.format(after, txt_summary)
+
             fmt: str = \
                 '<tr{tr_class}>\n' \
-                + '<th scope="row"><span class="text-muted">{num_prfx}</span>{num}</th>\n' \
+                + '<th scope="row"><muted>{num_prfx}</muted>{num}</th>\n' \
                 + '<td><img class="icn24" src="{src}"> {prfx} {nm}{pstfx}</td>\n' \
                 + ('<td>{qa:,d}{qip}</td>\n' if with_current_industry_progress else '') \
                 + '<td>{qwome:,d}</td>\n' \
@@ -984,13 +1037,13 @@ def render_report(
                 fmt.format(
                     tr_class=' class="active"' if not row0_prefix else '',
                     num_prfx=row0_prefix, num=row1_num,
-                    prfx='<tt><span class="text-muted">{}</span></tt>'.format(
+                    prfx='<tt><muted>{}</muted></tt>'.format(
                         get_pseudographics_prefix(row0_levels, row1_num == len(__ap344.planned_materials))),
                     nm=m1_tnm,
                     pstfx='{qm}{bpq}'.format(
-                        qm="<sup> <strong style='color:darkblue;'>x{}</strong></sup>".format(m1_quantity),
+                        qm=" <pcs_num>{}<sup>pcs</sup></pcs_num>".format(m1_quantity),
                         bpq='' if m1_industry is None or m1_industry.products_per_single_run == 1 else
-                            ' <strong>x{}</strong>'.format(m1_industry.products_per_single_run),
+                            " <dose_num>{}<sup>dose</sup></dose_num>".format(m1_industry.products_per_single_run),
                     ),
                     src=render_html.__get_img_src(m1_tid, 32),
                     qa=-1,
@@ -1009,10 +1062,8 @@ def render_report(
                            generate_grayed_reused_duplicate(False)
                        ),
                     qp='' if not m1_material.industry else
-                       '<small>'
-                       '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>qty</sup>*{}<sup>%</sup> => '
-                       '{:.1f}<sup>%</sup>'
-                       '</small>'.format(
+                       '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>qty</sup>*{}<sup>%</sup> &#8594; '
+                       '{:.1f}<sup>%</sup>'.format(
                            m1_planned_blueprints,  # 1.bp
                            m1_planned_runs,  # 1.run
                            m1_material.quantity,  # 1.qty
@@ -1029,14 +1080,12 @@ def render_report(
                                1+industry_plan.customization.min_probability/100.0
                            ) * 100.0  # 2.out
                        ) if m1_science else
-                       '<small>'
-                       '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>qty</sup> => '
+                       '{}<sup>bp</sup>*{}<sup>run</sup>*<pcs_num>{}<sup>qty</sup></pcs_num> &#8594; '
                        '{}<sup>me</sup> '
-                       '{}=> '
-                       '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>dose</sup> => '
+                       '{}&#8594; '
+                       '{}<sup>bp</sup>*<runs_num>{}<sup>run</sup></runs_num>*<dose_num>{}<sup>dose</sup></dose_num> &#8594; '
                        '{}<sup>out</sup>'
-                       '{}'
-                       '</small>'.format(
+                       '{}'.format(
                            m1_planned_blueprints,  # 1.bp
                            m1_planned_runs,  # 1.run
                            m1_material.quantity,  # 1.qty
@@ -1052,24 +1101,30 @@ def render_report(
                        '{:,d}{}'.format(
                            m1_obtaining_plan.rest_quantity,
                            '' if not m1_obtaining_plan.reused_duplicate else
-                           '<small>=<sup>{}-{}</sup></small>'.format(
+                           '=<sup>{}-{}</sup>'.format(
                                m1_obtaining_plan.rest_quantity + m1_planned_material.quantity_with_efficiency,
                                m1_planned_material.quantity_with_efficiency
                            )
                        ),
-                    qu='<small>'
-                       '{:.8f}<sup>chain</sup>*{}<sup>pcs</sup> => '
-                       '{:.8f}<sup>ratio</sup>'
-                       '</small>'.format(
+                    qu='{:.8f}<sup>chain</sup>/{:.1f}<sup>%</sup> &#8594; '
+                       '{:.8f}<sup>ratio</sup>'.format(
+                            m1_planned_material.usage_chain,
+                            m1_planned_blueprints * m1_planned_runs * m1_material.quantity * m1_industry.probability * (
+                                1.0 if not industry_plan.customization or
+                                       not industry_plan.customization.min_probability else
+                                1 + industry_plan.customization.min_probability / 100.0
+                            ) * 100.0,
+                            m1_planned_material.usage_chain * m1_planned_material.usage_ratio
+                       ) if m1_science else
+                       '{:.8f}<sup>chain</sup>*<pcs_num>{}<sup>pcs</sup></pcs_num> &#8594; '
+                       '{:.8f}<sup>ratio</sup>'.format(
                             m1_planned_material.usage_chain,
                             m1_planned_material.quantity_with_efficiency,
                             m1_planned_material.usage_chain * m1_planned_material.usage_ratio
                        ) if not m1_material.industry else
-                       '<small>'
                        '{:.8f}<sup>chain</sup> * '
-                       '({}<sup>me</sup>/{}{}<sup>out</sup>{} => {:.4f}) => '
-                       '{:.8f}<sup>ratio</sup>'
-                       '</small>'.format(
+                       '({}<sup>me</sup>/{}{}<sup>out</sup>{} &#8594; {:.4f}) &#8594; '
+                       '{:.8f}<sup>ratio</sup>'.format(
                            m1_planned_material.usage_chain,  # chain
                            m1_planned_material.quantity_with_efficiency,  # me
                            generate_grayed_reused_duplicate(True),  # before out
@@ -1080,29 +1135,20 @@ def render_report(
                        ),
                     qne='' if not m1_obtaining_plan.not_enough_quantity else
                         '{:,d}'.format(m1_obtaining_plan.not_enough_quantity),
-                    qsq='<small>'
-                        '{:,d}{}=<sup>{}+{}</sup>{}'
-                        '</small>'.format(
-                            m1_planned_material.summary_quantity_after,  # sum
-                            generate_grayed_reused_duplicate(True),  # before =
-                            m1_planned_material.summary_quantity_before,  # 1
-                            m1_planned_material.summary_quantity_after-m1_planned_material.summary_quantity_before,  # 2
-                            generate_grayed_reused_duplicate(False)  # after =
+                    qsq=generate_zeroed_summary_quantity(
+                            m1_planned_material.summary_quantity_before,
+                            m1_planned_material.summary_quantity_after
                         ),
                     qsr='' if m1_material.industry else
-                        '<small>'
-                        '{:.8f}=<sup>{:.4f}+{:.4f}</sup>'
-                        '</small>'.format(
-                            m1_planned_material.summary_ratio_after,
+                        generate_zeroed_summary_ratio(
                             m1_planned_material.summary_ratio_before,
-                            m1_planned_material.summary_ratio_after-m1_planned_material.summary_ratio_before
+                            m1_planned_material.summary_ratio_after
                         )
                 ))
             if m1_obtaining_activity:
                 row2_levels = row0_levels[:]
                 row2_levels.append(row1_num == len(__ap344.planned_materials))
                 generate_components_list(
-                    with_current_industry_progress,
                     "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num),
                     row2_levels,
                     m1_obtaining_activity)
@@ -1118,17 +1164,42 @@ def render_report(
     border: none;
     padding: 0px;
 }
+#tblFLCI { font-size: 72%; }
+#tblFLCI thead tr th { padding: 1px; border-bottom: 1px solid #1d3231; }
+#tblFLCI tbody tr td { padding-left: 1px; padding-right: 1px; border-top: none; vertical-align: middle; }
+#tblFLCI tbody tr td:nth-child(2),
+#tblFLCI tbody tr td:nth-child(6),
+#tblFLCI tbody tr td:nth-child(8),
+#tblFLCI tbody tr td:nth-child(9),
+#tblFLCI tbody tr td:nth-child(10) { white-space: nowrap; }
+#tblFLCI thead tr th:nth-child(3), #tblFLCI tbody tr td:nth-child(3),
+#tblFLCI thead tr th:nth-child(4), #tblFLCI tbody tr td:nth-child(4),
+#tblFLCI thead tr th:nth-child(5), #tblFLCI tbody tr td:nth-child(5),
+#tblFLCI thead tr th:nth-child(7), #tblFLCI tbody tr td:nth-child(7) { text-align: right; }
+#tblFLCI tbody tr td:nth-child(3),
+#tblFLCI tbody tr td:nth-child(4),
+#tblFLCI tbody tr td:nth-child(5),
+#tblFLCI tbody tr td:nth-child(6),
+#tblFLCI tbody tr td:nth-child(7),
+#tblFLCI tbody tr td:nth-child(8),
+#tblFLCI tbody tr td:nth-child(9),
+#tblFLCI tbody tr td:nth-child(10) { border-left: 1px solid #1d3231; }
+pcs_num { color: #727272; }
+dose_num { color: #8bbe68; }
+runs_num { color: #ff4546; }
+z0 { color: #727272; }
+muted { color: #777; }
 </style>
- <table class="table table-borderless table-condensed" style="font-size:small">
+ <table class="table table-borderless table-condensed" id="tblFLCI">
 <thead>""")
 
-    generate_components_header(False)
+    generate_components_header()
 
     glf.write("""
 </thead>
 <tbody>""")
 
-    generate_components_list(False, '', [], industry_plan.base_planned_activity)
+    generate_components_list('', [], industry_plan.base_planned_activity)
 
     glf.write("""
 </tbody>
@@ -1149,11 +1220,11 @@ def render_report(
                   + ('<th>Имеется +<br/>Производится</th>\n' if with_current_industry_progress else '')
                   + '<th>Требуется</th>'
                   + ('<th>Прогресс, %</th>\n' if with_current_industry_progress else '')
-                  + '<th style="text-align:right;">Цена,&nbsp;ISK/шт.</th>'
-                  '<th style="text-align:right;">Цена,&nbsp;ISK</th>'
-                  '<th style="text-align:right;">Пропорция,&nbsp;шт.</th>'
-                  '<th style="text-align:right;">Пропорция,&nbsp;ISK</th>'
-                  '<th style="text-align:right;"><strike>Объём,&nbsp;m&sup3;</strike></th>'
+                  + '<th>Цена,&nbsp;ISK/шт.</th>'
+                  '<th>Цена,&nbsp;ISK</th>'
+                  '<th>Пропорция,&nbsp;шт.</th>'
+                  '<th>Пропорция,&nbsp;ISK</th>'
+                  '<th><strike>Объём,&nbsp;m&sup3;</strike></th>'
                   '</tr>\n')
 
     glf.write("""
@@ -1161,12 +1232,38 @@ def render_report(
   <div class="media-body">
    <h4 class="media-heading">Сводная таблица производства</h4>""")
 
+    ftci_style_fmt: str = """
+<style>
+#tblFTCI { font-size: 80%; }
+#tblFTCI thead tr th { padding: 1px; border-bottom: 1px solid #1d3231; }
+#tblFTCI tbody tr td { padding-left: 1px; padding-right: 1px; border-top: none; vertical-align: middle; }
+#tblFTCI thead tr th, #tblFTCI tbody tr td { text-align: right; white-space: nowrap; }
+#tblFTCI thead tr th:nth-child(1), #tblFTCI tbody tr td:nth-child(1),
+#tblFTCI thead tr th:nth-child(2), #tblFTCI tbody tr td:nth-child(2) { text-align: left; }
+#tblFTCI tbody tr td:nth-child(3),
+#tblFTCI tbody tr td:nth-child(4),
+#tblFTCI tbody tr td:nth-child(5),
+#tblFTCI tbody tr td:nth-child(6),
+#tblFTCI tbody tr td:nth-child(7),
+#tblFTCI tbody tr td:nth-child(8),
+#tblFTCI tbody tr td:nth-child(9),
+#tblFTCI tbody tr td:nth-child(10) { border-left: 1px solid #1d3231; }
+.progress-tblFTCI {
+ height: 8px;
+ margin-bottom: 0px;
+ background-color: #232e31;
+ border-radius: 0px;
+}
+</style>"""
+
+    glf.write(ftci_style_fmt)
+
     glf.write("""
 <div class="table-responsive">
- <table class="table table-condensed" style="font-size:small">
+ <table class="table table-borderless table-condensed" id="tblFTCI">
 <thead>""")
 
-    generate_summary_raw_header(True)
+    generate_summary_raw_header(with_current_industry_progress=with_current_industry_progress)
 
     glf.write("""
 </thead>
@@ -1213,43 +1310,52 @@ def render_report(
                 m3_progress = 100.0
             else:
                 m3_progress = float(100.0 * float(m3_a) / m3_q)
+            # подготовка кнопки копирования названия в буфер обмена
+            __copy2clpbrd = '' if not enable_copy_to_clipboard else \
+                '&nbsp;<a data-target="#" role="button" data-copy="{nm}" class="qind-copy-btn"' \
+                ' data-toggle="tooltip">{gly}</a>'. \
+                format(nm=m3_tnm, gly=glyphicon("copy"))
+            # подготовка progress-бара
+            __prgrs_bar = '<span>{fprcnt:.1f}%</span><br>' \
+                          '<div class="progress progress-tblFTCI"><div class="progress-bar activity1" ' \
+                          'role="progressbar" aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100" ' \
+                          'style="width: {fprcnt:.1f}%;"></div></div>'. \
+                          format(prcnt=int(m3_progress), fprcnt=m3_progress)
             # вывод наименования ресурса
-            glf.write(
-                '<tr>\n'
-                ' <th scope="row">{num}</th>\n'
-                ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{me_te}</td>\n'
-                ' <td>{qa}{qip}</td>\n'
-                ' <td quantity="{qneed}">{qrn:,d}</td>\n'
-                ' <td><div class="progress" style="margin-bottom:0px"><div class="progress-bar{prcnt100}"'
-                ' role="progressbar" aria-valuenow="{prcnt}" aria-valuemin="0" aria-valuemax="100"'
-                ' style="width: {prcnt}%;">{fprcnt:.1f}%</div></div></td>\n'
-                ' <td align="right">{price}</td>'
-                ' <td align="right">{costn}</td>'
-                ' <td align="right">{qratio}</td>'
-                ' <td align="right">{pratio}</td>'
-                ' <td align="right"><strike>{volume}</strike></td>'
-                '</tr>'.format(
-                    num=row3_num,
-                    nm=m3_tnm,
-                    me_te='',
-                    src=render_html.__get_img_src(m3_tid, 32),
-                    qrn=m3_q,
-                    qneed=m3_q-m3_a-m3_j if m3_q > (m3_a+m3_j) else 0,
-                    qa='{:,d}'.format(m3_a) if m3_a >= 0 else
-                       '&infin; <small>runs</small>',
-                    qip='' if m3_j == 0 else
-                        '<mark>+ {}</mark>'.format(m3_j),
-                    prcnt=int(m3_progress),
-                    fprcnt=m3_progress,
-                    prcnt100=" progress-bar-success" if m3_progress == 100 else '',
-                    price='{:,.1f}'.format(m3_p) if m3_p is not None else '',
-                    costn='{:,.1f}'.format(m3_p * m3_q) if m3_p is not None else '',
-                    qratio='' if not m.purchased else
-                           '{:,.8f}'.format(m3_r),
-                    pratio='' if not m.purchased or m3_p is None else
-                           '{:,.1f}'.format(m3_p*m3_r+0.004999),
-                    volume='{:,.1f}'.format(m3_v * m3_q) if not is_blueprints_group else ''
-                ))
+            fmt: str = \
+                '<tr>\n' \
+                + ' <th scope="row">{num}</th>\n' \
+                + ' <td data-copy="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{me_te}</td>\n' \
+                + (' <td>{qa}{qip}</td>\n' if with_current_industry_progress else '') \
+                + ' <td quantity="{qneed}">{qrn:,d}</td>\n' \
+                + (' <td>{prgrs}</td>\n' if with_current_industry_progress else '') \
+                + ' <td>{price}</td>' \
+                + ' <td>{costn}</td>' \
+                + ' <td>{qratio}</td>' \
+                + ' <td>{pratio}</td>' \
+                + ' <td><strike>{volume}</strike></td>' \
+                '</tr>'
+            glf.write(fmt.format(
+                num=row3_num,
+                nm=m3_tnm,
+                clbrd=__copy2clpbrd,
+                me_te='',
+                src=render_html.__get_img_src(m3_tid, 32),
+                qrn=m3_q,
+                qneed=m3_q-m3_a-m3_j if m3_q > (m3_a+m3_j) else 0,
+                qa='{:,d}'.format(m3_a) if m3_a >= 0 else
+                   '&infin; <small>runs</small>',
+                qip='' if m3_j == 0 else
+                    '<mark>+ {}</mark>'.format(m3_j),
+                prgrs=__prgrs_bar,
+                price='{:,.1f}'.format(m3_p) if m3_p is not None else '',
+                costn='{:,.1f}'.format(m3_p * m3_q) if m3_p is not None else '',
+                qratio='' if not m.purchased else
+                       '{:,.8f}'.format(m3_r),
+                pratio='' if not m.purchased or m3_p is None else
+                       '{:,.1f}'.format(m3_p*m3_r+0.004999),
+                volume='{:,.1f}'.format(m3_v * m3_q) if not is_blueprints_group else ''
+            ))
 
     glf.write("""
 </tbody>
@@ -1268,7 +1374,9 @@ def dump_industry_plan(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_bp_materials,
         sde_market_groups,
-        sde_icon_ids):
+        sde_icon_ids,
+        with_current_industry_progress: bool,
+        enable_copy_to_clipboard: bool):
     assert industry_plan.base_industry
 
     product_name: str = industry_plan.base_industry.product_name
@@ -1281,7 +1389,9 @@ def dump_industry_plan(
             industry_plan,
             sde_bp_materials,
             sde_market_groups,
-            sde_icon_ids)
+            sde_icon_ids,
+            with_current_industry_progress=with_current_industry_progress,
+            enable_copy_to_clipboard=enable_copy_to_clipboard)
         render_html.__dump_footer(ghf)
     finally:
         ghf.close()
@@ -1307,9 +1417,10 @@ def main():
     # однако это не относится к другим типам activity !!!
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
-        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        # {'bptid': 10630, 'qr': 10, 'me': 10, 'te': 20},  # Rocket Launcher I
+        {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
-        {'bptid': 10632, 'qr': 11, 'me': 4, 'te': 14},  # Rocket Launcher II
+        # {'bptid': 10632, 'qr': 11, 'me': 4, 'te': 14},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
@@ -1348,7 +1459,9 @@ def main():
             '{}/industry_cost'.format(argv_prms["workspace_cache_files_dir"]),
             sde_bp_materials,
             sde_market_groups,
-            sde_icon_ids
+            sde_icon_ids,
+            with_current_industry_progress=False,
+            enable_copy_to_clipboard=True
         )
 
 

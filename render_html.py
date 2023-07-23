@@ -148,6 +148,7 @@ a:focus.url {
  color: #ffa600;
  background-color: #8f6310;
 }
+hr { border-top: 1px solid #1d3231; }
 .panel {
  background-color: #162326;
 }
