@@ -93,6 +93,7 @@ if (isset($_GET['trader'])) {
 // настройки видимости элементов таблицы (по умолчанию)
 const MARKET_TABLE_columns = 9;
 const MARKET_TABLE_DEFAULT_order_volume_visible = 0; // видимость колонки таблицы "кол-во сделок (неделя/ордер)"
+const MARKET_TABLE_DEFAULT_industry_volume_visible = 0; // видимость колонки таблицы "объём производства"
 
 
 
@@ -209,10 +210,10 @@ function eve_ceiling($isk) {
 
 function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell, $jita_buy) { ?>
 <tr class="qind-summary">
- <td colspan="<?=MARKET_TABLE_DEFAULT_order_volume_visible?3:2?>"><?=$market_group?> Summary</td>
+ <td colspan="<?=(MARKET_TABLE_DEFAULT_order_volume_visible?3:2)+(MARKET_TABLE_DEFAULT_industry_volume_visible?1:0)?>"><?=$market_group?> Summary</td>
  <td><?=number_format($price,0,'.',',').'<br>'.number_format($volume,0,'.',',')?>m³</td>
  <td><?=number_format($jita_sell,0,'.',',').'<br>'.number_format($jita_buy,0,'.',',')?></td>
- <td colspan="<?=MARKET_TABLE_columns-5-(MARKET_TABLE_DEFAULT_order_volume_visible?0:1)?>"></td>
+ <td colspan="<?=MARKET_TABLE_columns-6-(MARKET_TABLE_DEFAULT_order_volume_visible?0:1)-(MARKET_TABLE_DEFAULT_industry_volume_visible?0:1)?>"></td>
 </tr>
 <?php }
 
@@ -241,9 +242,11 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
 #tblMarket thead tr th:nth-child(3),
 #tblMarket tbody tr td:nth-child(3) { text-align: right; display: <?=MARKET_TABLE_DEFAULT_order_volume_visible?'table-cell':'none'?>; }
 #tblMarket thead tr th:nth-child(4),
-#tblMarket tbody tr td:nth-child(4) { text-align: right; }
+#tblMarket tbody tr td:nth-child(4) { text-align: right; display: <?=MARKET_TABLE_DEFAULT_industry_volume_visible?'table-cell':'none'?>; }
 #tblMarket thead tr th:nth-child(5),
 #tblMarket tbody tr td:nth-child(5) { text-align: right; }
+#tblMarket thead tr th:nth-child(6),
+#tblMarket tbody tr td:nth-child(6) { text-align: right; }
 #tblMarket tfoot tr,
 .qind-summary { font-weight: bold; }
 #tblMarket tfoot tr td,
@@ -259,6 +262,7 @@ mute-sm { font-size: 85%; }
   <th style="width:32px;"></th>
   <th>Названия предметов (+продано за сутки)</th>
   <th>Неделя<br><mark>Ордер</mark> шт</th>
+  <th>Объёмы<br>производства</th>
   <th>Цена RI4<sup>sell</sup><br><mark>Кол-во</mark> шт</th>
   <th>Цена <?=$trade_hub_system?><sup>sell</sup><br><mark>Кол-во</mark> шт</th>
   <th style="text-align:right;">Jita Buy..Sell<br><?php if (!is_null($IMPORT_PRICE_TO_TRADE_HUB)) { ?><mark>Import Price</mark><?php } ?></th>
@@ -442,6 +446,12 @@ mute-sm { font-size: 85%; }
 
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
+ <?php } ?>
+
+ <?php if (is_null($industrial_jobs) && is_null($present_in_assets) && is_null($blueprints_prepared)) { ?><td></td><?php } else { ?>
+ <td><?=is_null($blueprints_prepared)?'':$blueprints_prepared.'<sup> bp</sup><br>'?>
+     <?=is_null($industrial_jobs)?'':$industrial_jobs.'<sup> job</sup><br>'?>
+     <?=is_null($present_in_assets)?'':$present_in_assets.'<sup> stock</sup>'?></td>
  <?php } ?>
 
 <?php
@@ -761,18 +771,18 @@ from
     left outer join (
       select ecj_product_type_id,sum(ecj_runs*sdebp_quantity) qty
       from esi_corporation_industry_jobs,eve_sde_blueprint_products
-      where ecj_corporation_id=98677876 and ecj_status='active' and ecj_activity_id=1 and ecj_product_type_id=sdebp_product_id and sdebp_activity=1 and sdebp_blueprint_type_id=ecj_blueprint_type_id
+      where ecj_corporation_id=any($1) and ecj_status='active' and ecj_activity_id=1 and ecj_product_type_id=sdebp_product_id and sdebp_activity=1 and sdebp_blueprint_type_id=ecj_blueprint_type_id
       group by ecj_product_type_id
     ) jobs on (market.type_id = jobs.ecj_product_type_id)
     -- наличие товара в ассетах корпорации
     left outer join (
-      select eca_type_id,count(eca_quantity) qty
+      select eca_type_id,sum(eca_quantity) qty
       from esi_corporation_assets
-      where eca_corporation_id=98677876 and
+      where eca_corporation_id=any($1) and
         eca_location_id not in (
           select eca_item_id
           from esi_corporation_assets
-          where eca_corporation_id=98677876 and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '{pers}%' or eca_name like '.{nf}%')
+          where eca_corporation_id=any($1) and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '{pers}%' or eca_name like '.{nf}%')
         )
       group by eca_type_id
     ) coass on (market.type_id = coass.eca_type_id)
@@ -780,10 +790,10 @@ from
     left outer join (
       select sdebp_product_id,sum(ecb_runs*sdebp_quantity) qty
       from esi_corporation_blueprints,eve_sde_blueprint_products
-      where ecb_corporation_id=98677876 and ecb_quantity=-2 and ecb_location_id in (
+      where ecb_corporation_id=any($1) and ecb_quantity=-2 and ecb_location_id in (
         select eca_item_id
         from esi_corporation_assets
-        where eca_corporation_id=98677876 and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '[prod%') -- or eca_name like '.[SCIENCE]%')
+        where eca_corporation_id=any($1) and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '[prod%') -- or eca_name like '.[SCIENCE]%')
       ) and sdebp_activity=1 and sdebp_blueprint_type_id=ecb_type_id
       group by sdebp_product_id
     ) bprep on (market.type_id = bprep.sdebp_product_id)
@@ -958,6 +968,7 @@ EOD;
        <li><a data-target="#" role="button" id="btn-qind-hidednotbuylabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Не показывать don't buy маркеры</a></li>
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" id="btn-qind-showordervolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём сделок (неделя/ордер)</a></li>
+       <li><a data-target="#" role="button" id="btn-qind-showindustryvolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём производства</a></li>
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" id="qind-btn-reset">Сбросить настройки</a></li>
       </ul>
@@ -1440,8 +1451,25 @@ $('#btn-qind-showordervolumes').on('click', function () {
   turn_on ? $(this).css('display','table-cell') : $(this).css('display','none');
  });
  // двигаем слово summary на место колонки, которую удалили
+ var col4_on=!isMenuActivated($('#btn-qind-showindustryvolumes'));
  $('tr.qind-summary td:nth-child(1)').each(function() {
-  $(this).attr('colspan',turn_on?3:2);
+  $(this).attr('colspan',(turn_on?3:2)+(col4_on?1:0));
+ });
+});
+//-----------
+$('#btn-qind-showindustryvolumes').on('click', function () {
+ var turn_on=!isMenuActivated($(this));
+ toggleMenuMarker($(this),turn_on);
+ $('#tblMarket thead tr th:nth-child(4)').each(function() {
+  turn_on ? $(this).css('display','table-cell') : $(this).css('display','none');
+ });
+ $('#tblMarket tbody tr td:nth-child(4)').each(function() {
+  turn_on ? $(this).css('display','table-cell') : $(this).css('display','none');
+ });
+ // двигаем слово summary на место колонки, которую удалили
+ var col3_on=!isMenuActivated($('#btn-qind-showordervolumes'));
+ $('tr.qind-summary td:nth-child(1)').each(function() {
+  $(this).attr('colspan',(turn_on?3:2)+(col3_on?1:0));
  });
 });
 //-----------
@@ -1452,6 +1480,7 @@ $(document).ready(function(){
  toggleMenuMarker($('#btn-qind-showlabels'), true);
  toggleMenuMarker($('#btn-qind-hidednotbuylabels'), true);
  toggleMenuMarker($('#btn-qind-showordervolumes'), <?=MARKET_TABLE_DEFAULT_order_volume_visible?1:0?>);
+ toggleMenuMarker($('#btn-qind-showindustryvolumes'), <?=MARKET_TABLE_DEFAULT_industry_volume_visible?1:0?>);
  rebuildLabelsVisibility();
  
 
