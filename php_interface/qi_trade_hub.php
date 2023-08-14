@@ -234,6 +234,9 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
 .label-qind-lowprice { color: #fff; background-color: #f0ad4e; }
 .label-qind-highprice { color: #fff; background-color: #777; }
 .label-qind-veryfew { color: #fff; background-color: #337ab7; }
+.label-qind-prepblueprints { color: #d9d9d9; background-color: #20528a; }
+.label-qind-industryjobs { color: #000; background-color: #ff9900; }
+.label-qind-inassets { color: #fff; background-color: #0a7f6f; } /*c8c8c8:751c1c*/
 /*стили отображения ячеек таблицы*/
 #tblMarket thead tr th:nth-child(3),
 #tblMarket tbody tr td:nth-child(3) { text-align: right; display: <?=MARKET_TABLE_DEFAULT_order_volume_visible?'table-cell':'none'?>; }
@@ -288,6 +291,7 @@ mute-sm { font-size: 85%; }
         {
             $problems = '';
             $warnings = '';
+            $industry = '';
             $interrupt_detected = false;
 
             $tid = $product['id'];
@@ -312,6 +316,16 @@ mute-sm { font-size: 85%; }
             //$jita_10_profit = $jita_10_price - $jita_sell - $markup;
             $trade_hub_sell = $product['ps'];
             $trade_hub_sell_volume = $product['psv'];
+            $industrial_jobs = $product['jq'];
+            $present_in_assets = $product['aq'];
+            $blueprints_prepared = $product['bpr'];
+
+            if (!is_null($blueprints_prepared))
+                $industry .= '<span class="label label-qind-prepblueprints">blueprints</span>&nbsp;';
+            if (!is_null($industrial_jobs))
+                $industry .= '<span class="label label-qind-industryjobs">jobs</span>&nbsp;';
+            if (!is_null($present_in_assets))
+                $industry .= '<span class="label label-qind-inassets">in assets</span>&nbsp;';
 
             $storage_quantity = 0;
             if ($storage)
@@ -424,7 +438,7 @@ mute-sm { font-size: 85%; }
 ?>
 <tr<?php if ($ri4_sell_lvl==2) { ?> style="background: #e8e8e8;"<?php } ?>>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
- <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings?></td>
+ <td><?=$nm?><?=get_clipboard_copy_button($nm)?><?=(!is_null($day_volume)&&$day_volume)?' <span style="background-color:#00fa9a">&nbsp;+ '.number_format($day_volume,0,'.',',').'&nbsp;</span>':''?><?='<br><span class="text-muted">'.$tid.'</span> '.$problems.$warnings.$industry?></td>
 
  <?php if (is_null($weekly_volume)) { ?><td></td><?php } else { ?>
  <td><?=number_format($weekly_volume,1,'.',',')?><br><mark><span style="font-size: smaller;"><?=number_format($order_volume,1,'.',',')?></span></mark></td>
@@ -637,7 +651,10 @@ select
   end as up, -- universe price
   round(orders_stat.ri4_price::numeric, 2) as mp, -- RI4 price
   trade_hub.ethp_sell as ps, -- Nisuwa sell
-  trade_hub.ethp_sell_volume as psv -- Nisuwa sell volume
+  trade_hub.ethp_sell_volume as psv, -- Nisuwa sell volume
+  jobs.qty as jq,
+  coass.qty as aq,
+  bprep.qty as bpr
 from
   qi.eve_sde_market_groups_semantic as market_group,
   ( select m.type_id, min(m.lvl) as lvl
@@ -740,6 +757,36 @@ from
       from qi.esi_trade_hub_prices
       where ethp_location_id=$2  -- станка рынка
     ) trade_hub on (market.type_id = trade_hub.ethp_type_id)
+    -- производственные работы для этого товара
+    left outer join (
+      select ecj_product_type_id,sum(ecj_runs*sdebp_quantity) qty
+      from esi_corporation_industry_jobs,eve_sde_blueprint_products
+      where ecj_corporation_id=98677876 and ecj_status='active' and ecj_activity_id=1 and ecj_product_type_id=sdebp_product_id and sdebp_activity=1 and sdebp_blueprint_type_id=ecj_blueprint_type_id
+      group by ecj_product_type_id
+    ) jobs on (market.type_id = jobs.ecj_product_type_id)
+    -- наличие товара в ассетах корпорации
+    left outer join (
+      select eca_type_id,count(eca_quantity) qty
+      from esi_corporation_assets
+      where eca_corporation_id=98677876 and
+        eca_location_id not in (
+          select eca_item_id
+          from esi_corporation_assets
+          where eca_corporation_id=98677876 and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '{pers}%' or eca_name like '.{nf}%')
+        )
+      group by eca_type_id
+    ) coass on (market.type_id = coass.eca_type_id)
+    -- чертежи в ассетах корпорации
+    left outer join (
+      select sdebp_product_id,sum(ecb_runs*sdebp_quantity) qty
+      from esi_corporation_blueprints,eve_sde_blueprint_products
+      where ecb_corporation_id=98677876 and ecb_quantity=-2 and ecb_location_id in (
+        select eca_item_id
+        from esi_corporation_assets
+        where eca_corporation_id=98677876 and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '[prod%') -- or eca_name like '.[SCIENCE]%')
+      ) and sdebp_activity=1 and sdebp_blueprint_type_id=ecb_type_id
+      group by sdebp_product_id
+    ) bprep on (market.type_id = bprep.sdebp_product_id)
 where
   market_group.id = tid.sdet_market_group_id and
   ($5=0 or market_group.semantic_id not in (
@@ -930,7 +977,11 @@ EOD;
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="interrupt"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Обновить ордера (конкуренты)</a></li>
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="place-an-order"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Выставить на продажу (довоз)</a></li>
-      </ul>
+       <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="prep-blueprints"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Чертежи готовы (инвент)</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="industry-jobs"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар производится</a></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="in-assets"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар находится в ассетах</a></li>
+     </ul>
     </li>
    </ul>
    <form class="navbar-form navbar-right">
@@ -1265,6 +1316,12 @@ var g_purchase_types = [<?php
         show = tr.find('td').eq(1).find('span.label-qind-placeanorder').length;
       else if (show_group == 'interrupt')
         show = tr.find('td').eq(1).find('span.label-qind-interrupt').length;
+      else if (show_group == 'prep-blueprints')
+        show = tr.find('td').eq(1).find('span.label-qind-prepblueprints').length;
+      else if (show_group == 'industry-jobs')
+        show = tr.find('td').eq(1).find('span.label-qind-industryjobs').length;
+      else if (show_group == 'in-assets')
+        show = tr.find('td').eq(1).find('span.label-qind-inassets').length;
       if (show)
         tr.removeClass('hidden');
       else if (tr.find('td').eq(0).hasClass('active'))
