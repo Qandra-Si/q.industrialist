@@ -1351,6 +1351,9 @@ class QDatabaseTools:
         self.qidb.commit()
         del data
 
+        # удаление устаревших работ
+        self.dbswagger.discard_obsolete_corporation_jobs()
+
         return known_industry_jobs, active_industry_jobs
 
     # -------------------------------------------------------------------------

@@ -1183,6 +1183,21 @@ class QSwaggerInterface:
             data.append(data_item)
         return data
 
+
+    def discard_obsolete_corporation_jobs(self):
+        # CCP отдают не более 2000 работ, соответственно если их будет больше, то часть работ не будет упомянута никогда
+        self.db.execute(
+            "UPDATE esi_corporation_industry_jobs "
+            "SET ecj_status='delivered' "
+            "FROM ("
+            " SELECT ecj_corporation_id AS cid, ecj_job_id AS jid"
+            " FROM esi_corporation_industry_jobs"
+            " WHERE ecj_status='active' AND CURRENT_TIMESTAMP AT TIME ZONE 'GMT' > (ecj_end_date+interval '15 minute')"
+            ") j "
+            "WHERE ecj_job_id=j.jid AND ecj_corporation_id=j.cid;"
+        )
+        # ecj_updated_at не трогаем и он будет меньше end_date
+
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/blueprints/
     # corporations/{corporation_id}/industry/jobs/
