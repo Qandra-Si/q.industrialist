@@ -31,8 +31,8 @@ include_once '.settings.php';
  <li><span class="label label-forgotten">forgotten</span> - уже месяц, как не используется в работках;
  <li><span class="label label-obsolete">obsolete</span> - уже два месяца не используется;
  <li><span class="label label-default">abandoned</span> - забыт на три месяца;
- <li><span class="label label-understock">understock</span> - материалов в скопилось слишком много;
- <li><span class="label label-overstock">overstock</span> - материалов не хватает;
+ <li><span class="label label-understock">understock</span> - материалов не хватает;
+ <li><span class="label label-overstock">overstock</span> - материалов в скопилось слишком много;
  <li><span class="label label-absent">absent</span> - материал отсутствует в стоке, хотя использовался в каких-либо работах за последние 2 месяца;
  <li><span class="label label-success">we buy it</span> - материал закупается прямо сейчас (выставлены ордера на покупку).
 </ul></p>
