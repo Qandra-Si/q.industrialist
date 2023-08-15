@@ -1192,11 +1192,16 @@ class QSwaggerInterface:
             "FROM ("
             " SELECT ecj_corporation_id AS cid, ecj_job_id AS jid"
             " FROM esi_corporation_industry_jobs"
-            " WHERE ecj_status='active' AND CURRENT_TIMESTAMP AT TIME ZONE 'GMT' > (ecj_end_date+interval '15 minute')"
+            " WHERE"
+            "   ecj_status='active' AND"
+            "   ecj_activity_id=1 AND"
+            "   CURRENT_TIMESTAMP AT TIME ZONE 'GMT' > (ecj_end_date+interval '180 minute')"
             ") j "
             "WHERE ecj_job_id=j.jid AND ecj_corporation_id=j.cid;"
         )
         # ecj_updated_at не трогаем и он будет меньше end_date
+        # автоматически завершаем только activity_id=1, т.к. у этих работ не меняются параметры при завершении
+        # иначе возникают проблемы с формированием esi_blueprints_costs
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/blueprints/
@@ -1441,8 +1446,10 @@ class QSwaggerInterface:
             # debug: print('unlinked_jobs', unlinked_jobs)
             used_ebc_ids = []
             for job in unlinked_jobs:
+                successful_runs: typying.Optional[int] = job[3]
+                if successful_runs is None:
+                    continue
                 solar_system = job[0]
-                successful_runs: int = job[3]
                 found_ebc_ids = []
                 if successful_runs > 0:
                     for bpc in unlinked_bp2s_and_jobs:

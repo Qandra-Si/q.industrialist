@@ -128,7 +128,7 @@ from
     qi.esi_corporation_wallet_journals j
      left outer join qi.esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
    where
-    (ecwj_date > '2021-01-03') and
+    (ecwj_date > '2023-05-01') and
     (ecwj_context_id_type = 'market_transaction_id') and
     ( ( ecwj_corporation_id=any($1) and
         ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
@@ -235,7 +235,8 @@ function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_syst
 .label-qind-lowprice { color: #fff; background-color: #f0ad4e; }
 .label-qind-highprice { color: #fff; background-color: #777; }
 .label-qind-veryfew { color: #fff; background-color: #337ab7; }
-.label-qind-prepblueprints { color: #d9d9d9; background-color: #20528a; }
+.label-qind-prepblueprints,
+.label-qind-invblueprints { color: #d9d9d9; background-color: #20528a; }
 .label-qind-industryjobs { color: #000; background-color: #ff9900; }
 .label-qind-inassets { color: #fff; background-color: #0a7f6f; } /*c8c8c8:751c1c*/
 /*стили отображения ячеек таблицы*/
@@ -323,7 +324,10 @@ mute-sm { font-size: 85%; }
             $industrial_jobs = $product['jq'];
             $present_in_assets = $product['aq'];
             $blueprints_prepared = $product['bpr'];
+            $blueprints_invent = $product['bpi'];
 
+            if (!is_null($blueprints_invent))
+                $industry .= '<span class="label label-qind-invblueprints">invent</span>&nbsp;';
             if (!is_null($blueprints_prepared))
                 $industry .= '<span class="label label-qind-prepblueprints">blueprints</span>&nbsp;';
             if (!is_null($industrial_jobs))
@@ -449,7 +453,8 @@ mute-sm { font-size: 85%; }
  <?php } ?>
 
  <?php if (is_null($industrial_jobs) && is_null($present_in_assets) && is_null($blueprints_prepared)) { ?><td></td><?php } else { ?>
- <td><?=is_null($blueprints_prepared)?'':$blueprints_prepared.'<sup> bp</sup><br>'?>
+ <td><?=is_null($blueprints_invent)?'':'&asymp;'.$blueprints_invent.'<sup> inv</sup><br>'?>
+     <?=is_null($blueprints_prepared)?'':$blueprints_prepared.'<sup> bp</sup><br>'?>
      <?=is_null($industrial_jobs)?'':$industrial_jobs.'<sup> job</sup><br>'?>
      <?=is_null($present_in_assets)?'':$present_in_assets.'<sup> stock</sup>'?></td>
  <?php } ?>
@@ -664,7 +669,8 @@ select
   trade_hub.ethp_sell_volume as psv, -- Nisuwa sell volume
   jobs.qty as jq,
   coass.qty as aq,
-  bprep.qty as bpr
+  bprdy.qty as bpr,
+  bpinv.qty as bpi
 from
   qi.eve_sde_market_groups_semantic as market_group,
   ( select m.type_id, min(m.lvl) as lvl
@@ -675,7 +681,7 @@ from
         esi_corporation_wallet_journals j
           left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
       where
-        (ecwj_date > '2021-01-03') and
+        (ecwj_date > '2023-05-01') and
         (ecwj_context_id_type = 'market_transaction_id') and
         ( ( ecwj_corporation_id=any($1) and
             ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
@@ -771,32 +777,55 @@ from
     left outer join (
       select ecj_product_type_id,sum(ecj_runs*sdebp_quantity) qty
       from esi_corporation_industry_jobs,eve_sde_blueprint_products
-      where ecj_corporation_id=any($1) and ecj_status='active' and ecj_activity_id=1 and ecj_product_type_id=sdebp_product_id and sdebp_activity=1 and sdebp_blueprint_type_id=ecj_blueprint_type_id
+      where
+        ecj_corporation_id=any($1) and ecj_status='active' and ecj_activity_id=1 and
+        ecj_product_type_id=sdebp_product_id and sdebp_activity=1 and sdebp_blueprint_type_id=ecj_blueprint_type_id and
+        ecj_blueprint_location_id in (select container_id from eve_ri4_manufacturing_containers where corporation_id=any($1))
       group by ecj_product_type_id
     ) jobs on (market.type_id = jobs.ecj_product_type_id)
     -- наличие товара в ассетах корпорации
     left outer join (
       select eca_type_id,sum(eca_quantity) qty
       from esi_corporation_assets
-      where eca_corporation_id=any($1) and
-        eca_location_id not in (
-          select eca_item_id
-          from esi_corporation_assets
-          where eca_corporation_id=any($1) and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '{pers}%' or eca_name like '.{nf}%')
-        )
+      where
+        eca_corporation_id=any($1) and
+        eca_location_id not in (select container_id from eve_ri4_personal_containers where corporation_id=any($1))
       group by eca_type_id
     ) coass on (market.type_id = coass.eca_type_id)
     -- чертежи в ассетах корпорации
     left outer join (
       select sdebp_product_id,sum(ecb_runs*sdebp_quantity) qty
       from esi_corporation_blueprints,eve_sde_blueprint_products
-      where ecb_corporation_id=any($1) and ecb_quantity=-2 and ecb_location_id in (
-        select eca_item_id
-        from esi_corporation_assets
-        where eca_corporation_id=any($1) and eca_is_singleton and eca_location_type='item' and eca_location_flag like 'CorpSAG%' and (eca_name like '[prod%') -- or eca_name like '.[SCIENCE]%')
-      ) and sdebp_activity=1 and sdebp_blueprint_type_id=ecb_type_id
+      where
+        ecb_corporation_id=any($1) and ecb_quantity=-2 and sdebp_activity=1 and sdebp_blueprint_type_id=ecb_type_id and
+        ecb_location_id not in (select container_id from eve_ri4_manufacturing_containers where corporation_id=any($1))
       group by sdebp_product_id
-    ) bprep on (market.type_id = bprep.sdebp_product_id)
+    ) bprdy on (market.type_id = bprdy.sdebp_product_id)
+    -- чертежи, которые сейчас инвентятся
+    left outer join (
+      select
+       --i.bp1id,
+       --i.bp2id,
+       i.pr3id,
+       --(select sdet_type_name from eve_sde_type_ids where sdet_type_id=bp1id) bp1nm,
+       --(select sdet_type_name from eve_sde_type_ids where sdet_type_id=bp2id) bp2nm,
+       --(select sdet_type_name from eve_sde_type_ids where sdet_type_id=pr3id) pr3nm,
+       i.qty
+      from (
+        select
+         ecj_blueprint_type_id as bp1id,
+         bp2.sdebp_product_id as bp2id,
+         pr3.sdebp_product_id as pr3id,
+         sum(round(ecj_runs*bp2.sdebp_quantity*ecj_probability)*pr3.sdebp_quantity) as qty -- без учёта декрипторов, огульное округление
+        from esi_corporation_industry_jobs bp1
+          left outer join eve_sde_blueprint_products as bp2 on (ecj_blueprint_type_id=bp2.sdebp_blueprint_type_id and bp2.sdebp_activity=8)
+          left outer join eve_sde_blueprint_products as pr3 on (bp2.sdebp_product_id=pr3.sdebp_blueprint_type_id and pr3.sdebp_activity=1)
+        where
+          ecj_corporation_id=any($1) and ecj_status='active' and ecj_activity_id=8 and
+          ecj_blueprint_location_id in (select container_id from eve_ri4_invent_containers where corporation_id=any($1))
+        group by 1,2,3
+      ) i
+    ) bpinv on (market.type_id = bpinv.pr3id)
 where
   market_group.id = tid.sdet_market_group_id and
   ($5=0 or market_group.semantic_id not in (
@@ -989,6 +1018,7 @@ EOD;
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="place-an-order"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Выставить на продажу (довоз)</a></li>
        <li role="separator" class="divider"></li>
+       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="inv-blueprints"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Чертежи инвентятся</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="prep-blueprints"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Чертежи готовы (инвент)</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="industry-jobs"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар производится</a></li>
        <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="in-assets"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар находится в ассетах</a></li>
@@ -1329,6 +1359,8 @@ var g_purchase_types = [<?php
         show = tr.find('td').eq(1).find('span.label-qind-interrupt').length;
       else if (show_group == 'prep-blueprints')
         show = tr.find('td').eq(1).find('span.label-qind-prepblueprints').length;
+      else if (show_group == 'inv-blueprints')
+        show = tr.find('td').eq(1).find('span.label-qind-invblueprints').length;
       else if (show_group == 'industry-jobs')
         show = tr.find('td').eq(1).find('span.label-qind-industryjobs').length;
       else if (show_group == 'in-assets')

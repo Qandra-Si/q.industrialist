@@ -219,5 +219,81 @@ create or replace view qi.eve_sde_available_blueprint_materials as
       inner join qi.eve_sde_type_ids on (m.sdebm_material_id = sdet_type_id and sdet_published);
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+-- eve_ri4_personal_containers
+-- список контейнеров, в которых хранятся личные ассеты и ассеты общака
+--------------------------------------------------------------------------------
+create or replace view qi.eve_ri4_personal_containers as
+  select a.eca_corporation_id as corporation_id, a.eca_item_id as container_id
+   --, a.eca_name as name
+   --, eca_location_flag as hangar
+   --, (select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
+   --, (select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
+  from esi_corporation_assets a
+  where
+   eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
+   ( select substring(eca_location_flag,8,1) in ('1','7') or -- CorpSAG1, CorpSAG7
+     (eca_name like '{pers}%' or eca_name like '.{nf}%') -- остальные ангары
+   );
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- eve_ri4_manufacturing_containers
+-- список контейнеров, в которых находятся чертежи для производства
+--------------------------------------------------------------------------------
+create or replace view qi.eve_ri4_manufacturing_containers as
+  select a.eca_corporation_id as corporation_id, a.eca_item_id as container_id
+   --, a.eca_name as name
+   --, eca_location_flag as hangar
+   --, (select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
+   -- , (select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
+  fro esi_corporation_assets a
+  where
+   eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
+   ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
+     (eca_name like '[prod%') -- остальные ангары
+   );
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- eve_ri4_stock_containers
+-- список контейнеров, в которых находится сток для производства
+--------------------------------------------------------------------------------
+create or replace view qi.eve_ri4_stock_containers as
+  select a.eca_corporation_id as corporation_id, a.eca_item_id as container_id
+   --,a.eca_name as name
+   --,eca_location_flag as hangar
+   --,(select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
+   --,(select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
+  from esi_corporation_assets a
+  where
+   eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
+   ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
+     (eca_name like '%.stock%') -- коробки ..stock% и ...stock% в остальных ангарах
+   );
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- eve_ri4_invent_containers
+-- список контейнеров, из которых запускается инвент
+--------------------------------------------------------------------------------
+create or replace view qi.eve_ri4_invent_containers as
+  select a.eca_corporation_id as corporation_id, a.eca_item_id as container_id
+   --,a.eca_name as name
+   --,eca_location_flag as hangar
+   --,(select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
+   --,(select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
+  from esi_corporation_assets a
+  where
+   eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
+   ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
+     (eca_name like '%SCIENCE%invent%') -- коробки '.[SCIENCE] invention' в остальных ангарах
+   );
+--------------------------------------------------------------------------------
+
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.
