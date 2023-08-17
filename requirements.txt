@@ -5,7 +5,7 @@ future==0.16.0
 idna==3.3
 pyasn1==0.4.4
 python-jose==3.0.1
-requests==2.26.0
+requests==2.31.0
 rsa==4.7
 six==1.11.0
 urllib3==1.26.7
