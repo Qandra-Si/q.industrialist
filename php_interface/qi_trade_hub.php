@@ -4,10 +4,49 @@ include 'qi_tools_and_utils.php';
 include_once '.settings.php';
 
 
+const SORT_PRFT_ASC = 1;
+const SORT_PRFT_DESC = -1;
+const SORT_PERC_ASC = 2;
+const SORT_PERC_DESC = -2;
+const T1_ONLY_DEFAULT = 0;
+const T2_ONLY_DEFAULT = 0;
+const T3_ONLY_DEFAULT = 0;
+const FA_ONLY_DEFAULT = 0;
+const RA_ONLY_DEFAULT = 0;
+const SHOW_ONLY_RI4_SALES_DEFAULT = 1;
+const DO_NOT_SHOW_RAW_MATERIALS_DEFAULT = 1;
+const INDUSTRY_POSSIBLE_DEFAULT = null;
+
+
+$SORT = SORT_PRFT_ASC;
+$GRPs = null;
+
+// Abyssal (15) - не производится
+// Deadspace (6) - не производится
+// Limited Time (19) - иногда производится
+// Officer (5) - единичные экземпляры производятся (Zorya's)
+// Premium (17) - не производится
+// Storyline (3) - иногда производится
+// Faction (4)
+// Structure Faction (52)
+// Structure Tech I (54)
+// Structure Tech II (53)
+// Tech I (1)
+// Tech II (2)
+// Tech III (14)
+$T1 = T1_ONLY_DEFAULT;
+$T2 = T2_ONLY_DEFAULT;
+$T3 = T3_ONLY_DEFAULT;
+$FA = FA_ONLY_DEFAULT;
+$RA = RA_ONLY_DEFAULT;
+$INDUSTRY_POSSIBLE = INDUSTRY_POSSIBLE_DEFAULT;
+
+
 if (!isset($SHOW_ONLY_RI4_SALES))
-    $SHOW_ONLY_RI4_SALES = 1; // признак отображения информации по ордерам, которые выставлены не нами
+    $SHOW_ONLY_RI4_SALES = SHOW_ONLY_RI4_SALES_DEFAULT; // признак отображения информации по ордерам, которые выставлены не нами
 if (!isset($DO_NOT_SHOW_RAW_MATERIALS))
-    $DO_NOT_SHOW_RAW_MATERIALS = 1; // не показывать метариалы, закуп которых выполняется для производственных работ (фильтрация спекуляции и закупа для производства, например минералов)
+    $DO_NOT_SHOW_RAW_MATERIALS = DO_NOT_SHOW_RAW_MATERIALS_DEFAULT; // не показывать метариалы, закуп которых выполняется для производственных работ (фильтрация спекуляции и закупа для производства, например минералов)
+
 if (!isset($IMPORT_PRICE_TO_TRADE_HUB))
     $IMPORT_PRICE_TO_TRADE_HUB = null; // null; // например, цена импорта 1куб.м. из Jita в Querious была 866 ISK
 if (!isset($MIN_PROFIT))
@@ -28,16 +67,65 @@ if (!isset($TRADER_ID))
     $TRADER_ID = 0; // Xatul' Madan: 95858524, DarkFman: 874053567, Zed Ostus: 2116422143
 
 
+if (!isset($_GET['grp'])) $GRPs = null; else {
+  $_get_grp = htmlentities($_GET['grp']);
+  if (is_numeric($_get_grp)) $GRPs = array(get_numeric($_get_grp));
+  else if (is_numeric_array($_get_grp)) $GRPs = get_numeric_array($_get_grp);
+  else return;
+}
+
+if (!isset($_GET['s'])) $SORT = SORT_PRFT_ASC; else {
+  $_get_sort = htmlentities($_GET['s']);
+  if (is_numeric($_get_sort)) $SORT = get_numeric($_get_sort);
+  else $SORT = SORT_PRFT_ASC;
+}
+
+if (!isset($_GET['t1'])) $T1 = T1_ONLY_DEFAULT; else {
+  $_get_t1 = htmlentities($_GET['t1']);
+  if (is_numeric($_get_t1)) $T1 = get_numeric($_get_t1);
+  else $T1 = T1_ONLY_DEFAULT;
+}
+
+if (!isset($_GET['t2'])) $T2 = T2_ONLY_DEFAULT; else {
+  $_get_t2 = htmlentities($_GET['t2']);
+  if (is_numeric($_get_t2)) $T2 = get_numeric($_get_t2);
+  else $T2 = T2_ONLY_DEFAULT;
+}
+
+if (!isset($_GET['t3'])) $T3 = T3_ONLY_DEFAULT; else {
+  $_get_t3 = htmlentities($_GET['t3']);
+  if (is_numeric($_get_t3)) $T3 = get_numeric($_get_t3);
+  else $T3 = T3_ONLY_DEFAULT;
+}
+
+if (!isset($_GET['faction'])) $FA = FA_ONLY_DEFAULT; else {
+  $_get_faction = htmlentities($_GET['faction']);
+  if (is_numeric($_get_faction)) $FA = get_numeric($_get_faction);
+  else $FA = FA_ONLY_DEFAULT;
+}
+
+if (!isset($_GET['rare'])) $RA = RA_ONLY_DEFAULT; else {
+  $_get_rare = htmlentities($_GET['rare']);
+  if (is_numeric($_get_rare)) $RA = get_numeric($_get_rare);
+  else $RA = RA_ONLY_DEFAULT;
+}
+
 if (isset($_GET['only_ri4_sales'])) {
     $_get_only_ri4_sales = htmlentities($_GET['only_ri4_sales']);
-    if (is_numeric($_get_only_ri4_sales))
-        $SHOW_ONLY_RI4_SALES = get_numeric($_get_only_ri4_sales) ? 1 : 0;
+    if (is_numeric($_get_only_ri4_sales)) $SHOW_ONLY_RI4_SALES = get_numeric($_get_only_ri4_sales) ? 1 : 0;
+    else $SHOW_ONLY_RI4_SALES = SHOW_ONLY_RI4_SALES_DEFAULT;
 }
 
 if (isset($_GET['raw_materials'])) {
     $_get_raw_materials = htmlentities($_GET['raw_materials']);
-    if (is_numeric($_get_raw_materials))
-        $DO_NOT_SHOW_RAW_MATERIALS = get_numeric($_get_raw_materials) ? 0 : 1; // инверсия
+    if (is_numeric($_get_raw_materials)) $DO_NOT_SHOW_RAW_MATERIALS = get_numeric($_get_raw_materials) ? 0 : 1; // инверсия
+    else $DO_NOT_SHOW_RAW_MATERIALS = DO_NOT_SHOW_RAW_MATERIALS_DEFAULT;
+}
+
+if (isset($_GET['industry_possible'])) {
+    $_get_industry_possible = htmlentities($_GET['industry_possible']);
+    if (is_numeric($_get_industry_possible)) $INDUSTRY_POSSIBLE = get_numeric($_get_industry_possible) ? 1 : 0;
+    else $INDUSTRY_POSSIBLE = INDUSTRY_POSSIBLE_DEFAULT;
 }
 
 if (isset($_GET['import'])) {
@@ -87,6 +175,98 @@ if (isset($_GET['trader'])) {
     $_get_trader_id = htmlentities($_GET['trader']);
     if (is_numeric($_get_trader_id))
         $TRADER_ID = get_numeric($_get_trader_id);
+}
+
+
+function get_actual_url($s, $grp, $t1, $t2, $t3, $fa, $ra, $ri4, $nsraw, $ip)
+{
+    $url = strtok($_SERVER[REQUEST_URI], '?').'?s='.$s;
+    if ($t1!=T1_ONLY_DEFAULT) $url = $url.'&t1='.($t1?1:0);
+    if ($t2!=T2_ONLY_DEFAULT) $url = $url.'&t2='.($t2?1:0);
+    if ($t3!=T3_ONLY_DEFAULT) $url = $url.'&t3='.($t3?1:0);
+    if ($fa!=FA_ONLY_DEFAULT) $url = $url.'&faction='.($fa?1:0);
+    if ($ra!=RA_ONLY_DEFAULT) $url = $url.'&rare='.($ra?1:0);
+    if (!is_null($grp) && !empty($grp)) $url = $url.'&grp='.implode(',',$grp);
+    if ($ri4!=SHOW_ONLY_RI4_SALES_DEFAULT) $url = $url.'&only_ri4_sales='.($ri4?1:0);
+    if ($nsraw!=DO_NOT_SHOW_RAW_MATERIALS_DEFAULT) $url = $url.'&raw_materials='.($nsraw?0:1); // инверсия
+    if (!is_null($ip)) $url = $url.'&industry_possible='.($ip?1:0);
+    return $url;
+}
+
+
+function __dump_trade_hub_links(&$market, $SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $RI4, $NSRAW, $IP) {
+    ?>Filters: <?php
+
+    $no_filters =
+        is_null($GRPs) &&
+        ($T1==T1_ONLY_DEFAULT) &&
+        ($T2==T2_ONLY_DEFAULT) &&
+        ($T3==T3_ONLY_DEFAULT) &&
+        ($FA==FA_ONLY_DEFAULT) &&
+        ($RA==RA_ONLY_DEFAULT) &&
+        ($RI4==SHOW_ONLY_RI4_SALES_DEFAULT) &&
+        ($NSRAW==DO_NOT_SHOW_RAW_MATERIALS_DEFAULT) &&
+        (!is_null($IP));
+    if ($no_filters) { ?><b><?php }
+    ?><a href="<?=get_actual_url($SORT, null, T1_ONLY_DEFAULT, T2_ONLY_DEFAULT, T3_ONLY_DEFAULT, FA_ONLY_DEFAULT, RA_ONLY_DEFAULT, SHOW_ONLY_RI4_SALES_DEFAULT, DO_NOT_SHOW_RAW_MATERIALS_DEFAULT, INDUSTRY_POSSIBLE_DEFAULT)?>">DEFAULT</a><?php
+    if ($no_filters) { ?></b><?php }
+
+    if ($T1==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1?0:1, 0, 0, 0, 0, $RI4, $NSRAW, $IP)?>">T1 only</a><?php
+    if ($T1==1) { ?></b><?php }
+
+    if ($T2==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, $T2?0:1, 0, 0, 0, $RI4, $NSRAW, $IP)?>">T2 only</a><?php
+    if ($T2==1) { ?></b><?php }
+
+    if ($T3==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, 0, $T3?0:1, 0, 0, $RI4, $NSRAW, $IP)?>">T3 only</a><?php
+    if ($T3==1) { ?></b><?php }
+
+    if ($FA==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, 0, 0, $FA?0:1, 0, $RI4, $NSRAW, $IP)?>">Faction only</a><?php
+    if ($FA==1) { ?></b><?php }
+
+    if ($RA==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, 0, 0, 0, 0, $RA?0:1, $RI4, $NSRAW, $IP)?>">Rare speciments</a><?php
+    if ($RA==1) { ?></b><?php }
+
+    ?><br>Settings: <?php
+
+    if ($RI4==1) { ?><b><?php }
+    ?><a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $RI4?0:1, $NSRAW, $IP)?>">Only RI4 sales</a><?php
+    if ($RI4==1) { ?></b><?php }
+
+    if ($NSRAW==1) { ?><b><?php }
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $RI4, $NSRAW?0:1, $IP)?>">Without RAW materials</a><?php
+    if ($NSRAW==1) { ?></b><?php }
+
+    if (!is_null($IP)) {
+    ?>, <b><a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $RI4, $NSRAW, $IP?0:null)?>">Industry <?=($IP==0)?'im':''?>possible</a></b><?php
+    } else {
+    ?>, <a href="<?=get_actual_url($SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $RI4, $NSRAW, 1)?>">Industry undefined</a><?php
+    }
+
+    $first = true;
+    $prev_market_group = null;
+    if ($market)
+        foreach ($market as $pkey => &$product)
+        {
+            $market_group = $product['grp'];
+            if ($prev_market_group != $market_group)
+            {
+                $prev_market_group = $market_group;
+                $market_group_id = intval($product['grp_id']);
+                $grp = is_null($GRPs) ? array() : $GRPs;
+                $key = array_search($market_group_id, $grp);
+                $not_found = $key === false;
+                if ($not_found) array_push($grp, $market_group_id); else unset($grp[$key]);
+                if ($first) { $first = false; ?><br>Categories: <?php } else { ?>, <?php }
+                if (!$not_found) { ?><b><?php }
+                ?><a href="<?=get_actual_url($SORT, $grp, $T1, $T2, $T3, $FA, $RA, $RI4, $NSRAW, $IP)?>"><?=$market_group?></a><?php
+                if (!$not_found) { ?></b><?php }
+            }
+        }
 }
 
 
@@ -208,6 +388,7 @@ function eve_ceiling($isk) {
     return $isk;
 }
 
+
 function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell, $jita_buy) { ?>
 <tr class="qind-summary">
  <td colspan="<?=(MARKET_TABLE_DEFAULT_order_volume_visible?3:2)+(MARKET_TABLE_DEFAULT_industry_volume_visible?1:0)?>"><?=$market_group?> Summary</td>
@@ -221,6 +402,7 @@ function __dump_market_group_summary(&$market_group, $price, $volume, $jita_sell
 function __dump_querious_market(&$market, &$storage, &$purchase, $trade_hub_system) {
     global $IMPORT_PRICE_TO_TRADE_HUB, $MIN_PROFIT, $MAX_PROFIT;
     global $TRADE_HUB_TAX, $BROKERS_FEE;
+    global $GRPs, $T1, $T2, $T3, $FA, $RA, $INDUSTRY_POSSIBLE;
     $TAX_AND_FEE = $TRADE_HUB_TAX + $BROKERS_FEE;
 ?>
 <h2><?=$trade_hub_system?> Market</h2>
@@ -283,6 +465,7 @@ mute-sm { font-size: 85%; }
     $amarr_buy_price = 0.0;
     $jita_buy_price = 0.0;
     $prev_market_group = null;
+    $curr_market_group = null;
     $summary_market_group_price = 0;
     $summary_market_group_volume = 0;
     $summary_market_group_jita_sell = 0;
@@ -301,7 +484,6 @@ mute-sm { font-size: 85%; }
 
             $tid = $product['id'];
             $ri4_sell_lvl = $product['ri4s'];
-            $market_group = $product['grp'];
             $nm = $product['name'];
             $weekly_volume = $product['wv'];
             $order_volume = $product['ov'];
@@ -325,6 +507,58 @@ mute-sm { font-size: 85%; }
             $present_in_assets = $product['aq'];
             $blueprints_prepared = $product['bpr'];
             $blueprints_invent = $product['bpi'];
+
+            $market_group = $product['grp'];
+            if ($prev_market_group != $market_group)
+            {
+                if (!is_null($prev_market_group) && $market_group_summary_market_price)
+                {
+                    __dump_market_group_summary(
+                        $prev_market_group,
+                        $market_group_summary_market_price,
+                        $market_group_summary_market_volume,
+                        $market_group_summary_jita_sell,
+                        $market_group_summary_jita_buy
+                    );
+                }
+                $prev_market_group = $market_group;
+                $curr_market_group = $market_group;
+                $market_group_summary_market_price = 0;
+                $market_group_summary_market_volume = 0;
+                $market_group_summary_jita_sell = 0;
+                $market_group_summary_jita_buy = 0;
+                ?><tr><td class="active" colspan="<?=MARKET_TABLE_columns?>"><strong><?=$market_group?></strong></td></tr><?php
+            }
+
+            if ($T1 == 1 || $T2 == 1 || $T3 == 1 || $FA == 1 || $RA == 1)
+            {
+                $meta = $product['meta'];
+                if (is_null($meta)) continue;
+                // см. https://everef.net/meta-groups
+                $meta_num = intval($meta);
+                if ($T1 == 1) { if ($meta_num != 1 && $meta_num != 54) continue; }
+                else if ($T2 == 1) { if ($meta_num != 2 && $meta_num != 53) continue; }
+                else if ($T3 == 1) { if ($meta_num != 14) continue; }
+                else if ($FA == 1) { if ($meta_num != 4 && $meta_num != 52) continue; }
+                else if ($RA == 1) { if ($meta_num != 15 && $meta_num != 6 && $meta_num != 19 && $meta_num != 5 && $meta_num != 17 && $meta_num != 3) continue; } // 15,6,19,5,17,3
+            }
+            if (!is_null($INDUSTRY_POSSIBLE))
+            {
+                $blueprint_type_id = $product['bp_tid'];
+                if ($INDUSTRY_POSSIBLE == 1) // possible
+                {
+                    if (is_null($blueprint_type_id)) continue;
+                }
+                else if ($INDUSTRY_POSSIBLE == 0) // impossible
+                {
+                    if (!is_null($blueprint_type_id)) continue;
+                }
+            }
+            if (!is_null($GRPs))
+            {
+                $market_group_id = intval($product['grp_id']);
+                if (array_search($market_group_id, $GRPs) === false) continue;
+            }
 
             if (!is_null($blueprints_invent))
                 $industry .= '<span class="label label-qind-invblueprints">invent</span>&nbsp;';
@@ -423,26 +657,6 @@ mute-sm { font-size: 85%; }
                     $we_bought_it = true;
                     break;
                 }
-
-            if ($prev_market_group != $market_group)
-            {
-                if (!is_null($prev_market_group))
-                {
-                    __dump_market_group_summary(
-                        $prev_market_group,
-                        $market_group_summary_market_price,
-                        $market_group_summary_market_volume,
-                        $market_group_summary_jita_sell,
-                        $market_group_summary_jita_buy
-                    );
-                }
-                $prev_market_group = $market_group;
-                $market_group_summary_market_price = 0;
-                $market_group_summary_market_volume = 0;
-                $market_group_summary_jita_sell = 0;
-                $market_group_summary_jita_buy = 0;
-                ?><tr><td class="active" colspan="<?=MARKET_TABLE_columns?>"><strong><?=$market_group?></strong></td></tr><?php
-            }
 ?>
 <tr<?php if ($ri4_sell_lvl==2) { ?> style="background: #e8e8e8;"<?php } ?>>
  <td><img class="icn32" src="<?=__get_img_src($tid,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
@@ -518,10 +732,10 @@ mute-sm { font-size: 85%; }
 </tr>
 <?php
     }
-    if (!is_null($prev_market_group))
+    if (!is_null($curr_market_group) && $market_group_summary_market_price)
     {
         __dump_market_group_summary(
-            $prev_market_group,
+            $curr_market_group,
             $market_group_summary_market_price,
             $market_group_summary_market_volume,
             $market_group_summary_jita_sell,
@@ -646,8 +860,12 @@ function __dump_querious_storage(&$storage, $trade_hub_system) { ?>
 select
   market.type_id as id,
   market.lvl as ri4s, -- RI4 sell level
+  market_group.semantic_id as grp_id,
   market_group.name as grp,
   tid.sdet_type_name as name,
+  tid.sdet_meta_group_id as meta,
+  industry.sdebp_blueprint_type_id as bp_tid,
+  bptid.sdet_type_name as bp_name,
   case
     when (weeks_passed.volume_sell=0) or (weeks_passed.diff<0.14) then null
     when (weeks_passed.diff < 1.14) then weeks_passed.volume_sell
@@ -707,6 +925,9 @@ from
   ) market
     -- сведения о предмете
     left outer join eve_sde_type_ids tid on (market.type_id = tid.sdet_type_id)
+    -- сведения о возможности производства предмета
+    left outer join eve_sde_blueprint_products as industry on (sdebp_product_id = market.type_id and sdebp_activity=1)
+    left outer join eve_sde_type_ids bptid on (industry.sdebp_blueprint_type_id = tid.sdet_type_id)
     -- цены в жите прямо сейчас
     left outer join (
       select ethp_type_id, ethp_sell as sell, ethp_buy as buy
@@ -1042,6 +1263,7 @@ EOD;
     {
       ?><p>Станция рынка: <span class="text-primary"><?=$trade_hub_status[0]['name']?></span><?=get_clipboard_copy_button($trade_hub_status[0]['name'])?><br>Время последней актуализации цен: <span class="text-primary"><?=is_null($trade_hub_status[0]['prc'])?'нет данных':$trade_hub_status[0]['prc'].' ET'?></span><br>Время последней актуализации ордеров: <span class="text-primary"><?=is_null($trade_hub_status[0]['ord'])?'нет данных':$trade_hub_status[0]['ord'].' ET'?></span><br>Время последней сделки: <span class="text-primary"><?=is_null($trade_hub_status[0]['tra'])?'нет данных':$trade_hub_status[0]['tra'].' ET'?></span></p><?php
     }
+    __dump_trade_hub_links($market, $SORT, $GRPs, $T1, $T2, $T3, $FA, $RA, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS, $INDUSTRY_POSSIBLE);
     __dump_querious_market($market, $storage, $purchase, $trade_hub_system);
 ?>
 <!-- --- --- --- -->
