@@ -362,31 +362,32 @@ def main():
             sys.stdout.flush()
 
             # Requires: public access
-            if markets_analyzer_first_time:
-                markets_analyzer_first_time = False
-                sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
-                market_regions = [(int(id), sde_inv_names[id]) for id in sde_inv_names if
-                                  sde_inv_names[id] in q_market_analyzer_settings.g_regions]
-                del sde_inv_names
-                try:
-                    # Public information about market prices
-                    for (region_id, region_name) in market_regions:
-                        markets_region_orders = interface.get_esi_paged_data(
-                            "markets/{}/orders/".format(region_id))
-                        print("\n{} market has {} orders".format(
-                            region_name, len(markets_region_orders) if markets_region_orders else 0))
-                        sys.stdout.flush()
-                        del markets_region_orders
-                except requests.exceptions.HTTPError as err:
-                    status_code = err.response.status_code
-                    if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
-                        pass
-                    else:
-                        raise
-                except:
-                    print(sys.exc_info())
-                    raise
-                del market_regions
+            # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned from using ESI. Please contact Technical Support. (support@eveonline.com)
+            #if markets_analyzer_first_time:
+            #    markets_analyzer_first_time = False
+            #    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
+            #    market_regions = [(int(id), sde_inv_names[id]) for id in sde_inv_names if
+            #                      sde_inv_names[id] in q_market_analyzer_settings.g_regions]
+            #    del sde_inv_names
+            #    try:
+            #        # Public information about market prices
+            #        for (region_id, region_name) in market_regions:
+            #            markets_region_orders = interface.get_esi_paged_data(
+            #                "markets/{}/orders/".format(region_id))
+            #            print("\n{} market has {} orders".format(
+            #                region_name, len(markets_region_orders) if markets_region_orders else 0))
+            #            sys.stdout.flush()
+            #            del markets_region_orders
+            #    except requests.exceptions.HTTPError as err:
+            #        status_code = err.response.status_code
+            #        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+            #            pass
+            #        else:
+            #            raise
+            #    except:
+            #        print(sys.exc_info())
+            #        raise
+            #    del market_regions
 
         eve_esi_tools.dump_debug_into_file(argv_prms["workspace_cache_files_dir"], "various_characters_data", various_characters_data)
 

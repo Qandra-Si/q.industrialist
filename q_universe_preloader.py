@@ -267,14 +267,15 @@ def main():
             # загрузка исторических цен по регионам (ОЧЕНЬ МЕДЛЕННО из-за большого кол-ва данных), как
             # правило загрузка рыночных данных одного крупного региона, например The Forge, занимает
             # несколько часов
-            if categories & {'all', 'public', 'once', 'trade_history'}:
-                # Requires: public access
-                if dbtools.is_market_regions_history_refreshed():
-                    for region in q_industrialist_settings.g_market_regions:
-                        market_region_history_updates = dbtools.actualize_market_region_history(region)
-                        print("Region '{}' has {} market history updates\n".
-                              format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
-                        sys.stdout.flush()
+            # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned from using ESI. Please contact Technical Support. (support@eveonline.com)
+            #if categories & {'all', 'public', 'once', 'trade_history'}:
+            #    # Requires: public access
+            #    if dbtools.is_market_regions_history_refreshed():
+            #        for region in q_industrialist_settings.g_market_regions:
+            #            market_region_history_updates = dbtools.actualize_market_region_history(region)
+            #            print("Region '{}' has {} market history updates\n".
+            #                  format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
+            #            sys.stdout.flush()
 
     sys.stdout.flush()
 
