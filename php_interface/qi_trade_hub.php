@@ -894,22 +894,22 @@ from
   ( select m.type_id, min(m.lvl) as lvl
     from (
       -- список транзакций по покупке/продаже имени корпораций или от имени избранных персонажей
-      select ecwt_type_id as type_id, 0 as lvl
-      from
-        esi_corporation_wallet_journals j
-          left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
-      where
-        (ecwj_date > '2023-05-01') and
-        (ecwj_context_id_type = 'market_transaction_id') and
-        ( ( ecwj_corporation_id=any($1) and
-            ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
-          ( ecwj_second_party_id=$3 and -- торговый персонаж,...
-            ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
-        ) and
-        ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
-      union
+      --select ecwt_type_id as type_id, 0 as lvl
+      --from
+      --  esi_corporation_wallet_journals j
+      --    left outer join esi_corporation_wallet_transactions t on (ecwj_context_id = ecwt_transaction_id) -- (j.ecwj_reference_id = t.ecwt_journal_ref_id)
+      --where
+      --  (ecwj_date > '2023-05-01') and
+      --  (ecwj_context_id_type = 'market_transaction_id') and
+      --  ( ( ecwj_corporation_id=any($1) and
+      --      ecwt_location_id=$2 and not ecwt_is_buy ) or -- станка рынка
+      --    ( ecwj_second_party_id=$5 and -- торговый персонаж,...
+      --      ecwt_location_id<>$2 and ecwt_is_buy ) -- ..., который закупается не по месту продажи
+      --  ) and
+      --  ecwt_type_id is not null -- данные journal могут пока отсутствовать, а в transaction уже быть
+      --union
       -- список того, что корпорация продавала или продаёт
-      select ecor_type_id, 1
+      select ecor_type_id as type_id, 1 as lvl
       from esi_corporation_orders
       where
         not ecor_is_buy_order and
@@ -919,7 +919,7 @@ from
       -- список того, что выставлено в маркете (не нами)
       select ethp_type_id, 2
       from qi.esi_trade_hub_prices
-      where $4=0 and ethp_location_id=$2  -- станка рынка
+      where $3=0 and ethp_location_id=$2  -- станка рынка
     ) m
     group by 1
   ) market
@@ -1049,7 +1049,7 @@ from
     ) bpinv on (market.type_id = bpinv.pr3id)
 where
   market_group.id = tid.sdet_market_group_id and
-  ($5=0 or market_group.semantic_id not in (
+  ($4=0 or market_group.semantic_id not in (
     2, -- Blueprints & Reactions
     19, -- Trade Goods
     150, -- Skills
@@ -1069,7 +1069,7 @@ where
 -- order by tid.sdet_packaged_volume desc
 order by market_group.name, tid.sdet_type_name;
 EOD;
-    $params = array('{'.implode(',',$CORPORATION_IDs).'}', $TRADE_HUB_ID, $TRADER_ID, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS);
+    $params = array('{'.implode(',',$CORPORATION_IDs).'}', $TRADE_HUB_ID, $SHOW_ONLY_RI4_SALES, $DO_NOT_SHOW_RAW_MATERIALS); //, $TRADER_ID);
     $market_cursor = pg_query_params($conn, $query, $params)
             or die('pg_query err: '.pg_last_error());
     $market = pg_fetch_all($market_cursor);
