@@ -86,7 +86,8 @@ EOD;
  <a class="btn btn-success" href="/qi_market_fhttc.php" role="button">FH-TTC Market</a>
  <a class="btn btn-success" href="qi_market_mj5f9.php" role="button">MJ-5F9 Market</a>
  <a class="btn btn-success" href="qi_market_b2j5n.php" role="button">B2J-5N Market</a>
- <a class="btn btn-success" href="qi_market_f9fuv.php" role="button">F9-FUV Market</a><br>
+ <a class="btn btn-success" href="qi_market_f9fuv.php" role="button">F9-FUV Market</a>
+ <a class="btn btn-success" href="qi_market_p3xtn.php" role="button">P3X-TN Market</a><br>
 <br>
 <?php
     $query = <<<EOD
