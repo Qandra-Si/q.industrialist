@@ -67,6 +67,7 @@ DROP INDEX IF EXISTS qi.idx_epj_pk;
 DROP TABLE IF EXISTS qi.esi_pilot_industry_jobs;
 
 ---
+DROP INDEX IS EXISTS qi.idx_ecor_corporation_location_id;
 DROP INDEX IF EXISTS qi.idx_ecor_history;
 DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
 DROP INDEX IF EXISTS qi.idx_ecor_issued;
@@ -874,6 +875,11 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ecor_history
     ON qi.esi_corporation_orders USING btree
     (ecor_history ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_ecor_corporation_location_id
+    ON qi.esi_corporation_orders USING btree
+    (ecor_corporation_id ASC NULLS LAST, ecor_location_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
