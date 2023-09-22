@@ -380,10 +380,10 @@ our_price/volume = <?=number_format($our_price,2,'.',',').' ('.$our_volume.')'?>
   }
 ?>
 
-<?=is_null($their_margin)?'':'their = '.number_format($their_margin->price,2,'.',',').'&nbsp;= '.
+their = <?=is_null($their_margin)?'':number_format($their_margin->price,2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($their_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($their_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
-   number_format(eve_ceiling($their_margin->price_wo_logistic),2,'.',',').'<br>'?>
+   number_format(eve_ceiling($their_margin->price_wo_logistic),2,'.',',')?><br>
 our = <?=number_format($hub_margin->price,2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($hub_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($hub_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
