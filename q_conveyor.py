@@ -54,6 +54,7 @@ def main():
     sde_inv_items = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invItems")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
+    sde_long_term_industry = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "longTermIndustry")
 
     # удаление из списка чертежей тех, которые не published (надо соединить typeIDs и blueprints, отбросив часть)
     for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
@@ -385,6 +386,7 @@ def main():
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         materials_for_bps,
         research_materials_for_bps,
         products_for_bps,

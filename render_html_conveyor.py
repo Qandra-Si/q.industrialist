@@ -691,6 +691,7 @@ def __dump_not_available_materials_list(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         # списки контейнеров и станок из экземпляра контейнера
         manufacturing_blueprint_loc_ids,
         manufacturing_stock_loc_ids,
@@ -716,6 +717,7 @@ def __dump_not_available_materials_list(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         # esi данные, загруженные с серверов CCP
         corp_industry_jobs_data,
         # списки контейнеров и станок из экземпляра контейнера
@@ -963,6 +965,7 @@ def __dump_blueprints_list_with_materials(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         products_for_bps,
         reaction_products_for_bps,
         global_materials_summary,
@@ -1441,6 +1444,7 @@ def __dump_blueprints_list_with_materials(
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            sde_long_term_industry,
             # списки контейнеров и станок из экземпляра контейнера
             blueprint_loc_ids,
             stock_all_loc_ids,
@@ -1734,6 +1738,7 @@ def __dump_corp_conveyors(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         materials_for_bps,
         research_materials_for_bps,
         products_for_bps,
@@ -1883,6 +1888,7 @@ tr.qind-em th
                 sde_type_ids,
                 sde_bp_materials,
                 sde_market_groups,
+                sde_long_term_industry,
                 products_for_bps,
                 reaction_products_for_bps,
                 global_materials_summary,
@@ -1944,6 +1950,7 @@ tr.qind-em th
                 sde_type_ids,
                 sde_bp_materials,
                 sde_market_groups,
+                sde_long_term_industry,
                 # списки контейнеров и станок из экземпляра контейнера
                 global_blueprint_loc_ids,
                 global_stock_all_loc_ids,
@@ -2394,6 +2401,7 @@ def dump_conveyor_into_report(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        sde_long_term_industry,
         materials_for_bps,
         research_materials_for_bps,
         products_for_bps,
@@ -2426,6 +2434,7 @@ def dump_conveyor_into_report(
                     sde_type_ids,
                     sde_bp_materials,
                     sde_market_groups,
+                    sde_long_term_industry,
                     materials_for_bps,
                     research_materials_for_bps,
                     products_for_bps,
