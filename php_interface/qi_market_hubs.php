@@ -372,9 +372,19 @@ our_price/volume = <?=number_format($our_price,2,'.',',').' ('.$our_volume.')'?>
     $relative_jita_margin = new market_hub_margin();
     $relative_jita_margin->calculate_up($h, $jita_margin->price_wo_logistic, $packaged_volume, $isotopes_price);
   }
+  $their_margin = null;
+  if (!is_null($their_price))
+  {
+    $their_margin = new market_hub_margin();
+    $their_margin->calculate_down($h, $their_price, $packaged_volume, $isotopes_price);
+  }
 ?>
 
-price = <?=number_format($hub_margin->price,2,'.',',').'&nbsp;= '.
+<?=is_null($their_margin)?'':'their = '.number_format($their_margin->price,2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($their_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($their_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($their_margin->price_wo_logistic),2,'.',',').'<br>'?>
+our = <?=number_format($hub_margin->price,2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($hub_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($hub_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($hub_margin->price_wo_logistic),2,'.',',')?><br>
@@ -388,7 +398,7 @@ price = <?=number_format($hub_margin->price,2,'.',',').'&nbsp;= '.
    number_format(eve_ceiling($relative_jita_margin->price),2,'.',',')?><br>
 
 
-? = <?=$price_total.' '.$price_max.' '.$orders_total.' '.$default_profit?></td><?php
+? = <?='tot:'.$price_total.' max:'.$price_max.' num:'.$orders_total.' '.($default_profit*100).'%'?></td><?php
                 }
             }
         if (!is_null($hub_positions)) { unset($hub_positions); $hub_positions = null; }
