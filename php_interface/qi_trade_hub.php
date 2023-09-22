@@ -180,7 +180,7 @@ if (isset($_GET['trader'])) {
 
 function get_actual_url($s, $grp, $t1, $t2, $t3, $fa, $ra, $ri4, $nsraw, $ip)
 {
-    $url = strtok($_SERVER[REQUEST_URI], '?').'?s='.$s;
+    $url = strtok($_SERVER['REQUEST_URI'], '?').'?s='.$s;
     if ($t1!=T1_ONLY_DEFAULT) $url = $url.'&t1='.($t1?1:0);
     if ($t2!=T2_ONLY_DEFAULT) $url = $url.'&t2='.($t2?1:0);
     if ($t3!=T3_ONLY_DEFAULT) $url = $url.'&t3='.($t3?1:0);
