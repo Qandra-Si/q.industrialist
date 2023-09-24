@@ -1795,8 +1795,8 @@ class QDatabaseTools:
             history_updated_at = self.eve_now
             active_is_updated = True
             history_is_updated = True
-        elif not active_is_updated and not history_is_updated:
-            return None
+        #elif not active_is_updated and not history_is_updated:
+        #    return None
 
         if active_is_updated:
             # подгружаем данные из БД в кеш с тем, чтобы сравнить данные в кеше и данные от ССР
@@ -1845,6 +1845,15 @@ class QDatabaseTools:
             del absent_db_ids
             del history_order_ids
 
+        if active_is_updated and history_is_updated:
+            # данные по ордерам из БД в кеш уже подгружены и актуализированы с теми, что пришли от ССР
+            # т.е. уже был вызван метод self.prepare_corp_cache...
+            active_order_ids = [int(o['order_id']) for o in active_data]
+            history_order_ids = [int(o['order_id']) for o in history_data]
+            corp_cache = self.get_corp_cache(self.__cached_corporation_orders, corporation_id)
+            obsolete_order_ids = set(corp_cache.keys()) - set(active_order_ids) - set(history_order_ids)
+            self.dbswagger.discard_absent_corporation_orders(corporation_id, list(obsolete_order_ids))
+
         del history_data
         del active_data
 
@@ -1853,7 +1862,7 @@ class QDatabaseTools:
         self.dbswagger.sync_market_location_history_with_corp_orders_by_corp(corporation_id)
 
         # удаление устаревших ордеров
-        self.dbswagger.discard_obsolete_contracts()
+        self.dbswagger.discard_obsolete_corporation_orders()
 
         return corp_has_active_orders, corp_has_finished_orders
 

@@ -259,7 +259,7 @@ function __dump_market_table_header(&$hub_ids, &$market_hubs) {?>
         <?php
     }
 ?>
-  <th style="text-align:right;">Jita Buy..Sell</th>
+  <th style="text-align:right;">Jita Sell..Buy</th>
   <th style="text-align:center;">Подробности</th>
  </tr>
 </thead>
@@ -336,8 +336,43 @@ function __dump_market_sale_orders(
         if (!is_null($hub_positions))
             foreach ($hub_positions as $hub_key => &$so_key)
             {
+                $h = $market_hubs[$hub_key];
+                $brokers_fee = $h['fee'];
+                $trade_hub_tax = $h['tax'];
+                $default_profit = $h['pr'];
+                $manufacturing_possible = $h['m'];
+                $invent_possible = $h['i'];
+                //$lightyears = $h['ly'];
+                $isotopes = $h['it'];
+
+                $jita_margin = null;
+                $relative_jita_margin = null;
+                if (($h['hub'] != 60003760) && !is_null($market_jita_hub) && !is_null($jita_sell))
+                {
+                    $jita_margin = new market_hub_margin();
+                    $jita_margin->calculate_down($market_jita_hub, $jita_sell, $packaged_volume, $isotopes_price);
+                    $relative_jita_margin = new market_hub_margin();
+                    $relative_jita_margin->calculate_up($h, $jita_margin->price_wo_logistic, $packaged_volume, $isotopes_price);
+                }
+
                 if (is_null($so_key))
-                    echo "<td></td>";
+                {
+?><td>
+their_price/volume =<br>
+our_price/volume =<br>
+<?=is_null($packaged_volume)?'':'<br>packaged = '.number_format($packaged_volume*$our_volume,2,'.',',').'m³'?><br>
+their =<br>
+our =<br>
+<?=is_null($jita_margin)?'':'jita = '.number_format($jita_margin->price,2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($jita_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($jita_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($jita_margin->price_wo_logistic),2,'.',',')?><br>
+<?=is_null($relative_jita_margin)?'':'rel jita = '.number_format($relative_jita_margin->price_wo_logistic,2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($relative_jita_margin->price_wo_fee_tax),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($relative_jita_margin->price_wo_profit),2,'.',',').'&nbsp;= '.
+   number_format(eve_ceiling($relative_jita_margin->price),2,'.',',')?><br>
+</td><?php
+                }
                 else
                 {
                     $o = $sale_orders[$so_key];
@@ -348,30 +383,13 @@ function __dump_market_sale_orders(
                     $orders_total = $o['ot'];
                     $their_volume = $o['tv'];
                     $their_price = $o['tp'];
-                    $h = $market_hubs[$hub_key];
-                    $brokers_fee = $h['fee'];
-                    $trade_hub_tax = $h['tax'];
-                    $default_profit = $h['pr'];
-                    $manufacturing_possible = $h['m'];
-                    $invent_possible = $h['i'];
-                    //$lightyears = $h['ly'];
-                    $isotopes = $h['it'];
 ?><td>
 their_price/volume = <?=is_null($their_price)?'':number_format($their_price,2,'.',',').' ('.$their_volume.')'?><br>
 our_price/volume = <?=number_format($our_price,2,'.',',').' ('.$our_volume.')'?>
-<?=is_null($packaged_volume)?'':'<br>packaged = '.number_format($packaged_volume*$our_volume,2,'.',',').'m³'?>
-<br><?php
+<?=is_null($packaged_volume)?'':'<br>packaged = '.number_format($packaged_volume*$our_volume,2,'.',',').'m³'?><br>
+<?php
   $hub_margin = new market_hub_margin();
   $hub_margin->calculate_down($h, $our_price, $packaged_volume, $isotopes_price);
-  $jita_margin = null;
-  $relative_jita_margin = null;
-  if (($h['hub'] != 60003760) && !is_null($market_jita_hub) && !is_null($jita_sell))
-  {
-    $jita_margin = new market_hub_margin();
-    $jita_margin->calculate_down($market_jita_hub, $jita_sell, $packaged_volume, $isotopes_price);
-    $relative_jita_margin = new market_hub_margin();
-    $relative_jita_margin->calculate_up($h, $jita_margin->price_wo_logistic, $packaged_volume, $isotopes_price);
-  }
   $their_margin = null;
   if (!is_null($their_price))
   {
@@ -404,8 +422,8 @@ our = <?=number_format($hub_margin->price,2,'.',',').'&nbsp;= '.
         if (!is_null($hub_positions)) { unset($hub_positions); $hub_positions = null; }
         ?>
 <td>
- <?=is_null($jita_buy)?'':number_format($jita_buy,2,'.',',')?><br>
  <?=is_null($jita_sell)?'':number_format($jita_sell,2,'.',',')?><br>
+ <?=is_null($jita_buy)?'':number_format($jita_buy,2,'.',',')?><br>
  <?=is_null($packaged_volume)?'':number_format($packaged_volume,($packaged_volume>0.009)?2:3,'.',',').'m³'?>
 </td>
 <td></td>

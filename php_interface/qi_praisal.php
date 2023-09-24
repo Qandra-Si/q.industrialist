@@ -445,9 +445,9 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
     else
     {
       $color = null;
-      if ($their_price > $our_price)
+      if ($their_price < $our_price)
         $color = '#9e6101';
-      else if ($their_price < $our_price)
+      else if ($their_price > $our_price)
         $color = '#3371b6';
       ?><span class="grayed">(<?=$our_volume?>)</span>&nbsp;<?=$color?'<span style="color:'.$color.'";>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</span>':''?><br>
         <span class="grayed">(<?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></span><?php

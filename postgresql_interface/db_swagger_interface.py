@@ -2194,7 +2194,16 @@ class QSwaggerInterface:
             data.append(row[0])
         return data
 
-    def discard_obsolete_contracts(self):
+    def discard_absent_corporation_orders(self, corporation_id: int, absert_ids: typing.List[int]):
+        self.db.execute(
+            "UPDATE esi_corporation_orders "
+            "SET ecor_history=true "
+            "WHERE NOT ecor_history AND ecor_corporation_id=%s AND ecor_order_id IN (SELECT * FROM UNNEST(%s));",
+            corporation_id,
+            absert_ids
+        )
+
+    def discard_obsolete_corporation_orders(self):
         self.db.execute(
             "UPDATE esi_corporation_orders "
             "SET ecor_history=true "
