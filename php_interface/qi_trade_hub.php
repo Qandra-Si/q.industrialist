@@ -1783,27 +1783,21 @@ $(document).ready(function(){
          .html(numLikeEve(market_type[3].toFixed(2)))
          .parent().removeClass('hidden');
       } else {
-        $('#dtlsJitaSell')
-         .html(numLikeEve(market_type[3].toFixed(2)))
-         .parent().addClass('hidden');
+        $('#dtlsJitaSell').closest('div').addClass('hidden');
       }
       if (market_type[4]) {
         $('#dtlsJitaBuy')
          .html(numLikeEve(market_type[4].toFixed(2)))
          .parent().removeClass('hidden');
       } else {
-        $('#dtlsJitaBuy')
-         .html(numLikeEve(market_type[4].toFixed(2)))
-         .parent().addClass('hidden');
+        $('#dtlsJitaBuy').closest('div').addClass('hidden');
       }
       if (market_type[5]) {
         $('#dtlsAmarrSell')
          .html(numLikeEve(market_type[5].toFixed(2)))
          .parent().removeClass('hidden');
       } else {
-        $('#dtlsAmarrSell')
-         .html(numLikeEve(market_type[5].toFixed(2)))
-         .parent().addClass('hidden');
+        $('#dtlsAmarrSell').closest('div').addClass('hidden');
       }
       $('#dtlsUniversePrice').html(numLikeEve(market_type[6].toFixed(2)));
       var span_last_ri4_buy = $('#dtlsLastBuyPrice');

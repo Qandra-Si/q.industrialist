@@ -15,7 +15,7 @@ function __get_img_src($tp, $sz, $use_filesystem_resources)
 // --------------------------------------------------------------------------------------------------------------
 // __dump_header
 // --------------------------------------------------------------------------------------------------------------
-function __dump_header($header_name, $use_filesystem_resources, $html_style="")
+function __dump_header($header_name, $use_filesystem_resources, $html_style="", $use_dark_mode=false)
 {
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
@@ -88,6 +88,138 @@ function __dump_header($header_name, $use_filesystem_resources, $html_style="")
  <!-- Manifest.json  -->
  <link rel="manifest" href="manifest.webmanifest">
 <?=$html_style?>
+<?php if ($use_dark_mode) { ?>
+<style type="text/css">
+body {
+ color: #c5c8c9;
+ background-color: #162326;
+}
+a.url {
+ color: #ffa600;
+}
+a:hover.url,
+a:focus.url {
+ color: #ffa600;
+ background-color: #8f6310;
+}
+hr { border-top: 1px solid #1d3231; }
+.panel {
+ background-color: #162326;
+}
+.panel-default > .panel-heading {
+ color: #e8e8e8;
+ background-color: #21312b;
+ border-color: #1d3231;
+}
+.btn-default {
+ color: #c7cccb;
+ background-color: #233630;
+ border-color: #489579;
+}
+.btn-default:hover {
+ color: #ebefee;
+ background-color: #477e6b;
+ border-color: #4b8975;
+}
+.btn-default.active,
+.btn-default:active,
+.btn-default.focus,
+.btn-default:focus,
+.open > .dropdown-toggle.btn-default,
+.btn-default:active:hover,
+.btn-default.active:hover,
+.open > .dropdown-toggle.btn-default:hover,
+.btn-default:active:focus,
+.btn-default.active:focus,
+.open > .dropdown-toggle.btn-default:focus,
+.btn-default:active.focus,
+.btn-default.active.focus,
+.open > .dropdown-toggle.btn-default.focus {
+ color: #616161;
+ background-color: #e7e7e7;
+ border-color: #e7e7e7;
+}
+.page-header { border-bottom: 1px solid #1d3231; }
+.table > tbody > tr.active > td,
+.table > tbody > tr.active > th,
+.table > tbody > tr > td.active,
+.table > tbody > tr > th.active,
+.table > tfoot > tr.active > td,
+.table > tfoot > tr.active > th,
+.table > tfoot > tr > td.active,
+.table > tfoot > tr > th.active,
+.table > thead > tr.active > td,
+.table > thead > tr.active > th,
+.table > thead > tr > td.active,
+.table > thead > tr > th.active { background-color: #2a493e; }
+.table > tbody > tr > td { color: inherit; background-color: inherit; }
+.table-hover > tbody > tr:hover,
+.table > tbody > tr:active > td {
+ color: #c4c8c7;
+ background-color: #22312e;
+}
+.activity1 { background-color: #ff9900; }
+.activity3,
+.activity4,
+.activity5,
+.activity7,
+.activity8 { background-color: #3371b6; }
+.activity9,
+.activity11 { background-color: #0a7f6f; }
+.label-summary {
+ font-size: 66%;
+ font-weight: unset;
+}
+mark {
+ background-color: #1a302e;
+ color: #d8dada;
+ padding: .3em .3em .3em;
+}
+.progress {
+ height: 8px;
+ margin-bottom: 0px;
+ background-color: #232e31;
+ border-radius: 0px;
+}
+.modal-content {
+ background-color: #19181c;
+ border: 1px solid #302f33;
+}
+div.modal-header > button.close {
+ color: #d2d2d2;
+ text-shadow: 0 1px 0 #1f1f1f;
+}
+div.modal-header {
+ border-bottom: 1px solid #302f33;
+}
+div.modal-footer {
+ border-top: 1px solid #302f33;
+}
+div.modal-header > h4 > span.text-primary {
+ color: #9e6101;
+}
+div.modal-header > h4.modal-title {
+ color: #dddcdd;
+}
+div.modal-body * mark {
+ background-color: #242427;
+}
+div.modal-body > hr {
+ margin-top: 4px;
+ margin-bottom: 4px;
+}
+
+.table-gallente { padding: 1px; font-size: smaller; }
+.table-gallente thead tr th:nth-child(1),
+.table-gallente tbody tr td:nth-child(1) { width: 32px; }
+.table-gallente tbody tr:hover td:nth-child(2) { border-left: 1px solid #6db09e; }
+.table-gallente thead tr th { padding: 4px; border-bottom: 1px solid #1d3231; vertical-align: bottom; }
+.table-gallente tbody tr td { padding: 4px; border-top: none; vertical-align: top; }
+.table-gallente tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
+.table-gallente tbody tr td { border-left: 1px solid #1d3231; }
+.table-gallente tbody tr td:nth-child(2) { border-left: none; }
+</style>
+<?php } ?>
 </head>
 <body>
  <div class="page-header"><h1>Q.Industrialist <small><?=$header_name?></small></h1></div>
@@ -175,10 +307,16 @@ function __dump_any_into_modal_footer() { ?>
 
 
 // --------------------------------------------------------------------------------------------------------------
+// get_glyph_icon_button
+// --------------------------------------------------------------------------------------------------------------
+function get_glyph_icon_button(string $glyph, string $html="") {
+    return ' <a data-target="#" role="button" '.$html.' data-original-title="" title=""><span class="glyphicon glyphicon-'.$glyph.'" aria-hidden="true"></a>';
+}
+// --------------------------------------------------------------------------------------------------------------
 // get_clipboard_copy_button
 // --------------------------------------------------------------------------------------------------------------
 function get_clipboard_copy_button(&$data_copy) {
-    return ' <a data-target="#" role="button" data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip" data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></a>';
+    return get_glyph_icon_button("copy", 'data-copy="'.$data_copy.'" class="qind-copy-btn" data-toggle="tooltip"');
 }
 
 
@@ -246,7 +384,7 @@ $(document).ready(function(){
         if (!(nm === undefined)) {
          var td2q = $(this).find('td').eq(2).attr('quantity');
          if (!(td2q === undefined) && (td2q > 0)) {
-          if (data_copy) data_copy += "\n"; 
+          if (data_copy) data_copy += "\n";
           data_copy += nm + "\t" + td2q;
          }
         }
