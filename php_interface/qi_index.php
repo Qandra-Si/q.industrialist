@@ -80,6 +80,7 @@ EOD;
  <a class="btn btn-success" disabled href="/qi_querious_industry_request.php" role="button">Querious Industry</a><br>
  <br>
  Все наши маркеты (ларьки) одной таблицей:<br>
+ <a class="btn btn-danger" href="/qi_praisal.php" role="button">Q.Praisal</a>
  <a class="btn btn-success" href="/qi_market_hubs.php" role="button">Market Hubs</a><br>
  <br>
  Все наши маркеты (ларьки) с индивидуальными торговыми терминалами:<br>
