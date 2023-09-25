@@ -20,7 +20,7 @@ function __dump_clipboard_waiter($notice) { ?>
 </div> <!--row-->
 </center>
 <?php } ?>
-<script src="/qi_praisal_js.php"></script>
+<script src="/tools/tids.php"></script>
 <script>
 document.addEventListener('paste', async (e) => {
  e.preventDefault();
@@ -342,6 +342,40 @@ EOD;
   echo "null];\n";
 }
 
+function __dump_praisal_menu_bar() { ?>
+<nav class="navbar navbar-default">
+ <div class="container-fluid">
+  <div class="navbar-header">
+   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
+    <span class="sr-only">Переключить навигацию</span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+   </button>
+   <a class="navbar-brand" data-target="#"><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>
+  </div>
+  <div class="collapse navbar-collapse" id="bs-navbar-collapse">
+   <ul class="nav navbar-nav">
+    <li class="dropdown">
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки отображения <span class="caret"></span></a>
+      <ul class="dropdown-menu">
+       <li><a id="btnToggleJitaPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowJitaPrice"></span> Показывать Jita Price</a></li>
+       <li><a id="btnToggleAmarrPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAmarrPrice"></span> Показывать Amarr Price</a></li>
+       <li><a id="btnToggleUniversePrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUniversePrice"></span> Показывать Universe Price</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnToggleMarketVolume" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMarketVolume"></span> Показывать объём товара на рынке</a></li>
+       <li><a id="btnToggleBestOffer" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBestOffer"></span> Показывать объём лучшего предложения</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnResetOptions" data-target="#" role="button">Сбросить все настройки</a></li>
+      </ul>
+    </li>
+    <li><a id="btnShowMarketHubs" data-target="" role="button" data-toggle="modal">Торговые хабы</a></li>
+   </ul>
+  </div>
+ </div>
+</nav>
+<?php }
+
 function __dump_praisal_table_header(&$market_hubs)
 {
   $active_market_hub_ids = array();
@@ -363,6 +397,8 @@ price_normal { color: #3371b6; }
 tid { white-space: nowrap; }
 .qind-info-btn { color: #808080; }
 .qind-info-btn:hover, .qind-info-btn:active, .qind-info-btn:focus { color: #aaa; }
+market-volume { color: #808080; }
+best-offer { color: #9e6101; }
 </style>
 <table class="table table-condensed table-hover table-gallente" id="tbl">
 <thead>
@@ -437,7 +473,7 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
     if ($hub != $_hub) continue;
     if (is_null($their_price))
     {
-      ?><grayed>(<?=$our_volume?>)</grayed>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
+      ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
     }
     else
     {
@@ -446,8 +482,8 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
         $color = 'price_warning';
       else if ($their_price > $our_price)
         $color = 'price_normal';
-      ?><grayed>(<?=$our_volume?>)</grayed>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
-        <grayed>(<?=(is_null($best_offer_volume))?'':'<price_warning>'.$best_offer_volume.'</price_warning>/'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></grayed><?php
+      ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
+        <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
     }
     break;
   }
@@ -529,6 +565,7 @@ $sale_orders = array();
 __dump_market_orders_data($conn, $market_hubs, $sys_type_ids, $sale_orders);
 ?></script><?php
 
+__dump_praisal_menu_bar();
 __dump_praisal_table_header($market_hubs);
 foreach (range(0,$IDs_len/2-1) as $idx)
 {
@@ -551,7 +588,72 @@ pg_close($conn);
 
 
 <style>
+table.table-market-hubs thead tr th:nth-child(2),
+table.table-market-hubs thead tr th:nth-child(3),
+table.table-market-hubs thead tr th:nth-child(4),
+table.table-market-hubs thead tr th:nth-child(5),
+table.table-market-hubs thead tr th:nth-child(6),
+table.table-market-hubs thead tr th:nth-child(7),
+table.table-market-hubs tbody tr td:nth-child(2),
+table.table-market-hubs tbody tr td:nth-child(3),
+table.table-market-hubs tbody tr td:nth-child(4),
+table.table-market-hubs tbody tr td:nth-child(5),
+table.table-market-hubs tbody tr td:nth-child(6),
+table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
 </style>
+<div class="modal fade" id="modalMarketHubs" tabindex="-1" role="dialog" aria-labelledby="modalMarketHubs">
+ <div class="modal-dialog modal-lg" role="document">
+  <div class="modal-content">
+   <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    <h4 class="modal-title" id="modalMarketHubsLabel"></h4>
+   </div>
+   <div class="modal-body">
+   <!-- -->
+<h3>Активные хабы</h3>
+<table id="tblHubs" class="table table-condensed table-market-hubs table-hover" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Хаб</th>
+  <th>Пошлина<br>КпБТ,%</th>
+  <th>Комиссия<br>брокера,%</th>
+  <th>Налог с<br>продаж,%</th>
+  <th>Маржа,%</th>
+  <th>Дистанция,сл</th>
+  <th>Изотопы,шт</th>
+  <th>Маршрут</th>
+ </tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<h3>Архивные хабы</h3>
+<table id="tblArchiveHubs" class="table table-condensed table-market-hubs" style="padding:1px;font-size:smaller;">
+<thead>
+ <tr>
+  <th>Хаб</th>
+  <th>Пошлина<br>КпБТ,%</th>
+  <th>Комиссия<br>брокера,%</th>
+  <th>Налог с<br>продаж,%</th>
+  <th>Маржа,%</th>
+  <th>Дистанция,сл</th>
+  <th>Изотопы,шт</th>
+  <th>Маршрут</th>
+ </tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+   <!-- -->
+   </div>
+   <div class="modal-footer">
+    <button type="button" class="btn btn-default" data-dismiss="modal">Закрыть</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+
 <div class="modal fade" id="modalDetails" tabindex="-1" role="dialog" aria-labelledby="modalDetailsLabel">
  <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
@@ -561,240 +663,214 @@ pg_close($conn);
    </div>
    <div class="modal-body">
 <!-- -->
-<div class="row">
-  <div class="col-md-8">Текущая Jita Sell цена</div>
-  <div class="col-md-4" align="right"><mark id="dtlsJitaSell"></mark> ISK<?=get_glyph_icon_button('copy','id="copyJitaSell" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Текущая Jita Buy цена</div>
-  <div class="col-md-4" align="right"><mark id="dtlsJitaBuy"></mark> ISK<?=get_glyph_icon_button('copy','id="copyJitaBuy" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Текущая Amarr Sell цена</div>
-  <div class="col-md-4" align="right"><mark id="dtlsAmarrSell"></mark> ISK<?=get_glyph_icon_button('copy','id="copyAmarrSell" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Текущая Amarr Buy цена</div>
-  <div class="col-md-4" align="right"><mark id="dtlsAmarrBuy"></mark> ISK<?=get_glyph_icon_button('copy','id="copyAmarrBuy" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Средняя цена товара на Tranquility</div>
-  <div class="col-md-4" align="right"><mark id="dtlsUniversePrice"></mark> ISK<?=get_glyph_icon_button('copy','id="copyUniversePrice" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-<div class="col-md-8">Базовая цена (установленная CCP-шниками)</div>
-  <div class="col-md-4" align="right"><mark id="dtlsBasePrice"></mark> ISK<?=get_glyph_icon_button('copy','id="copyBasePrice" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<!-- -->
-<hr>
-<div class="row">
-  <div class="col-md-4">Занимаемый объём</div>
-  <div class="col-md-8" align="right"><div id="dtlsVolume"></div></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Вместимость грузового отсека</div>
-  <div class="col-md-4" align="right"><mark id="dtlsCapacity"></mark> m³</div>
-</div>
-<!-- -->
-<hr>
-<div class="row">
-  <div class="col-md-8">Идентификатор предмета</div>
-  <div class="col-md-4" align="right"><mark id="dtlsTypeId"></mark><?=get_glyph_icon_button('copy','id="copyTypeId" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Идентификатор market-группы</div>
-  <div class="col-md-4" align="right"><mark id="dtlsMarketGroupId"></mark></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Идентификатор группы</div>
-  <div class="col-md-4" align="right"><mark id="dtlsGroupId"></mark></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Идентификатор meta-группы</div>
-  <div class="col-md-4" align="right"><mark id="dtlsMetaGroupId"></mark></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Идентификатор технологического уровня</div>
-  <div class="col-md-4" align="right"><mark id="dtlsTechLevelId"></mark></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Предмет опубликован</div>
-  <div class="col-md-4" align="right"><mark id="dtlsPublished"></mark></div>
-</div>
-<div class="row">
-  <div class="col-md-8">Предмет зарегистрирован в БД</div>
-  <div class="col-md-4" align="right"><mark id="dtlsCreatedAt"></mark></div>
-</div>
+<ul class="nav nav-tabs">
+  <li role="presentation" class="active"><a href="#navPrice" aria-controls="navPrice" role="tab" data-toggle="tab">Цены</a></li>
+  <li role="presentation"><a href="#navAssets" aria-controls="navAssets" role="tab" data-toggle="tab">Имущество</a></li>
+  <li role="presentation"><a href="#navTrade" aria-controls="navTrade" role="tab" data-toggle="tab">Торговля</a></li>
+  <li role="presentation"><a href="#navDetails" aria-controls="navDetails" role="tab" data-toggle="tab">Характеристики</a></li>
+</ul>
+<div class="tab-content">
+  <!-- -->
+  <div role="tabpanel" class="tab-pane active" id="navPrice">
+    <div class="row">
+      <div class="col-md-8">Текущая Jita Sell цена</div>
+      <div class="col-md-4" align="right"><mark id="dtlsJitaSell"></mark> ISK<?=get_glyph_icon_button('copy','id="copyJitaSell" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Текущая Jita Buy цена</div>
+      <div class="col-md-4" align="right"><mark id="dtlsJitaBuy"></mark> ISK<?=get_glyph_icon_button('copy','id="copyJitaBuy" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Текущая Amarr Sell цена</div>
+      <div class="col-md-4" align="right"><mark id="dtlsAmarrSell"></mark> ISK<?=get_glyph_icon_button('copy','id="copyAmarrSell" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Текущая Amarr Buy цена</div>
+      <div class="col-md-4" align="right"><mark id="dtlsAmarrBuy"></mark> ISK<?=get_glyph_icon_button('copy','id="copyAmarrBuy" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Средняя цена товара на Tranquility</div>
+      <div class="col-md-4" align="right"><mark id="dtlsUniversePrice"></mark> ISK<?=get_glyph_icon_button('copy','id="copyUniversePrice" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+    <div class="col-md-8">Базовая цена (установленная CCP-шниками)</div>
+      <div class="col-md-4" align="right"><mark id="dtlsBasePrice"></mark> ISK<?=get_glyph_icon_button('copy','id="copyBasePrice" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+  </div>
+  <!-- -->
+  <div role="tabpanel" class="tab-pane" id="navDetails">
+    <div class="row">
+      <div class="col-md-4">Занимаемый объём</div>
+      <div class="col-md-8" align="right"><div id="dtlsVolume"></div></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Вместимость грузового отсека</div>
+      <div class="col-md-4" align="right"><mark id="dtlsCapacity"></mark> m³</div>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-md-8">Идентификатор предмета</div>
+      <div class="col-md-4" align="right"><mark id="dtlsTypeId"></mark><?=get_glyph_icon_button('copy','id="copyTypeId" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Идентификатор market-группы</div>
+      <div class="col-md-4" align="right"><mark id="dtlsMarketGroupId"></mark></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Идентификатор группы</div>
+      <div class="col-md-4" align="right"><mark id="dtlsGroupId"></mark></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Идентификатор meta-группы</div>
+      <div class="col-md-4" align="right"><mark id="dtlsMetaGroupId"></mark></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Идентификатор технологического уровня</div>
+      <div class="col-md-4" align="right"><mark id="dtlsTechLevelId"></mark></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Предмет опубликован</div>
+      <div class="col-md-4" align="right"><mark id="dtlsPublished"></mark></div>
+    </div>
+    <div class="row">
+      <div class="col-md-8">Предмет зарегистрирован в БД</div>
+      <div class="col-md-4" align="right"><mark id="dtlsCreatedAt"></mark></div>
+    </div>
+  </div>
+  <!-- -->
+  <div role="tabpanel" class="tab-pane" id="navTrade">
+    <!-- -->
+    <center>
+      <nav aria-label="Market Hubs" id="dtlsSelMarketHub">
+       <ul class="pagination pagination-sm">
+<?php
+  foreach ($market_hubs as ["hub" => $hub, "co" => $co, "a" => $a, "f" => $f, "ss" => $ss])
+  {
+    if ($a == 't' || $f == 't') continue; // archive or forbidden
+    ?><li hub="<?=$hub?>" corp="<?=$co?>"><a href="#"><?=$ss?></a></li><?php
+  }
+?>
+       </ul>
+      </nav>
+    </center>
+    <div class="row">
+     <div class="col-md-5">
+      Текущие ордера в маркете
+<style type="text/css">
+.tblMarketOrders-wrapper { max-height: 300px; overflow: auto; scrollbar-color: #696969 #262727; scrollbar-width: thin; }
+.tblMarketOrders-wrapper table { padding:1px; font-size: x-small; width: 100%; }
+.tblMarketOrders-wrapper thead th { position: sticky; top: 0; z-index: 1; color: #7f7f7f; background-color: #202020; text-align:center; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(1) { text-align: right; font-weight: bold; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(2) { text-align: right; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(3) { text-align: center; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(4) { text-align: left; }
+.tblMarketOrders-wrapper tbody tr td:nth-child(5) { text-align: left; font-weight: bold; }
+</style>
+    <div class="tblMarketOrders-wrapper">
+     <table id="tblMarketOrders">
+      <thead>
+       <tr>
+        <th style="width:30%;" colspan="2">Покупка</th>
+        <th style="width:40%;">Цена,&nbsp;ISK</th>
+        <th style="width:30%;" colspan="2">Продажа</th>
+       </tr>
+      </thead>
+      <tbody>
+      </tbody>
+     </table>
+     <form id="frmMarketOrders">
+      <input type="hidden" name="corp" readonly value="">
+      <input type="hidden" name="hub" readonly value="">
+      <input type="hidden" name="tid" readonly>
+     </form>
+    </div>
+    <!-- -->
+     </div>
+     <div class="col-md-7">
+      Хронология изменений ордеров
+    <!-- -->
+<style type="text/css">
+.tblMarketHistory-wrapper { max-height: 300px; overflow: auto; scrollbar-color: #696969 #262727; scrollbar-width: thin; }
+.tblMarketHistory-wrapper table { padding:1px; font-size: x-small; width: 100%; }
+.tblMarketHistory-wrapper thead th { position: sticky; top: 0; z-index: 1; color: #7f7f7f; background-color: #202020; text-align:center; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(1) { text-align: left; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(2) { text-align: right; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(3) { text-align: center; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(4) { text-align: left; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(5) { text-align: right; }
+.tblMarketHistory-wrapper tbody tr td:nth-child(6) { text-align: right; }
+</style>
+    <div class="tblMarketHistory-wrapper">
+     <table id="tblMarketHistory">
+      <thead>
+       <tr>
+        <th style="width:21%;" colspan="2">Покупка</th>
+        <th style="width:28%;">Цена,&nbsp;ISK</th>
+        <th style="width:21%;" colspan="2">Продажа</th>
+        <th style="width:30%;">Длительность ордера</th>
+       </tr>
+      </thead>
+      <tbody>
+      </tbody>
+     </table>
+     <form id="frmMarketHistory">
+      <input type="hidden" name="corp" readonly value="">
+      <input type="hidden" name="hub" readonly value="">
+      <input type="hidden" name="tid" readonly>
+     </form>
+    </div>
+     </div>
+    </div>
+  </div>
+  <!-- -->
+  <div role="tabpanel" class="tab-pane" id="navAssets">
+<style type="text/css">
+.tblCorpAssets-wrapper { max-height: 300px; overflow: auto; scrollbar-color: #696969 #262727; scrollbar-width: thin; }
+.tblCorpAssets-wrapper table { padding:1px; font-size: x-small; width: 100%; }
+.tblCorpAssets-wrapper thead th { position: sticky; top: 0; z-index: 1; color: #7f7f7f; background-color: #202020; text-align:center; }
+.tblCorpAssets-wrapper thead tr th:nth-child(1),
+.tblCorpAssets-wrapper thead tr th:nth-child(2),
+.tblCorpAssets-wrapper tbody tr td:nth-child(1),
+.tblCorpAssets-wrapper tbody tr td:nth-child(2){ text-align: left; }
+.tblCorpAssets-wrapper thead tr th:nth-child(3),
+.tblCorpAssets-wrapper thead tr th:nth-child(4),
+.tblCorpAssets-wrapper thead tr th:nth-child(5),
+.tblCorpAssets-wrapper tbody tr td:nth-child(3),
+.tblCorpAssets-wrapper tbody tr td:nth-child(4),
+.tblCorpAssets-wrapper tbody tr td:nth-child(5){ text-align: right; }
+</style>
+    <div class="tblCorpAssets-wrapper">
+     <table id="tblCorpAssets" class="table table-condensed table-hover">
+      <thead>
+       <tr>
+        <th>Название</th>
+        <th>Хранилище</th>
+        <th>Кол-во</th>
+        <th>Создан</th>
+        <th>Обновлён</th>
+       </tr>
+      </thead>
+      <tbody>
+      </tbody>
+     </table>
+    </div>
+   <form id="frmCorpAssets">
+    <input type="hidden" name="corp" readonly value="">
+    <input type="hidden" name="tid" readonly>
+   </form>
+  </div>
+  <!-- -->
+</div> <!--tab-content-->
 <!-- -->
    </div>
    <div class="modal-footer">
-    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-default" data-dismiss="modal">Закрыть</button>
    </div>
   </div>
  </div>
 </div>
 
-<script>
-function numLikeEve(x) {
-  if (x < 1.0) return x;
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-(function() {
-  /**
-   * Корректировка округления десятичных дробей.
-   *
-   * @param {String}  type  Тип корректировки.
-   * @param {Number}  value Число.
-   * @param {Integer} exp   Показатель степени (десятичный логарифм основания корректировки).
-   * @returns {Number} Скорректированное значение.
-   */
-  function decimalAdjust(type, value, exp) {
-    // Если степень не определена, либо равна нулю...
-    if (typeof exp === 'undefined' || +exp === 0) {
-      return Math[type](value);
-    }
-    value = +value;
-    exp = +exp;
-    // Если значение не является числом, либо степень не является целым числом...
-    if (isNaN(value) || !(typeof exp === 'number' && exp % 1 === 0)) {
-      return NaN;
-    }
-    // Сдвиг разрядов
-    value = value.toString().split('e');
-    value = Math[type](+(value[0] + 'e' + (value[1] ? (+value[1] - exp) : -exp)));
-    // Обратный сдвиг
-    value = value.toString().split('e');
-    return +(value[0] + 'e' + (value[1] ? (+value[1] + exp) : exp));
-  }
-  // Десятичное округление к ближайшему
-  if (!Math.round10) {
-    Math.round10 = function(value, exp) {
-      return decimalAdjust('round', value, exp);
-    };
-  }
-  // Десятичное округление вниз
-  if (!Math.floor10) {
-    Math.floor10 = function(value, exp) {
-      return decimalAdjust('floor', value, exp);
-    };
-  }
-  // Десятичное округление вверх
-  if (!Math.ceil10) {
-    Math.ceil10 = function(value, exp) {
-      return decimalAdjust('ceil', value, exp);
-    };
-  }
-})();
-function eveCeiling(isk) {
-  if (isk < 100.0) ;
-  else if (isk < 1000.0) isk = Math.ceil10(isk * 10.0) / 10.0;
-  else if (isk < 10000.0) isk = Math.ceil10(isk);
-  else if (isk < 100000.0) isk = Math.round10(isk+5, 1);
-  else if (isk < 1000000.0) isk = Math.round10(isk+50, 2);
-  else if (isk < 10000000.0) isk = Math.round10(isk+500, 3);
-  else if (isk < 100000000.0) isk = Math.round10(isk+5000, 4);
-  else if (isk < 1000000000.0) isk = Math.round10(isk+50000, 5);
-  else if (isk < 10000000000.0) isk = Math.round10(isk+500000, 6);
-  else if (isk < 100000000000.0) isk = Math.round10(isk+5000000, 7);
-  else isk = null;
-  return isk;
-}
-
-$(document).ready(function(){
- $('a.qind-info-btn').bind('click', function() {
-  var tr = $(this).closest('tr');
-  if (tr.attr('type_id') === undefined) return;
-  var type_id = tr.attr('type_id');
-  var tid = null;
-  for (const t of g_main_data) {
-   if (t[0] != type_id) continue;
-   tid = t;
-   break;
-  }
-  if (tid === null) return;
-  var modal = $("#modalDetails");
-  $('#modalDetailsLabel').html('<span class="text-primary">Подробности о предмете</span> '+tid[1]);
-  if (tid[12]) {
-    $('#dtlsJitaSell')
-     .html(numLikeEve(tid[12].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyJitaSell').attr('data-copy', numLikeEve(tid[12].toFixed(2)));
-  } else {
-    $('#dtlsJitaSell')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[13]) {
-    $('#dtlsJitaBuy')
-     .html(numLikeEve(tid[13].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyJitaBuy').attr('data-copy', numLikeEve(tid[13].toFixed(2)));
-  } else {
-    $('#dtlsJitaBuy')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[14]) {
-    $('#dtlsAmarrSell')
-     .html(numLikeEve(tid[14].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyamarrSell').attr('data-copy', numLikeEve(tid[14].toFixed(2)));
-  } else {
-    $('#dtlsAmarrSell')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[15]) {
-    $('#dtlsAmarrBuy')
-     .html(numLikeEve(tid[15].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyAmarrBuy').attr('data-copy', numLikeEve(tid[15].toFixed(2)));
-  } else {
-    $('#dtlsAmarrBuy')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[16]) {
-    $('#dtlsUniversePrice')
-     .html(numLikeEve(tid[16].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyUniversePrice').attr('data-copy', numLikeEve(tid[16].toFixed(2)));
-  } else {
-    $('#dtlsUniversePrice')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[5]) {
-    $('#dtlsBasePrice')
-     .html(numLikeEve(tid[5].toFixed(2)))
-     .parent().removeClass('hidden');
-    $('#copyBasePrice').attr('data-copy', numLikeEve(tid[5].toFixed(2)));
-  } else {
-    $('#dtlsBasePrice')
-     .closest('div').addClass('hidden');
-  }
-  if (tid[2] == tid[3])
-    $('#dtlsVolume').html('<mark>'+numLikeEve(tid[2]+'</mark> m³'));
-  else
-    $('#dtlsVolume').html('<mark>'+numLikeEve(tid[2])+'</mark> m³ (в упакованном виде <mark>'+numLikeEve(tid[3])+'</mark> m³)');
-  $('#dtlsCapacity').html(numLikeEve(tid[4]));
-  $('#dtlsTypeId').html(tid[0]);
-  $('#copyTypeId').attr('data-copy', tid[0]);
-  $('#dtlsMarketGroupId').html(tid[6]);
-  $('#dtlsGroupId').html(tid[7]);
-  if (tid[8])
-    $('#dtlsMetaGroupId').html(tid[8]).parent().removeClass('hidden');
-  else
-    $('#dtlsMetaGroupId').closest('div').addClass('hidden');
-  if (tid[9])
-    $('#dtlsTechLevelId').html(tid[9]).parent().removeClass('hidden');
-  else
-    $('#dtlsTechLevelId').closest('div').addClass('hidden');
-  $('#dtlsPublished').html(tid[10]?'да':'нет');
-  if (tid[11])
-    $('#dtlsCreatedAt').html(tid[11]).parent().removeClass('hidden');
-  else
-    $('#dtlsCreatedAt').closest('div').addClass('hidden');
-  modal.modal('show');
- });
-});
-</script>
-
+<script><?php include 'qi_praisal.js'; ?></script>
 <?php
 __dump_footer();
 __dump_copy_to_clipboard_javascript();

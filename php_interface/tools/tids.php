@@ -1,5 +1,5 @@
 <?php
-include_once '.settings.php';
+include_once '../.settings.php';
 
 if (!extension_loaded('pgsql')) return;
 $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." user=".DB_USERNAME." password=".DB_PASSWORD)
@@ -19,6 +19,9 @@ $tid_cursor = pg_query_params($conn, $query, $params)
         or die('pg_query err: '.pg_last_error());
 $tid = pg_fetch_all($tid_cursor);
 pg_close($conn);
+
+ob_end_clean();
+header('Content-Type: application/javascript');
 
 $end = end($tid)['id'];
 echo "var g_sde_max_type_id=".$end.";\n".

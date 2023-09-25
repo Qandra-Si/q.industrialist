@@ -102,7 +102,9 @@ a:focus.url {
  color: #ffa600;
  background-color: #8f6310;
 }
-hr { border-top: 1px solid #1d3231; }
+hr {
+ border-top: 1px solid #1d3231;
+}
 .panel {
  background-color: #162326;
 }
@@ -181,6 +183,52 @@ mark {
  background-color: #232e31;
  border-radius: 0px;
 }
+
+body nav.navbar {
+ background-color: #162326;
+ border-radius: unset;
+ margin-bottom: 6px;
+ border-top: 1px solid #162326;
+ border-left: 1px solid #162326;
+ border-right: 1px solid #162326;
+ border-bottom: 1px solid #1d3231;
+}
+body nav.navbar * div.navbar-header > a.navbar-brand {
+ color: #c5c8c9;
+}
+body nav.navbar * div.navbar-collapse {
+ border-color: #1d3231;
+}
+body nav.navbar * div.navbar-collapse > ul.navbar-nav > li > a {
+ background-color: #162326;
+ color: #c5c8c9;
+}
+body nav.navbar * div.navbar-collapse > ul.navbar-nav > li > a:focus,
+body nav.navbar * div.navbar-collapse > ul.navbar-nav > li > a:active,
+body nav.navbar * div.navbar-collapse > ul.navbar-nav > li > a:hover {
+ background-color: #22312e;
+ color: #dadada;
+}
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu {
+ background-color: #19181c;
+}
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li > a {
+ color: #c5c8c9;
+}
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li.divider {
+ background-color: #302f33;
+}
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li > a:focus,
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li > a:active,
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li > a:hover {
+ background-color: #22312e;
+ color: #dadada;
+}
+body nav.navbar * div.navbar-collapse * ul.dropdown-menu > li.disabled > a {
+ color: #808080;
+ pointer-events: none;
+}
+
 .modal-content {
  background-color: #19181c;
  border: 1px solid #302f33;
@@ -190,7 +238,8 @@ div.modal-header > button.close {
  text-shadow: 0 1px 0 #1f1f1f;
 }
 div.modal-header {
- border-bottom: 1px solid #302f33;
+ border-bottom: unset;
+ padding: 5px;
 }
 div.modal-footer {
  border-top: 1px solid #302f33;
@@ -204,9 +253,114 @@ div.modal-header > h4.modal-title {
 div.modal-body * mark {
  background-color: #242427;
 }
-div.modal-body > hr {
+div.modal-body * hr {
  margin-top: 4px;
  margin-bottom: 4px;
+}
+
+div.modal-content * div.tab-content {
+ padding-top: 10px;
+}
+div.modal-content * ul.nav-tabs {
+ border-bottom: 1px solid #302f33;
+}
+div.modal-content * .nav > li > a {
+ padding: 3px 10px;
+}
+div.modal-content * .nav-tabs > li > a {
+ margin-right: 1px;
+ border-radius: unset;
+}
+div.modal-content * .nav-tabs > li > a,
+div.modal-content * .nav-tabs > li > a:hover {
+ color: #8b8a8c;
+ background-color: #19181c;
+ border-top: 1px solid #19181c;
+ border-left: 1px solid #19181c;
+ border-right: 1px solid #19181c;
+ border-bottom: 1px solid #302f33;
+}
+div.modal-content * .nav-tabs > li > a:hover,
+div.modal-content * .nav-tabs > li.active > a:hover {
+ border-bottom: 1px solid #9db09e;
+}
+div.modal-content * .nav-tabs > li > a:focus,
+div.modal-content * .nav-tabs > li.active > a,
+div.modal-content * .nav-tabs > li.active > a:hover,
+div.modal-content * .nav-tabs > li.active > a:focus {
+ color: #e4e4e4;
+ background-color: #242427;
+ border-top: 1px solid #242427;
+ border-left: 1px solid #242427;
+ border-right: 1px solid #242427;
+ border-bottom: 1px solid #9db09e;
+}
+
+div.modal-body * nav > ul.pagination {
+  margin: unset;
+}
+div.modal-body * nav > ul.pagination > li > a {
+ color: #8b8a8c;
+ background-color: #19181c;
+ border-top: 1px solid #19181c;
+ border-left: 1px solid #19181c;
+ border-right: 1px solid #19181c;
+ border-bottom: 1px solid #302f33;
+}
+div.modal-body * nav > ul.pagination > li > a:hover,
+div.modal-body * nav > ul.pagination > li.active > a:hover {
+ border-bottom: 1px solid #9db09e;
+}
+div.modal-body * nav > ul.pagination > li > a:focus,
+div.modal-body * nav > ul.pagination > li.active > a,
+div.modal-body * nav > ul.pagination > li.active > a:hover,
+div.modal-body * nav > ul.pagination > li.active > a:focus {
+ color: #e4e4e4;
+ background-color: #242427;
+ border-top: 1px solid #242427;
+ border-left: 1px solid #242427;
+ border-right: 1px solid #242427;
+ border-bottom: 1px solid #9db09e;
+}
+
+/*.table > tbody > tr.active > td,
+.table > tbody > tr.active > th,
+.table > tbody > tr > td.active,
+.table > tbody > tr > th.active,
+.table > tfoot > tr.active > td,
+.table > tfoot > tr.active > th,
+.table > tfoot > tr > td.active,
+.table > tfoot > tr > th.active,
+.table > thead > tr.active > td,
+.table > thead > tr.active > th,
+.table > thead > tr > td.active,
+.table > thead > tr > th.active { background-color: #2a493e; }
+.table > tbody > tr > td { color: inherit; background-color: inherit; }
+.table-hover > tbody > tr:hover,
+.table > tbody > tr:active > td {
+ color: #c4c8c7;
+ background-color: #22312e;
+}*/
+
+div.modal-content * .table > thead > tr > th { border-bottom: 1px solid #302f33; }
+div.modal-content * .table > tbody > tr > td { border-top: 1px solid #302f33; }
+div.modal-content * .table > tbody > tr.active > td,
+div.modal-content * .table > tbody > tr.active > th,
+div.modal-content * .table > tbody > tr > td.active,
+div.modal-content * .table > tbody > tr > th.active,
+div.modal-content * .table > tfoot > tr.active > td,
+div.modal-content * .table > tfoot > tr.active > th,
+div.modal-content * .table > tfoot > tr > td.active,
+div.modal-content * .table > tfoot > tr > th.active,
+div.modal-content * .table > thead > tr.active > td,
+div.modal-content * .table > thead > tr.active > th,
+div.modal-content * .table > thead > tr > td.active,
+div.modal-content * .table > thead > tr > th.active { background-color: #242427; }
+div.modal-content * .table > tbody > tr > td { color: inherit; background-color: inherit; }
+div.modal-content * .table-hover > tbody > tr:hover,
+div.modal-content * .table > tbody > tr:active > td {
+ color: #c4c8c7;
+ background-color: #242427;
 }
 
 .table-gallente { padding: 1px; font-size: smaller; }
