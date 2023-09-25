@@ -2682,6 +2682,7 @@ class QSwaggerInterface:
         # 35834,  # Keepstar
         # 35835,  # Athanor
         # 35836,  # Tatara
+        # 11192,  # Buzzard ... (market_group_semantic=4)
         """
         tids = self.db.select_all_rows(
             "SELECT sdet_type_id "
@@ -2690,6 +2691,10 @@ class QSwaggerInterface:
             " SELECT sdeg_group_id"
             " FROM eve_sde_market_groups"
             " WHERE sdeg_parent_id=379"
+            " union"
+            " SELECT id"
+            " FROM eve_sde_market_groups_semantic"
+            " WHERE semantic_id=4"
             ");"
         )
         return tids
