@@ -348,7 +348,7 @@ function __dump_praisal_menu_bar() { ?>
  <div class="container-fluid">
   <div class="navbar-header">
    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-navbar-collapse" aria-expanded="false">
-    <span class="sr-only">Переключить навигацию</span>
+    <span class="sr-only">Настройки таблицы</span>
     <span class="icon-bar"></span>
     <span class="icon-bar"></span>
     <span class="icon-bar"></span>
@@ -358,7 +358,7 @@ function __dump_praisal_menu_bar() { ?>
   <div class="collapse navbar-collapse" id="bs-navbar-collapse">
    <ul class="nav navbar-nav">
     <li class="dropdown">
-     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки отображения <span class="caret"></span></a>
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки таблицы <span class="caret"></span></a>
       <ul class="dropdown-menu">
        <li><a id="btnToggleJitaPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowJitaPrice"></span> Показывать Jita Price</a></li>
        <li><a id="btnToggleAmarrPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAmarrPrice"></span> Показывать Amarr Price</a></li>
@@ -366,6 +366,9 @@ function __dump_praisal_menu_bar() { ?>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleMarketVolume" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMarketVolume"></span> Показывать объём товара на рынке</a></li>
        <li><a id="btnToggleBestOffer" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBestOffer"></span> Показывать объём лучшего предложения</a></li>
+       <li role="separator" class="divider"></li>
+       <li><a id="btnToggleOurOrdersOnly" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowOurOrdersOnly"></span> Скрыть цены без наших ордеров (логист)</a></li>
+        <li><a id="btnToggleTheirOrdersOnly" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowTheirOrdersOnly"></span> Показывать предложения конкурентов (торговец)</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnResetOptions" data-target="#" role="button">Сбросить все настройки</a></li>
       </ul>
@@ -400,6 +403,7 @@ tid { white-space: nowrap; }
 .qind-info-btn:hover, .qind-info-btn:active, .qind-info-btn:focus { color: #aaa; }
 market-volume { color: #808080; }
 best-offer { color: #9e6101; }
+their-orders-only {}
 </style>
 <table class="table table-condensed table-hover table-gallente" id="tbl">
 <thead>
@@ -483,12 +487,12 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
         else if ($their_price > $our_price)
           $color = 'price_normal';
         ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
-          <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
+          <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)</market-volume>&nbsp;<?=number_format($their_price,2,'.',',')?><?php
       }
       else if ($tp_known)
       {
-        ?><br>
-          <market-volume>(<?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
+        ?><their-orders-only><br>
+          <market-volume>(<?=$their_volume?>)</market-volume>&nbsp;<?=number_format($their_price,2,'.',',')?></their-orders-only><?php
       }
       else if ($op_known)
       {
@@ -619,34 +623,40 @@ table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
    </div>
    <div class="modal-body">
    <!-- -->
+<form id="frmMarketHubDetails">
+ <input type="hidden" name="min" readonly value="">
+</form>
 <h3>Активные хабы</h3>
 <table id="tblHubs" class="table table-condensed table-market-hubs table-hover" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
   <th>Хаб</th>
+  <th>Актуальность</th>
   <th>Пошлина<br>КпБТ,%</th>
   <th>Комиссия<br>брокера,%</th>
   <th>Налог с<br>продаж,%</th>
   <th>Маржа,%</th>
-  <th>Дистанция,сл</th>
-  <th>Изотопы,шт</th>
+  <th>Дистанция,сл<br>Изотопы,шт</th>
   <th>Маршрут</th>
  </tr>
 </thead>
 <tbody>
 </tbody>
 </table>
+<p>В списках выше перечислены торговые хабы, в которых наши корпорации выставляли сделки и ведут торговую деятельность. Имена пилотов, которые упомянуты, появляются в списках либо в результате массовой торговой деятельности, либо фиксируются в базе данных при добавлении нового хаба. Актуальность отображает дату/время последних операций на рынке (вообще всех операций, а не только корпоративных); отображает количество известных на данный сомент ордеров и количество зафиксированных изменений в ордерах за последние X минут.</p>
+<p>Пошлина КпБП - процент от ордера, который выплачивается комиссии по безопасной торговле (прямой вывод ССР). Комиссия брокера устанавливается владельцем структуры. Налог с продаж зависит от скилов пилота. Маржа - задаёт профит по сделкам, принятый для торговли на этой структуре (используется в автоматических расчётах в качестве рекомендованного уровня "жадности", однако не отражает рыночную ситуацию в целом, т.ч. остаётся на усмотрение торговца).</p>
+<p>Дистанция показывает кол-во световых лет туда-и-обратно, которые рассчитываются прыжками <mark>Rhea</mark> со скилами в 5. Изотопами считаются <mark>Nitrogen Isotopes</mark> на пути туда-и-обратно на <mark>Rhea</mark> со скилами в 5. См. также ссылки на маршруты в торговый хаб и обратно в домашку.</p>
 <h3>Архивные хабы</h3>
 <table id="tblArchiveHubs" class="table table-condensed table-market-hubs" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
   <th>Хаб</th>
+  <th>Актуальность</th>
   <th>Пошлина<br>КпБТ,%</th>
   <th>Комиссия<br>брокера,%</th>
   <th>Налог с<br>продаж,%</th>
   <th>Маржа,%</th>
-  <th>Дистанция,сл</th>
-  <th>Изотопы,шт</th>
+  <th>Дистанция,сл<br>Изотопы,шт</th>
   <th>Маршрут</th>
  </tr>
 </thead>
@@ -878,6 +888,7 @@ table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
   </div>
  </div>
 </div>
+
 
 <script><?php include 'qi_praisal.js'; ?></script>
 <?php
