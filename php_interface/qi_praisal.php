@@ -234,16 +234,16 @@ function __dump_market_orders_data(&$conn, &$market_hubs, &$type_ids, &$sale_ord
   $query = <<<EOD
 select
  --sell_orders.corp_id,
- sell_orders.type_id as id, -- type_id
- sell_orders.hub_id as hub, -- hub id
+ coalesce(sell_orders.type_id,hub_market.type_id) as id, -- type_id
+ coalesce(sell_orders.hub_id,hub_market.hub_id) as hub, -- hub id
  sell_orders.volume_remain as ov, -- our_volume
  round(sell_orders.price_total::numeric, 2) as pt, -- price_total
  sell_orders.price_min as op, -- our_price
  sell_orders.price_max as pm, -- price_max
- sell_orders.orders_total as ot, -- orders_total
+ coalesce(sell_orders.orders_total,0) as ot, -- orders_total
  hub_market.total_volume as tv, -- their_volume
  hub_market.min_price as tp, -- their_price
- their_best_offer.remain as bo -- their best offer volume (remain)
+ their_best_offer.remain as bo -- their best offer (remain)
 from
  -- сводная статистика по текущим ордерам в наших маркетах
  (select
@@ -263,7 +263,7 @@ from
   ecor_corporation_id=any($1)
  group by ecor_corporation_id, ecor_location_id, ecor_type_id) sell_orders
   -- локальные цены в этих торговых хабах (исключая наши позиции)
-  left outer join (
+  full join (
    select
     etho_location_id as hub_id,
     etho_type_id as type_id,
@@ -330,14 +330,14 @@ EOD;
       echo '['.
               $type_id.','. //0
               $hub.','. //1
-              $our_volume.','. //2
-              $price_total.','. //3
-              $our_price.','. //4
-              $price_max.','. //5
+              ($our_volume ?? 'null').','. //2
+              ($price_total ?? 'null').','. //3
+              ($our_price ?? 'null').','. //4
+              ($price_max ?? 'null').','. //5
               $orders_total.','. //6
-              (is_null($their_volume)?'null':$their_volume).','. //7
-              (is_null($their_price)?'null':$their_price).','. //8
-              (is_null($best_offer_volume)?'null':$best_offer_volume). //9
+              ($their_volume ?? 'null').','. //7
+              ($their_price ?? 'null').','. //8
+              ($best_offer_volume ?? 'null'). //9
            "],\n";
     }
   echo "null];\n";
@@ -473,11 +473,9 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
     {
       if ($type_id != $_type_id) continue;
       if ($hub != $_hub) continue;
-      if (is_null($their_price))
-      {
-        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
-      }
-      else
+      $op_known = !is_null($our_price);
+      $tp_known = !is_null($their_price);
+      if ($op_known && $tp_known)
       {
         $color = null;
         if ($their_price < $our_price)
@@ -486,6 +484,15 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
           $color = 'price_normal';
         ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
           <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
+      }
+      else if ($tp_known)
+      {
+        ?><br>
+          <market-volume>(<?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
+      }
+      else if ($op_known)
+      {
+        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
       }
       break;
     }
