@@ -314,31 +314,32 @@ EOD;
   //echo "/*".$query."\n"; var_export($trader_corp_ids); var_export($hub_ids); var_export($type_ids); echo "*/\n";
 
   echo 'g_sale_orders=[';
-  foreach ($sale_orders as ["id" => $type_id,
-                            "hub" => $hub,
-                            "ov" => $our_volume,
-                            "pt" => $price_total,
-                            "op" => $our_price,
-                            "pm" => $price_max,
-                            "ot" => $orders_total,
-                            "tv" => $their_volume,
-                            "tp" => $their_price,
-                            "bo" => $best_offer_volume
-                           ])
-  {
-    echo '['.
-            $type_id.','. //0
-            $hub.','. //1
-            $our_volume.','. //2
-            $price_total.','. //3
-            $our_price.','. //4
-            $price_max.','. //5
-            $orders_total.','. //6
-            (is_null($their_volume)?'null':$their_volume).','. //7
-            (is_null($their_price)?'null':$their_price).','. //8
-            (is_null($best_offer_volume)?'null':$best_offer_volume). //9
-         "],\n";
-  }
+  if ($sale_orders)
+    foreach ($sale_orders as ["id" => $type_id,
+                              "hub" => $hub,
+                              "ov" => $our_volume,
+                              "pt" => $price_total,
+                              "op" => $our_price,
+                              "pm" => $price_max,
+                              "ot" => $orders_total,
+                              "tv" => $their_volume,
+                              "tp" => $their_price,
+                              "bo" => $best_offer_volume
+                             ])
+    {
+      echo '['.
+              $type_id.','. //0
+              $hub.','. //1
+              $our_volume.','. //2
+              $price_total.','. //3
+              $our_price.','. //4
+              $price_max.','. //5
+              $orders_total.','. //6
+              (is_null($their_volume)?'null':$their_volume).','. //7
+              (is_null($their_price)?'null':$their_price).','. //8
+              (is_null($best_offer_volume)?'null':$best_offer_volume). //9
+           "],\n";
+    }
   echo "null];\n";
 }
 
@@ -457,36 +458,37 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
 <?php foreach ($active_market_hub_ids as $hub) { ?>
 <td>
 <?php
-  foreach ($sale_orders as ["id" => $_type_id,
-                            "hub" => $_hub,
-                            "ov" => $our_volume,
-                            "pt" => $price_total,
-                            "op" => $our_price,
-                            "pm" => $price_max,
-                            "ot" => $orders_total,
-                            "tv" => $their_volume,
-                            "tp" => $their_price,
-                            "bo" => $best_offer_volume
-                           ])
-  {
-    if ($type_id != $_type_id) continue;
-    if ($hub != $_hub) continue;
-    if (is_null($their_price))
+  if ($sale_orders)
+    foreach ($sale_orders as ["id" => $_type_id,
+                              "hub" => $_hub,
+                              "ov" => $our_volume,
+                              "pt" => $price_total,
+                              "op" => $our_price,
+                              "pm" => $price_max,
+                              "ot" => $orders_total,
+                              "tv" => $their_volume,
+                              "tp" => $their_price,
+                              "bo" => $best_offer_volume
+                             ])
     {
-      ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
+      if ($type_id != $_type_id) continue;
+      if ($hub != $_hub) continue;
+      if (is_null($their_price))
+      {
+        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
+      }
+      else
+      {
+        $color = null;
+        if ($their_price < $our_price)
+          $color = 'price_warning';
+        else if ($their_price > $our_price)
+          $color = 'price_normal';
+        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
+          <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
+      }
+      break;
     }
-    else
-    {
-      $color = null;
-      if ($their_price < $our_price)
-        $color = 'price_warning';
-      else if ($their_price > $our_price)
-        $color = 'price_normal';
-      ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
-        <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)&nbsp;<?=number_format($their_price,2,'.',',')?></market-volume><?php
-    }
-    break;
-  }
 ?>
 </td>
 <?php } ?>
