@@ -41,8 +41,8 @@ function rebuildOptionsMenu() {
   $('#btnToggleBestOffer').parent().removeClass('disabled');
  else
   $('#btnToggleBestOffer').parent().addClass('disabled');
- displayOptionInMenu('Show Only Our Orders', $('#imgShowOurOrdersOnly'));
- displayOptionInMenu('Show Only Our Orders', $('#imgShowTheirOrdersOnly'), true);
+ displayOptionInMenu('Show Only Our Orders', $('#imgShowOurOrdersOnly'), true);
+ displayOptionInMenu('Show Only Our Orders', $('#imgShowTheirOrdersOnly'));
 }
 function applyOptionVal(show, selector) {
  $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
@@ -449,7 +449,10 @@ function rebuildBody() {
   applyOptionVal(show, 'best-offer');
  }
  /*var*/ show = ls.getItem('Show Only Our Orders');
- applyOptionVal((show==1)?1:0, 'their-orders-only');
+ if (show==0)
+  $('their-orders-only').css('opacity','0.1');
+ else
+  $('their-orders-only').css('opacity','unset');
 }
 // Options menu and submenu setup
 function toggleMenuOption(name, inverse=false) {

@@ -846,17 +846,17 @@ table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
 <style type="text/css">
 .tblCorpAssets-wrapper { max-height: 300px; overflow: auto; scrollbar-color: #696969 #262727; scrollbar-width: thin; }
 .tblCorpAssets-wrapper table { padding:1px; font-size: x-small; width: 100%; }
-.tblCorpAssets-wrapper thead th { position: sticky; top: 0; z-index: 1; color: #7f7f7f; background-color: #202020; text-align:center; }
+.tblCorpAssets-wrapper thead th { position: sticky; top: 0; z-index: 1; color: #e4e4e4; background-color: #242427; }
 .tblCorpAssets-wrapper thead tr th:nth-child(1),
 .tblCorpAssets-wrapper thead tr th:nth-child(2),
 .tblCorpAssets-wrapper tbody tr td:nth-child(1),
 .tblCorpAssets-wrapper tbody tr td:nth-child(2){ text-align: left; }
 .tblCorpAssets-wrapper thead tr th:nth-child(3),
-.tblCorpAssets-wrapper thead tr th:nth-child(4),
-.tblCorpAssets-wrapper thead tr th:nth-child(5),
 .tblCorpAssets-wrapper tbody tr td:nth-child(3),
 .tblCorpAssets-wrapper tbody tr td:nth-child(4),
-.tblCorpAssets-wrapper tbody tr td:nth-child(5){ text-align: right; }
+.tblCorpAssets-wrapper tbody tr td:nth-child(5){ text-align: right; width: min-content; }
+.tblCorpAssets-wrapper thead tr th:nth-child(4),
+.tblCorpAssets-wrapper thead tr th:nth-child(5){ text-align: center; width: min-content; }
 </style>
     <div class="tblCorpAssets-wrapper">
      <table id="tblCorpAssets" class="table table-condensed table-hover">
