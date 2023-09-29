@@ -637,7 +637,7 @@ $(document).ready(function(){
     $('#dtlsAmarrSell')
      .html(numLikeEve(tid[14].toFixed(2)))
      .parent().removeClass('hidden');
-    $('#copyamarrSell').attr('data-copy', numLikeEve(tid[14].toFixed(2)));
+    $('#copyAmarrSell').attr('data-copy', numLikeEve(tid[14].toFixed(2)));
   } else {
     $('#dtlsAmarrSell')
      .closest('div').addClass('hidden');
