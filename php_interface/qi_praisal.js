@@ -43,6 +43,33 @@ function rebuildOptionsMenu() {
   $('#btnToggleBestOffer').parent().addClass('disabled');
  displayOptionInMenu('Show Only Our Orders', $('#imgShowOurOrdersOnly'), true);
  displayOptionInMenu('Show Only Our Orders', $('#imgShowTheirOrdersOnly'));
+
+ var hidden_hub_names = [];
+ var hidden_hubs = ls.getItem('Hidden Market Hubs');
+ if (hidden_hubs)
+  hidden_hubs = JSON.parse(hidden_hubs);
+ $('a.toggle-hub-option').each(function() {
+  const hub = parseInt($(this).attr('hub'));
+  var img = $(this).find('span.glyphicon-star');
+  if (!(hidden_hubs) || (hidden_hubs.indexOf(hub)==-1))
+   img.addClass('hidden');
+  else {
+   img.removeClass('hidden');
+   for (const h of g_market_hubs) {
+    if (h === null) break;
+    if (h[7]==1) continue; //archive
+    if (h[8]==1) continue; //forbidden
+    if (h[0]!=hub) continue;
+    const nm = h[9];
+    hidden_hub_names.push(nm);
+    break;
+   }
+  }
+ });
+ if (hidden_hub_names.length == 0)
+  $('#lbHiddenMarketHubs').html('-');
+ else
+  $('#lbHiddenMarketHubs').html(hidden_hub_names.join(","));
 }
 function applyOptionVal(show, selector) {
  $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
@@ -351,8 +378,8 @@ $("#frmCorpAssets").on("submit", function(e){
    var tbody = '';
    $(data).each(function(i,row) {
     var tr="<tr>"+
-     "<td>"+((row.nm===null)?'':row.nm)+"</td>"+
-     "<td>"+((row.lnm===null)?'':(row.lnm+'<br>'))+"<grayed>"+row.lfl+" ("+row.lid+")</grayed>"+"</td>"+
+     "<td>"+(row.nm ?? '')+"</td>"+
+     "<td>"+(row.lnm ?? '')+" <span class='text-primary'>"+row.lfl+"</span> <grayed>("+row.lid+")</grayed>"+"</td>"+
      "<td>"+numLikeEve(row.qty)+"</td>"+
      "<td>"+row.cat+"</td>"+
      "<td>"+row.uat+"</td>"+
@@ -453,7 +480,35 @@ function rebuildBody() {
   $('their-orders-only').css('opacity','0.1');
  else
   $('their-orders-only').css('opacity','unset');
+ var hidden_hubs = ls.getItem('Hidden Market Hubs');
+ if (hidden_hubs)
+  hidden_hubs = JSON.parse(hidden_hubs);
+ var visible_market_hubs_idx = [];
+ var hidden_market_hubs_idx = [];
+ for (const h of g_market_hubs) {
+  if (h === null) break;
+  if (h[7]==1) continue; //archive
+  if (h[8]==1) continue; //forbidden
+  const nm = h[9];
+  var idx = getTableHeaderIndex(nm.toLowerCase());
+  if (!(idx === null)) {
+   idx++;
+   if (hidden_hubs && (hidden_hubs.indexOf(h[0])>=0))
+    hidden_market_hubs_idx.push(idx);
+   else
+    visible_market_hubs_idx.push(idx);
+  }
+ }
+ for (const idx of visible_market_hubs_idx) {
+  applyOptionVal(1, '#tbl thead tr th:nth-child('+idx+')');
+  applyOptionVal(1, '#tbl tbody tr td:nth-child('+idx+')');
+ }
+ for (const idx of hidden_market_hubs_idx) {
+  applyOptionVal(0, '#tbl thead tr th:nth-child('+idx+')');
+  applyOptionVal(0, '#tbl tbody tr td:nth-child('+idx+')');
+ }
 }
+
 // Options menu and submenu setup
 function toggleMenuOption(name, inverse=false) {
  show = (ls.getItem(name) == (inverse?0:1)) ? 0 : 1;
@@ -481,6 +536,29 @@ $(document).ready(function(){
  rebuildOptionsMenu();
  rebuildBody();
 
+ $('.dropdown-submenu a.options-submenu').on("click", function(e){
+  $(this).next('ul').toggle();
+  e.stopPropagation();
+  e.preventDefault();
+ });
+ $('a.toggle-hub-option').on("click", function(e){
+  var hub = parseInt($(this).attr('hub'));
+  var hubs = ls.getItem('Hidden Market Hubs');
+  if (!(hubs)) {
+   hubs = [hub];
+  } else {
+   hubs = JSON.parse(hubs);
+   var idx = hubs.indexOf(hub);
+   if (idx == -1)
+    hubs.push(hub);
+   else
+    hubs.splice(idx,1);
+  }
+  ls.setItem('Hidden Market Hubs', JSON.stringify(hubs));
+  rebuildOptionsMenu();
+  rebuildBody();
+ });
+
  $('#dtlsSelMarketHub a').click(function(e) {
   e.preventDefault();
   var type_id = $('#copyTypeId').attr('data-copy');
@@ -494,6 +572,25 @@ $(document).ready(function(){
 
  $('#btnShowMarketHubs').click(function(e) { showMarketHubsModal(); });
 
+ // работа с буфером обмена
+ if (!( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) )) {
+  $('price_normal,price_warning,price_ordinal,price_grayed').each(function() {
+   $(this).tooltip();
+  });
+  $('price_normal,price_warning,price_ordinal,price_grayed').bind('click', function () {
+   var data_copy = $(this).html();
+   data_copy = data_copy.replace(/\s/g, '').replace(/<\/?[^>]+(>|$)/g, "").toLowerCase();
+   doCopyToClpbrd($(this), data_copy);
+  });
+  $('price_normal,price_warning,price_ordinal,price_grayed').bind('copied', function(event, message) {
+   var t = $(this).attr('title', message)
+    .tooltip('fixTitle')
+    .tooltip('show');
+   setTimeout(function() { t.tooltip('destroy'); }, 1500);
+  });
+ }
+
+ // щелчок по кнопке (i)
  $('a.qind-info-btn').bind('click', function() {
   var tr = $(this).closest('tr');
   if (tr.attr('type_id') === undefined) return;

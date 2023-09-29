@@ -343,7 +343,16 @@ EOD;
   echo "null];\n";
 }
 
-function __dump_praisal_menu_bar() { ?>
+function __dump_praisal_menu_bar(&$market_hubs)
+{
+  $active_market_hub_ids = array();
+  $active_trader_corp_ids = array();
+  get_active_market_hub_ids($market_hubs, $active_market_hub_ids, $active_trader_corp_ids);
+?>
+<style>
+.dropdown-submenu { position: relative; }
+.dropdown-submenu .dropdown-menu { top: 0; left: 100%; margin-top: -1px; }
+</style>
 <nav class="navbar navbar-default">
  <div class="container-fluid">
   <div class="navbar-header">
@@ -363,6 +372,18 @@ function __dump_praisal_menu_bar() { ?>
        <li><a id="btnToggleJitaPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowJitaPrice"></span> Показывать Jita Price</a></li>
        <li><a id="btnToggleAmarrPrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowAmarrPrice"></span> Показывать Amarr Price</a></li>
        <li><a id="btnToggleUniversePrice" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUniversePrice"></span> Показывать Universe Price</a></li>
+       <li class="dropdown-submenu">
+        <a class="options-submenu" data-target="#" role="button">Скрыть системы <mark id="lbHiddenMarketHubs">-</mark><span class="caret"></span></a>
+        <ul class="dropdown-menu" style="display: none;">
+<?php
+  foreach ($market_hubs as ["hub" => $hub, "a" => $a, "f" => $f, "ss" => $solar_system_name])
+  {
+    if ($a == 't' || $f == 't') continue; // archive or forbidden
+    ?><li><a id="btnToggleHub<?=$hub?>" hub="<?=$hub?>" class="option toggle-hub-option" data-target="#" role="button"><span class="glyphicon glyphicon-star hidden" aria-hidden="true"></span> <?=$solar_system_name?></a></li><?php
+  }
+?>
+        </ul>
+       </li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleMarketVolume" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMarketVolume"></span> Показывать объём товара на рынке</a></li>
        <li><a id="btnToggleBestOffer" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBestOffer"></span> Показывать объём лучшего предложения</a></li>
@@ -397,7 +418,13 @@ function __dump_praisal_table_header(&$market_hubs)
 <?php } ?> { text-align: right; }
 grayed { color : #808080; }
 price_warning { color : #9e6101; }
+price_warning:hover { color: #9e6101; text-shadow: 0 0 0.2vw #9e6101b2, 0 0 8vw #9e6101; cursor: default; }
 price_normal { color: #3371b6; }
+price_normal:hover { color: #3371b6; text-shadow: 0 0 0.2vw #3371b6b2, 0 0 8vw #3371b6; cursor: default; }
+price_ordinal { color: #c5c8c9; }
+price_ordinal:hover { color: #c5c8c9; text-shadow: 0 0 0.2vw #c5c8c9b2, 0 0 8vw #c5c8c9; cursor: default; }
+price_grayed { color: #808080; }
+price_grayed:hover { color: #808080; text-shadow: 0 0 0.2vw #808080b2, 0 0 8vw #808080; cursor: default; }
 tid { white-space: nowrap; }
 .qind-info-btn { color: #808080; }
 .qind-info-btn:hover, .qind-info-btn:active, .qind-info-btn:focus { color: #aaa; }
@@ -457,8 +484,7 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
 <tr <?=!is_null($t)?'type_id="'.$type_id.'"':''?>>
 <td><img class="icn32" src="<?=__get_img_src($type_id,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
       <td><?=$t?('<tid>'.$type_name.get_clipboard_copy_button($type_name)).get_glyph_icon_button('info-sign','class="qind-info-btn"').'</tid>':''?></td>
-<td><?=$cnt?></td>
-
+<td><?=number_format($cnt,0,'.',',')?></td>
 <?php foreach ($active_market_hub_ids as $hub) { ?>
 <td>
 <?php
@@ -486,34 +512,48 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
           $color = 'price_warning';
         else if ($their_price > $our_price)
           $color = 'price_normal';
-        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=$color?'<'.$color.'>':''?><?=number_format($our_price,2,'.',',')?><?=$color?'</'.$color.'>':''?><br>
-          <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)</market-volume>&nbsp;<?=number_format($their_price,2,'.',',')?><?php
+        else
+          $color = 'price_ordinal';
+        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?='<'.$color.'>'.number_format($our_price,2,'.',',').'</'.$color.'>'?><br>
+          <market-volume>(<?=(is_null($best_offer_volume))?'':'<best-offer>'.$best_offer_volume.'<grayed>/</grayed></best-offer>'?><?=$their_volume?>)</market-volume>&nbsp;<price_ordinal><?=number_format($their_price,2,'.',',')?></price_ordinal><?php
       }
       else if ($tp_known)
       {
         ?><their-orders-only><br>
-          <market-volume>(<?=$their_volume?>)</market-volume>&nbsp;<?=number_format($their_price,2,'.',',')?></their-orders-only><?php
+          <market-volume>(<?=$their_volume?>)</market-volume>&nbsp;<price_ordinal><?=number_format($their_price,2,'.',',')?></price_ordinal></their-orders-only><?php
       }
       else if ($op_known)
       {
-        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<?=number_format($our_price,2,'.',',')?><?php
+        ?><market-volume>(<?=$our_volume?>)</market-volume>&nbsp;<price_ordinal><?=number_format($our_price,2,'.',',')?></price_ordinal><?php
       }
       break;
     }
 ?>
 </td>
 <?php } ?>
-<td><?php if ($t) {
+<td><?php
+ if ($t) {
   $s = $t['jita_sell'];
   $b = $t['jita_buy'];
-  if ($s || $b) echo (is_null($s)?'':number_format($s,2,'.',',')).'<br><grayed>'.(is_null($s)?'':number_format($b,2,'.',',').'</grayed>'); }
+  if ($s || $b) {
+   if (!(is_null($s))) { ?><?='<price_ordinal>'.number_format($s,2,'.',',').'</price_ordinal>'?><?php }
+   echo '<br>';
+   if (!(is_null($b))) { ?><?='<price_grayed>'.number_format($b,2,'.',',').'</price_grayed>'?><?php }
+  }
+ }
 ?></td>
-<td><?php if ($t) {
+<td><?php
+ if ($t) {
   $s = $t['amarr_sell'];
   $b = $t['amarr_buy'];
-  if ($s || $b) echo (is_null($s)?'':number_format($s,2,'.',',')).'<br><grayed>'.(is_null($s)?'':number_format($b,2,'.',',').'</grayed>'); }
+  if ($s || $b) {
+   if (!(is_null($s))) { ?><?='<price_ordinal>'.number_format($s,2,'.',',').'</price_ordinal>'?><?php }
+   echo '<br>';
+   if (!(is_null($b))) { ?><?='<price_grayed>'.number_format($b,2,'.',',').'</price_grayed>'?><?php }
+  }
+ }
 ?></td>
-<td><?php if ($t && $t['universe_price']) echo number_format($t['universe_price'],2,'.',','); ?></td>
+<td><?php if ($t && $t['universe_price']) echo '<price_ordinal>'.number_format($t['universe_price'],2,'.',',').'</price_ordinal>'; ?></td>
 </tr>
 <?php }
 
@@ -578,7 +618,7 @@ $sale_orders = array();
 __dump_market_orders_data($conn, $market_hubs, $sys_type_ids, $sale_orders);
 ?></script><?php
 
-__dump_praisal_menu_bar();
+__dump_praisal_menu_bar($market_hubs);
 __dump_praisal_table_header($market_hubs);
 foreach (range(0,$IDs_len/2-1) as $idx)
 {
@@ -854,7 +894,7 @@ table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
 .tblCorpAssets-wrapper thead tr th:nth-child(3),
 .tblCorpAssets-wrapper tbody tr td:nth-child(3),
 .tblCorpAssets-wrapper tbody tr td:nth-child(4),
-.tblCorpAssets-wrapper tbody tr td:nth-child(5){ text-align: right; width: min-content; }
+.tblCorpAssets-wrapper tbody tr td:nth-child(5){ text-align: right; white-space: nowrap; width: min-content; }
 .tblCorpAssets-wrapper thead tr th:nth-child(4),
 .tblCorpAssets-wrapper thead tr th:nth-child(5){ text-align: center; width: min-content; }
 </style>
@@ -890,8 +930,6 @@ table.table-market-hubs tbody tr td:nth-child(7) { text-align: right; }
 </div>
 
 
-<script><?php include 'qi_praisal.js'; ?></script>
-<?php
-__dump_footer();
-__dump_copy_to_clipboard_javascript();
-?>
+<?php __dump_copy_to_clipboard_javascript(); ?>
+<script><?php include 'qi_praisal.js'; /*используется copy_to_clipboard*/ ?></script>
+<?php __dump_footer(); ?>
