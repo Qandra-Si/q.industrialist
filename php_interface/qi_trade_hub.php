@@ -637,11 +637,11 @@ mute-sm { font-size: 85%; }
 
             if (!empty($problems)) {
                 if ($amarr_sell <= $jita_sell) {
-                    $amarr_buy_order .= $nm.' '.ceil($weekly_volume)."\n";
+                    $amarr_buy_order .= $nm."\t".ceil($weekly_volume)."\n";
                     $amarr_buy_price += $amarr_sell * ceil($weekly_volume);
                 }
                 else {
-                    $jita_buy_order .= $nm.' '.ceil($weekly_volume)."\n";
+                    $jita_buy_order .= $nm."\t".ceil($weekly_volume)."\n";
                     $jita_buy_price += $jita_sell * ceil($weekly_volume);
                 }
             }
