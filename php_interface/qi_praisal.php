@@ -71,6 +71,50 @@ document.addEventListener('paste', async (e) => {
 </script>
 <?php }
 
+function __dump_blueprints_data(&$conn, &$type_ids, &$blueprints_data) {
+  $query = <<<EOD
+select x.bp, x.act, x.prod
+from (
+ select p.sdebp_blueprint_type_id as bp, 1 as act, p.sdebp_product_id as prod
+ from eve_sde_blueprint_products p
+ where sdebp_blueprint_type_id=any($1) and sdebp_activity=1
+ union
+ select p1.sdebp_blueprint_type_id, 8, p2.sdebp_product_id
+ from eve_sde_blueprint_products p1, eve_sde_blueprint_products p2
+ where
+  p1.sdebp_blueprint_type_id=any($1) and
+  p1.sdebp_activity=8 and
+  p2.sdebp_blueprint_type_id=p1.sdebp_product_id and
+  p2.sdebp_activity=1
+ ) x
+order by 1, 2, 3;
+EOD;
+  $params = array('{'.implode(',',$type_ids).'}');
+  $blueprints_data_cursor = pg_query_params($conn, $query, $params)
+          or die('pg_query err: '.pg_last_error());
+  $blueprints_data = pg_fetch_all($blueprints_data_cursor);
+
+  echo 'g_blueprints_data=[';
+  foreach ($blueprints_data as &$t)
+  {
+    echo '['.
+            $t['bp'].','. //0
+            $t['act'].','. //1
+            $t['prod']. //2
+         "],\n";
+  }
+  echo "null];\n";
+}
+
+function get_product_type_ids(&$blueprints_data, &$product_type_ids)
+{
+  foreach ($blueprints_data as ["prod" => $prod])
+  {
+    $product_type_ids[] = intval($prod);
+  }
+  $product_type_ids = array_unique($product_type_ids, SORT_NUMERIC);
+}
+
 function __dump_main_data(&$conn, &$type_ids, &$main_data) {
   $query = <<<EOD
 select
@@ -484,7 +528,7 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
 <tr <?=!is_null($t)?'type_id="'.$type_id.'"':''?>>
 <td><img class="icn32" src="<?=__get_img_src($type_id,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
       <td><?=$t?('<tid>'.$type_name.get_clipboard_copy_button($type_name)).get_glyph_icon_button('info-sign','class="qind-info-btn"').'</tid>':''?></td>
-<td><?=number_format($cnt,0,'.',',')?></td>
+<td><?=is_null($cnt)?'':number_format($cnt,0,'.',',')?></td>
 <?php foreach ($active_market_hub_ids as $hub) { ?>
 <td>
 <?php
@@ -557,6 +601,19 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
 </tr>
 <?php }
 
+function get_main_data_tkey(&$main_data, $id)
+{
+  $t_key = null;
+  foreach ($main_data as $tk => $t)
+  {
+    $_id = intval($t['sdet_type_id']);
+    if ($_id!=$id) continue;
+    $t_key = $tk;
+    break;
+  }
+  return $t_key;
+}
+
 
 __dump_header("Praisal", FS_RESOURCES, "", true);
 
@@ -610,12 +667,18 @@ $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." use
 pg_exec($conn, "SET search_path TO qi");
 
 ?><script><?php
+$blueprints_data = array();
+__dump_blueprints_data($conn, $sys_type_ids, $blueprints_data);
+$product_type_ids = array();
+get_product_type_ids($blueprints_data, $product_type_ids);
+$merged_type_ids = array_merge($sys_type_ids, $product_type_ids);
+
 $main_data = array();
-__dump_main_data($conn, $sys_type_ids, $main_data);
+__dump_main_data($conn, $merged_type_ids, $main_data);
 $market_hubs = array();
 __dump_market_hubs_data($conn, $market_hubs);
 $sale_orders = array();
-__dump_market_orders_data($conn, $market_hubs, $sys_type_ids, $sale_orders);
+__dump_market_orders_data($conn, $market_hubs, $merged_type_ids, $sale_orders);
 ?></script><?php
 
 __dump_praisal_menu_bar($market_hubs);
@@ -624,15 +687,17 @@ foreach (range(0,$IDs_len/2-1) as $idx)
 {
   $id = $IDs[2*$idx];
   $cnt = $IDs[2*$idx+1];
-  $t_key = null;
-  foreach ($main_data as $tk => $t)
-  {
-    $_id = intval($t['sdet_type_id']);
-    if ($_id!=$id) continue;
-    $t_key = $tk;
-    break;
-  }
+  $t_key = get_main_data_tkey($main_data, $id);
   __dump_praisal_table_row($id, $cnt, is_null($t_key) ? null : $main_data[$t_key], $market_hubs, $sale_orders);
+  foreach ($blueprints_data as ["bp" => $bp, "act" => $act, "prod" => $prod])
+  {
+    $_bp = intval($bp);
+    if ($_bp!=$id) continue;
+    if ($_bp>$id) break;
+    $_prod = intval($prod);
+    $t_key = get_main_data_tkey($main_data, $prod);
+    __dump_praisal_table_row($prod, null, is_null($t_key) ? null : $main_data[$t_key], $market_hubs, $sale_orders);
+  }
 }
 __dump_praisal_table_footer($market_hubs);
 __dump_clipboard_waiter(false);
