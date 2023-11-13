@@ -290,11 +290,28 @@ from (
       b.ecb_time_efficiency as te,
       b.ecb_quantity as quantity,
       -1 as storage
-    from qi.esi_corporation_blueprints b
+    from
+      qi.esi_corporation_assets a,
+      qi.esi_corporation_blueprints b
     where
-      b.ecb_corporation_id = 98615601 and
-      b.ecb_location_id in (1037211996610, 1037368057421) and
+      a.eca_name='{pers} Qandra Si' and
+      --b.ecb_corporation_id = 98615601 and
+      --b.ecb_location_id in (1037211996610, 1037368057421) and
+      b.ecb_location_id = a.eca_item_id and
       b.ecb_quantity <> -2
+    union
+    select
+     b.epb_item_id,
+     b.epb_type_id,
+     b.epb_location_id,
+     b.epb_material_efficiency,
+     b.epb_time_efficiency,
+     b.epb_quantity,
+     -1
+    from esi_pilot_blueprints b
+    where
+     b.epb_quantity <> -2 and
+     b.epb_character_id in (2116129465,2118133173,2118530470,2116746261,2119173458,2116156168,95858524,2118511176,2116301331,2119305157,95825908)
     union
     select
       j.ecj_blueprint_id,
@@ -305,14 +322,33 @@ from (
       1,
       j.ecj_activity_id
     from
+      qi.esi_corporation_assets a,
       qi.esi_corporation_industry_jobs j
     where
-      j.ecj_corporation_id = 98615601 and
-      ( j.ecj_output_location_id in (1037211996610, 1037368057421) or
-        j.ecj_blueprint_location_id in (1037211996610, 1037368057421)
+      a.eca_name='{pers} Qandra Si' and
+      --j.ecj_corporation_id = 98615601 and
+      --( j.ecj_output_location_id in (1037211996610, 1037368057421) or
+      --  j.ecj_blueprint_location_id in (1037211996610, 1037368057421)
+      --) and
+      ( j.ecj_output_location_id = a.eca_item_id or
+        j.ecj_blueprint_location_id = a.eca_item_id
       ) and
       -- j.ecj_activity_id in (3,4) and
       j.ecj_status = 'active'
+    union
+    select
+     j.epj_blueprint_id,
+     j.epj_blueprint_type_id,
+     j.epj_blueprint_location_id,
+     null,
+     null,
+     1,
+     j.epj_activity_id
+    from
+     esi_pilot_industry_jobs j
+    where
+     j.epj_character_id in (2116129465,2118133173,2118530470,2116746261,2119173458,2116156168,95858524,2118511176,2116301331,2119305157,95825908) and
+     j.epj_status = 'active'
   ) as q on (t.id = q.type_id)
 order by rrr.rnum;
 EOD;
