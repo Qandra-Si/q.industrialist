@@ -1,4 +1,6 @@
 ﻿# -*- encoding: utf-8 -*-
+import typing
+
 from .db_swagger_cache import *
 from .db_swagger_translator import QSwaggerTranslator
 
@@ -37,6 +39,10 @@ class QSwaggerDictionary:
             raise Exception("Unable to load market groups twice")
         self.sde_market_groups = self.__qit.get_market_groups()
         return self.sde_market_groups
+
+    def get_type_id(self, type_id: int) -> typing.Optional[QSwaggerTypeId]:
+        cached_type_id: QSwaggerTypeId = self.sde_type_ids.get(type_id)
+        return cached_type_id
 
     def load_published_type_ids(self) -> typing.Dict[int, QSwaggerTypeId]:
         if self.sde_type_ids:
@@ -105,9 +111,13 @@ class QSwaggerDictionary:
         cached_station: typing.Optional[QSwaggerStation] = self.stations.get(station_id)
         return cached_station
 
+    def get_station_by_name(self, station_name: str) -> typing.Optional[QSwaggerStation]:
+        cached_station: typing.Optional[QSwaggerStation] = next((s for s in self.stations.values() if s.station_name == station_name), None)
+        return cached_station
+
     def load_station(self, station_name: str) -> typing.Optional[QSwaggerStation]:
         # поиск ранее загруженной станции (структуры, фабрики)
-        cached_station: typing.Optional[QSwaggerStation] = next((c for c in self.stations.values() if c.station_name == station_name), None)
+        cached_station: typing.Optional[QSwaggerStation] = next((s for s in self.stations.values() if s.station_name == station_name), None)
         if cached_station:
             return cached_station
         # загрузка сведений о станции из БД

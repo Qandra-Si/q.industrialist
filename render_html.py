@@ -56,11 +56,18 @@ def __get_icon_src(icon_id, sde_icon_ids):
         return ""
 
 
+def __get_file_src(filename: str) -> str:
+    if q_industrialist_settings.g_use_filesystem_resources:
+        return f'../{filename}'
+    else:
+        return f'/{filename}'
+
+
 def get_span_glyphicon(icon: str) -> str:
     return '<span class="glyphicon glyphicon-{}" aria-hidden="true"></span>'.format(icon)
 
 
-def __dump_header(glf, header_name, qind_ver=None, use_dark_mode=False):
+def __dump_header(glf, header_name, use_dark_mode=False):
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
     # рекомендуемый набор favicon-ок, см. https://stackoverflow.com/a/52322368
@@ -128,95 +135,9 @@ def __dump_header(glf, header_name, qind_ver=None, use_dark_mode=False):
  <!-- Manifest.json  -->
  <link rel="manifest" href="manifest.webmanifest">
 """)
-    if qind_ver:
-        glf.write(
-            ' <!-- Q.Industrialist -->\n'
-            ' <link rel="stylesheet" href="q.industrialist/{ver}/css/bootstrapped.css">\n'.
-            format(ver=qind_ver)
-        )
     if use_dark_mode:
-        glf.write("""<style type="text/css">
-body {
- color: #c5c8c9;
- background-color: #162326;
-}
-a.url {
- color: #ffa600;
-}
-a:hover.url,
-a:focus.url {
- color: #ffa600;
- background-color: #8f6310;
-}
-.panel {
- background-color: #162326;
-}
-.panel-default > .panel-heading {
- color: #e8e8e8;
- background-color: #21312b;
- border-color: #1d3231;
-}
-.btn-default {
- color: #c7cccb;
- background-color: #233630;
- border-color: #489579;
-}
-.btn-default:hover {
- color: #ebefee;
- background-color: #477e6b;
- border-color: #4b8975;
-}
-.btn-default.active,
-.btn-default:active,
-.btn-default.focus,
-.btn-default:focus,
-.open > .dropdown-toggle.btn-default,
-.btn-default:active:hover,
-.btn-default.active:hover,
-.open > .dropdown-toggle.btn-default:hover,
-.btn-default:active:focus,
-.btn-default.active:focus,
-.open > .dropdown-toggle.btn-default:focus,
-.btn-default:active.focus,
-.btn-default.active.focus,
-.open > .dropdown-toggle.btn-default.focus {
- color: #616161;
- background-color: #e7e7e7;
- border-color: #e7e7e7;
-}
-.page-header { border-bottom: 1px solid #1d3231; }
-.table > tbody > tr.active > td,
-.table > tbody > tr.active > th,
-.table > tbody > tr > td.active,
-.table > tbody > tr > th.active,
-.table > tfoot > tr.active > td,
-.table > tfoot > tr.active > th,
-.table > tfoot > tr > td.active,
-.table > tfoot > tr > th.active,
-.table > thead > tr.active > td,
-.table > thead > tr.active > th,
-.table > thead > tr > td.active,
-.table > thead > tr > th.active { background-color: #2a493e; }
-
-.activity1 { background-color: #ff9900; }
-.activity3,
-.activity4,
-.activity5,
-.activity7,
-.activity8 { background-color: #3371b6; }
-.activity9,
-.activity11 { background-color: #0a7f6f; }
-
-.label-summary {
- font-size: 66%;
- font-weight: unset;
-}
-mark {
- background-color: #1a302e;
- color: #d8dada;
- padding: .3em .3em .3em;
-}
-</style>""")
+        glf.write(' <!-- Q.Industrialist -->\n')
+        glf.write(f' <link rel="stylesheet" href="{__get_file_src("render_stylesheet_dark.css")}">')
     glf.write("""
 </head>
 <body>

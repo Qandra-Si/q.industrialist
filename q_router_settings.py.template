@@ -1,0 +1,197 @@
+# индивидуальные настройки для работы скрипта q_router.py
+# содержит настройки работы с производственным конвейером:
+
+g_routes = [
+    {'station': "P-ZMZV - Mendeleev",
+     'desc': 'Татара, реакции',
+     'output': [
+        # Processed Moon Materials
+          16663,  # Caesarium Cadmide
+          57453,  # Carbon Fiber
+          16659,  # Carbon Polymers
+          16660,  # Ceramic Powder
+          16655,  # Crystallite Alloy
+          16668,  # Dysporite
+          16656,  # Fernite Alloy
+          16669,  # Ferrofluid
+          17769,  # Fluxed Condensates
+          16665,  # Hexite
+          16666,  # Hyperflurite
+          16667,  # Neo Mercurite
+          57454,  # Oxy-Organic Solvents
+          16662,  # Platinum Technite
+          33337,  # Promethium Mercurite
+          17960,  # Prometium
+          16657,  # Rolled Tungsten Alloy
+          16658,  # Silicon Diborite
+          16664,  # Solerium
+          16661,  # Sulfuric Acid
+          57455,  # Thermosetting Polymer
+          33336,  # Thulium Hafnite
+          16654,  # Titanium Chromide
+          17959,  # Vanadium Hafnite
+          #32824, # Unrefined Caesarium Cadmide               <--- устарели (вышли из эксплуатации)
+          #32829, # Unrefined Crystallite Alloy               <--- устарели (вышли из эксплуатации)
+          #29660, # Unrefined Dysporite                       <--- устарели (вышли из эксплуатации)
+          #32828, # Unrefined Fernite Alloy                   <--- устарели (вышли из эксплуатации)
+          #29663, # Unrefined Ferrofluid                      <--- устарели (вышли из эксплуатации)
+          #29659, # Unrefined Fluxed Condensates              <--- устарели (вышли из эксплуатации)
+          #32825, # Unrefined Hexite                          <--- устарели (вышли из эксплуатации)
+          #29664, # Unrefined Hyperflurite                    <--- устарели (вышли из эксплуатации)
+          #29661, # Unrefined Neo Mercurite                   <--- устарели (вышли из эксплуатации)
+          #32822, # Unrefined Platinum Technite               <--- устарели (вышли из эксплуатации)
+          #33338, # Unrefined Promethium Mercurite            <--- устарели (вышли из эксплуатации)
+          #29662, # Unrefined Prometium                       <--- устарели (вышли из эксплуатации)
+          #32826, # Unrefined Rolled Tungsten Alloy           <--- устарели (вышли из эксплуатации)
+          #32823, # Unrefined Solerium                        <--- устарели (вышли из эксплуатации)
+          #33339, # Unrefined Thulium Hafnite                 <--- устарели (вышли из эксплуатации)
+          #32827, # Unrefined Titanium Chromide               <--- устарели (вышли из эксплуатации)
+          #32821, # Unrefined Vanadium Hafnite                <--- устарели (вышли из эксплуатации)
+        # Molecular-Forged Materials
+          57469,  # Goal-Orienting Neurolink Stabilizer
+          57463,  # Isotropic Neofullerene Alpha-3
+          57464,  # Isotropic Neofullerene Beta-6
+          57465,  # Isotropic Neofullerene Gamma-9
+          57467,  # Reaction-Orienting Neurolink Stabilizer
+          57468,  # Stress-Responding Neurolink Stabilizer
+          57466,  # Ultradian-Cycling Neurolink Stabilizer
+          57460,  # Axosomatic Neurolink Enhancer             <--- двойное назначение
+          57461,  # Cogni-Emotive Neurolink Enhancer          <--- двойное назначение
+          57459,  # Hypnagogic Neurolink Enhancer             <--- двойное назначение
+          57462,  # Sense-Heuristic Neurolink Enhancer        <--- двойное назначение
+          57458,  # Meta-Operant Neurolink Enhancer           <--- это варится из 4х редких реакций
+        # Booster Materials                                 <--- пока нигде не варим (это наркота)
+          25241,  # Pure Improved Blue Pill Booster
+          25335,  # Pure Improved Crash Booster
+          25336,  # Pure Improved Drop Booster
+          25337,  # Pure Improved Exile Booster
+          25339,  # Pure Improved Frentix Booster
+          25338,  # Pure Improved Mindflood Booster
+          25341,  # Pure Improved Sooth Sayer Booster
+          25340,  # Pure Improved X-Instinct Booster
+          25237,  # Pure Standard Blue Pill Booster
+          25242,  # Pure Standard Crash Booster
+          25330,  # Pure Standard Drop Booster
+          25331,  # Pure Standard Exile Booster
+          25252,  # Pure Standard Frentix Booster
+          25332,  # Pure Standard Mindflood Booster
+          25334,  # Pure Standard Sooth Sayer Booster
+          25333,  # Pure Standard X-Instinct Booster
+          25283,  # Pure Strong Blue Pill Booster
+          25342,  # Pure Strong Crash Booster
+          25343,  # Pure Strong Drop Booster
+          25344,  # Pure Strong Exile Booster
+          25346,  # Pure Strong Frentix Booster
+          25345,  # Pure Strong Mindflood Booster
+          25348,  # Pure Strong Sooth Sayer Booster
+          25347,  # Pure Strong X-Instinct Booster
+          28686,  # Pure Synth Blue Pill Booster
+          28687,  # Pure Synth Crash Booster
+          28688,  # Pure Synth Drop Booster
+          28689,  # Pure Synth Exile Booster
+          28690,  # Pure Synth Frentix Booster
+          28691,  # Pure Synth Mindflood Booster
+          28692,  # Pure Synth Sooth Sayer Booster
+          28693,  # Pure Synth X-Instinct Booster
+     ],
+    },
+    {'station': "9CG6-H - Alice' Brewery",
+     'desc': 'Атанор, реакции',
+     'output': [
+        # Advanced Moon Materials
+          16670,  # Crystalline Carbonide
+          17317,  # Fermionic Condensates
+          16673,  # Fernite Carbide
+          16683,  # Ferrogel
+          16679,  # Fullerides
+          16682,  # Hypersynaptic Fibers
+          16681,  # Nanotransistors
+          33362,  # Nonlinear Metamaterials
+          16680,  # Phenolic Composites
+          33359,  # Photonic Metamaterials
+          33361,  # Plasmonic Metamaterials
+          57456,  # Pressurized Oxidizers      <--- уезжает на Сотию (остальное не Азбель)
+          57457,  # Reinforced Carbon Fiber    <--- уезжает на Сотию (остальное не Азбель)
+          16678,  # Sylramic Fibers
+          33360,  # Terahertz Metamaterials
+          16671,  # Titanium Carbide
+          16672,  # Tungsten Carbide
+     ]
+    },
+    {'station': "9CG6-H - King Glorden",
+     'desc': 'Азбель, производство',
+     'output': [
+        # Advanced Components (Amarr)
+          11549,  # Antimatter Reactor Unit
+          11694,  # EM Pulse Generator
+          11532,  # Fusion Thruster
+          11689,  # Laser Focusing Crystals
+          11557,  # Linear Shield Emitter
+          11539,  # Nanoelectrical Microprocessor
+          11537,  # Radar Sensor Cluster
+          11554,  # Tesseract Capacitor Unit
+          11543,  # Tungsten Carbide Armor Plate
+          #57470, # U-C Trigger Neurolink Conduit           <--- не варится на Азбели (варится на Сотие)
+        # Advanced Components (Caldari)
+          11534,  # Gravimetric Sensor Cluster
+          11693,  # Graviton Pulse Generator
+          11550,  # Graviton Reactor Unit
+          11533,  # Magpulse Thruster
+          11540,  # Quantum Microprocessor
+          #57471, # R-O Trigger Neurolink Conduit           <--- не варится на Азбели (варится на Сотие)
+          11552,  # Scalar Capacitor Unit
+          11690,  # Superconductor Rails
+          11558,  # Sustained Shield Emitter
+          11544,  # Titanium Diborite Armor Plate
+        # Advanced Components (Gallente)
+          11545,  # Crystalline Carbonide Armor Plate
+          11547,  # Fusion Reactor Unit
+          11531,  # Ion Thruster
+          11535,  # Magnetometric Sensor Cluster
+          11553,  # Oscillator Capacitor Unit
+          11688,  # Particle Accelerator Unit
+          11541,  # Photon Microprocessor
+          11695,  # Plasma Pulse Generator
+          11556,  # Pulse Shield Emitter
+          #57472, # S-R Trigger Neurolink Conduit           <--- не варится на Азбели (варится на Сотие)
+        # Advanced Components (Minmatar)
+          11555,  # Deflection Shield Emitter
+          11551,  # Electrolytic Capacitor Unit
+          11542,  # Fernite Carbide Composite Armor Plate
+          #57473, # G-O Trigger Neurolink Conduit           <--- не варится на Азбели (варится на Сотие)
+          11536,  # Ladar Sensor Cluster
+          11538,  # Nanomechanical Microprocessor
+          11692,  # Nuclear Pulse Generator
+          11548,  # Nuclear Reactor Unit
+          11530,  # Plasma Thruster
+          11691,  # Thermonuclear Trigger Unit
+        # Advanced Components (Triglavian)                  <--- нет чертежей, не варится на Азбели
+          #53288,  # Capital Singularity Radiation Convertor
+          #53290,  # Capital Trinary State Processor
+          #53289,  # Capital Zero-Point Field Manipulator
+          #52314,  # Lattice Locked Dekaisogen
+          #52310,  # Radiation Absorption Thruster
+          #52311,  # Singularity Radiation Convertor
+          #52313,  # Trinary State Processor
+          #52312,  # Zero-Point Field Manipulator
+     ]
+    },
+    {'station': "UYU-VV - DarkFman vs Photon UI",
+     'desc': 'Атанор, реакции',
+     'output': [
+        # Polymer Materials
+          30311,  # C3-FTM Acid
+          30310,  # Carbon-86 Epoxy Resin
+          30305,  # Fullerene Intercalated Graphite
+          30303,  # Fulleroferrocene
+          30309,  # Graphene Nanoribbons
+          30307,  # Lanthanum Metallofullerene
+          30306,  # Methanofullerene
+          30304,  # PPD Fullerene Fibers
+          30308,  # Scandium Metallofullerene
+     ]
+    },
+    {'station': "P-ZMZV - Shukhov",
+     'desc': 'Сотия, производство',
+    },
+]

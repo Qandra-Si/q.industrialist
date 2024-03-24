@@ -1,4 +1,6 @@
 ﻿import typing
+from distutils.command.config import config
+
 import render_html
 import eve_sde_tools
 import eve_esi_tools
@@ -7,7 +9,10 @@ import eve_conveyor_tools
 from render_html import get_span_glyphicon as glyphicon
 from math import ceil
 
-import q_conveyor_settings
+#import q_conveyor_settings
+
+import postgresql_interface as db
+from __init__ import __version__
 
 
 g_modal_industry_seq = 1
@@ -342,10 +347,10 @@ def get_ntier_materials_list_of_not_available__obsolete(
         # в случае, если имеем дело с реакциями, то q - это кол-во оригиналов чертежей
         # в случае, если имеем дело не с реакциями, то r - это кол-во ранов чертежа
         if is_reaction_blueprint:
-            __blueprints = ceil(m["q"] / (quantity_of_single_run * 50))
+            __blueprints = ceil(m["q"] / (quantity_of_single_run * 15))  # TODO: надо использовать in_cache.runs_number_per_day
             ntier_set_of_blueprints = [{"r": -1, "q": __blueprints}]
             m.update({"bp": {"q": __blueprints,
-                             "runs": 50,
+                             "runs": 15,  # TODO: надо использовать in_cache.runs_number_per_day
                              "id": blueprint_type_id,
                              "a": ntier_activity,
                              "nm": eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
@@ -371,7 +376,7 @@ def get_ntier_materials_list_of_not_available__obsolete(
             # по хорошему тут надо слазить в библиотеку чертежей...
             0 if is_reaction_blueprint else 10,
             is_blueprint_copy=not is_reaction_blueprint,
-            fixed_number_of_runs=50 if is_reaction_blueprint else None)
+            fixed_number_of_runs=15 if is_reaction_blueprint else None)  # TODO: надо использовать in_cache.runs_number_per_day
         if not is_reaction_blueprint:
             calc_materials_summary__obsolete(nemlwe, ntier_materials_list_for_next_itr__sotiyo)
         else:
@@ -476,6 +481,16 @@ def __dump_not_available_materials_list_rows(
             ms_blueprint_products = in_cache.products_per_single_run
             is_reaction = in_cache.is_reaction
             ms_where = in_cache.where
+            # получаем информацию по кол-ву ранов, которое можно выполнить при имеющемся кол-ве ресурсов
+            ms_runs_number_per_day: typing.Optional[int] = in_cache.runs_number_per_day
+            ms_possible_jobs: typing.Optional[int] = None
+            if ms_runs is not None and ms_runs_number_per_day is not None:
+                ms_possible_jobs = conveyor_materials.check_possible_job_runs(in_cache)
+                if (ms_runs_number_per_day * ms_possible_jobs) > (ms_runs * ms_blueprints):
+                    if ms_runs == ms_runs_number_per_day:
+                        ms_possible_jobs = ms_blueprints
+                    else:
+                        ms_possible_jobs = ceil((ms_runs * ms_blueprints) / ms_runs_number_per_day)
             # считаем остатки и потребности кол-ва материалов в стоке
             ms_planned__manuf: int = in_cache.reserved_in_manuf_stock
             ms_planned__react: int = in_cache.reserved_in_react_stock
@@ -491,6 +506,8 @@ def __dump_not_available_materials_list_rows(
             # считаем кол-во материалов, которое производится в сток
             # TODO: вывести предупреждение о том, что какие-то материалы производятся ИЗ конвейера НЕ В сток
             ms_in_progress = in_cache.in_progress
+            # считаем признак того, что материала произведено (или УЖЕ производится) достаточное кол-во
+            ms_not_available: bool = (ms_not_available__manuf + ms_not_available__react) > ms_in_progress
             # TODO: вывести таблицу со сводной информацией о необходимости транспортировки накопленного между станциями
             ms_need_stock_transfer__manuf: bool = in_cache.need_transfer_into_manuf_stock()
             ms_need_stock_transfer__react: bool = in_cache.need_transfer_into_react_stock()
@@ -534,7 +551,10 @@ def __dump_not_available_materials_list_rows(
                            prfx='Required<br>' if __high_group_header else '',
                            ))
                 if 'runs' in dump_listed_table_cells:
-                    glf.write('<th class="active qind-rr hidden">To launch</th>\n')
+                    glf.write(
+                        '<th class="active qind-rr hidden">To launch</th>\n'
+                        '<th class="active qind-pr hidden">Possible</th>\n'
+                    )
                 if 'planned' in dump_listed_table_cells:
                     glf.write(
                         '<th class="active qind-mp hidden">{prfx}Sotiyo</th>\n'
@@ -637,7 +657,11 @@ def __dump_not_available_materials_list_rows(
                        em='' if ms_not_available__manuf or ms_not_available__react else ' class="qind-em hidden"'
                        ))
             if 'runs' in dump_listed_table_cells:
-                glf.write(' <td class="qind-rr hidden">{r}</td>\n'.format(r=__runs))
+                glf.write(
+                    ' <td class="qind-rr hidden">{r}</td>\n'
+                    ' <td class="qind-pr hidden">{pr}</td>\n'.
+                    format(r=__runs, pr=__possible_jobs)
+                )
             if 'planned' in dump_listed_table_cells:
                 glf.write(
                     ' <td class="qind-mp hidden">{pm}</td>\n'
@@ -1672,22 +1696,6 @@ def __dump_corp_conveyors_stock_all(
   </ul>
 </div>
 
-<style>
-#tblStock tr { font-size: small; }
-.badge-light { color: #212529; background-color: #f8f9fa; }
-.label-time { color: #131313; background-color: #7adee3; }
-.label-not-enough { color: #fff; background-color: #f0ad4e; }
-.label-impossible { color: #fff; background-color: #d9534f; }
-.label-impossible-ntier { color: #fff; background-color: #e89694; }
-.label-overstock { color: # eee; background-color: #131313; }
-.label-invent-overstocked { color: # eee; background-color: #131313; }
-.label-not-available { color: #fff; background-color: #b7b7b7; }
-.text-material-industry-ntier { color: #aaa; }
-.text-material-buy-ntier { color: #a67877; }
-div.qind-tid { font-size: 85%; }
-tid { white-space: nowrap; }
-</style>
-
  <table id="tblStock" class="table table-condensed table-hover table-responsive">
 <thead>
  <tr>
@@ -1766,57 +1774,9 @@ def __dump_corp_conveyors(
         # настройки генерации отчёта
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        conveyor_data):
+        conveyor_data,
+        global_materials_dictionary):
     glf.write("""
-<style>
-table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
-
-table.qind-table-materials tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
-{ margin-top: -2px; margin-bottom: -1px; }
-
-table.qind-table-materials > tbody > tr > td,
-table.qind-table-materials > tbody > tr > th
-{ padding: 1px; font-size: smaller; }
-
-table.qind-table-materials > tbody > tr > th
-{ font-weight: bold; text-align: right; }
-
-table tbody tr.qind-fgh td, /* first group header */
-table tbody tr.qind-fgh th
-{ vertical-align: bottom; }
-
-table.qind-table-materials tbody tr th:nth-child(1)
-{ width: 24px; }
-
-td.qind-mr, /* materials required */
-td.qind-mp, /* materials planned */
-td.qind-mc, /* materials consumed */
-td.qind-rr, /* recommended runs */
-td.qind-me, /* materials exist */
-td.qind-ip /* materials in progress */
-{ text-align: right; }
-
-td.qind-mr { background-color: #fffbf1; } /* materials required : light yellow */
-td.qind-me { background-color: #f2fff1; } /* materials exist : light green */
-td.qind-mc { background-color: #f1f7ff; } /* materials consumed : light cyan */
-tr:hover td.qind-mr { background-color: #f4f0e7; }
-tr:hover td.qind-me { background-color: #e8f4e6; }
-tr:hover td.qind-mc { background-color: #e5ecf4; }
-
-a.qind-sign { color: #a52a2a; } /* exclamation sign: brown color */
-a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) */
-
-div.qind-bib /* blueprints interactivity block */
-{ margin-left: auto; margin-right: 0; float: right; padding-top: 1px; white-space: nowrap; }
-
-div.qind-bib a { color: #aaa; } /* material menu: gray color */
-div.qind-bib a:hover { color:  #c70039; } /* material menu: dark red color */
-
-tr.qind-em td, /* enough materials */
-tr.qind-em th
-{ color: #aaa; }
-</style>
-
 <div id="qind-tid-caption" style="display:none"><b>{nm}</b></div>
 <div id="qind-tid-menu" style="display:none">
  <b>{nm}</b> {tid}
@@ -1901,7 +1861,6 @@ tr.qind-em th
     # инициализация списка материалов, требуемых (и уже используемых) в производстве
     global_materials_summary = []
     global_materials_used = []
-    global_materials_dictionary = eve_conveyor_tools.ConveyorDictionary()
 
     for corp_conveyors in conveyor_data:
         glf.write("""
@@ -2072,30 +2031,7 @@ tr.qind-em th
 """)
 
     # сохраняем в отчёт справочник названий, кодов и сведений о производстве
-    type_ids = global_materials_dictionary.materials.keys()
-    sorted_type_ids = sorted(type_ids, key=lambda x: int(x))
-    glf.write('var g_sde_max_type_id={max};\n'
-              'var g_sde_type_len={len};\n'
-              'var g_sde_type_ids=['.format(max=sorted_type_ids[-1], len=len(sorted_type_ids)))
-    for (idx, type_id) in enumerate(sorted_type_ids):
-        in_ref: eve_conveyor_tools.ConveyorReference = global_materials_dictionary.get(type_id)
-        # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
-        glf.write('{end}[{id},"{nm}"]'.format(
-            id=type_id,
-            nm=in_ref.name.replace('"', '\\\"'),
-            end=',' if idx else "\n"))
-    glf.write("""
-];
-function getSdeItemName(t) {
- if ((t < 0) || (t > g_sde_max_type_id)) return null;
- for (var i=0; i<g_sde_type_len; ++i) {
-  var ti = g_sde_type_ids[i][0];
-  if (t == ti) return g_sde_type_ids[i][1];
-  if (ti >= g_sde_max_type_id) break;
- }
- return null;
-}
-""")
+    dump_global_materials_dictionary(glf, global_materials_dictionary)
     # удаляем более ненужный список материалов
     del global_materials_dictionary
 
@@ -2287,6 +2223,7 @@ function getSdeItemName(t) {
     applyOption('Show Planned Materials', '.qind-mp');
     applyOption('Show Consumed Materials', '.qind-mc');
     applyOption('Show Recommended Runs', '.qind-rr');
+    applyOption('Show Recommended Runs', '.qind-pr');
     applyOption('Show In Progress', '.qind-ip');
     applyOption('Show Enough Materials', '.qind-em');
     applyOption('Show Legend', '#legend-block');
@@ -2504,7 +2441,8 @@ def dump_conveyor_into_report(
         # настройки генерации отчёта
         # esi данные, загруженные с серверов CCP
         # данные, полученные в результате анализа и перекомпоновки входных списков
-        conveyor_data):
+        conveyor_data,
+        global_materials_dictionary: eve_conveyor_tools.ConveyorDictionary):
     glf = open('{dir}/conveyor.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, "Conveyor")
@@ -2518,10 +2456,19 @@ def dump_conveyor_into_report(
             research_materials_for_bps,
             products_for_bps,
             reaction_products_for_bps,
-            conveyor_data)
+            conveyor_data,
+            global_materials_dictionary)
         render_html.__dump_footer(glf)
     finally:
         glf.close()
+
+
+class RouterSettings:
+    def __init__(self):
+        # параметры работы конвейера
+        self.station: str = ''
+        self.desc: str = ''
+        self.output: typing.List[int] = []
 
 
 class ConveyorSettings:
@@ -2544,7 +2491,165 @@ class ConveyorSettings:
         self.trade_sale_stock: typing.List[int, int] = []
 
 
+def dump_global_materials_dictionary(glf, conveyor_dictionary: eve_conveyor_tools.ConveyorDictionary) -> None:
+    # сохраняем в отчёт справочник названий, кодов и сведений о производстве
+    type_ids = conveyor_dictionary.materials.keys()
+    sorted_type_ids = sorted(type_ids, key=lambda x: int(x))
+    glf.write('var g_sde_max_type_id={max};\n'
+              'var g_sde_type_len={len};\n'
+              'var g_sde_type_ids=['.format(max=sorted_type_ids[-1], len=len(sorted_type_ids)))
+    for (idx, type_id) in enumerate(sorted_type_ids):
+        in_ref: eve_conveyor_tools.ConveyorReference = conveyor_dictionary.get(type_id)
+        # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
+        glf.write('{end}[{id},"{nm}"]'.format(
+            id=type_id,
+            nm=in_ref.name.replace('"', '\\\"'),
+            end=',' if idx else "\n"))
+    glf.write("""];
+function getSdeItemName(t) {
+ if ((t < 0) || (t > g_sde_max_type_id)) return null;
+ for (var i=0; i<g_sde_type_len; ++i) {
+  var ti = g_sde_type_ids[i][0];
+  if (t == ti) return g_sde_type_ids[i][1];
+  if (ti >= g_sde_max_type_id) break;
+ }
+ return null;
+}""")
+
+
+"""
+def dump_conveyor2_into_report(
+        # путь, где будет сохранён отчёт
+        ws_dir: str,
+        # настройки генерации отчёта
+        settings: typing.List[ConveyorSettings]) -> None:
+    glf = open('{dir}/conveyor2.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+    try:
+        render_html.__dump_header(glf, 'Conveyor', use_dark_mode=True)
+        dump_nav_menu(glf)
+        glf.write('<div class="container-fluid">\n')
+        ""__dump_corp_conveyors(
+            glf,
+            settings)""
+        glf.write('</div><!--container-fluid-->\n')
+        render_html.__dump_footer(glf)
+    finally:
+        glf.close()
+"""
+
+
+def dump_additional_stylesheet(glf) -> None:
+    glf.write("""
+<style>
+table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
+
+table.qind-table-materials tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
+{ margin-top: -2px; margin-bottom: -1px; }
+
+table.qind-table-materials > tbody > tr > td,
+table.qind-table-materials > tbody > tr > th
+{ padding: 1px; font-size: smaller; }
+
+table.qind-table-materials > tbody > tr > th,
+table.qind-table-materials > tbody > tr > td:nth-child(1)
+{ font-weight: bold; text-align: right; }
+
+table tbody tr.qind-fgh td, /* first group header */
+table tbody tr.qind-fgh th
+{ vertical-align: bottom; }
+
+table.qind-table-materials tbody tr th:nth-child(1)
+{ width: 24px; }
+
+td.qind-mr, /* materials required */
+td.qind-mp, /* materials planned */
+td.qind-mc, /* materials consumed */
+td.qind-rr, /* recommended runs */
+td.qind-me, /* materials exist */
+td.qind-ip /* materials in progress */
+{ text-align: right; }
+
+td.qind-mr { background-color: #fffbf1; } /* materials required : light yellow */
+td.qind-me { background-color: #f2fff1; } /* materials exist : light green */
+td.qind-mc { background-color: #f1f7ff; } /* materials consumed : light cyan */
+tr:hover td.qind-mr { background-color: #f4f0e7; }
+tr:hover td.qind-me { background-color: #e8f4e6; }
+tr:hover td.qind-mc { background-color: #e5ecf4; }
+
+a.qind-sign { color: #a52a2a; } /* exclamation sign: brown color */
+a.qind-sign:hover { color: #981d21; } /* exclamation sign: brown color (darken) */
+
+div.qind-bib /* blueprints interactivity block */
+{ margin-left: auto; margin-right: 0; float: right; padding-top: 1px; white-space: nowrap; }
+
+div.qind-bib a { color: #aaa; } /* material menu: gray color */
+div.qind-bib a:hover { color:  #c70039; } /* material menu: dark red color */
+
+tr.qind-em td, /* enough materials */
+tr.qind-em th
+{ color: #aaa; }
+
+#tblStock tr { font-size: small; }
+#tbl-stock tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
+{ margin-top: -2px; margin-bottom: -1px; }
+#tbl-stock tbody tr td { padding: 1px; font-size: smaller; }
+#tbl-stock thead tr th:nth-child(1),
+#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; }
+#tbl-stock thead tr th:nth-child(3),
+#tbl-stock thead tr th:nth-child(4),
+#tbl-stock thead tr th:nth-child(5),
+#tbl-stock tbody tr td:nth-child(3),
+#tbl-stock tbody tr td:nth-child(4),
+#tbl-stock tbody tr td:nth-child(5) { text-align: right; }
+
+table.tbl-conveyor tr { font-size: small; }
+table.tbl-conveyor tbody tr td { padding: 1px; font-size: smaller; }
+table.tbl-conveyor thead tr th:nth-child(1),
+table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
+table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; }
+
+.badge-light { color: #212529; background-color: #f8f9fa; }
+.label-time { color: #131313; background-color: #7adee3; }
+.label-not-enough { color: #fff; background-color: #f0ad4e; }
+.label-impossible { color: #fff; background-color: #d9534f; }
+.label-impossible-ntier { color: #fff; background-color: #e89694; }
+.label-overstock { color: # eee; background-color: #131313; }
+.label-invent-overstocked { color: # eee; background-color: #131313; }
+.label-not-available { color: #fff; background-color: #b7b7b7; }
+.text-material-industry-ntier { color: #aaa; }
+.text-material-buy-ntier { color: #a67877; }
+div.qind-tid { font-size: 85%; }
+tid { white-space: nowrap; }
+</style>
+""")
+
+
 def dump_nav_menu(glf) -> None:
+    menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
+        (True, 'impossible', 'Недоступные для запуска работы'),  # btnToggleImpossible
+        (False, 'active', "Запущенные работы"),  # btnToggleActive
+        None,
+        (False, 'used-materials', "Используемые материалы"),  # btnToggleUsedMaterials
+        (True, 'not-available', "Недоступные материалы"),  # btnToggleNotAvailable
+        None,
+        (True, 'end-level-manuf', "Производство последнего уровня"),  # btnToggleEndLevelManuf
+        (False, 'entry-level-purchasing', "Список для закупки"),  # btnToggleEntryLevelPurchasing
+        (True, 'intermediate-manuf', "Материалы промежуточного производства"),  # btnToggleIntermediateManuf
+        (False, 'enough-materials', "Материалы, которых достаточно"),  # btnToggleEnoughMaterials
+        (False, 'assets-movement', "Список перемещений материалов"),  # btnToggleAssetsMovement
+    ]
+    menu_table: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
+        (True, 'recommended-runs', "Рекомендуемое кол-во запусков"),  # btnToggleRecommendedRuns
+        (False, 'planned-materials', "Кол-во запланированных материалов"),  # btnTogglePlannedMaterials
+        (False, 'consumed-materials', "Рассчитанное кол-во материалов"),  # btnToggleConsumedMaterials
+        (False, 'exist-in-stock', "Кол-во материалов в стоке"),  # btnToggleExistInStock
+        (False, 'in-progress', "Кол-во материалов, находящихся в производстве"),  # btnToggleInProgress
+    ]
+    menu_sort: typing.List[typing.Tuple[bool, str, str]] = [
+        (False, 'name', "Название"),  # btnSortByName
+        (False, 'duration', "Длительность"),  # btnSortByDuration
+        (True, 'priority', "Приоритет"),  # btnSortByPriority
+    ]
     glf.write("""
 <nav class="navbar navbar-default">
  <div class="container-fluid">
@@ -2561,58 +2666,241 @@ def dump_nav_menu(glf) -> None:
   <div class="collapse navbar-collapse" id="bs-navbar-collapse">
    <ul class="nav navbar-nav">
     <li class="dropdown">
-     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки таблицы <span class="caret"></span></a>
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Настройки <span class="caret"></span></a>
       <ul class="dropdown-menu">
-       <li><a data-target="#" role="button" id="btn-qind-showlabels"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать цветные маркеры</a></li>
-       <li role="separator" class="divider"></li>
-       <li><a data-target="#" role="button" id="btn-qind-showordervolumes"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Показывать объём сделок (неделя/ордер)</a></li>
+""")
+    for m in menu_settings:
+        if m is None:
+            glf.write('<li role="separator" class="divider"></li>\n')
+        else:
+            glf.write(f"<li><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
+    glf.write("""
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" id="qind-btn-reset">Сбросить настройки</a></li>
       </ul>
     </li>
     <li class="dropdown">
-     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Фильтрация <span class="caret"></span></a>
+     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Таблица <span class="caret"></span></a>
       <ul class="dropdown-menu">
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="all"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Все ордера</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="active"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Активные ордера</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="sold"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Всё продано</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="very-few"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Товар заканчивается</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="need-delivery"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Требуется доставка</a></li>
-       <li role="separator" class="divider"></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="high-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена завышена</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="low-price"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Цена занижена</a></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="interrupt"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Обновить ордера (конкуренты)</a></li>
-       <li role="separator" class="divider"></li>
-       <li><a data-target="#" role="button" class="qind-btn-filter" qind-group="place-an-order"><span class="glyphicon glyphicon-star" aria-hidden="true"></span> Выставить на продажу (довоз)</a></li>
+""")
+    for m in menu_table:
+        if m is None:
+            glf.write('<li role="separator" class="divider"></li>\n')
+        else:
+            glf.write(f"<li><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
+    glf.write("""
       </ul>
     </li>
+    <li><a data-target="#modalRouter" role="button" data-toggle="modal">Станции</a></li>
+    <li><a data-target="#modalConveyor" role="button" data-toggle="modal">Конвейер</a></li>
    </ul>
    <form class="navbar-form navbar-right">
-    <label>Sort:&nbsp;</label>
+    <label>Сортировка:&nbsp;</label>
     <div class="btn-group" role="group" aria-label="Sort">
-     <button id="btnSortByName" type="button" class="btn btn-default active">Name</button>
+""")
+    for m in menu_sort:
+        glf.write(f"<button type='button' class='btn btn-default qind-btn-sort' qind-group='{m[1]}'>{m[2]}</button>")
+    glf.write("""
     </div>
    </form>
   </div>
  </div>
 </nav>
+<script>
 """)
+    glf.write('var g_menu_options_default=[')
+    g_menu_options_default_len = 0
+    for (idx, m) in enumerate(menu_settings + menu_table):
+        if m is None: continue
+        glf.write('{f}[{d},"{nm}"]'.format(
+            f=',' if g_menu_options_default_len > 0 else '',
+            d='1' if m[0] else '0',
+            nm=m[1]
+        ))
+        g_menu_options_default_len += 1
+    glf.write(f'];\nvar g_menu_options_default_len={g_menu_options_default_len};\n')
+    # ---
+    g_menu_sort_default = next((m[1] for m in menu_sort if m[0]), 'name')
+    glf.write(f"var g_menu_sort_default='{g_menu_sort_default}';\n")
+    glf.write("</script>\n")
 
 
-def dump_conveyor2_into_report(
+def dump_nav_menu_router_dialog(
+        glf,
+        qid: db.QSwaggerDictionary,
+        router_settings: typing.List[RouterSettings]) -> None:
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    render_html.__dump_any_into_modal_header_wo_button(
+        glf,
+        "Распределение производства по станциям",
+        unique_id="Router",
+        modal_size="modal-lg")
+    # формируем содержимое модального диалога
+    row_num: int = 1
+    for (idx, s) in enumerate(router_settings):
+        station: db.QSwaggerStation = qid.get_station_by_name(s.station)
+        if idx > 0:
+            glf.write('<hr>')
+        glf.write(f'<h3 station_id="{station.station_id}" station_type="{station.station_type.name}">{station.station_name} <small>{s.desc}</small></h3>')
+        glf.write("""
+<table id="tbl-stock" class="table table-condensed table-hover table-responsive">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Продукция</th>
+  <th>В стоке</th>
+  <th>Не хватает</th>
+  <th>В производстве</th>
+ </tr>
+</thead>
+<tbody>
+""")
+        for type_id in s.output:
+            product: db.QSwaggerTypeId = qid.get_type_id(type_id)
+            quantity: int = 1  # resource_dict["q"]
+            in_progress: int = 2  # = resource_dict["j"]
+            not_enough: int = 3  # = resource_dict["ne"]
+            # проверяем списки метариалов, используемых в исследованиях и производстве
+            material_tag: str = ""
+            #if type_id in materials_for_bps:
+            #    pass
+            #elif type_id in research_materials_for_bps:
+            #    material_tag = ' <span class="label label-warning">research material</span></small>'
+            #else:
+            #    material_tag = ' <span class="label label-danger">non material</span></small>'
+            copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
+                          ' data-toggle="tooltip">{gly}</a>'.format(tid=type_id, gly=glyphicon("copy"))
+            glf.write(
+                '<tr>'
+                '<td scope="row">{num}</td>'
+                '<td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{mat_tag}</td>'
+                '<td align="right">{q}</td>'
+                '<td align="right">{ne}</td>'
+                '<td align="right">{ip}</td>'
+                '</tr>\n'.
+                format(num=row_num,
+                       nm=product.name,
+                       src=render_html.__get_img_src(type_id, 32),
+                       clbrd=copy2clpbrd,
+                       mat_tag=material_tag,
+                       q="" if quantity == 0 else '{:,d}'.format(quantity),
+                       ne="" if not_enough == 0 else '{:,d}'.format(not_enough),
+                       ip="" if in_progress == 0 else '{:,d}'.format(in_progress))
+            )
+            row_num += 1
+        glf.write("""
+</tbody>
+</table>
+""")
+    # закрываем footer модального диалога
+    render_html.__dump_any_into_modal_footer(glf)
+
+
+def dump_nav_menu_conveyor_dialog(
+        glf,
+        qid: db.QSwaggerDictionary,
+        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    render_html.__dump_any_into_modal_header_wo_button(
+        glf,
+        "Настройки конвейера",
+        unique_id="Conveyor",
+        modal_size="modal-lg")
+    # формируем содержимое модального диалога
+    glf.write("""<p>Ниже перечислены контейнеры, которые "увидел" конвейер и содержимое которых учитывает в расчётах. Названия
+контейнеров должны выбираться по специальным шаблонам (см. корпоративные биллютени). В контейнерах из раздела <mark>Чертежи</mark>
+должны находиться BPC или BPO для расчёта производственных процессов, процессов инвента или варки реакций. Содержимое
+контейнеров из раздела <mark>Оверсток</mark> учитывается в расчётах таким образом, что непроданная продукция не будет
+снова попадать в расчёт производства (даже если в контейнерах <mark>Чертежи</mark> имеются чертежи для этой продукции).
+Материалы для производства будут браться в расчёт из контейнеров группы <mark>Сток</mark> (у инвента как правило свой
+сток, совпадающий с расположением BPO, а у производства и реакций свой). Для расчёта промежуточных этапов производства
+выбираются контейнеры из раздела <mark>Дополнительные чертежи</mark>, - следите за тем, чтобы в этот раздел не попадали
+лишние названия, например персональные коробки или коробки 'Ночного цеха'.</p><hr>
+""")
+    row_num: int = 1
+    for (idx, s) in enumerate(conveyor_settings):
+        corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
+        trade_corporation: typing.Optional[db.QSwaggerCorporation] = qid.get_corporation(s.trade_corporation_id) if s.trade_corporation_id else None
+        activities: str = ', '.join(s.activities)
+        glf.write(f'')
+        glf.write(f"""
+<h3 corporation_id={corporation.corporation_id}>Конвейер {corporation.corporation_name} <small>{activities}</small></h3>
+<div class="row">
+ <div class="col-md-4">
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Чертежи</th></tr></thead>
+<tbody>""")
+        for container in sorted([corporation.assets.get(x).name for x in s.containers_source], key=lambda x: x):
+            glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
+            row_num += 1
+        glf.write(f"""</tbody>
+</table>
+</div>
+<!-- -->
+<div class="col-md-4">
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Сток <span style="color:#777">{corporation.corporation_name}</span></th></tr><thead>
+<tbody>""")
+        for container in sorted([corporation.assets.get(x).name for x in s.containers_stock], key=lambda x: x):
+            glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
+            row_num += 1
+        glf.write("</tbody></table>")
+        if trade_corporation:
+            glf.write(f"""
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Оверсток <span style="color:#777">{trade_corporation.corporation_name}</span></th></tr></thead>
+<tbody>""")
+            for container in sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x):
+                glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
+                row_num += 1
+            glf.write("</tbody></table>")
+        glf.write("""
+</div>
+<!-- -->
+<div class="col-md-4">""")
+        if 'manufacturing' in s.activities:
+            glf.write("""
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Дополнительные чертежи</th></tr></thead>
+<tbody>""")
+            for container in sorted([corporation.assets.get(x).name for x in s.containers_blueprints], key=lambda x: x):
+                glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
+                row_num += 1
+            glf.write("</tbody></table>")
+        glf.write("""
+ </div>
+</div>
+""")
+    # закрываем footer модального диалога
+    render_html.__dump_any_into_modal_footer(glf)
+
+
+def dump_router2_into_report(
         # путь, где будет сохранён отчёт
         ws_dir: str,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
-        settings: typing.List[ConveyorSettings]) -> None:
-    glf = open('{dir}/conveyor2.html'.format(dir=ws_dir), "wt+", encoding='utf8')
+        router_settings: typing.List[RouterSettings],
+        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+    glf = open('{dir}/router.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
-        render_html.__dump_header(glf, 'Conveyor', '0.10')
+        render_html.__dump_header(glf, f'Router', use_dark_mode=True)
+        dump_additional_stylesheet(glf)
         dump_nav_menu(glf)
-        glf.write('<div class="container-fluid">\n')
+        # инициализация списка материалов, требуемых (и уже используемых) в производстве
+        global_materials_dictionary = eve_conveyor_tools.ConveyorDictionary()
         """__dump_corp_conveyors(
             glf,
             settings)"""
-        glf.write('</div><!--container-fluid-->\n')
+        # сохраняем в отчёт справочник названий, кодов и сведений о производстве
+        """dump_global_materials_dictionary(glf, global_materials_dictionary)"""
+        # сохраняем содержимое диалоговых окон
+        dump_nav_menu_router_dialog(glf, qid, router_settings)
+        dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
+        glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
+        # удаляем более ненужный список материалов
+        del global_materials_dictionary
         render_html.__dump_footer(glf)
     finally:
         glf.close()

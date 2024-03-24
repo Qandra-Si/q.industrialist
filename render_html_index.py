@@ -23,6 +23,7 @@ def __dump_index(glf):
       <li><a href="conveyor-querious.html">Querious</a></li>
     </ul>
   </div>
+  <a href="router.html" class="btn btn-primary btn-lg btn-block" role="button">Router</a>
   <a href="cynonetwork.html" class="btn btn-primary btn-lg btn-block" role="button">Cyno Network</a>
 """)
     if q_market_analyzer_settings.g_regions:

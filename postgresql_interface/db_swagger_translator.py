@@ -133,9 +133,10 @@ class QSwaggerTranslator:
             elif activity_id == 5:
                 if blueprint.copying is not None:
                     raise Exception("Unable to add copying activity twice: blueprint #{}".format(type_id))
-                elif product_id is not None:
-                    raise Exception("Unable to add copying, product must be unknown: blueprint #{}".format(type_id))
-                blueprint.add_activity_without_product(activity_id, row[2])
+                cached_product_type: QSwaggerTypeId = type_ids.get(product_id)
+                if cached_product_type is None:
+                    raise Exception("Unable to add copying activity with unknown product #{}".format(product_id))
+                blueprint.add_activity(cached_product_type, row)
             elif activity_id == 4:
                 if blueprint.research_material is not None:
                     raise Exception("Unable to add research material activity twice: blueprint #{}".format(type_id))

@@ -236,24 +236,33 @@ class QSwaggerBlueprintInvention(QSwaggerActivity):
         return 8
 
     @property
-    def time(self) -> int:
-        return self.__time
-
-    @property
     def products(self) -> typing.List[QSwaggerInventionProduct]:
         return self.__products
 
 
 class QSwaggerBlueprintCopying(QSwaggerActivity):
-    def __init__(self, time: int):
+    def __init__(self, time: int, product_type: QSwaggerTypeId):
         super().__init__(time)
+        self.__product: QSwaggerProduct = QSwaggerProduct(product_type, 1)
 
     def __del__(self):
-        pass
+        del self.__product
 
     @staticmethod
     def activity_id() -> int:
         return 5
+
+    @property
+    def product(self) -> QSwaggerProduct:
+        return self.__product
+
+    @property
+    def product_type(self) -> QSwaggerTypeId:
+        return self.__product.product_type
+
+    @property
+    def product_id(self) -> int:
+        return self.__product.product_id
 
 
 class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
@@ -342,12 +351,13 @@ class QSwaggerBlueprint:
         elif activity_id == 9:
             quantity: int = row[4]
             self.__reaction = QSwaggerBlueprintReaction(time, product_type, quantity)
+        elif activity_id == 5:
+            # продукт не всегда того же типа: копирка чертежа 33082 производит чертёж 33081
+            self.__copying = QSwaggerBlueprintCopying(time, product_type)
 
     def add_activity_without_product(self, activity_id: int, time: int) -> None:
         if activity_id == 8:
             self.__invention = QSwaggerBlueprintInvention(time)  # продукты добавляются отдельным методом
-        elif activity_id == 5:
-            self.__copying = QSwaggerBlueprintCopying(time)  # не имеет продукта (продукт того же типа)...
         elif activity_id == 4:
             self.__research_material = QSwaggerBlueprintResearchMaterial(time)  # ...также не имеет продукта
         elif activity_id == 3:

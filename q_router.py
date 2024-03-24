@@ -1,4 +1,4 @@
-﻿""" Q.Conveyor (desktop/mobile)
+""" Q.Conveyor (desktop/mobile)
 
 Prerequisites:
     * Have a Python 3 environment available to you (possibly by using a
@@ -19,7 +19,7 @@ run the following command from this directory as the root:
 
 $ chcp 65001 & @rem on Windows only!
 $ python eve_sde_tools.py --cache_dir=~/.q_industrialist
-$ python q_conveyor.py --corporation="R Industry" --online --cache_dir=~/.q_industrialist
+$ python q_router.py --corporation="R Industry" --corporation="R Strike" --online --cache_dir=~/.q_industrialist
 
 Requires application scopes:
     * esi-industry.read_corporation_jobs.v1 - Requires role(s): Factory_Manager
@@ -32,6 +32,7 @@ import re
 import console_app
 import q_industrialist_settings
 import q_conveyor_settings
+import q_router_settings
 import render_html_conveyor_db
 
 import postgresql_interface as db
@@ -48,7 +49,7 @@ def main():
         console_app.print_help_screen(0)
         return
 
-    qidb: db.QIndustrialistDatabase = db.QIndustrialistDatabase("conveyor", debug=argv_prms.get("verbose_mode", False))
+    qidb: db.QIndustrialistDatabase = db.QIndustrialistDatabase("router", debug=argv_prms.get("verbose_mode", False))
     qidb.connect(q_industrialist_settings.g_database)
     qit: db.QSwaggerTranslator = db.QSwaggerTranslator(qidb)
     qid: db.QSwaggerDictionary = db.QSwaggerDictionary(qit)
@@ -78,9 +79,36 @@ def main():
                     job.output_location.name if job.output_location else '?',
                     job.facility.station_name if job.facility else '?'))
         """
+    # загружаем сведения о станциях, которые есть в настройках маршрутизатора
+    for r in q_router_settings.g_routes:
+        station: typing.Optional[db.QSwaggerStation] = qid.load_station(r['station'])
+        if not station:
+            raise Exception(f"Unable to load station by name: {r['station']}")
+    # отключаемся от сервера
     qid.disconnect_from_translator()
     del qit
     del qidb
+
+    unique_manuf_lines: typing.Set[int] = set()
+    for r in q_router_settings.g_routes:
+        for p in r['output']:
+            if p in unique_manuf_lines:
+                raise Exception(f"Unable to add manuf product twice: product #{p}")
+            unique_manuf_lines.add(p)
+            product: typing.Optional[db.QSwaggerTypeId] = qid.get_type_id(p)
+            if not product:
+                raise Exception(f"Unable to add unknown product: product #{p}")
+    del unique_manuf_lines
+
+    # следуем по загруженным данным и собираем входные данные (настройки) маршрутизации продуктов производства
+    settings_of_router: typing.List[render_html_conveyor_db.RouterSettings] = []
+    for r in q_router_settings.g_routes:
+        # инициализируем настройки маршрутизации продуктов производства
+        settings: render_html_conveyor_db.RouterSettings = render_html_conveyor_db.RouterSettings()
+        settings.station = r['station']
+        settings.desc = r['desc']
+        settings.output = r['output']
+        settings_of_router.append(settings)
 
     # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
     settings_of_conveyors: typing.List[render_html_conveyor_db.ConveyorSettings] = []
@@ -200,6 +228,20 @@ def main():
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
 
+    """
+    # вывод на экран того, что получилось
+    for (idx, __s) in enumerate(settings_of_router):
+        s: render_html_conveyor_db.RouterSettings = __s
+        station: db.QSwaggerStation = qid.get_station_by_name(s.station)
+        if idx > 0:
+            print()
+        print(f'{station.station_name}: #{station.station_id} [{station.station_type.name}] ({s.desc})')
+        for p in s.output:
+            product: typing.Optional[db.QSwaggerTypeId] = qid.get_type_id(p)
+            print(f'  {product.type_id} {product.name}')
+    print()
+    """
+    """
     # вывод на экран того, что получилось
     for (idx, __s) in enumerate(settings_of_conveyors):
         s: render_html_conveyor_db.ConveyorSettings = __s
@@ -221,12 +263,16 @@ def main():
         if trade_corporation:
             print('trader corp:   ', trade_corporation.corporation_name)
             print('sale stock:    ', ';'.join(sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x)))
+    """
 
-    # вывод в отчёт результатов работы конвейера(ов)
-    render_html_conveyor_db.dump_conveyor2_into_report(
+    # вывод в отчёт результатов работы роутера
+    render_html_conveyor_db.dump_router2_into_report(
         # путь, где будет сохранён отчёт
         argv_prms["workspace_cache_files_dir"],
+        # данные (справочники)
+        qid,
         # настройки генерации отчёта
+        settings_of_router,
         settings_of_conveyors
     )
     # ---
