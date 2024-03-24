@@ -2596,7 +2596,8 @@ tr.qind-em th
 #tbl-stock tbody tr td { padding: 1px; font-size: smaller; }
 #tbl-stock thead tr { height: 50px; }
 #tbl-stock thead tr th:nth-child(1),
-#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; white-space: nowrap; }
+#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; }
+#tbl-stock tbody tr td:nth-child(2) { white-space: nowrap; }
 #tbl-stock thead tr th:nth-child(3),
 #tbl-stock thead tr th:nth-child(4),
 #tbl-stock thead tr th:nth-child(5),
@@ -2607,8 +2608,8 @@ tr.qind-em th
 table.tbl-conveyor tr { font-size: small; }
 table.tbl-conveyor tbody tr td { padding: 1px; font-size: smaller; }
 table.tbl-conveyor thead tr th:nth-child(1),
-table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; white-space: nowrap; }
-table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; }
+table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
+table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; white-space: nowrap; }
 
 .badge-light { color: #212529; background-color: #f8f9fa; }
 .label-time { color: #131313; background-color: #7adee3; }
