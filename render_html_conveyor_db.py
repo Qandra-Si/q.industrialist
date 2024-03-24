@@ -2590,11 +2590,13 @@ tr.qind-em th
 { color: #aaa; }
 
 #tblStock tr { font-size: small; }
-#tbl-stock tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
+#tbl-stock tr { font-size: small; }
+#tbl-stock tbody tr td:nth-child(2) img /* material icon (compact view) */
 { margin-top: -2px; margin-bottom: -1px; }
 #tbl-stock tbody tr td { padding: 1px; font-size: smaller; }
+#tbl-stock thead tr { height: 50px; }
 #tbl-stock thead tr th:nth-child(1),
-#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; }
+#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; white-space: nowrap; }
 #tbl-stock thead tr th:nth-child(3),
 #tbl-stock thead tr th:nth-child(4),
 #tbl-stock thead tr th:nth-child(5),
@@ -2605,7 +2607,7 @@ tr.qind-em th
 table.tbl-conveyor tr { font-size: small; }
 table.tbl-conveyor tbody tr td { padding: 1px; font-size: smaller; }
 table.tbl-conveyor thead tr th:nth-child(1),
-table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
+table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; white-space: nowrap; }
 table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; }
 
 .badge-light { color: #212529; background-color: #f8f9fa; }
@@ -2736,61 +2738,110 @@ def dump_nav_menu_router_dialog(
         unique_id="Router",
         modal_size="modal-lg")
     # формируем содержимое модального диалога
-    row_num: int = 1
+    row_num: int = 0
     for (idx, s) in enumerate(router_settings):
         station: db.QSwaggerStation = qid.get_station_by_name(s.station)
         if idx > 0:
             glf.write('<hr>')
-        glf.write(f'<h3 station_id="{station.station_id}" station_type="{station.station_type.name}">{station.station_name} <small>{s.desc}</small></h3>')
-        glf.write("""
-<table id="tbl-stock" class="table table-condensed table-hover table-responsive">
+        glf.write(f"""
+<h3 station_id='{station.station_id}' station_type='{station.station_type.name}'>{station.station_name} <small>{s.desc}</small></h3>
+<div class="row">
+ <div class="col-md-6">
+<table id="tbl-stock" class="table table-condensed table-hover">
 <thead>
  <tr>
   <th>#</th>
   <th>Продукция</th>
-  <th>В стоке</th>
-  <th>Не хватает</th>
-  <th>В производстве</th>
+  <th><small>В стоке</small></th>
+  <th><small>Не хватает</small></th>
+  <th><small>Производится</small></th>
  </tr>
 </thead>
 <tbody>
 """)
-        for type_id in s.output:
-            product: db.QSwaggerTypeId = qid.get_type_id(type_id)
-            quantity: int = 1  # resource_dict["q"]
-            in_progress: int = 2  # = resource_dict["j"]
-            not_enough: int = 3  # = resource_dict["ne"]
+        for product_type_id in s.output:
+            row_num += 1
+            product: db.QSwaggerTypeId = qid.get_type_id(product_type_id)
+            if not product: continue
+            quantity: int = 0  # resource_dict["q"]
+            in_progress: int = 0  # = resource_dict["j"]
+            not_enough: int = 0  # = resource_dict["ne"]
             # проверяем списки метариалов, используемых в исследованиях и производстве
             material_tag: str = ""
-            #if type_id in materials_for_bps:
+            #if product_type_id in materials_for_bps:
             #    pass
-            #elif type_id in research_materials_for_bps:
+            #elif product_type_id in research_materials_for_bps:
             #    material_tag = ' <span class="label label-warning">research material</span></small>'
             #else:
             #    material_tag = ' <span class="label label-danger">non material</span></small>'
             copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
-                          ' data-toggle="tooltip">{gly}</a>'.format(tid=type_id, gly=glyphicon("copy"))
+                          ' data-toggle="tooltip">{gly}</a>'.format(tid=product_type_id, gly=glyphicon("copy"))
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
                 '<td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{mat_tag}</td>'
-                '<td align="right">{q}</td>'
-                '<td align="right">{ne}</td>'
-                '<td align="right">{ip}</td>'
+                '<td>{q}</td>'
+                '<td>{ne}</td>'
+                '<td>{ip}</td>'
                 '</tr>\n'.
                 format(num=row_num,
                        nm=product.name,
-                       src=render_html.__get_img_src(type_id, 32),
+                       src=render_html.__get_img_src(product_type_id, 32),
                        clbrd=copy2clpbrd,
                        mat_tag=material_tag,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
                        ne="" if not_enough == 0 else '{:,d}'.format(not_enough),
                        ip="" if in_progress == 0 else '{:,d}'.format(in_progress))
             )
-            row_num += 1
         glf.write("""
 </tbody>
 </table>
+</div> <!-- col -->
+<div class="col-md-6">
+<table id="tbl-stock" class="table table-condensed table-hover">
+<thead>
+ <tr>
+  <th>#</th>
+  <th>Сырьё</th>
+  <th><small>В стоке</small></th>
+  <th><small>Не хватает</small></th>
+ </tr>
+</thead>
+<tbody>""")
+        materials: typing.Set[int] = set()
+        for product_type_id in s.output:
+            activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
+            if not activities: continue
+            for a in activities:
+                mats: db.QSwaggerActivityMaterials = a.materials
+                for m in mats.materials:
+                    materials.add(m.material_id)
+        for __sort_key, material_type_id in sorted([(qid.get_type_id(x).market_group_id, x) for x in materials]):
+            material: db.QSwaggerTypeId = qid.get_type_id(material_type_id)
+            quantity: int = 0  # resource_dict["q"]
+            not_enough: int = 0  # = resource_dict["ne"]
+            copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
+                          ' data-toggle="tooltip">{gly}</a>'.format(tid=material_type_id, gly=glyphicon("copy"))
+            glf.write(
+                '<tr>'
+                '<td scope="row">{num}</td>'
+                '<td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}</td>'
+                '<td>{q}</td>'
+                '<td>{ne}</td>'
+                '</tr>\n'.
+                format(num=row_num,
+                       nm=material.name,
+                       src=render_html.__get_img_src(material_type_id, 32),
+                       clbrd=copy2clpbrd,
+                       q="" if quantity == 0 else '{:,d}'.format(quantity),
+                       ne="" if not_enough == 0 else '{:,d}'.format(not_enough))
+            )
+
+        glf.write("""
+</tbody>
+</table>
+</div> <!-- col -->
+</div> <!-- row -->
 """)
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)
@@ -2835,7 +2886,7 @@ def dump_nav_menu_conveyor_dialog(
             row_num += 1
         glf.write(f"""</tbody>
 </table>
-</div>
+</div> <!-- col -->
 <!-- -->
 <div class="col-md-4">
 <table class="table table-condensed table-hover tbl-conveyor">
@@ -2855,7 +2906,7 @@ def dump_nav_menu_conveyor_dialog(
                 row_num += 1
             glf.write("</tbody></table>")
         glf.write("""
-</div>
+</div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
         if 'manufacturing' in s.activities:
@@ -2868,8 +2919,8 @@ def dump_nav_menu_conveyor_dialog(
                 row_num += 1
             glf.write("</tbody></table>")
         glf.write("""
- </div>
-</div>
+ </div> <!-- col -->
+</div> <!-- row -->
 """)
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)

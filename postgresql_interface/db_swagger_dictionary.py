@@ -12,6 +12,7 @@ class QSwaggerDictionary:
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_type_ids: typing.Dict[int, QSwaggerTypeId] = {}
         self.sde_blueprints: typing.Dict[int, QSwaggerBlueprint] = {}
+        self.sde_activities: typing.Dict[int, typing.List[QSwaggerActivity]] = {}  # id=product_id
         # публичные сведения (пилоты, структуры, станции)
         self.characters: typing.Dict[int, QSwaggerCharacter] = {}
         self.stations: typing.Dict[int, QSwaggerStation] = {}
@@ -25,6 +26,7 @@ class QSwaggerDictionary:
         del self.stations
         del self.characters
         # справочники
+        del self.sde_activities
         del self.sde_blueprints
         del self.sde_type_ids
         del self.sde_market_groups
@@ -51,6 +53,14 @@ class QSwaggerDictionary:
         self.sde_type_ids = self.__qit.get_published_type_ids()
         return self.sde_type_ids
 
+    def get_blueprint(self, blueprint_type_id: int) -> typing.Optional[QSwaggerBlueprint]:
+        cached_blueprint: QSwaggerBlueprint = self.sde_blueprints.get(blueprint_type_id)
+        return cached_blueprint
+
+    def get_activities_by_product(self, product_type_id: int) -> typing.Optional[typing.List[QSwaggerActivity]]:
+        cached_activities: typing.List[QSwaggerActivity] = self.sde_activities.get(product_type_id)
+        return cached_activities
+
     def load_blueprints(self) -> typing.Dict[int, QSwaggerBlueprint]:
         if self.sde_blueprints:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
@@ -58,6 +68,24 @@ class QSwaggerDictionary:
         self.sde_blueprints = self.__qit.get_blueprints(
             # справочники
             self.sde_type_ids)
+
+        def push(type_id: int, activity: QSwaggerActivity) -> None:
+            l = self.sde_activities.get(type_id)
+            if not l:
+                self.sde_activities[type_id] = [activity]
+            else:
+                l.append(activity)
+
+        for b in self.sde_blueprints.values():
+            if b.manufacturing:
+                push(b.manufacturing.product_id, b.manufacturing)
+            if b.invention:
+                for p in b.invention.products:
+                    push(p.product_id, b.invention)
+            if b.copying:
+                push(b.copying.product_id, b.copying)
+            if b.reaction:
+                push(b.reaction.product_id, b.reaction)
         return self.sde_blueprints
 
     def get_corporation(self, corporation_id: int) -> typing.Optional[QSwaggerCorporation]:
