@@ -26,14 +26,14 @@ function __dump_header($header_name, $use_filesystem_resources, $html_style="", 
         $bs_css = 'bootstrap/3.4.1/css/bootstrap.min.css';
         $jq_js = 'jquery/jquery-1.12.4.min.js';
         $bs_js = 'bootstrap/3.4.1/js/bootstrap.min.js';
-        $bs_dark_css = '../render_stylesheet_dark.css'
+        $bs_dark_css = '../render_stylesheet_dark.css';
     }
     else
     {
         $bs_css = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous';
         $jq_js = 'https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous';
         $bs_js = 'https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous';
-        $bs_dark_css = '/render_stylesheet_dark.css'
+        $bs_dark_css = '/render_stylesheet_dark.css';
     }
 ?>
 <!doctype html>
