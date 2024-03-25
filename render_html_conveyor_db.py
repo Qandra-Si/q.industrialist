@@ -2755,7 +2755,7 @@ def dump_nav_menu_router_dialog(
   <th>Продукция</th>
   <th><small>В стоке</small></th>
   <th><small>Не хватает</small></th>
-  <th><small>Производится</small></th>
+  <th><small>Произво-<br>-дится</small></th>
  </tr>
 </thead>
 <tbody>
