@@ -25,6 +25,24 @@ table.qind-table > thead > tr > th:nth-child(2),
 table.qind-table > tbody > tr > td:nth-child(2)
 { text-align: left; }
 
+table.qind-table-materials tbody > tr > td:nth-child(3) > img /* material icon (compact view) */
+{ margin-top: -2px; margin-bottom: -1px; }
+table.qind-table-materials { padding: 1px; font-size: smaller; }
+table.qind-table-materials thead tr th:nth-child(1),
+table.qind-table-materials tbody tr td:nth-child(1),
+table.qind-table-materials thead tr th:nth-child(3),
+table.qind-table-materials tbody tr td:nth-child(3)
+{ width: 32px; }
+table.qind-table-materials > thead > tr > th:nth-child(1),
+table.qind-table-materials > tbody > tr > td:nth-child(1),
+table.qind-table-materials > thead > tr > th:nth-child(2),
+table.qind-table-materials > tbody > tr > td:nth-child(2),
+table.qind-table-materials > thead > tr > th:nth-child(3),
+table.qind-table-materials > tbody > tr > td:nth-child(3),
+table.qind-table-materials > thead > tr > th:nth-child(4),
+table.qind-table-materials > tbody > tr > td:nth-child(4)
+{ text-align: left; }
+
 table.qind-table-assets > thead > tr > th:nth-child(3),
 table.qind-table-assets > tbody > tr > td:nth-child(3),
 table.qind-table-assets > thead > tr > th:nth-child(4),
@@ -115,6 +133,71 @@ EOD;
  <td><?=$t['sdet_tech_level']?></td>
  <td><?=($t['sdet_published']=='t')?'да':'нет'?></td>
  <td><?=$t['sdet_created_at']?></td>
+</tr><?php
+    }
+?></tbody>
+</table><?php
+}
+
+
+function __dump_manufacturing_materials(&$conn, &$ids) {
+    $sys_ids = array_filter($ids, "sys_numbers");
+    $query = <<<EOD
+select
+ sdebm_blueprint_type_id bpid,
+ tid.sdet_type_name bpnm,
+ p.sdebp_product_id pid,
+ pid.sdet_type_name pnm,
+ sdebm_activity a,
+ sdebm_quantity q
+from qi.eve_sde_blueprint_materials
+ inner join eve_sde_type_ids as tid on (tid.sdet_type_id=sdebm_blueprint_type_id)
+ inner join eve_sde_blueprint_products as p on (p.sdebp_blueprint_type_id=sdebm_blueprint_type_id and p.sdebp_activity=sdebm_activity)
+ inner join eve_sde_type_ids as pid on (pid.sdet_type_id=p.sdebp_product_id)
+where sdebm_material_id=any($1) -- or sdet_market_group_id=any($1) or sdet_group_id=any($1)
+order by sdebm_activity, sdebm_quantity desc;
+EOD;
+    $params = array('{'.implode(',',$sys_ids).'}');
+    $materials_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query err: '.pg_last_error());
+    $materials = pg_fetch_all($materials_cursor);
+    if (!$materials) return;
+?><h2>Сведения о применении материала в чертежах</h2>
+<table class="table table-condensed table-hover qind-table qind-table-materials">
+<thead>
+ <tr>
+  <th></th>
+  <th>Чертёж</th>
+  <th></th>
+  <th>Продукция</th>
+  <th>Тип</th>
+  <th>Кол-во</th>
+ </tr>
+</thead>
+<tbody><?php
+    foreach ($materials as &$m)
+    {
+        $blueprint_type_id = $m['bpid'];
+        $blueprint_type_name = $m['bpnm'];
+        $product_type_id = $m['pid'];
+        $product_type_name = $m['pnm'];
+?><tr>
+ <td><img class="icn24" src="<?=__get_img_src($blueprint_type_id,32,FS_RESOURCES)?>"></td>
+ <td><?=$blueprint_type_name.get_clipboard_copy_button($blueprint_type_name)?> <span class="text-muted">(<?=$blueprint_type_id?>)</span></td>
+ <td><img class="icn24" src="<?=__get_img_src($product_type_id,32,FS_RESOURCES)?>"></td>
+ <td><?=$product_type_name.get_clipboard_copy_button($product_type_name)?> <span class="text-muted">(<?=$product_type_id?>)</span></td>
+ <td><?php
+    switch ($m['a'])
+    {
+    case 1: echo 'произв.'; break;
+    case 8: echo 'инвент'; break;
+    case 5: echo 'копир.'; break;
+    case 4: echo 'me'; break;
+    case 3: echo 'te'; break;
+    case 9: echo 'реакции'; break;
+    }
+ ?></td>
+ <td><?=$m['q']?></td>
 </tr><?php
     }
 ?></tbody>
@@ -621,6 +704,7 @@ pg_exec($conn, "SET search_path TO qi");
 ?>
 <div class="container-fluid">
 <?php __dump_type_ids($conn, $IDs); ?>
+<?php __dump_manufacturing_materials($conn, $IDs); ?>
 <?php __dump_assets($conn, $IDs); ?>
 <?php __dump_industry_lines($conn, $IDs); ?>
 <?php __dump_industry_statistic($conn, $IDs); ?>
