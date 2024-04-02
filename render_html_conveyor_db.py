@@ -2471,6 +2471,33 @@ class RouterSettings:
         self.output: typing.List[int] = []
 
 
+class ConveyorSettingsContainer:
+    def __init__(self, corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
+        self.corporation: db.QSwaggerCorporation = corporation
+        self.container: db.QSwaggerCorporationAssetsItem = container
+        self.station_id: typing.Optional[int] = container.station_id
+
+    @property
+    def container_id(self) -> int:
+        return self.container.item_id
+
+    @property
+    def container_name(self) -> str:
+        return self.container.name
+
+
+class ConveyorSettingsPriorityContainer(ConveyorSettingsContainer):
+    def __init__(self, priority: int, corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
+        super().__init__(corporation, container)
+        self.priority: int = priority
+
+
+class ConveyorSettingsSaleContainer(ConveyorSettingsContainer):
+    def __init__(self, trade_corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
+        super().__init__(trade_corporation, container)
+        self.trade_corporation: db.QSwaggerCorporation = trade_corporation
+
+
 class ConveyorSettings:
     def __init__(self):
         # параметры работы конвейера
@@ -2480,15 +2507,14 @@ class ConveyorSettings:
         self.activities: typing.List[str] = ['manufacturing']
         self.conveyor_with_reactions: bool = False
         # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
-        self.containers_source: typing.List[int] = []
-        self.containers_stock: typing.List[int] = []
-        self.containers_blueprints: typing.List[int] = []
+        self.containers_sources: typing.List[ConveyorSettingsPriorityContainer] = []  # station:container:priority
+        self.containers_stocks: typing.List[ConveyorSettingsContainer] = []  # station:container
+        self.containers_blueprints: typing.List[ConveyorSettingsContainer] = []  # station:container
         self.containers_react_formulas: typing.List[int] = []
         self.containers_react_stock: typing.List[int] = []
         self.manufacturing_groups: typing.Optional[typing.List[int]] = []
         # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу произвдства)
-        self.trade_corporation_id: typing.Optional[int] = None
-        self.trade_sale_stock: typing.List[int, int] = []
+        self.trade_sale_stock: typing.List[ConveyorSettingsSaleContainer] = []  # station:container:trade_corporation
 
 
 def dump_global_materials_dictionary(glf, conveyor_dictionary: eve_conveyor_tools.ConveyorDictionary) -> None:
@@ -2731,7 +2757,8 @@ def dump_nav_menu(glf) -> None:
 def dump_nav_menu_router_dialog(
         glf,
         qid: db.QSwaggerDictionary,
-        router_settings: typing.List[RouterSettings]) -> None:
+        router_settings: typing.List[RouterSettings],
+        conveyor_settings: typing.List[ConveyorSettings]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
@@ -2744,8 +2771,25 @@ def dump_nav_menu_router_dialog(
         station: db.QSwaggerStation = qid.get_station_by_name(s.station)
         if idx > 0:
             glf.write('<hr>')
+        containers_stocks: typing.Set[int] = set()
+        corporation: typing.Optional[db.QSwaggerCorporation] = None
+        for cs in conveyor_settings:
+            for c in cs.containers_stocks:
+                if c.station_id == station.station_id:
+                    containers_stocks.add(c.container_id)
+                    if corporation and not corporation == c.corporation:
+                        raise Exception(f"There are multiple routes for multiple corporations {corporation.corporation_name} and {c.corporation.corporation_name}")
+                    corporation = c.corporation
+        glf.write(f"<h3 station_id='{station.station_id}'>{station.station_name} "
+                  f"<small>({station.station_type_name}, {s.desc})</small>"
+                  "</h3>")
+        if not corporation or not containers_stocks:
+            glf.write("<span style='color:#ffa600'>Внимание! Не найдены stock-контейнеры, следует проверить настройки "
+                      "конвейера.</span>")
+        else:
+            z0 = sorted([corporation.assets.get(x).name for x in containers_stocks], key=lambda x: x)
+            glf.write("<small>Сток контейнеры: <ul><li><mark>" + "</mark><li><mark>".join(z0) + "</mark></ul></small>")
         glf.write(f"""
-<h3 station_id='{station.station_id}' station_type='{station.station_type.name}'>{station.station_name} <small>{s.desc}</small></h3>
 <div class="row">
  <div class="col-md-6">
 <table id="tbl-stock" class="table table-condensed table-hover">
@@ -2767,6 +2811,11 @@ def dump_nav_menu_router_dialog(
             quantity: int = 0  # resource_dict["q"]
             in_progress: int = 0  # = resource_dict["j"]
             not_enough: int = 0  # = resource_dict["ne"]
+            # считаем кол-во материалов в стоке
+            if corporation and containers_stocks:
+                for a in corporation.assets.values():
+                    if a.type_id == product_type_id and a.location_id in containers_stocks:
+                        quantity += a.quantity
             # проверяем списки метариалов, используемых в исследованиях и производстве
             material_tag: str = ""
             #if product_type_id in materials_for_bps:
@@ -2821,6 +2870,11 @@ def dump_nav_menu_router_dialog(
             material: db.QSwaggerTypeId = qid.get_type_id(material_type_id)
             quantity: int = 0  # resource_dict["q"]
             not_enough: int = 0  # = resource_dict["ne"]
+            # считаем кол-во материалов в стоке
+            if corporation and containers_stocks:
+                for a in corporation.assets.values():
+                    if a.type_id == material_type_id and a.location_id in containers_stocks:
+                        quantity += a.quantity
             copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
                           ' data-toggle="tooltip">{gly}</a>'.format(tid=material_type_id, gly=glyphicon("copy"))
             glf.write(
@@ -2871,55 +2925,104 @@ def dump_nav_menu_conveyor_dialog(
 """)
     row_num: int = 1
     for (idx, s) in enumerate(conveyor_settings):
+        if idx:
+            glf.write('<hr>')
         corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
-        trade_corporation: typing.Optional[db.QSwaggerCorporation] = qid.get_corporation(s.trade_corporation_id) if s.trade_corporation_id else None
         activities: str = ', '.join(s.activities)
-        glf.write(f'')
-        glf.write(f"""
-<h3 corporation_id={corporation.corporation_id}>Конвейер {corporation.corporation_name} <small>{activities}</small></h3>
+        glf.write(f"<h3 corporation_id='{corporation.corporation_id}'>Конвейер {corporation.corporation_name} "
+                  f"<small>{activities}</small></h3>")
+        stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
+                                              [x.station_id for x in s.containers_stocks] +
+                                              [x.station_id for x in s.containers_blueprints] +
+                                              [x.station_id for x in s.trade_sale_stock]))
+        stations: typing.List[db.QSwaggerStation] = sorted(
+            [qid.get_station(x) for x in stations],
+            key=lambda x: x.station_name if x else '')
+        for station in stations:
+            station_id: int = station.station_id if station else None
+            station_name: str = station.station_name if station else None
+            station_type: str = station.station_type_name if station else None
+            glf.write(f"""
+<h4 station_id='{station_id}'>{station_name} <small>{station_type}</small></h4>
 <div class="row">
  <div class="col-md-4">
+""")
+            z: typing.List[ConveyorSettingsPriorityContainer] = sorted(
+                [x for x in s.containers_sources if x.station_id == station_id],
+                key=lambda x: x.container_name)
+            if z:
+                glf.write("""
 <table class="table table-condensed table-hover tbl-conveyor">
 <thead><tr><th>#</th><th>Чертежи</th></tr></thead>
 <tbody>""")
-        for container in sorted([corporation.assets.get(x).name for x in s.containers_source], key=lambda x: x):
-            glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
-            row_num += 1
-        glf.write(f"""</tbody>
-</table>
-</div> <!-- col -->
-<!-- -->
-<div class="col-md-4">
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Сток <span style="color:#777">{corporation.corporation_name}</span></th></tr><thead>
-<tbody>""")
-        for container in sorted([corporation.assets.get(x).name for x in s.containers_stock], key=lambda x: x):
-            glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
-            row_num += 1
-        glf.write("</tbody></table>")
-        if trade_corporation:
-            glf.write(f"""
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Оверсток <span style="color:#777">{trade_corporation.corporation_name}</span></th></tr></thead>
-<tbody>""")
-            for container in sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x):
-                glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
-                row_num += 1
-            glf.write("</tbody></table>")
-        glf.write("""
+                for container in z:
+                    glf.write(f"<tr container_id='{container.container_id}'>"
+                              f"<td>{row_num}</td>"
+                              f"<td>{container.container_name}</td>"
+                              "</tr>")
+                    row_num += 1
+                glf.write("""
+</tbody>
+</table>""")
+            glf.write("""
 </div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
-        if 'manufacturing' in s.activities:
+            z: typing.List[ConveyorSettingsContainer] = sorted(
+                [x for x in s.containers_stocks if x.station_id == station_id],
+                key=lambda x: x.container_name)
+            if z:
+                glf.write(f"""
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Сток <span style="color:#777">{corporation.corporation_name}</span></th></tr><thead>
+<tbody>""")
+                for container in z:
+                    glf.write(f"<tr container_id='{container.container_id}'>"
+                              f"<td>{row_num}</td>"
+                              f"<td>{container.container_name}</td>"
+                              "</tr>")
+                    row_num += 1
+                glf.write("</tbody></table>")
+            z: typing.List[ConveyorSettingsSaleContainer] = sorted(
+                [x for x in s.trade_sale_stock if x.station_id == station_id],
+                key=lambda x: x.container_name)
+            if z:
+                w0: typing.List[str] = list(set([x.trade_corporation.corporation_name for x in z]))
+                w1: typing.List[str] = sorted(w0, key=lambda x: x)
+                for corporation_name in w1:
+                    glf.write(f"""
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>Оверсток <span style="color:#777">{corporation_name}</span></th></tr></thead>
+<tbody>""")
+                    for container in z:
+                        if container.trade_corporation.corporation_name == corporation_name:
+                            glf.write(f"<tr container_id='{container.container_id}'>"
+                                      f"<td>{row_num}</td>"
+                                      f"<td style='color:#ffa600'>{container.container_name}</td>"
+                                      "</tr>")
+                            row_num += 1
+                glf.write("</tbody></table>")
             glf.write("""
+</div> <!-- col -->
+<!-- -->
+<div class="col-md-4">""")
+            if 'manufacturing' in s.activities:
+                z: typing.List[ConveyorSettingsContainer] = sorted(
+                    [x for x in s.containers_blueprints if x.station_id == station_id],
+                    key=lambda x: x.container_name)
+                if z:
+                    glf.write("""
 <table class="table table-condensed table-hover tbl-conveyor">
 <thead><tr><th>#</th><th>Дополнительные чертежи</th></tr></thead>
 <tbody>""")
-            for container in sorted([corporation.assets.get(x).name for x in s.containers_blueprints], key=lambda x: x):
-                glf.write(f"<tr><td>{row_num}</td><td>{container}</td></tr>")
-                row_num += 1
-            glf.write("</tbody></table>")
-        glf.write("""
+                    for container in z:
+                        glf.write(f"<tr container_id='{container.container_id}'>"
+                                  f"<td>{row_num}</td>"
+                                  f"<td>{container.container_name}</td>"
+                                  "</tr>")
+                        row_num += 1
+                    glf.write("</tbody></table>")
+            glf.write("""
  </div> <!-- col -->
 </div> <!-- row -->
 """)
@@ -2948,7 +3051,7 @@ def dump_router2_into_report(
         # сохраняем в отчёт справочник названий, кодов и сведений о производстве
         """dump_global_materials_dictionary(glf, global_materials_dictionary)"""
         # сохраняем содержимое диалоговых окон
-        dump_nav_menu_router_dialog(glf, qid, router_settings)
+        dump_nav_menu_router_dialog(glf, qid, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
         # удаляем более ненужный список материалов

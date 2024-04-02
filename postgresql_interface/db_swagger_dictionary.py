@@ -143,7 +143,28 @@ class QSwaggerDictionary:
         cached_station: typing.Optional[QSwaggerStation] = next((s for s in self.stations.values() if s.station_name == station_name), None)
         return cached_station
 
-    def load_station(self, station_name: str) -> typing.Optional[QSwaggerStation]:
+    def load_stations(
+            self,
+            station_ids: typing.Union[typing.List[int], typing.Set[int]]) -> typing.Dict[int, QSwaggerStation]:
+        # поиск ранее загруженной станции (структуры, фабрики)
+        if isinstance(station_ids, list):
+            ids: typing.List[int] = list(set(station_ids) - self.stations.keys())
+        elif isinstance(station_ids, set):
+            ids: typing.List[int] = list(station_ids - self.stations.keys())
+        else:
+            raise Exception("Unable to determine type of station ids")
+        # загрузка сведений о станции из БД
+        cached_stations: typing.Dict[int, QSwaggerStation] = self.__qit.get_stations(ids, self.sde_type_ids)
+        if not cached_stations:
+            # raise Exception(
+            #     "There are no station '{}' in the database, please preload data".format(station_name))
+            return {}
+        # сохранение загруженных сведений о станции в кеш
+        for s in cached_stations.values():
+            self.stations[s.station_id] = s
+        return cached_stations
+
+    def load_station_by_name(self, station_name: str) -> typing.Optional[QSwaggerStation]:
         # поиск ранее загруженной станции (структуры, фабрики)
         cached_station: typing.Optional[QSwaggerStation] = next((s for s in self.stations.values() if s.station_name == station_name), None)
         if cached_station:
@@ -192,6 +213,20 @@ class QSwaggerDictionary:
             load_unknown_type_blueprints=load_unknown_type_blueprints)
         return corporation.blueprints
 
+    def load_corporation_container_places(
+            self,
+            corporation: QSwaggerCorporation) -> None:
+        if not isinstance(corporation, QSwaggerCorporation):
+            raise Exception("Illegal corporation descriptor")
+        if not corporation.assets and not corporation.blueprints:  # загружайте как минимум ассеты
+            raise Exception("You should load assets firstly")
+        self.__qit.get_corporation_container_places(
+            # идентификаторы
+            corporation.corporation_id,
+            # справочники
+            corporation.assets,
+            corporation.blueprints)
+
     def load_corporation_industry_jobs(
             self,
             corporation: QSwaggerCorporation,
@@ -213,3 +248,20 @@ class QSwaggerDictionary:
             # настройки
             load_unknown_type_blueprints=load_unknown_type_blueprints)
         return corporation.industry_jobs
+
+    def load_corporation_stations(
+            self,
+            corporation: QSwaggerCorporation) -> typing.Dict[int, QSwaggerStation]:
+        if not isinstance(corporation, QSwaggerCorporation):
+            raise Exception("Illegal corporation descriptor")
+        if not corporation.assets and not corporation.blueprints:  # загружайте как минимум ассеты
+            raise Exception("You should load assets firstly")
+        assets_stations: typing.Set[int] = set()
+        if corporation.assets:
+            assets_stations = set([a.station_id for a in corporation.assets.values() if a.station_id is not None])
+        blueprints_stations: typing.Set[int] = set()
+        if corporation.blueprints:
+            blueprints_stations = set([b.station_id for b in corporation.blueprints.values() if b.station_id is not None])
+        station_ids: typing.Set[int] = assets_stations | blueprints_stations
+        return self.load_stations(station_ids)
+
