@@ -64,7 +64,9 @@ def main():
         # загрузка корпоративных ассетов
         qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=False)
         qid.load_corporation_blueprints(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_container_places(corporation)
         qid.load_corporation_industry_jobs(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_stations(corporation)
         """
         # отладка
         for job in corporation.industry_jobs.values():
@@ -81,7 +83,7 @@ def main():
         """
     # загружаем сведения о станциях, которые есть в настройках маршрутизатора
     for r in q_router_settings.g_routes:
-        station: typing.Optional[db.QSwaggerStation] = qid.load_station(r['station'])
+        station: typing.Optional[db.QSwaggerStation] = qid.load_station_by_name(r['station'])
         if not station:
             raise Exception(f"Unable to load station by name: {r['station']}")
     # отключаемся от сервера
@@ -164,15 +166,18 @@ def main():
                     # превращаем названия (шаблоны названий) в номера контейнеров
                     for priority in conveyor['blueprints'].keys():
                         if next((1 for tmplt in conveyor['blueprints'][priority] if re.search(tmplt, container_name)), None):
-                            settings.containers_source.append(container_id)
+                            scs = render_html_conveyor_db.ConveyorSettingsPriorityContainer(priority, corporation, container)
+                            settings.containers_sources.append(scs)
                             source_box = True
                             if settings.same_stock_container:
-                                settings.containers_stock.append(container_id)
+                                scs = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                                settings.containers_stocks.append(scs)
                                 stock_box = True
                             break
                     if not settings.same_stock_container:
                         if next((1 for tmplt in conveyor['stock'] if re.search(tmplt, container_name)), None):
-                            settings.containers_stock.append(container_id)
+                            scs = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                            settings.containers_stocks.append(scs)
                             stock_box = True
                     # if next((0 for tmplt in conveyor['blueprints'] if re.search(tmplt, container_name)), 1):
                     # получаем информацию по реакциям (если включены)
@@ -196,35 +201,37 @@ def main():
                                 if next((1 for tmplt in conveyor['exclude'] if re.search(tmplt, container_name)), None):
                                     blueprints_box = False
                         if blueprints_box:
-                            settings.containers_blueprints.append(container_id)
+                            scb = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                            settings.containers_blueprints.append(scb)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
-                if not settings.containers_source:
+                if not settings.containers_sources:
                     continue
                 # уточняем настройки поведения конвейера (секция behavior)
                 if 'behavior' in conveyor:
                     behavior_market = conveyor['behavior'].get('market')
                     if behavior_market:
                         # пропускаем некорректные настройки (просто правильность синтаксиса настроек)
-                        trade_corporation_name: str = behavior_market.get('corporation')
-                        if not trade_corporation_name:
+                        trade_corporation_names: typing.List[str] = behavior_market.get('corporations')
+                        if not trade_corporation_names:
                             continue
                         # поиск корпорации, которая торгует (видимо в Jita? но это не обязательно)
-                        trade_corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(trade_corporation_name)
-                        if trade_corporation:
-                            settings.trade_corporation_id = trade_corporation.corporation_id
-                            for container_id in trade_corporation.container_ids:
-                                container: db.QSwaggerCorporationAssetsItem = trade_corporation.assets.get(container_id)
-                                if not container:
-                                    continue
-                                container_name: str = container.name
-                                if not container_name:
-                                    continue
-                                container_hangar: str = container.location_flag
-                                if container_hangar[:-1] != 'CorpSAG':
-                                    continue
-                                # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
-                                if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
-                                    settings.trade_sale_stock.append(container_id)
+                        for trade_corporation_name in trade_corporation_names:
+                            trade_corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(trade_corporation_name)
+                            if trade_corporation:
+                                for container_id in trade_corporation.container_ids:
+                                    container: db.QSwaggerCorporationAssetsItem = trade_corporation.assets.get(container_id)
+                                    if not container:
+                                        continue
+                                    container_name: str = container.name
+                                    if not container_name:
+                                        continue
+                                    container_hangar: str = container.location_flag
+                                    if container_hangar[:-1] != 'CorpSAG':
+                                        continue
+                                    # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
+                                    if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
+                                        cssc = render_html_conveyor_db.ConveyorSettingsSaleContainer(trade_corporation, container)
+                                        settings.trade_sale_stock.append(cssc)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
 
@@ -243,26 +250,39 @@ def main():
     """
     """
     # вывод на экран того, что получилось
-    for (idx, __s) in enumerate(settings_of_conveyors):
+    for (idx0, __s) in enumerate(settings_of_conveyors):
         s: render_html_conveyor_db.ConveyorSettings = __s
         corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
-        trade_corporation: typing.Optional[db.QSwaggerCorporation] = qid.get_corporation(s.trade_corporation_id) if s.trade_corporation_id else None
-        if idx > 0:
+        if idx0 > 0:
             print()
         print('industry corp: ', corporation.corporation_name)
         print('activities:    ', ','.join(s.activities))
-        print('source:        ', '\n                '.join(sorted([corporation.assets.get(x).name for x in s.containers_source], key=lambda x: x)))
-        print('stock:         ', '\n                '.join(sorted([corporation.assets.get(x).name for x in s.containers_stock], key=lambda x: x)))
-        if 'manufacturing' in s.activities:
-            print('blueprints:    ', '\n                '.join(sorted([corporation.assets.get(x).name for x in s.containers_blueprints], key=lambda x: x)))
+        stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
+                                              [x.station_id for x in s.containers_stocks] +
+                                              [x.station_id for x in s.containers_blueprints] +
+                                              [x.station_id for x in s.trade_sale_stock]))
+        stations: typing.List[int] = sorted(stations, key=lambda x: qid.get_station(x).station_name if x else '')
+        for station_id in stations:
+            print('station:       ', station_id, qid.get_station(station_id).station_name if station_id else None)
+            z = sorted([x for x in s.containers_sources if x.station_id == station_id], key=lambda x: x.container_name)
+            if z:
+                print('>source:       ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+            z = sorted([x for x in s.containers_stocks if x.station_id == station_id], key=lambda x: x.container_name)
+            if z:
+                print('>stock:        ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+            if 'manufacturing' in s.activities:
+                z = sorted([x for x in s.containers_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
+                if z:
+                    print('>blueprints:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+            z = sorted([x for x in s.trade_sale_stock if x.station_id == station_id], key=lambda x: x.container_name)
+            if z:
+                print('>trader corp:  ', '\n                '.join([f'{x.trade_corporation.corporation_id} {x.trade_corporation.corporation_name}' for x in z]))
+                print('>sale stock:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
         if s.fixed_number_of_runs is not None:
             print('fixed runs:    ', s.fixed_number_of_runs)
         if s.conveyor_with_reactions:
             print('formulas:      ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_formulas], key=lambda x: x)))
             print('react stock:   ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_stock], key=lambda x: x)))
-        if trade_corporation:
-            print('trader corp:   ', trade_corporation.corporation_name)
-            print('sale stock:    ', ';'.join(sorted([trade_corporation.assets.get(x).name for x in s.trade_sale_stock], key=lambda x: x)))
     """
 
     # вывод в отчёт результатов работы роутера

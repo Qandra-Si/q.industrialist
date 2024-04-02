@@ -1,4 +1,6 @@
 ﻿# -*- encoding: utf-8 -*-
+import typing
+
 from .db_swagger_cache import *
 from .db_interface import QIndustrialistDatabase
 
@@ -278,7 +280,8 @@ class QSwaggerTranslator:
             " location_id,"
             " solar_system_id,"
             " station_type_id,"
-            " solar_system_name "
+            " solar_system_name,"
+            " station_type_name "
             "FROM esi_known_stations "
             "WHERE name=%(nm)s;",
             {'nm': station_name}
@@ -287,7 +290,7 @@ class QSwaggerTranslator:
             return None
         station_type_id: int = row[2]
         station_type: QSwaggerTypeId = type_ids.get(station_type_id)  # маловероятно, что тип неизвестен
-        cached_station: QSwaggerStation = QSwaggerStation(row[0], station_name, row[1], row[3], station_type)
+        cached_station: QSwaggerStation = QSwaggerStation(row[0], station_name, row[1], row[3], station_type, row[4])
         del row
         return cached_station
 
@@ -307,7 +310,8 @@ class QSwaggerTranslator:
             " name,"
             " solar_system_id,"
             " station_type_id,"
-            " solar_system_name "
+            " solar_system_name,"
+            " station_type_name "
             "FROM esi_known_stations "
             "WHERE location_id IN (SELECT * FROM UNNEST(%(ids)s));",
             {'ids': ids}
@@ -320,7 +324,7 @@ class QSwaggerTranslator:
             station_id: int = row[0]
             station_type_id: int = row[3]
             station_type: QSwaggerTypeId = type_ids.get(station_type_id)  # маловероятно, что тип неизвестен
-            data[station_id] = QSwaggerStation(station_id, row[1], row[2], row[4], station_type)
+            data[station_id] = QSwaggerStation(station_id, row[1], row[2], row[4], station_type, row[5])
         del rows
         return data
 
@@ -368,6 +372,64 @@ class QSwaggerTranslator:
             data[item_id] = QSwaggerCorporationAssetsItem(cached_item_type, row)
         del rows
         return data
+
+    def get_corporation_container_places(
+            self,
+            corporation_id: int,
+            assets: typing.Dict[int, QSwaggerCorporationAssetsItem],
+            blueprints: typing.Dict[int, QSwaggerCorporationBlueprint]) -> None:
+        rows = self.db.select_all_rows(
+            """
+SELECT
+ a.eca_item_id,
+ CASE office.eca_location_type
+  WHEN 'item' THEN
+   CASE office.eca_location_flag
+    WHEN 'OfficeFolder' THEN office.eca_location_id
+    ELSE (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)
+   END
+  WHEN 'station' THEN office.eca_location_id
+  ELSE NULL
+ END as station_id
+FROM
+ eve_sde_type_ids t,
+ esi_corporation_assets a
+  INNER JOIN esi_corporation_assets AS office ON (office.eca_item_id=a.eca_location_id)
+WHERE
+ a.eca_corporation_id=%(id)s AND
+ t.sdet_type_id=a.eca_type_id AND
+ a.eca_is_singleton AND
+ a.eca_name IS NOT NULL AND
+ a.eca_location_flag LIKE 'CorpSAG%%' AND
+ t.sdet_group_id in (448,649);
+""",
+            {'id': corporation_id}
+        )
+        # Инициализирует контейнеры указанной корпорации, которые имели название и располагались в корпангаре.
+        # После чего перебирает все ассеты корпорации и указывает расположение предметов, которые находились в
+        # обнаруженных контейнерах. А после этого повторяет те же действия для чертежей.
+        # По правилам работы конвейера нас интересуют лишь только предметы, расположенные в именованных коробках.
+        if rows is not None:
+            places: typing.Dict[int, int] = {}
+            for row in rows:
+                container_id: int = row[0]
+                station_id: int = row[1]
+                places[container_id] = station_id
+                if assets and station_id:
+                    container: QSwaggerCorporationAssetsItem = assets.get(container_id)
+                    if container:
+                        container.set_station_id(station_id)
+            if assets:
+                for a in assets.values():
+                    station_id: typing.Optional[int] = places.get(a.location_id, None)
+                    if station_id:
+                        a.set_station_id(station_id)
+            if blueprints:
+                for b in blueprints.values():
+                    station_id: typing.Optional[int] = places.get(b.location_id, None)
+                    if station_id:
+                        b.set_station_id(station_id)
+            del rows
 
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/blueprints/

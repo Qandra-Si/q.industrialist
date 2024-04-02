@@ -435,12 +435,14 @@ class QSwaggerStation:
             station_name: str,
             solar_system_id: int,
             solar_system_name: str,
-            station_type: QSwaggerTypeId):
+            station_type: QSwaggerTypeId,
+            station_type_name: str):
         self.__station_id: int = station_id
         self.__station_name: str = station_name
         self.__solar_system_id: int = solar_system_id
         self.__solar_system_name: str = solar_system_name
         self.__station_type: QSwaggerTypeId = station_type
+        self.__station_type_name: str = station_type_name
 
     @property
     def station_id(self) -> int:
@@ -462,6 +464,10 @@ class QSwaggerStation:
     def station_type(self) -> QSwaggerTypeId:
         return self.__station_type
 
+    @property
+    def station_type_name(self) -> str:
+        return self.__station_type_name
+
 
 class QSwaggerCorporationAssetsItem:
     def __init__(self, item_type: QSwaggerTypeId, row):
@@ -475,6 +481,7 @@ class QSwaggerCorporationAssetsItem:
         self.__is_singleton: bool = row[6]
         self.__name: typing.Optional[str] = row[7]
         self.__updated_at: datetime.datetime = row[8]
+        self.__station_id: typing.Optional[int] = None
 
     @property
     def item_id(self) -> int:
@@ -516,6 +523,13 @@ class QSwaggerCorporationAssetsItem:
     def updated_at(self) -> datetime.datetime:
         return self.__updated_at
 
+    @property
+    def station_id(self) -> typing.Optional[int]:
+        return self.__station_id
+
+    def set_station_id(self, station_id: int) -> None:
+        self.__station_id = station_id
+
 
 class QSwaggerCorporationBlueprint:
     def __init__(self, blueprint_type: QSwaggerBlueprint, row):
@@ -529,6 +543,7 @@ class QSwaggerCorporationBlueprint:
         self.__material_efficiency: int = row[6]
         self.__runs: int = row[7]
         self.__updated_at: datetime.datetime = row[8]
+        self.__station_id: typing.Optional[int] = None
 
     @property
     def item_id(self) -> int:
@@ -569,6 +584,13 @@ class QSwaggerCorporationBlueprint:
     @property
     def updated_at(self) -> datetime.datetime:
         return self.__updated_at
+
+    @property
+    def station_id(self) -> typing.Optional[int]:
+        return self.__station_id
+
+    def set_station_id(self, station_id: int) -> None:
+        self.__station_id = station_id
 
 
 class QSwaggerCorporationIndustryJob:
