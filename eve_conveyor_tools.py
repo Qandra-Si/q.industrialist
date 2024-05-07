@@ -3,6 +3,7 @@
 import typing
 from math import ceil
 from math import floor
+from enum import Enum
 
 import eve_sde_tools
 import eve_efficiency
@@ -748,22 +749,26 @@ class ConveyorMaterials:
                 not_enough_materials__again['M'].clear()
 
 
+class ConveyorReferenceSubtype(Enum):
+    CONVEYOR_REF_PRODUCT = 0
+    CONVEYOR_REF_BLUEPRINT = 1
+
+
 # ConveyorReference - долговременный справочник материала конвейера, хранится долго и накапливает информацию из
 # экземпляров ConveyorMaterials и ConveyorItem
 # - subtype=0 : сохранение данных материала
 # - subtype=1 : сохранение данных чертежа для постройки материала
 class ConveyorReference:
-    def __init__(self, item: ConveyorItem, subtype: int):
-        if subtype == 0:
+    def __init__(self, item: ConveyorItem, subtype: ConveyorReferenceSubtype):
+        if subtype == ConveyorReferenceSubtype.CONVEYOR_REF_PRODUCT:
             # код продукта
             self.type_id: int = item.type_id
             # название продукта
             self.name: str = item.name
-        else:
-            # код продукта
+        else:  # ConveyorReferenceSubtype.CONVEYOR_REF_BLUEPRINT
+            # код чертежа
             self.type_id: int = item.blueprint_type_id
-            # название продукта
-            self.name: str = item.blueprint_name
+            # название чертежа
             self.name: str = item.blueprint_name
 
 
@@ -789,6 +794,6 @@ class ConveyorDictionary:
             if in_ref is not None:
                 continue
             in_cache: ConveyorItem = conveyor_materials.get(type_id)
-            self.materials[type_id] = ConveyorReference(in_cache, 0)
+            self.materials[type_id] = ConveyorReference(in_cache, ConveyorReferenceSubtype.CONVEYOR_REF_PRODUCT)
             if in_cache.blueprint_type_id is not None:
-                self.materials[in_cache.blueprint_type_id] = ConveyorReference(in_cache, 1)
+                self.materials[in_cache.blueprint_type_id] = ConveyorReference(in_cache, ConveyorReferenceSubtype.CONVEYOR_REF_BLUEPRINT)

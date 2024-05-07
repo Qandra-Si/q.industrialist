@@ -139,8 +139,7 @@ def main():
             for corporation_id in corporation_ids:
                 corporation = qid.get_corporation(corporation_id)
                 # инициализируем настройки запуска конвейера
-                settings: render_html_conveyor_db.ConveyorSettings = render_html_conveyor_db.ConveyorSettings()
-                settings.corporation_id = corporation_id
+                settings: render_html_conveyor_db.ConveyorSettings = render_html_conveyor_db.ConveyorSettings(corporation)
                 # читаем настройки производственной активности
                 settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
                 settings.same_stock_container = conveyor.get('same_stock_container', True)
@@ -202,7 +201,7 @@ def main():
                                     blueprints_box = False
                         if blueprints_box:
                             scb = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
-                            settings.containers_blueprints.append(scb)
+                            settings.containers_additional_blueprints.append(scb)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
                 if not settings.containers_sources:
                     continue
@@ -259,7 +258,7 @@ def main():
         print('activities:    ', ','.join(s.activities))
         stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
                                               [x.station_id for x in s.containers_stocks] +
-                                              [x.station_id for x in s.containers_blueprints] +
+                                              [x.station_id for x in s.containers_additional_blueprints] +
                                               [x.station_id for x in s.trade_sale_stock]))
         stations: typing.List[int] = sorted(stations, key=lambda x: qid.get_station(x).station_name if x else '')
         for station_id in stations:
@@ -271,7 +270,7 @@ def main():
             if z:
                 print('>stock:        ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             if 'manufacturing' in s.activities:
-                z = sorted([x for x in s.containers_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
+                z = sorted([x for x in s.containers_additional_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:
                     print('>blueprints:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             z = sorted([x for x in s.trade_sale_stock if x.station_id == station_id], key=lambda x: x.container_name)

@@ -280,3 +280,14 @@ div.modal-content * .table > tbody > tr:active > td {
 .table-gallente tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
 .table-gallente tbody tr td { border-left: 1px solid #1d3231; }
 .table-gallente tbody tr td:nth-child(2) { border-left: none; }
+
+.alert-danger {
+  color: #b7b2b0;
+  background-color: #362421;
+  border-color: #aa2b2b;
+}
+.alert-warning {
+  color: #c2c0bd;
+  background-color: #3a2c11;
+  border-color: #ce8704;
+}
