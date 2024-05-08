@@ -1,65 +1,11 @@
 ﻿import typing
 
 import render_html
-import eve_conveyor_tools
 from render_html import get_span_glyphicon as glyphicon
 
 import postgresql_interface as db
-from __init__ import __version__
-
-
-class RouterSettings:
-    def __init__(self):
-        # параметры работы конвейера
-        self.station: str = ''
-        self.desc: str = ''
-        self.output: typing.List[int] = []
-
-
-class ConveyorSettingsContainer:
-    def __init__(self, corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
-        self.corporation: db.QSwaggerCorporation = corporation
-        self.container: db.QSwaggerCorporationAssetsItem = container
-        self.station_id: typing.Optional[int] = container.station_id
-
-    @property
-    def container_id(self) -> int:
-        return self.container.item_id
-
-    @property
-    def container_name(self) -> str:
-        return self.container.name
-
-
-class ConveyorSettingsPriorityContainer(ConveyorSettingsContainer):
-    def __init__(self, priority: int, corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
-        super().__init__(corporation, container)
-        self.priority: int = priority
-
-
-class ConveyorSettingsSaleContainer(ConveyorSettingsContainer):
-    def __init__(self, trade_corporation: db.QSwaggerCorporation, container: db.QSwaggerCorporationAssetsItem):
-        super().__init__(trade_corporation, container)
-        self.trade_corporation: db.QSwaggerCorporation = trade_corporation
-
-
-class ConveyorSettings:
-    def __init__(self, corporation: db.QSwaggerCorporation):
-        # параметры работы конвейера
-        self.corporation: db.QSwaggerCorporation = corporation
-        self.fixed_number_of_runs: typing.Optional[int] = None
-        self.same_stock_container: bool = False
-        self.activities: typing.List[str] = ['manufacturing']
-        self.conveyor_with_reactions: bool = False
-        # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
-        self.containers_sources: typing.List[ConveyorSettingsPriorityContainer] = []  # station:container:priority
-        self.containers_stocks: typing.List[ConveyorSettingsContainer] = []  # station:container
-        self.containers_additional_blueprints: typing.List[ConveyorSettingsContainer] = []  # station:container
-        self.containers_react_formulas: typing.List[int] = []
-        self.containers_react_stock: typing.List[int] = []
-        self.manufacturing_groups: typing.Optional[typing.List[int]] = []
-        # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу произвдства)
-        self.trade_sale_stock: typing.List[ConveyorSettingsSaleContainer] = []  # station:container:trade_corporation
+import eve_router_tools as tools
+# from __init__ import __version__
 
 
 def dump_additional_stylesheet(glf) -> None:
@@ -255,8 +201,8 @@ def dump_nav_menu(glf) -> None:
 def dump_nav_menu_router_dialog(
         glf,
         qid: db.QSwaggerDictionary,
-        router_settings: typing.List[RouterSettings],
-        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+        router_settings: typing.List[tools.RouterSettings],
+        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
@@ -403,7 +349,7 @@ def dump_nav_menu_router_dialog(
 def dump_nav_menu_conveyor_dialog(
         glf,
         qid: db.QSwaggerDictionary,
-        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
@@ -426,7 +372,7 @@ def dump_nav_menu_conveyor_dialog(
         if idx:
             glf.write('<hr>')
         corporation: db.QSwaggerCorporation = s.corporation
-        activities: str = ', '.join(s.activities)
+        activities: str = ', '.join([str(_) for _ in s.activities])
         glf.write(f"<h3 corporation_id='{corporation.corporation_id}'>Конвейер {corporation.corporation_name} "
                   f"<small>{activities}</small></h3>")
         stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
@@ -445,7 +391,7 @@ def dump_nav_menu_conveyor_dialog(
 <div class="row">
  <div class="col-md-4">
 """)
-            z: typing.List[ConveyorSettingsPriorityContainer] = sorted(
+            z: typing.List[tools.ConveyorSettingsPriorityContainer] = sorted(
                 [x for x in s.containers_sources if x.station_id == station_id],
                 key=lambda x: x.container_name)
             if z:
@@ -466,7 +412,7 @@ def dump_nav_menu_conveyor_dialog(
 </div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
-            z: typing.List[ConveyorSettingsContainer] = sorted(
+            z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                 [x for x in s.containers_stocks if x.station_id == station_id],
                 key=lambda x: x.container_name)
             if z:
@@ -481,7 +427,7 @@ def dump_nav_menu_conveyor_dialog(
                               "</tr>")
                     row_num += 1
                 glf.write("</tbody></table>")
-            z: typing.List[ConveyorSettingsSaleContainer] = sorted(
+            z: typing.List[tools.ConveyorSettingsSaleContainer] = sorted(
                 [x for x in s.trade_sale_stock if x.station_id == station_id],
                 key=lambda x: x.container_name)
             if z:
@@ -505,7 +451,7 @@ def dump_nav_menu_conveyor_dialog(
 <!-- -->
 <div class="col-md-4">""")
             if 'manufacturing' in s.activities:
-                z: typing.List[ConveyorSettingsContainer] = sorted(
+                z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                     [x for x in s.containers_additional_blueprints if x.station_id == station_id],
                     key=lambda x: x.container_name)
                 if z:
@@ -531,7 +477,7 @@ def dump_nav_menu_conveyor_dialog(
 def dump_blueprints_overflow_warn(
         glf,
         # настройки генерации отчёта
-        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # перебор всех корпораций у всех возможных конвейеров
     corporations: typing.Set[int] = set()
     for s in conveyor_settings:
@@ -558,12 +504,348 @@ def dump_blueprints_overflow_warn(
                 ))
 
 
+# blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
+# метод возвращает список tuple: [{"id": 11399, "q": 11, "qmin": 11"}] с учётом ME
+def get_materials_list(
+        # при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
+        blueprints: typing.List[db.QSwaggerCorporationBlueprint],
+        fixed_number_of_runs=None):  # учитывается только для оригиналов, т.е. для is_blueprint_copy=False
+    # список материалов по набору чертежей с учётом ME
+    materials_list_with_efficiency = []
+    # перебираем все чертежи
+    for b in blueprints:
+        pass
+    """
+        for m in b.blueprint_type.
+    # перебираем все ресурсы (материалы) чертежа
+    for m in self.blueprint_activity_dict["materials"]:
+        bp_manuf_need_all = 0
+        bp_manuf_need_min = 0
+        for __bp3 in blueprints_details:
+            # расчёт кол-ва ранов для этого чертежа
+            if is_blueprint_copy:
+                quantity_of_runs = __bp3["r"]
+                quantity_of_blueprints = 1
+            else:
+                quantity_of_blueprints = __bp3["q"] if __bp3["q"] > 0 else 1
+                quantity_of_runs = fixed_number_of_runs if fixed_number_of_runs else 1
+                # умножение на количество оригиналов будет выполнено позже...
+            # расчёт кол-ва материала с учётом эффективности производства
+            __industry_input = eve_efficiency.get_industry_material_efficiency(
+                self.blueprint_activity,
+                quantity_of_runs,
+                m["quantity"],  # сведения из чертежа
+                material_efficiency)
+            # вычисляем минимально необходимое материалов, необходимых для работ хотя-бы по одному чертежу
+            bp_manuf_need_min = __industry_input if bp_manuf_need_min == 0 else min(bp_manuf_need_min, __industry_input)
+            # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
+            __industry_input *= quantity_of_blueprints
+            # считаем общее количество материалов, необходимых для работ по этом чертежу
+            bp_manuf_need_all += __industry_input
+        # вывод информации о ресурсе (материале)
+        bpmm_tid: int = m["typeID"]
+        materials_list_with_efficiency.append({
+            "id": bpmm_tid,
+            "q": bp_manuf_need_all,
+            "qmin": bp_manuf_need_min,
+        })
+    return materials_list_with_efficiency
+    """
+
+
+def dump_list_of_active_jobs(
+        glf,
+        active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    # группируем работы по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = \
+        tools.get_jobs_grouped_by(
+            active_jobs,
+            group_by_product=True,
+            group_by_activity=True)
+    # сортируем уже сгруппированные работы
+    grouped_and_sorted: typing.List[typing.Tuple[str, int, db.QSwaggerCorporationIndustryJob]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
+        j0: db.QSwaggerCorporationIndustryJob = group[0]
+        qty: int = tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
+        qty = qty * sum([j.runs for j in group])
+        grouped_and_sorted.append((
+            j0.product_type.name,
+            qty,
+            j0))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # выводим в отчёт
+    for _, qty, job in grouped_and_sorted:
+        glf.write(f"active: <b>{job.product_type.name}</b><sup>({job.product_type_id})</sup>"
+                  f" x{qty}"
+                  f" / {job.blueprint_type.blueprint_type.name}<sup>({job.blueprint_type.type_id})</sup>"
+                  "<br>")
+    # освобождаем память
+    del grouped_and_sorted
+    del grouped
+
+
+def dump_list_of_completed_jobs(
+        glf,
+        completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    # группируем работы по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = \
+        tools.get_jobs_grouped_by(
+            completed_jobs,
+            group_by_product=True,
+            group_by_activity=True)
+    # сортируем уже сгруппированные работы
+    grouped_and_sorted: typing.List[typing.Tuple[str, int, db.QSwaggerCorporationIndustryJob]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
+        j0: db.QSwaggerCorporationIndustryJob = group[0]
+        qty: int = tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
+        qty = qty * sum([j.runs for j in group])
+        grouped_and_sorted.append((
+            j0.product_type.name,
+            qty,
+            j0))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # выводим в отчёт
+    for _, qty, job in grouped_and_sorted:
+        glf.write(f"completed: <b>{job.product_type.name}</b><sup>({job.product_type_id})</sup>"
+                  f" x{qty}"
+                  f" / {job.blueprint_type.blueprint_type.name}<sup>({job.blueprint_type.type_id})</sup>"
+                  "<br>")
+    # освобождаем память
+    del grouped_and_sorted
+    del grouped
+
+
+def dump_list_of_impossible_blueprints(
+        glf,
+        # список чертежей, которые невозможно запустить в выбранном конвейере
+        impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
+    # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+        tools.get_blueprints_grouped_by(
+            impossible_blueprints,
+            group_by_type_id=True,
+            group_by_me=False,
+            group_by_te=False,
+            group_by_runs=False)
+    # сортируем уже сгруппированные чертежи
+    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationBlueprint]]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
+        grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # выводим в отчёт
+    for _, qty, blueprint in grouped_and_sorted:
+        glf.write(f"impossible: <b>{blueprint.blueprint_type.blueprint_type.name}</b><sup>({blueprint.type_id})</sup>"
+                  f" x{qty}"
+                  "<br>")
+
+
+def calc_corp_conveyor(
+        glf,
+        # настройки генерации отчёта
+        router_settings: typing.List[tools.RouterSettings],
+        conveyor_settings: tools.ConveyorSettings,
+        # список чертежей, которые нобходимо обработать
+        ready_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
+    # группируем чертежи по типу, me и runs кодам, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+        tools.get_blueprints_grouped_by(
+            ready_blueprints,
+            group_by_type_id=True,
+            group_by_me=True,
+            group_by_te=False,
+            group_by_runs=True)
+    """
+    glf.write("<h4>calc</h4>"
+              "<h5>grouped</h5>"
+              f"{[f'{_[1][0].blueprint_type.blueprint_type.name} {_[0][1]}:{_[0][2]}/{_[0][3]} x{len(_[1])}<br>' for _ in grouped.items()]}")
+    """
+    # сортируем уже сгруппированные чертежи
+    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationBlueprint]]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
+        grouped_and_sorted.append((
+            group[0].blueprint_type.blueprint_type.name,
+            group))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # выводим в отчёт
+    for _, group in grouped_and_sorted:
+        b0: db.QSwaggerCorporationBlueprint = group[0]
+        glf.write(f"<b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
+                  f" x{len(group)}"
+                  f" {b0.material_efficiency}<sup>me</sup>"
+                  f" {b0.runs}<sup>runs</sup>"
+                  "<br>")
+        for blueprint in group:
+
+            pass
+
+
 def dump_corp_conveyors(
         glf,
         # настройки генерации отчёта
-        router_settings: typing.List[RouterSettings],
-        conveyor_settings: typing.List[ConveyorSettings]) -> None:
-    pass
+        router_settings: typing.List[tools.RouterSettings],
+        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
+    # проверка, пусты ли настройки конвейера?
+    if len(conveyor_settings) == 0: return
+    # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
+    # если нет, то... надо добавить здесь какой-то сворачиваемый список?
+    corporations: typing.Set[int] = set([s.corporation.corporation_id for s in conveyor_settings])
+    if not len(corporations) == 1:
+        raise Exception("Unsupported mode: multiple corporations in a single conveyor")
+    # получаем ссылку на единственную корпорацию
+    corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
+    glf.write(f"<h2>{corporation.corporation_name}</h2>\n")
+    # группируем контейнеры по приоритетам
+    prioritized: typing.Dict[tools.ConveyorSettings, typing.Dict[int, typing.List[tools.ConveyorSettingsPriorityContainer]]] = {}
+    for s in conveyor_settings:
+        p0 = prioritized.get(s)
+        if not p0:
+            prioritized[s] = {}
+            p0 = prioritized.get(s)
+        for container in s.containers_sources:
+            p1 = p0.get(container.priority)
+            if p1:
+                p1.append(container)
+            else:
+                p0[container.priority] = [container]
+    # перебираем сгруппированные приоритезированные группы
+    for settings in prioritized.keys():
+        p0 = prioritized.get(settings)
+        for priority in sorted(p0.keys()):
+            # получаем список контейнеров с чертежами для производства
+            containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(priority)
+            container_ids: typing.Set[int] = set([_.container_id for _ in containers])
+            glf.write(f"<h3>{priority}</h3>"
+                      f"<h4>container_ids</h4>{[f'{_.container_id}:{_.container_name}' for _ in containers]}<br>")
+            # получаем список чертежей, находящихся в этих контейнерах
+            blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                [b for b in corporation.blueprints.values() if b.location_id in container_ids]
+            # проверяем текущие работы (запущенные из этих контейнеров),
+            # если чертёж находится в активных работах, то им пользоваться нельзя
+            active_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [j for j in corporation.industry_jobs_active.values() if j.blueprint_location_id in container_ids]
+            # также, если чертёж находится в завершённых работах, то им тоже пользоваться нельзя
+            completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [j for j in corporation.industry_jobs_completed.values() if j.blueprint_location_id in container_ids]
+            # составляем новый (уменьшенный) список тех чертежей, запуск которых возможен
+            active_blueprint_ids: typing.Set[int] = \
+                set([j.blueprint_id for j in active_jobs])
+            completed_blueprint_ids: typing.Set[int] = \
+                set([j.blueprint_id for j in completed_jobs if j.blueprint_id not in active_blueprint_ids])
+            completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [j for j in completed_jobs if j.blueprint_id not in active_blueprint_ids]
+            # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
+            possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            for a in settings.activities:
+                for b in blueprints:
+                    activity = b.blueprint_type.get_activity(activity_id=a.to_int())
+                    if activity:
+                        possible_blueprints.append(b)
+                    else:
+                        impossible_blueprints.append(b)
+            # возможна ситуация, когда один и тот же чертёж ранее использовался (находится в completed
+            # списке) и одновременно используется (находится в active списке), доверяем при этом active
+            # списку
+            used_blueprint_ids: typing.Set[int] = \
+                active_blueprint_ids | \
+                completed_blueprint_ids
+            # TODO: ассеты не проверяем, т.к. они актуализируются гораздо реже (может стоит проверить новьё?)
+            possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                [b for b in possible_blueprints if b.item_id not in used_blueprint_ids]
+            impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                [b for b in impossible_blueprints if b.item_id not in used_blueprint_ids]
+            """
+            glf.write(f"<h4>blueprints</h4>{[_.item_id for _ in blueprints]}<br>"
+                      f"<h4>active_blueprint_ids</h4>{active_blueprint_ids}<br>"
+                      f"<h4>completed_blueprint_ids</h4>{completed_blueprint_ids}<br>"
+                      f"<h4>used_blueprint_ids</h4>{used_blueprint_ids}<br>"
+                      f"<h4>possible_blueprints</h4>{[_.item_id for _ in possible_blueprints]}<br>"
+                      f"<h4>impossible_blueprints</h4>{[_.item_id for _ in impossible_blueprints]}<br>")
+            """
+            # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
+            if possible_blueprints:
+                calc_corp_conveyor(
+                    glf,
+                    # настройки генерации отчёта
+                    router_settings,
+                    settings,
+                    # список чертежей, которые необходимо обработать
+                    possible_blueprints)
+            # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера
+            if active_jobs:
+                dump_list_of_active_jobs(
+                    glf,
+                    active_jobs)  # [b for b in blueprints if b.item_id in active_blueprint_ids]
+            # вывести информацию о работах, которые прямо недавно закончились
+            if completed_jobs:
+                dump_list_of_completed_jobs(
+                    glf,
+                    completed_jobs)  # [b for b in blueprints if b.item_id in completed_blueprint_ids]
+            # если в коробке застряли чертежи которых там не должно быть, то выводим об этом сведения
+            if impossible_blueprints:
+                dump_list_of_impossible_blueprints(
+                    glf,
+                    impossible_blueprints)
+
+    # формируем список продуктов, производство которых будет выполняться на обнаруженных станциях
+    for s in conveyor_settings:
+        source_container_ids: typing.Set[int] = set([_.container_id for _ in s.containers_sources])
+        glf.write(
+            f"""<h2>{corporation.corporation_name}</h2>
+{[_.container_name for _ in s.containers_sources]}<br>
+{source_container_ids}<br>"""
+        )
+        source_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = list()
+        for b in corporation.blueprints.values():
+            if b.location_id in source_container_ids:
+                source_blueprints.append(b)
+        source_industry_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = list()
+        for j in corporation.industry_jobs_active.values():
+            if j.blueprint_location_id in source_container_ids:
+                source_industry_jobs.append(j)
+        source_assets: typing.List[db.QSwaggerCorporationAssetsItem] = list()
+        for a in corporation.assets.values():
+            if a.location_id in source_container_ids:
+                source_assets.append(a)
+        glf.write(
+            f"""{[str(b.type_id)+':'+str(b.item_id) for b in source_blueprints]}<br>
+{[j.blueprint_id for j in source_industry_jobs]}<br>
+{[a.item_id for a in source_assets]}<br>"""
+        )
+
+        for blueprint in source_blueprints:
+            # TODO: здесь надо определить (по работам) находится ли чертёж в ассетах?
+            blueprint_type_id: int = blueprint.type_id
+            for a in s.activities:
+                activity = blueprint.blueprint_type.get_activity(activity_id=a.to_int())
+                blueprint_type_name: str = blueprint.blueprint_type.blueprint_type.name
+                product_type_id: typing.Optional[int] = None
+                product_type: typing.Optional[db.QSwaggerTypeId] = None
+                if not activity: continue
+                if a == tools.ConveyorActivity.CONVEYOR_MANUFACTURING:
+                    manufacturing: db.QSwaggerBlueprintManufacturing = activity
+                    product_type_id = manufacturing.product_id
+                    product_type = manufacturing.product_type
+                elif a == tools.ConveyorActivity.CONVEYOR_INVENTION:
+                    invention: db.QSwaggerBlueprintInvention = activity
+                elif a == tools.ConveyorActivity.CONVEYOR_COPYING:
+                    copying: db.QSwaggerBlueprintCopying = activity
+                elif a == tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL:
+                    research_material: db.QSwaggerBlueprintResearchMaterial = activity
+                elif a == tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME:
+                    research_time: db.QSwaggerBlueprintResearchTime = activity
+                elif a == tools.ConveyorActivity.CONVEYOR_REACTION:
+                    reaction: db.QSwaggerBlueprintReaction = activity
+
+        # удаление списков найденных  чертежей, предметов и работ
+        del source_assets
+        del source_industry_jobs
+        del source_blueprints
+
 
 def dump_router2_into_report(
         # путь, где будет сохранён отчёт
@@ -571,8 +853,8 @@ def dump_router2_into_report(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
-        router_settings: typing.List[RouterSettings],
-        conveyor_settings: typing.List[ConveyorSettings]) -> None:
+        router_settings: typing.List[tools.RouterSettings],
+        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     glf = open('{dir}/router.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, f'Router', use_dark_mode=True)

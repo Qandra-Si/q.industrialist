@@ -719,7 +719,8 @@ class QSwaggerCorporation:
         # наборы данных (взаимосвязаны друг с другом, ВАЖЕН ПОРЯДОК уничтожения!)
         self.assets: typing.Dict[int, QSwaggerCorporationAssetsItem] = {}
         self.blueprints: typing.Dict[int, QSwaggerCorporationBlueprint] = {}
-        self.industry_jobs: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
+        self.industry_jobs_active: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
+        self.industry_jobs_completed: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
         # идентификаторы корпоративных контейнеров
         self.container_ids: typing.List[int] = []
 
@@ -727,7 +728,8 @@ class QSwaggerCorporation:
         # идентификаторы корпоративных контейнеров
         del self.container_ids
         # наборы данных (взаимосвязаны друг с другом, ВАЖЕН ПОРЯДОК уничтожения!)
-        del self.industry_jobs
+        del self.industry_jobs_completed
+        del self.industry_jobs_active
         del self.blueprints
         del self.assets
 

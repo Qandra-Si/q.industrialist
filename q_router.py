@@ -36,6 +36,7 @@ import q_router_settings
 import render_html_conveyor_db
 
 import postgresql_interface as db
+import eve_router_tools as tools
 
 from __init__ import __version__
 
@@ -65,7 +66,8 @@ def main():
         qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=False)
         qid.load_corporation_blueprints(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_container_places(corporation)
-        qid.load_corporation_industry_jobs(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_industry_jobs_active(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_industry_jobs_completed(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_stations(corporation)
         """
         # отладка
@@ -103,17 +105,17 @@ def main():
     del unique_manuf_lines
 
     # следуем по загруженным данным и собираем входные данные (настройки) маршрутизации продуктов производства
-    settings_of_router: typing.List[render_html_conveyor_db.RouterSettings] = []
+    settings_of_router: typing.List[tools.RouterSettings] = []
     for r in q_router_settings.g_routes:
         # инициализируем настройки маршрутизации продуктов производства
-        settings: render_html_conveyor_db.RouterSettings = render_html_conveyor_db.RouterSettings()
+        settings: tools.RouterSettings = tools.RouterSettings()
         settings.station = r['station']
         settings.desc = r['desc']
         settings.output = r['output']
         settings_of_router.append(settings)
 
     # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
-    settings_of_conveyors: typing.List[render_html_conveyor_db.ConveyorSettings] = []
+    settings_of_conveyors: typing.List[tools.ConveyorSettings] = []
     for entity in q_conveyor_settings.g_entities:
         # пропускаем отключенные группы настроек (остались для архива?)
         if not entity.get('enabled', False) or not entity.get('conveyors'):
@@ -139,11 +141,12 @@ def main():
             for corporation_id in corporation_ids:
                 corporation = qid.get_corporation(corporation_id)
                 # инициализируем настройки запуска конвейера
-                settings: render_html_conveyor_db.ConveyorSettings = render_html_conveyor_db.ConveyorSettings(corporation)
+                settings: tools.ConveyorSettings = tools.ConveyorSettings(corporation)
+                activities: typing.List[str] = conveyor.get('activities', ['manufacturing'])
                 # читаем настройки производственной активности
                 settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
                 settings.same_stock_container = conveyor.get('same_stock_container', True)
-                settings.activities = conveyor.get('activities', ['manufacturing'])
+                settings.activities = [tools.ConveyorActivity.from_str(a) for a in activities]
                 settings.conveyor_with_reactions = conveyor.get('reactions', False)
                 # получаем информацию по реакциям (если включены)
                 if settings.conveyor_with_reactions:
@@ -165,17 +168,17 @@ def main():
                     # превращаем названия (шаблоны названий) в номера контейнеров
                     for priority in conveyor['blueprints'].keys():
                         if next((1 for tmplt in conveyor['blueprints'][priority] if re.search(tmplt, container_name)), None):
-                            scs = render_html_conveyor_db.ConveyorSettingsPriorityContainer(priority, corporation, container)
+                            scs = tools.ConveyorSettingsPriorityContainer(priority, settings, corporation, container)
                             settings.containers_sources.append(scs)
                             source_box = True
                             if settings.same_stock_container:
-                                scs = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                                scs = tools.ConveyorSettingsContainer(settings, corporation, container)
                                 settings.containers_stocks.append(scs)
                                 stock_box = True
                             break
                     if not settings.same_stock_container:
                         if next((1 for tmplt in conveyor['stock'] if re.search(tmplt, container_name)), None):
-                            scs = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                            scs = tools.ConveyorSettingsContainer(settings, corporation, container)
                             settings.containers_stocks.append(scs)
                             stock_box = True
                     # if next((0 for tmplt in conveyor['blueprints'] if re.search(tmplt, container_name)), 1):
@@ -189,7 +192,7 @@ def main():
                                 settings.containers_react_stock.append(container_id)
                                 stock_box = True
                     # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например сток T1)
-                    if 'manufacturing' in settings.activities:
+                    if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in settings.activities:
                         blueprints_box: bool = True
                         if source_box or stock_box or formulas_box:
                             blueprints_box = False
@@ -200,7 +203,7 @@ def main():
                                 if next((1 for tmplt in conveyor['exclude'] if re.search(tmplt, container_name)), None):
                                     blueprints_box = False
                         if blueprints_box:
-                            scb = render_html_conveyor_db.ConveyorSettingsContainer(corporation, container)
+                            scb = tools.ConveyorSettingsContainer(settings, corporation, container)
                             settings.containers_additional_blueprints.append(scb)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
                 if not settings.containers_sources:
@@ -229,7 +232,7 @@ def main():
                                         continue
                                     # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
                                     if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
-                                        cssc = render_html_conveyor_db.ConveyorSettingsSaleContainer(trade_corporation, container)
+                                        cssc = tools.ConveyorSettingsSaleContainer(settings, trade_corporation, container)
                                         settings.trade_sale_stock.append(cssc)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
@@ -237,7 +240,7 @@ def main():
     """
     # вывод на экран того, что получилось
     for (idx, __s) in enumerate(settings_of_router):
-        s: render_html_conveyor_db.RouterSettings = __s
+        s: tools.RouterSettings = __s
         station: db.QSwaggerStation = qid.get_station_by_name(s.station)
         if idx > 0:
             print()
@@ -250,7 +253,7 @@ def main():
     """
     # вывод на экран того, что получилось
     for (idx0, __s) in enumerate(settings_of_conveyors):
-        s: render_html_conveyor_db.ConveyorSettings = __s
+        s: tools.ConveyorSettings = __s
         corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
         if idx0 > 0:
             print()
@@ -269,7 +272,7 @@ def main():
             z = sorted([x for x in s.containers_stocks if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
                 print('>stock:        ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
-            if 'manufacturing' in s.activities:
+            if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
                 z = sorted([x for x in s.containers_additional_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:
                     print('>blueprints:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))

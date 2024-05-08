@@ -187,6 +187,7 @@ class QSwaggerTranslator:
                 prev_blueprint_type_id = blueprint_type_id
                 blueprint = data.get(blueprint_type_id)
                 # возможная ситуация, что такого чертежа нет - тогда это ошибка
+                # TODO: в то же время есть флаг load_unknown_type_blueprints, который тут надо обработать
                 if blueprint is None:
                     raise Exception("Unable to add material into blueprint #{} activity #{}".format(blueprint_type_id, activity_id))
                 prev_activity_id = -1
@@ -472,9 +473,9 @@ WHERE
     # corporations/{corporation_id}/industry/jobs/
     # -------------------------------------------------------------------------
 
-    def get_corporation_industry_jobs(
+    def get_internal_corporation_industry_jobs(
             self,
-            corporation_id: int,
+            rows: typing.Any,
             type_ids: typing.Dict[int, QSwaggerTypeId],
             blueprints: typing.Dict[int, QSwaggerBlueprint],
             characters: typing.Dict[int, QSwaggerCharacter],
@@ -482,46 +483,26 @@ WHERE
             corporation_assets: typing.Dict[int, QSwaggerCorporationAssetsItem],
             corporation_blueprints: typing.Dict[int, QSwaggerCorporationBlueprint],
             load_unknown_type_blueprints: bool = True) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
-        rows = self.db.select_all_rows(  # около 3000 одновременных активных корп работ, или больше...
-            "SELECT"
-            " ecj_job_id,"
-            " ecj_installer_id,"
-            " ecj_facility_id,"
-            " ecj_activity_id,"
-            " ecj_blueprint_id,"
-            " ecj_blueprint_type_id,"
-            " ecj_blueprint_location_id,"
-            " ecj_output_location_id,"
-            " ecj_runs,"
-            " ecj_cost,"
-            " ecj_licensed_runs,"
-            " ecj_probability,"
-            " ecj_product_type_id,"
-            " ecj_end_date "
-            "FROM esi_corporation_industry_jobs "
-            "WHERE ecj_completed_date IS NULL AND ecj_corporation_id=%(id)s;",
-            {'id': corporation_id}
-        )
-        if rows is None:
-            return {}
         # получаем список пилотов, которые запустили работы, обычно 100 уникальных пилотов на 3000 работах
         unique_installer_ids: typing.List[int] = list(set([r[1] for r in rows]))
         if unique_installer_ids:
             unknown_installer_ids: typing.List[int] = [c_id for c_id in unique_installer_ids if not characters.get(c_id)]
-            unknown_job_installers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_installer_ids)
-            for (character_id, cached_character) in unknown_job_installers.items():
-                characters[character_id] = cached_character
-            del unknown_job_installers
+            if unknown_installer_ids:
+                unknown_job_installers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_installer_ids)
+                for (character_id, cached_character) in unknown_job_installers.items():
+                    characters[character_id] = cached_character
+                del unknown_job_installers
             del unknown_installer_ids
         del unique_installer_ids
         # получаем список фабрик, на которых запущены работы, обычно единицы уникальных станций/структур
         unique_facility_ids: typing.List[int] = list(set([r[2] for r in rows]))
         if unique_facility_ids:
             unknown_facility_ids: typing.List[int] = [c_id for c_id in unique_facility_ids if not stations.get(c_id)]
-            unknown_job_facilities: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_facility_ids, type_ids)
-            for (facility_id, cached_facility) in unknown_job_facilities.items():
-                stations[facility_id] = cached_facility
-            del unknown_job_facilities
+            if unknown_facility_ids:
+                unknown_job_facilities: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_facility_ids, type_ids)
+                for (facility_id, cached_facility) in unknown_job_facilities.items():
+                    stations[facility_id] = cached_facility
+                del unknown_job_facilities
             del unknown_facility_ids
         del unique_facility_ids
         # обработка данных по корпоративным работам и связывание их с другими кешированными объектами
@@ -609,5 +590,95 @@ WHERE
                 output_location,  # коробки редко перемещаются, поэтому обычно известны
                 facility,  # фабрики обычно известны, если не пропал доступ (и БД неотсинхронизирована)
                 row)
+        return data
+
+    def get_corporation_industry_jobs_active(
+            self,
+            corporation_id: int,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            blueprints: typing.Dict[int, QSwaggerBlueprint],
+            characters: typing.Dict[int, QSwaggerCharacter],
+            stations: typing.Dict[int, QSwaggerStation],
+            corporation_assets: typing.Dict[int, QSwaggerCorporationAssetsItem],
+            corporation_blueprints: typing.Dict[int, QSwaggerCorporationBlueprint],
+            load_unknown_type_blueprints: bool = True) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
+        rows = self.db.select_all_rows(  # около 3000 одновременных активных корп работ, или больше...
+            "SELECT"
+            " ecj_job_id,"
+            " ecj_installer_id,"
+            " ecj_facility_id,"
+            " ecj_activity_id,"
+            " ecj_blueprint_id,"
+            " ecj_blueprint_type_id,"
+            " ecj_blueprint_location_id,"
+            " ecj_output_location_id,"
+            " ecj_runs,"
+            " ecj_cost,"
+            " ecj_licensed_runs,"
+            " ecj_probability,"
+            " ecj_product_type_id,"
+            " ecj_end_date "
+            "FROM esi_corporation_industry_jobs "
+            "WHERE ecj_status='active' AND ecj_corporation_id=%(id)s;",  # ecj_completed_date IS NULL
+            {'id': corporation_id}
+        )
+        if rows is None:
+            return {}
+        data = self.get_internal_corporation_industry_jobs(
+            rows,
+            type_ids,
+            blueprints,
+            characters,
+            stations,
+            corporation_assets,
+            corporation_blueprints,
+            load_unknown_type_blueprints=load_unknown_type_blueprints)
+        del rows
+        return data
+
+    def get_corporation_industry_jobs_completed(
+            self,
+            corporation_id: int,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            blueprints: typing.Dict[int, QSwaggerBlueprint],
+            characters: typing.Dict[int, QSwaggerCharacter],
+            stations: typing.Dict[int, QSwaggerStation],
+            corporation_assets: typing.Dict[int, QSwaggerCorporationAssetsItem],
+            corporation_blueprints: typing.Dict[int, QSwaggerCorporationBlueprint],
+            load_unknown_type_blueprints: bool = True) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
+        rows = self.db.select_all_rows(  # около 3000 одновременных активных корп работ, или больше...
+            "SELECT"
+            " ecj_job_id,"
+            " ecj_installer_id,"
+            " ecj_facility_id,"
+            " ecj_activity_id,"
+            " ecj_blueprint_id,"
+            " ecj_blueprint_type_id,"
+            " ecj_blueprint_location_id,"
+            " ecj_output_location_id,"
+            " ecj_runs,"
+            " ecj_cost,"
+            " ecj_licensed_runs,"
+            " ecj_probability,"
+            " ecj_product_type_id,"
+            " ecj_end_date "
+            "FROM esi_corporation_industry_jobs "
+            "WHERE"
+            " ecj_corporation_id=%(id)s AND"
+            " (ecj_status<>'active' OR ecj_completed_date IS NOT NULL) AND"
+            " (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' < (ecj_end_date+interval '180 minute'));",
+            {'id': corporation_id}
+        )
+        if rows is None:
+            return {}
+        data = self.get_internal_corporation_industry_jobs(
+            rows,
+            type_ids,
+            blueprints,
+            characters,
+            stations,
+            corporation_assets,
+            corporation_blueprints,
+            load_unknown_type_blueprints=load_unknown_type_blueprints)
         del rows
         return data

@@ -227,13 +227,13 @@ class QSwaggerDictionary:
             corporation.assets,
             corporation.blueprints)
 
-    def load_corporation_industry_jobs(
+    def load_corporation_industry_jobs_active(
             self,
             corporation: QSwaggerCorporation,
             load_unknown_type_blueprints=False) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
         if not isinstance(corporation, QSwaggerCorporation):
             raise Exception("Illegal corporation descriptor")
-        corporation.industry_jobs = self.__qit.get_corporation_industry_jobs(
+        corporation.industry_jobs_active = self.__qit.get_corporation_industry_jobs_active(
             # идентификаторы
             corporation.corporation_id,
             # справочники
@@ -247,7 +247,29 @@ class QSwaggerDictionary:
             corporation.blueprints,
             # настройки
             load_unknown_type_blueprints=load_unknown_type_blueprints)
-        return corporation.industry_jobs
+        return corporation.industry_jobs_active
+
+    def load_corporation_industry_jobs_completed(
+            self,
+            corporation: QSwaggerCorporation,
+            load_unknown_type_blueprints=False) -> typing.Dict[int, QSwaggerCorporationIndustryJob]:
+        if not isinstance(corporation, QSwaggerCorporation):
+            raise Exception("Illegal corporation descriptor")
+        corporation.industry_jobs_completed = self.__qit.get_corporation_industry_jobs_completed(
+            # идентификаторы
+            corporation.corporation_id,
+            # справочники
+            self.sde_type_ids,
+            self.sde_blueprints,
+            # публичные сведения (пилоты, структуры, станции)
+            self.characters,
+            self.stations,
+            # корпоративные ассеты и данные
+            corporation.assets,
+            corporation.blueprints,
+            # настройки
+            load_unknown_type_blueprints=load_unknown_type_blueprints)
+        return corporation.industry_jobs_completed
 
     def load_corporation_stations(
             self,
