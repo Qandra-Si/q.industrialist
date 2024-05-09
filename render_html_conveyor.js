@@ -153,6 +153,76 @@ function resetOptionsMenuToDefault() {
  }
  resetOptionToDefault('sort', 'mode', g_menu_sort_default);
 }
+//-----------
+// работа с буфером обмена
+//-----------
+function copyToClipboard(elem, data_copy) {
+ var $temp = $("<textarea>");
+ $("body").append($temp);
+ $temp.val(data_copy).select();
+ try {
+  success = document.execCommand("copy");
+  if (success) {
+   elem.trigger('copied', ['Copied!']);
+  }
+ } finally {
+  $temp.remove();
+ }
+}
+//-----------
+// работа с буфером обмена (больше вариантов вода)
+//-----------
+function doCopyToClipboard(elem) {
+ // ожидаем либо data-tid="type_id"; либо data-copy="some value"; либо data-source="table"; либо data-source="span"
+ var data_tid = elem.data('tid');
+ if (!(data_tid === undefined)) {
+  var nm = getSdeItemName(data_tid);
+  if (!(nm === null)) copyToClipboard(elem, nm);
+  return;
+ }
+ var data_copy = elem.data('copy');
+ if (!(data_copy === undefined)) {
+  copyToClipboard(elem, data_copy);
+  return;
+ }
+ data_copy = '';
+ var data_source = elem.data('source');
+ if (data_source == 'table') {
+  var tr = elem.parent().parent();
+  var tbody = tr.parent();
+  var rows = tbody.children('tr');
+  var start_row = rows.index(tr);
+  rows.each( function(idx) {
+   var tr = $(this);
+   if (!(start_row === undefined) && (idx > start_row)) {
+    var td = tr.find('td').eq(0);
+    if (!(td.attr('class') === undefined))
+     start_row = undefined;
+    else {
+     var q1 = tr.find('td').eq(1).data('q'); q1 = (q1==undefined)?0:parseInt(q1,10);
+     var q2 = tr.find('td').eq(2).data('q'); q2 = (q2==undefined)?0:parseInt(q2,10);
+     var qq = q1 + q2;
+     if (qq == 0) return;
+     if (data_copy) data_copy += "\\n";
+     data_copy += td.data('nm') + "\\t" + qq;
+    }
+   }
+  });
+ } else if (data_source == 'span') {
+  var div = elem.parent().find('div.qind-tid');
+  if (!(div === undefined)) {
+   var tids = div.children('tid');
+   if (!(tids === undefined)) {
+    tids.each( function(idx) {
+     var tid = $(this);
+     if (data_copy) data_copy += "\\n";
+     data_copy += getSdeItemName(tid.data('tid')) + "\\t" + tid.data('q');
+    });
+   }
+  }
+ }
+ if (data_copy) copyToClipboard(elem, data_copy);
+}
 
 $(document).ready(function(){
   $('#qind-btn-reset').on('click', function () {

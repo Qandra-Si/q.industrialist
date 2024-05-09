@@ -406,7 +406,6 @@ class ConveyorMaterialRequirements:
 
 
 def calc_corp_conveyor(
-        glf,
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # настройки генерации отчёта

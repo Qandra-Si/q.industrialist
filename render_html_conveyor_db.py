@@ -94,6 +94,58 @@ table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; white-space: no
 .text-material-buy-ntier { color: #a67877; }
 div.qind-tid { font-size: 85%; }
 tid { white-space: nowrap; }
+mute { color: #777; }
+
+table.tbl-summary { padding: 1px; font-size: smaller; }
+table.tbl-summary thead tr th:nth-child(1),
+table.tbl-summary tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
+table.tbl-summary thead tr th:nth-child(2),
+table.tbl-summary tbody tr td:nth-child(2),
+table.tbl-summary thead tr th:nth-child(5),
+table.tbl-summary tbody tr td:nth-child(5) { width: 32px; }
+table.tbl-summary tbody tr:hover td:nth-child(3),
+table.tbl-summary tbody tr:hover td:nth-child(6) { border-left: 1px solid #6db09e; }
+table.tbl-summary thead tr th { padding: 4px; border-bottom: 1px solid #1d3231; vertical-align: bottom; }
+table.tbl-summary tbody tr td { padding: 4px; border-top: none; vertical-align: top; }
+table.tbl-summary tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
+table.tbl-summary tbody tr td { border-left: 1px solid #1d3231; }
+table.tbl-summary tbody tr td:nth-child(3),
+table.tbl-summary tbody tr td:nth-child(6) { border-left: none; }
+table.tbl-summary thead tr th:nth-child(4),
+table.tbl-summary tbody tr td:nth-child(4),
+table.tbl-summary thead tr th:nth-child(7),
+table.tbl-summary tbody tr td:nth-child(7) { text-align: right; }
+table.tbl-summary tbody tr td:nth-child(3),
+table.tbl-summary tbody tr td:nth-child(6) { white-space: nowrap; }
+
+/* table.tbl-summary tbody tr.job-active { color: #bcbcbc; } */
+table.tbl-summary tbody tr.job-completed { color: #515151; }
+table.tbl-summary tbody tr.job-completed td mute { color: #383838; }
+table.tbl-summary tbody tr.phantom { opacity: 0.15; }
+table.tbl-summary tbody tr.not-enough-materials td {
+ background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #821 49.9%, #821 60%, rgba(0, 0, 0, 0) 60%) 
+             fixed,
+             linear-gradient(-45deg, #821 10%, rgba(0, 0, 0, 0) 10%) 
+             fixed;
+ background-size: 1em 1em
+}
+
+table.tbl-summary tbody tr td.qind-summary {
+ font-size: medium;
+ text-align: left;
+ background: #111b1b;
+ border-bottom: 1px solid #111b1b; }
+table.tbl-summary tbody tr:hover td.qind-summary {
+ border-bottom: 1px solid #6db09e; }
+
+bp_tag { color: #777; }
+me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px solid #383739; }
+/* tid_tag { color: #777; font-size: 85%; } */
+
+.label-active-job { background-color: #213a42; color: #ccc; }
+.label-completed-job { background-color: #0f1111; color: #aaa; }
+.label-phantom-blueprint { background-color: #4f351d; color: #d6a879; }
+.label-impossible-blueprint { background-color: #f96900; color: #111111; }
 </style>
 """)
 
@@ -269,8 +321,8 @@ def dump_nav_menu_router_dialog(
             #    material_tag = ' <span class="label label-warning">research material</span></small>'
             #else:
             #    material_tag = ' <span class="label label-danger">non material</span></small>'
-            copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
-                          ' data-toggle="tooltip">{gly}</a>'.format(tid=product_type_id, gly=glyphicon("copy"))
+            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-copy="{product.name}" class="qind-copy-btn' \
+                          f' qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
@@ -320,8 +372,8 @@ def dump_nav_menu_router_dialog(
                 for a in corporation.assets.values():
                     if a.type_id == material_type_id and a.location_id in containers_stocks:
                         quantity += a.quantity
-            copy2clpbrd = '&nbsp;<a data-target="#" role="button" data-tid="{tid}" class="qind-copy-btn qind-sign"' \
-                          ' data-toggle="tooltip">{gly}</a>'.format(tid=material_type_id, gly=glyphicon("copy"))
+            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-copy="{material.name}" class="qind-copy-btn' \
+                          f'qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
@@ -475,6 +527,15 @@ def dump_nav_menu_conveyor_dialog(
     render_html.__dump_any_into_modal_footer(glf)
 
 
+g_tbl_summary_row_num: int = 0
+
+
+def get_tbl_summary_row_num() -> int:
+    global g_tbl_summary_row_num
+    g_tbl_summary_row_num += 1
+    return g_tbl_summary_row_num
+
+
 def dump_blueprints_overflow_warn(
         glf,
         # настройки генерации отчёта
@@ -505,68 +566,93 @@ def dump_blueprints_overflow_warn(
                 ))
 
 
-def dump_list_of_active_jobs(
+def dump_list_of_jobs(
         glf,
-        active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+        jobs: typing.List[db.QSwaggerCorporationIndustryJob],
+        is_active_jobs: bool) -> None:
     # группируем работы по типу, чтобы получить уникальные сочетания с количествами
     grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = \
         tools.get_jobs_grouped_by(
-            active_jobs,
+            jobs,
             group_by_product=True,
             group_by_activity=True)
     # сортируем уже сгруппированные работы
-    grouped_and_sorted: typing.List[typing.Tuple[str, int, db.QSwaggerCorporationIndustryJob]] = []
+    grouped_and_sorted: typing.List[typing.Tuple[str, int, int, typing.List[db.QSwaggerCorporationIndustryJob]]] = []
     for key in grouped.keys():
         group: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
         j0: db.QSwaggerCorporationIndustryJob = group[0]
-        qty: int = tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
-        qty = qty * sum([j.runs for j in group])
+        sum_runs: int = sum([j.runs for j in group])
+        sum_products: int = sum_runs * tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
         grouped_and_sorted.append((
             j0.product_type.name,
-            qty,
-            j0))
+            sum_runs,
+            sum_products,
+            group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # выводим в отчёт
-    for _, qty, job in grouped_and_sorted:
-        glf.write(f"active: <b>{job.product_type.name}</b><sup>({job.product_type_id})</sup>"
-                  f" x{qty}"
-                  f" / {job.blueprint_type.blueprint_type.name}<sup>({job.blueprint_type.type_id})</sup>"
-                  "<br>")
+    for _, sum_runs, sum_products, group in grouped_and_sorted:
+        j0: db.QSwaggerCorporationIndustryJob = group[0]
+        blueprint_type_id: int = j0.blueprint_type_id
+        blueprint_type_name: str = j0.blueprint_type.blueprint_type.name
+        product_type_id: int = j0.product_type_id
+        product_type_name: str = j0.product_type.name
+        installer: str = ''
+        installers_count: int = len(set([_.installer_id for _ in group]))
+        if installers_count == 1:
+            installer = f'<mute>Оператор</mute>&nbsp;{j0.installer.character_name}'
+        else:
+            installer_names: str = ', '.join(set([_.installer.character_name for _ in group]))
+            if len(installer_names) <= 20:
+                installer = f'<mute>Операторы</mute>&nbsp;{installer_names}'
+            else:
+                installer = f'<mute>Операторы&nbsp;-&nbsp;</mute><a data-target="#" data-copy="{installer_names}"' \
+                            f' data-toggle="tooltip" class="qind-copy-btn">{installers_count} перс</a>'
+        output: str = ''
+        outputs_count: int = len(set([_.output_location_id for _ in group]))
+        if outputs_count == 1:
+            output = f'<mute>Выход</mute>&nbsp;{j0.output_location.name if j0.output_location.name else j0.output_location_id}'
+        else:
+            output_names: str = ', '.join(
+                set([_.output_location.name if _.output_location.name else str(_.output_location_id) for _ in group]))
+            if len(output_names) <= 20:
+                output = f'<mute>Выход</mute>&nbsp;{output_names}'
+            else:
+                output = f'<mute>Выход&nbsp;-&nbsp;</mute><a data-target="#" data-copy="{output_names}"' \
+                         f' data-toggle="tooltip" class="qind-copy-btn">{outputs_count} кор</a>'
+        active_label: str = ''
+        if is_active_jobs:
+            active_label = '<label class="label label-active-job">проект ведётся</label>'
+        else:
+            active_label = '<label class="label label-completed-job">проект завершён</label>'
+        # <mute>Стоимость</mute>&nbsp;{'{:,.1f}'.format(job.cost)}
+        # </me_tag><tid_tag>&nbsp;({blueprint_type_id})</tid_tag>
+        glf.write(f"""<tr class="{'job-active' if is_active_jobs else 'job-completed'}">
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
+<td>{blueprint_type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{blueprint_type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+{active_label}<br>
+<mute>Число прогонов&nbsp;-&nbsp;</mute>{sum_runs}
+</td>
+<td>{len(group)}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(product_type_id, 32)}"></td>
+<td>{product_type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{product_type_name}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a><br>
+<small>{installer} {output}</small>
+</td>
+<td>{sum_products}</td>
+</tr>""")
     # освобождаем память
     del grouped_and_sorted
     del grouped
 
 
-def dump_list_of_completed_jobs(
-        glf,
-        completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
-    # группируем работы по типу, чтобы получить уникальные сочетания с количествами
-    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = \
-        tools.get_jobs_grouped_by(
-            completed_jobs,
-            group_by_product=True,
-            group_by_activity=True)
-    # сортируем уже сгруппированные работы
-    grouped_and_sorted: typing.List[typing.Tuple[str, int, db.QSwaggerCorporationIndustryJob]] = []
-    for key in grouped.keys():
-        group: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
-        j0: db.QSwaggerCorporationIndustryJob = group[0]
-        qty: int = tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
-        qty = qty * sum([j.runs for j in group])
-        grouped_and_sorted.append((
-            j0.product_type.name,
-            qty,
-            j0))
-    grouped_and_sorted.sort(key=lambda x: x[0])
-    # выводим в отчёт
-    for _, qty, job in grouped_and_sorted:
-        glf.write(f"completed: <b>{job.product_type.name}</b><sup>({job.product_type_id})</sup>"
-                  f" x{qty}"
-                  f" / {job.blueprint_type.blueprint_type.name}<sup>({job.blueprint_type.type_id})</sup>"
-                  "<br>")
-    # освобождаем память
-    del grouped_and_sorted
-    del grouped
+def dump_list_of_active_jobs(glf, active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    dump_list_of_jobs(glf, active_jobs, is_active_jobs=True)
+
+
+def dump_list_of_completed_jobs(glf, completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    dump_list_of_jobs(glf, completed_jobs, is_active_jobs=False)
 
 
 def dump_list_of_impossible_blueprints(
@@ -590,9 +676,17 @@ def dump_list_of_impossible_blueprints(
     # выводим в отчёт
     for _, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
-        glf.write(f"impossible: <b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
-                  f" x{len(group)}"
-                  "<br>")
+        type_id: int = b0.type_id
+        type_name: str = b0.blueprint_type.blueprint_type.name
+        glf.write(f"""<tr>
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+<label class="label label-impossible-blueprint">неподходящий чертёж</label></td>
+<td>{len(group)}</td>
+<td></td><td></td><td></td>
+</tr>""")
 
 
 def dump_list_of_phantom_blueprints(
@@ -622,12 +716,19 @@ def dump_list_of_phantom_blueprints(
     # выводим в отчёт
     for _, _, _, _, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
-        glf.write(f"phantom: <b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
-                  f" x{len(group)}"
-                  f" {b0.material_efficiency}:{b0.time_efficiency}<sup>me:te</sup>"
-                  f" {b0.runs}<sup>runs</sup>"
-                  f"<br><small><small>{[_.item_id for _ in group]}</small></small>"
-                  "<br>")
+        type_id: int = b0.type_id
+        type_name: str = b0.blueprint_type.blueprint_type.name
+        glf.write(f"""<tr class="phantom">
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+<label class="label label-phantom-blueprint">фантомный чертёж</label><br
+>{'<mute>Копия - </mute>'+str(b0.runs)+'<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{b0.material_efficiency}% {b0.time_efficiency}%</me_tag>&nbsp;<mute>({type_id})</mute></td>
+<td>{len(group)}</td>
+<td></td><td></td><td></td>
+</tr>""")
 
 
 def dump_list_of_possible_blueprints(
@@ -636,12 +737,18 @@ def dump_list_of_possible_blueprints(
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
     for stack in requirements:
         b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-        glf.write(f"<b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
-                  f" x{len(stack.group)}"
-                  f" {b0.material_efficiency}<sup>me</sup>"
-                  f" {b0.runs}<sup>runs</sup>"
-                  # f"<br>{[_.item_id for _ in stack.group]}"
-                  "<br>")
+        type_id: int = b0.type_id
+        type_name: str = b0.blueprint_type.blueprint_type.name
+        glf.write(f"""<tr{' class="not-enough-materials"' if not stack.enough_for_single else ''}>
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
+>{'<mute>Копия - </mute>'+str(b0.runs)+'<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{b0.material_efficiency}%</me_tag></td>
+<td>{len(stack.group)}</td>
+<td></td><td></td><td></td>
+</tr>""")  # </me_tag><tid_tag>&nbsp;({type_id})</tid_tag>
 
 
 def dump_corp_conveyors(
@@ -668,7 +775,6 @@ def dump_corp_conveyors(
         raise Exception("Unsupported mode: multiple corporations in a single conveyor")
     # получаем ссылку на единственную корпорацию
     corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
-    glf.write(f"<h2>Конвейер {corporation.corporation_name}</h2>\n")
     # группируем контейнеры по приоритетам
     prioritized: typing.Dict[int, typing.Dict[tools.ConveyorSettings, typing.List[tools.ConveyorSettingsPriorityContainer]]] = {}
     for s in conveyor_settings:
@@ -682,6 +788,25 @@ def dump_corp_conveyors(
                 p1.append(container)
             else:
                 p0[s] = [container]
+
+    glf.write(f"""
+<h2>Конвейер {corporation.corporation_name}</h2>
+<hr>
+<table class="table table-condensed table-hover tbl-summary">
+<thead>
+ <tr>
+  <th></th><!--1-->
+  <th></th><!--2-->
+  <th>Названия чертежей</th><!--3-->
+  <th>Кол-во</th><!--4-->
+  <th></th><!--5-->
+  <th>Названия предметов</th><!--6-->
+  <th>Кол-во</th><!--7-->
+ </tr>
+</thead>
+<tbody>
+""")
+
     # перебираем сгруппированные преоритизированные группы
     for priority in sorted(prioritized.keys()):
         p0 = prioritized.get(priority)
@@ -689,8 +814,13 @@ def dump_corp_conveyors(
             # получаем список контейнеров с чертежами для производства
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
-            glf.write(f"<h3>Приоритет {priority} <small>{', '.join([str(_) for _ in settings.activities])}</small></h3>"
-                      f"containers: {[f'{_.container_id}:<mark>{_.container_name}</mark>' for _ in containers]}<br>")
+            glf.write(f"""<tr>
+<td class="qind-summary" colspan="7">Приоритет {priority} <span class="text-muted">{', '.join([str(_) for _ in settings.activities])}</span></td>
+</tr>
+""")
+            """
+            glf.write(f"containers: {[f'{_.container_id}:<mark>{_.container_name}</mark>' for _ in containers]}<br>")
+            """
             # получаем список чертежей, находящихся в этих контейнерах
             blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
                 [b for b in corporation.blueprints.values() if b.location_id in container_ids]
@@ -769,7 +899,6 @@ def dump_corp_conveyors(
                         tools.get_corporation_stock_materials(corporation, settings)
                 # считаем потребности конвейера
                 requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints] = tools.calc_corp_conveyor(
-                    glf,
                     # данные (справочники)
                     qid,
                     # настройки генерации отчёта
@@ -825,6 +954,11 @@ def dump_corp_conveyors(
         del active_jobs
         del blueprints
 
+    glf.write(f"""
+</tbody>
+</table>
+""")
+
 
 def dump_router2_into_report(
         # путь, где будет сохранён отчёт
@@ -841,15 +975,11 @@ def dump_router2_into_report(
         dump_nav_menu(glf)
         dump_blueprints_overflow_warn(glf, conveyor_settings)
         # инициализация списка материалов, требуемых (и уже используемых) в производстве
-        """global_materials_dictionary = eve_conveyor_tools.ConveyorDictionary()"""
         dump_corp_conveyors(
             glf,
             qid,
             router_settings,
             conveyor_settings)
-        # сохраняем в отчёт справочник названий, кодов и сведений о производстве
-        """dump_global_materials_dictionary(glf, global_materials_dictionary)
-        # del global_materials_dictionary"""
         # сохраняем содержимое диалоговых окон
         dump_nav_menu_router_dialog(glf, qid, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
