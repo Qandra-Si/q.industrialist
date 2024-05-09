@@ -63,7 +63,7 @@ def main():
         # публичные сведения (пилоты, структуры, станции, корпорации)
         corporation: db.QSwaggerCorporation = qid.load_corporation(corporation_name)
         # загрузка корпоративных ассетов
-        qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=False)
+        qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=True)
         qid.load_corporation_blueprints(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_container_places(corporation)
         qid.load_corporation_industry_jobs_active(corporation, load_unknown_type_blueprints=True)

@@ -1,4 +1,5 @@
 ﻿import typing
+import datetime
 
 import render_html
 from render_html import get_span_glyphicon as glyphicon
@@ -504,55 +505,6 @@ def dump_blueprints_overflow_warn(
                 ))
 
 
-# blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
-# метод возвращает список tuple: [{"id": 11399, "q": 11, "qmin": 11"}] с учётом ME
-def get_materials_list(
-        # при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
-        blueprints: typing.List[db.QSwaggerCorporationBlueprint],
-        fixed_number_of_runs=None):  # учитывается только для оригиналов, т.е. для is_blueprint_copy=False
-    # список материалов по набору чертежей с учётом ME
-    materials_list_with_efficiency = []
-    # перебираем все чертежи
-    for b in blueprints:
-        pass
-    """
-        for m in b.blueprint_type.
-    # перебираем все ресурсы (материалы) чертежа
-    for m in self.blueprint_activity_dict["materials"]:
-        bp_manuf_need_all = 0
-        bp_manuf_need_min = 0
-        for __bp3 in blueprints_details:
-            # расчёт кол-ва ранов для этого чертежа
-            if is_blueprint_copy:
-                quantity_of_runs = __bp3["r"]
-                quantity_of_blueprints = 1
-            else:
-                quantity_of_blueprints = __bp3["q"] if __bp3["q"] > 0 else 1
-                quantity_of_runs = fixed_number_of_runs if fixed_number_of_runs else 1
-                # умножение на количество оригиналов будет выполнено позже...
-            # расчёт кол-ва материала с учётом эффективности производства
-            __industry_input = eve_efficiency.get_industry_material_efficiency(
-                self.blueprint_activity,
-                quantity_of_runs,
-                m["quantity"],  # сведения из чертежа
-                material_efficiency)
-            # вычисляем минимально необходимое материалов, необходимых для работ хотя-бы по одному чертежу
-            bp_manuf_need_min = __industry_input if bp_manuf_need_min == 0 else min(bp_manuf_need_min, __industry_input)
-            # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
-            __industry_input *= quantity_of_blueprints
-            # считаем общее количество материалов, необходимых для работ по этом чертежу
-            bp_manuf_need_all += __industry_input
-        # вывод информации о ресурсе (материале)
-        bpmm_tid: int = m["typeID"]
-        materials_list_with_efficiency.append({
-            "id": bpmm_tid,
-            "q": bp_manuf_need_all,
-            "qmin": bp_manuf_need_min,
-        })
-    return materials_list_with_efficiency
-    """
-
-
 def dump_list_of_active_jobs(
         glf,
         active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
@@ -636,14 +588,52 @@ def dump_list_of_impossible_blueprints(
         grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # выводим в отчёт
-    for _, qty, blueprint in grouped_and_sorted:
-        glf.write(f"impossible: <b>{blueprint.blueprint_type.blueprint_type.name}</b><sup>({blueprint.type_id})</sup>"
-                  f" x{qty}"
+    for _, group in grouped_and_sorted:
+        b0: db.QSwaggerCorporationBlueprint = group[0]
+        glf.write(f"impossible: <b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
+                  f" x{len(group)}"
+                  "<br>")
+
+
+def dump_list_of_phantom_blueprints(
+        glf,
+        # список чертежей, которые фантомно присутствуют в коробке конвейера (глюк ССР)
+        phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
+    # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+        tools.get_blueprints_grouped_by(
+            phantom_blueprints,
+            group_by_type_id=True,
+            group_by_me=True,
+            group_by_te=True,
+            group_by_runs=True)
+    # сортируем уже сгруппированные чертежи
+    grouped_and_sorted: typing.List[typing.Tuple[str, int, int, int, typing.List[db.QSwaggerCorporationBlueprint]]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
+        b0: db.QSwaggerCorporationBlueprint = group[0]
+        grouped_and_sorted.append((
+            b0.blueprint_type.blueprint_type.name,
+            b0.material_efficiency,
+            b0.time_efficiency,
+            b0.runs,
+            group))
+    grouped_and_sorted.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
+    # выводим в отчёт
+    for _, _, _, _, group in grouped_and_sorted:
+        b0: db.QSwaggerCorporationBlueprint = group[0]
+        glf.write(f"phantom: <b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
+                  f" x{len(group)}"
+                  f" {b0.material_efficiency}:{b0.time_efficiency}<sup>me:te</sup>"
+                  f" {b0.runs}<sup>runs</sup>"
+                  f"<br><small><small>{[_.item_id for _ in group]}</small></small>"
                   "<br>")
 
 
 def calc_corp_conveyor(
         glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
         conveyor_settings: tools.ConveyorSettings,
@@ -677,19 +667,31 @@ def calc_corp_conveyor(
                   f" x{len(group)}"
                   f" {b0.material_efficiency}<sup>me</sup>"
                   f" {b0.runs}<sup>runs</sup>"
+                  # f"<br>{[_.item_id for _ in group]}"
                   "<br>")
-        for blueprint in group:
-
-            pass
+        # вычисляем минимально необходимое кол-во материалов, необходимых для работ хотя-бы по одному чертежу
+        m0 = tools.get_materials_list(qid, conveyor_settings, [b0], conveyor_settings.fixed_number_of_runs)
+        # считаем общее количество материалов, необходимых для работ по этом чертежу
+        mG = tools.get_materials_list(qid, conveyor_settings, group, conveyor_settings.fixed_number_of_runs)
+        """
+        glf.write(f"min: {[_.material_type.name+' x'+str(_.quantity) for _ in m0]}<br>"
+                  f"group: {[_.material_type.name+' x'+str(_.quantity) for _ in mG]}<br>")
+        """
 
 
 def dump_corp_conveyors(
         glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
         conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # проверка, пусты ли настройки конвейера?
     if len(conveyor_settings) == 0: return
+
+    # инициализируем интервал отсеивания фантомных чертежей из списка corporation blueprints
+    phantom_timedelta = datetime.timedelta(hours=3)
+
     # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
     # если нет, то... надо добавить здесь какой-то сворачиваемый список?
     corporations: typing.Set[int] = set([s.corporation.corporation_id for s in conveyor_settings])
@@ -719,7 +721,7 @@ def dump_corp_conveyors(
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(priority)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
             glf.write(f"<h3>{priority}</h3>"
-                      f"<h4>container_ids</h4>{[f'{_.container_id}:{_.container_name}' for _ in containers]}<br>")
+                      f"containers: {[f'{_.container_id}:<mark>{_.container_name}</mark>' for _ in containers]}<br>")
             # получаем список чертежей, находящихся в этих контейнерах
             blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
                 [b for b in corporation.blueprints.values() if b.location_id in container_ids]
@@ -733,10 +735,14 @@ def dump_corp_conveyors(
             # составляем новый (уменьшенный) список тех чертежей, запуск которых возможен
             active_blueprint_ids: typing.Set[int] = \
                 set([j.blueprint_id for j in active_jobs])
+            """
             completed_blueprint_ids: typing.Set[int] = \
                 set([j.blueprint_id for j in completed_jobs if j.blueprint_id not in active_blueprint_ids])
+            # фильтруем список завершённых работ, удаляя из него использующиеся прямо сейчас чертежи
+            # (один и тот же чертёж мог быть запущен, выполнен, и снова запущен и выполняться прямо сейчас повторно)
             completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
                 [j for j in completed_jobs if j.blueprint_id not in active_blueprint_ids]
+            """
             # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
             possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
             impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
@@ -744,25 +750,43 @@ def dump_corp_conveyors(
                 for b in blueprints:
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
-                        possible_blueprints.append(b)
+                        if b.item_id not in active_blueprint_ids:
+                            possible_blueprints.append(b)
                     else:
                         impossible_blueprints.append(b)
-            # возможна ситуация, когда один и тот же чертёж ранее использовался (находится в completed
-            # списке) и одновременно используется (находится в active списке), доверяем при этом active
-            # списку
-            used_blueprint_ids: typing.Set[int] = \
-                active_blueprint_ids | \
-                completed_blueprint_ids
-            # TODO: ассеты не проверяем, т.к. они актуализируются гораздо реже (может стоит проверить новьё?)
-            possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
-                [b for b in possible_blueprints if b.item_id not in used_blueprint_ids]
-            impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
-                [b for b in impossible_blueprints if b.item_id not in used_blueprint_ids]
+            # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
+            # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
+            # чертежа тоже нет, ...вот такие фантомные чертежи мешаются в процессе расчётов (фильтрую чертежи более
+            # актуальными ассетами)
+            phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            if possible_blueprints:
+                # внимание! для поиска фантомных чертежей ассеты должны загружаться вместе с чертежами, т.е.
+                # при загрузке ассетов надо использовать флаг load_asseted_blueprints=True
+                phantom_blueprint_ids: typing.Set[int] = set()
+                for p in possible_blueprints:
+                    a: db.QSwaggerCorporationAssetsItem = corporation.assets.get(p.item_id)
+                    if a is not None: continue
+                    # если в ассетах чертежа нет, то это плохой признак
+                    # надо решать дилемму: чертежа уже нет, или всё ещё нет?
+                    b: db.QSwaggerCorporationBlueprint = corporation.blueprints.get(p.item_id)
+                    if (b.updated_at + phantom_timedelta) < qid.eve_now:
+                        phantom_blueprint_ids.add(b.item_id)
+                        phantom_blueprints.append(b)
+                # корректируем составляем список возможных к постройке чертежей
+                if phantom_blueprint_ids:
+                    possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                        [b for b in possible_blueprints if b.item_id not in phantom_blueprint_ids]
+                del phantom_blueprint_ids
+            # составляем список "залётных" чертежей, которые упали не в ту коробку
+            if impossible_blueprints:
+                impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                    [b for b in impossible_blueprints if b.item_id not in active_blueprint_ids]
             """
             glf.write(f"<h4>blueprints</h4>{[_.item_id for _ in blueprints]}<br>"
                       f"<h4>active_blueprint_ids</h4>{active_blueprint_ids}<br>"
                       f"<h4>completed_blueprint_ids</h4>{completed_blueprint_ids}<br>"
                       f"<h4>used_blueprint_ids</h4>{used_blueprint_ids}<br>"
+                      f"<h4>phantom_blueprints</h4>{[_.item_id for _ in phantom_blueprints]}<br>"
                       f"<h4>possible_blueprints</h4>{[_.item_id for _ in possible_blueprints]}<br>"
                       f"<h4>impossible_blueprints</h4>{[_.item_id for _ in impossible_blueprints]}<br>")
             """
@@ -770,6 +794,8 @@ def dump_corp_conveyors(
             if possible_blueprints:
                 calc_corp_conveyor(
                     glf,
+                    # данные (справочники)
+                    qid,
                     # настройки генерации отчёта
                     router_settings,
                     settings,
@@ -790,61 +816,19 @@ def dump_corp_conveyors(
                 dump_list_of_impossible_blueprints(
                     glf,
                     impossible_blueprints)
-
-    # формируем список продуктов, производство которых будет выполняться на обнаруженных станциях
-    for s in conveyor_settings:
-        source_container_ids: typing.Set[int] = set([_.container_id for _ in s.containers_sources])
-        glf.write(
-            f"""<h2>{corporation.corporation_name}</h2>
-{[_.container_name for _ in s.containers_sources]}<br>
-{source_container_ids}<br>"""
-        )
-        source_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = list()
-        for b in corporation.blueprints.values():
-            if b.location_id in source_container_ids:
-                source_blueprints.append(b)
-        source_industry_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = list()
-        for j in corporation.industry_jobs_active.values():
-            if j.blueprint_location_id in source_container_ids:
-                source_industry_jobs.append(j)
-        source_assets: typing.List[db.QSwaggerCorporationAssetsItem] = list()
-        for a in corporation.assets.values():
-            if a.location_id in source_container_ids:
-                source_assets.append(a)
-        glf.write(
-            f"""{[str(b.type_id)+':'+str(b.item_id) for b in source_blueprints]}<br>
-{[j.blueprint_id for j in source_industry_jobs]}<br>
-{[a.item_id for a in source_assets]}<br>"""
-        )
-
-        for blueprint in source_blueprints:
-            # TODO: здесь надо определить (по работам) находится ли чертёж в ассетах?
-            blueprint_type_id: int = blueprint.type_id
-            for a in s.activities:
-                activity = blueprint.blueprint_type.get_activity(activity_id=a.to_int())
-                blueprint_type_name: str = blueprint.blueprint_type.blueprint_type.name
-                product_type_id: typing.Optional[int] = None
-                product_type: typing.Optional[db.QSwaggerTypeId] = None
-                if not activity: continue
-                if a == tools.ConveyorActivity.CONVEYOR_MANUFACTURING:
-                    manufacturing: db.QSwaggerBlueprintManufacturing = activity
-                    product_type_id = manufacturing.product_id
-                    product_type = manufacturing.product_type
-                elif a == tools.ConveyorActivity.CONVEYOR_INVENTION:
-                    invention: db.QSwaggerBlueprintInvention = activity
-                elif a == tools.ConveyorActivity.CONVEYOR_COPYING:
-                    copying: db.QSwaggerBlueprintCopying = activity
-                elif a == tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL:
-                    research_material: db.QSwaggerBlueprintResearchMaterial = activity
-                elif a == tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME:
-                    research_time: db.QSwaggerBlueprintResearchTime = activity
-                elif a == tools.ConveyorActivity.CONVEYOR_REACTION:
-                    reaction: db.QSwaggerBlueprintReaction = activity
-
-        # удаление списков найденных  чертежей, предметов и работ
-        del source_assets
-        del source_industry_jobs
-        del source_blueprints
+            # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
+            if phantom_blueprints:
+                dump_list_of_phantom_blueprints(
+                    glf,
+                    phantom_blueprints)
+        # удаление списков найденных чертежей, предметов и работ
+        del phantom_blueprints
+        del possible_blueprints
+        del impossible_blueprints
+        del active_blueprint_ids
+        del completed_jobs
+        del active_jobs
+        del blueprints
 
 
 def dump_router2_into_report(
@@ -865,6 +849,7 @@ def dump_router2_into_report(
         """global_materials_dictionary = eve_conveyor_tools.ConveyorDictionary()"""
         dump_corp_conveyors(
             glf,
+            qid,
             router_settings,
             conveyor_settings)
         # сохраняем в отчёт справочник названий, кодов и сведений о производстве

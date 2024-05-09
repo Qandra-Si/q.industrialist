@@ -1,6 +1,7 @@
 ﻿# -*- encoding: utf-8 -*-
 import typing
 import datetime
+import pytz
 
 
 class QSwaggerMarketGroup:
@@ -144,6 +145,9 @@ class QSwaggerMaterial:
     @property
     def quantity(self) -> int:
         return self.__quantity
+
+    def increment_quantity(self, quantity: int) -> None:
+        self.__quantity += quantity
 
     @property
     def material_id(self) -> int:
@@ -480,7 +484,7 @@ class QSwaggerCorporationAssetsItem:
         self.__location_flag: str = row[5]
         self.__is_singleton: bool = row[6]
         self.__name: typing.Optional[str] = row[7]
-        self.__updated_at: datetime.datetime = row[8]
+        self.__updated_at: datetime.datetime = row[8].replace(tzinfo=pytz.UTC)
         self.__station_id: typing.Optional[int] = None
 
     @property
@@ -542,7 +546,7 @@ class QSwaggerCorporationBlueprint:
         self.__time_efficiency: int = row[5]
         self.__material_efficiency: int = row[6]
         self.__runs: int = row[7]
-        self.__updated_at: datetime.datetime = row[8]
+        self.__updated_at: datetime.datetime = row[8].replace(tzinfo=pytz.UTC)
         self.__station_id: typing.Optional[int] = None
 
     @property
@@ -591,6 +595,20 @@ class QSwaggerCorporationBlueprint:
 
     def set_station_id(self, station_id: int) -> None:
         self.__station_id = station_id
+
+    @property
+    def is_copy(self) -> bool:
+        # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
+        # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
+        # activities performed on them yet).
+        return self.__quantity == -2
+
+    @property
+    def is_original(self) -> bool:
+        # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
+        # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
+        # activities performed on them yet).
+        return self.__quantity == -1
 
 
 class QSwaggerCorporationIndustryJob:

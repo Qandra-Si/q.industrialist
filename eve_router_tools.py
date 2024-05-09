@@ -3,6 +3,7 @@
 import typing
 from enum import Enum
 
+import eve_efficiency
 import postgresql_interface as db
 
 
@@ -179,3 +180,95 @@ def get_product_quantity(
     elif ConveyorActivity.CONVEYOR_REACTION.to_int() == activity_id:
         reaction: db.QSwaggerBlueprintReaction = activity
         return reaction.quantity
+
+
+# blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
+# метод возвращает список tuple: [{"id": 11399, "q": 11, "qmin": 11"}] с учётом ME
+# при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
+# fixed_number_of_runs учитывается только для оригиналов, т.е. для is_blueprint_copy=False
+def get_materials_list(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
+        conveyor_settings: ConveyorSettings,
+        # список чертежей для которых необходимо рассчитать потребность в материалах
+        blueprints: typing.List[db.QSwaggerCorporationBlueprint],
+        fixed_number_of_runs: typing.Optional[int] = None) -> typing.List[db.QSwaggerMaterial]:
+    # список материалов по набору чертежей с учётом ME
+    materials_list_with_efficiency: typing.Dict[int, db.QSwaggerMaterial] = {}
+    # перебираем все активности и все чертежи
+    for a in conveyor_settings.activities:
+        for b in blueprints:
+            activity = b.blueprint_type.get_activity(activity_id=a.to_int())
+            if not activity: continue
+            # получаем справочную информацию по этому типу чертежа для выбранной активности
+            materials: db.QSwaggerActivityMaterials = activity.materials
+            if not materials: continue
+            # расчёт кол-ва ранов для этого чертежа
+            if b.is_copy:
+                quantity_of_runs = b.runs
+                quantity_of_blueprints = 1
+            else:
+                quantity_of_blueprints = b.quantity if b.quantity > 0 else 1
+                quantity_of_runs = fixed_number_of_runs if fixed_number_of_runs else 1
+                # умножение на количество оригиналов будет выполнено позже...
+            # перебираем все материалы и считаем кол-во с учётом me
+            for m in materials.materials:
+                # расчёт кол-ва материала с учётом эффективности производства
+                industry_input = eve_efficiency.get_industry_material_efficiency(
+                    str(a),
+                    quantity_of_runs,
+                    m.quantity,  # сведения из чертежа
+                    b.material_efficiency)  # сведения из корпоративного чертежа
+                # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
+                industry_input *= quantity_of_blueprints
+                # ---
+                in_cache: db.QSwaggerMaterial = materials_list_with_efficiency.get(m.material_id)
+                if not in_cache:
+                    materials_list_with_efficiency[m.material_id] = db.QSwaggerMaterial(m.material_type, industry_input)
+                else:
+                    in_cache.increment_quantity(industry_input)
+            # ---
+            if a == ConveyorActivity.CONVEYOR_INVENTION:
+                # Добавляем декрипторы (замечения и ограничения):
+                # - всегда все хулы запускаются с декриптором Accelerant Decryptor
+                # - всегда все риги запускаются с декриптором Symmetry Decryptor
+                # - всегда все T3 технологии запускаются с декриптором Parity Decryptor
+                # - всегда все модули запускаются без декрипторов
+                # - для запуска модулей скилы должны быть не меньше 2х, для запуска хулов и риг скилы должны быть
+                # в 3 и выше. Если ваши скилы меньше - лучше запускайте ресерч или ждите задач по копирке. Будьте
+                # внимательны, игнорируя эти замечения вы сильно усложняете работу производственников.
+                invention: db.QSwaggerBlueprintInvention = activity
+                # считаем, что какие бы варианты чертежей не инвентились, все они будут одного типа
+                product_blueprint_id: int = invention.products[0].product_id
+                product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
+                if product_blueprint_type and product_blueprint_type.manufacturing:
+                    market_group_id: int = product_blueprint_type.manufacturing.product_type.market_group_id
+                    decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
+                    while market_group_id is not None:
+                        if market_group_id == 204:  # Ships
+                            decryptor_type = qid.get_type_id(34201)  # Accelerant Decryptor
+                        elif market_group_id == 943:  # Ship Modifications
+                            decryptor_type = qid.get_type_id(34206)  # Symmetry Decryptor
+                        elif market_group_id == 1909:  # Ancient Relics
+                            decryptor_type = qid.get_type_id(34204)  # Parity Decryptor
+                        if decryptor_type: break
+                        market_group: db.QSwaggerMarketGroup = qid.get_market_group(market_group_id)
+                        if not market_group: break
+                        market_group_id = market_group.parent_id
+                    # расчёт кол-ва декрипторов с учётом эффективности производства
+                    if decryptor_type:
+                        industry_input = eve_efficiency.get_industry_material_efficiency(
+                            str(a),
+                            quantity_of_runs,
+                            1,  # всегда один декриптор
+                            b.material_efficiency)  # сведения из корпоративного чертежа
+                        # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
+                        industry_input *= quantity_of_blueprints
+                        # ---
+                        in_cache: db.QSwaggerMaterial = materials_list_with_efficiency.get(decryptor_type.type_id)
+                        if not in_cache:
+                            materials_list_with_efficiency[decryptor_type.type_id] = db.QSwaggerMaterial(decryptor_type, industry_input)
+                        else:
+                            in_cache.increment_quantity(industry_input)
+    return [m for m in materials_list_with_efficiency.values()]

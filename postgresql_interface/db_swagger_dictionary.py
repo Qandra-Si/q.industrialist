@@ -1,5 +1,7 @@
 ﻿# -*- encoding: utf-8 -*-
 import typing
+import datetime
+import pytz
 
 from .db_swagger_cache import *
 from .db_swagger_translator import QSwaggerTranslator
@@ -9,6 +11,7 @@ class QSwaggerDictionary:
     def __init__(self, qit: QSwaggerTranslator):
         self.__qit: QSwaggerTranslator = qit
         # справочники
+        self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_type_ids: typing.Dict[int, QSwaggerTypeId] = {}
         self.sde_blueprints: typing.Dict[int, QSwaggerBlueprint] = {}
@@ -34,6 +37,10 @@ class QSwaggerDictionary:
     def disconnect_from_translator(self):
         # после отключения использовать load_xxx методы запрещено
         self.__qit = None
+
+    def get_market_group(self, market_group_id: int) -> typing.Optional[QSwaggerMarketGroup]:
+        cached_market_group: QSwaggerMarketGroup = self.sde_market_groups.get(market_group_id)
+        return cached_market_group
 
     def load_market_groups(self) -> typing.Dict[int, QSwaggerMarketGroup]:
         if self.sde_market_groups:
