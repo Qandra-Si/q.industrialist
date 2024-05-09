@@ -630,53 +630,18 @@ def dump_list_of_phantom_blueprints(
                   "<br>")
 
 
-def calc_corp_conveyor(
+def dump_list_of_possible_blueprints(
         glf,
-        # данные (справочники)
-        qid: db.QSwaggerDictionary,
-        # настройки генерации отчёта
-        router_settings: typing.List[tools.RouterSettings],
-        conveyor_settings: tools.ConveyorSettings,
-        # список чертежей, которые нобходимо обработать
-        ready_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
-    # группируем чертежи по типу, me и runs кодам, чтобы получить уникальные сочетания с количествами
-    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
-        tools.get_blueprints_grouped_by(
-            ready_blueprints,
-            group_by_type_id=True,
-            group_by_me=True,
-            group_by_te=False,
-            group_by_runs=True)
-    """
-    glf.write("<h4>calc</h4>"
-              "<h5>grouped</h5>"
-              f"{[f'{_[1][0].blueprint_type.blueprint_type.name} {_[0][1]}:{_[0][2]}/{_[0][3]} x{len(_[1])}<br>' for _ in grouped.items()]}")
-    """
-    # сортируем уже сгруппированные чертежи
-    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationBlueprint]]] = []
-    for key in grouped.keys():
-        group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
-        grouped_and_sorted.append((
-            group[0].blueprint_type.blueprint_type.name,
-            group))
-    grouped_and_sorted.sort(key=lambda x: x[0])
-    # выводим в отчёт
-    for _, group in grouped_and_sorted:
-        b0: db.QSwaggerCorporationBlueprint = group[0]
+        # список чертежей и их потребности (сгруппированные и отсортированные)
+        requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
+    for stack in requirements:
+        b0: db.QSwaggerCorporationBlueprint = stack.group[0]
         glf.write(f"<b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
-                  f" x{len(group)}"
+                  f" x{len(stack.group)}"
                   f" {b0.material_efficiency}<sup>me</sup>"
                   f" {b0.runs}<sup>runs</sup>"
-                  # f"<br>{[_.item_id for _ in group]}"
+                  # f"<br>{[_.item_id for _ in stack.group]}"
                   "<br>")
-        # вычисляем минимально необходимое кол-во материалов, необходимых для работ хотя-бы по одному чертежу
-        m0 = tools.get_materials_list(qid, conveyor_settings, [b0], conveyor_settings.fixed_number_of_runs)
-        # считаем общее количество материалов, необходимых для работ по этом чертежу
-        mG = tools.get_materials_list(qid, conveyor_settings, group, conveyor_settings.fixed_number_of_runs)
-        """
-        glf.write(f"min: {[_.material_type.name+' x'+str(_.quantity) for _ in m0]}<br>"
-                  f"group: {[_.material_type.name+' x'+str(_.quantity) for _ in mG]}<br>")
-        """
 
 
 def dump_corp_conveyors(
@@ -691,6 +656,10 @@ def dump_corp_conveyors(
 
     # инициализируем интервал отсеивания фантомных чертежей из списка corporation blueprints
     phantom_timedelta = datetime.timedelta(hours=3)
+    # хранилище для списка доступных материалов (если коробки конвейера от приоритета к
+    # приоритету не меняются, то и хранилище не будет очищаться)
+    available_materials: typing.Dict[int, db.QSwaggerMaterial] = {}
+    available_materials_key: typing.Optional[tools.ConveyorSettings] = None
 
     # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
     # если нет, то... надо добавить здесь какой-то сворачиваемый список?
@@ -699,28 +668,28 @@ def dump_corp_conveyors(
         raise Exception("Unsupported mode: multiple corporations in a single conveyor")
     # получаем ссылку на единственную корпорацию
     corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
-    glf.write(f"<h2>{corporation.corporation_name}</h2>\n")
+    glf.write(f"<h2>Конвейер {corporation.corporation_name}</h2>\n")
     # группируем контейнеры по приоритетам
-    prioritized: typing.Dict[tools.ConveyorSettings, typing.Dict[int, typing.List[tools.ConveyorSettingsPriorityContainer]]] = {}
+    prioritized: typing.Dict[int, typing.Dict[tools.ConveyorSettings, typing.List[tools.ConveyorSettingsPriorityContainer]]] = {}
     for s in conveyor_settings:
-        p0 = prioritized.get(s)
-        if not p0:
-            prioritized[s] = {}
-            p0 = prioritized.get(s)
         for container in s.containers_sources:
-            p1 = p0.get(container.priority)
+            p0 = prioritized.get(container.priority)
+            if not p0:
+                prioritized[container.priority] = {}
+                p0 = prioritized.get(container.priority)
+            p1 = p0.get(s)
             if p1:
                 p1.append(container)
             else:
-                p0[container.priority] = [container]
-    # перебираем сгруппированные приоритезированные группы
-    for settings in prioritized.keys():
-        p0 = prioritized.get(settings)
-        for priority in sorted(p0.keys()):
+                p0[s] = [container]
+    # перебираем сгруппированные преоритизированные группы
+    for priority in sorted(prioritized.keys()):
+        p0 = prioritized.get(priority)
+        for settings in p0.keys():
             # получаем список контейнеров с чертежами для производства
-            containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(priority)
+            containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
-            glf.write(f"<h3>{priority}</h3>"
+            glf.write(f"<h3>Приоритет {priority} <small>{', '.join([str(_) for _ in settings.activities])}</small></h3>"
                       f"containers: {[f'{_.container_id}:<mark>{_.container_name}</mark>' for _ in containers]}<br>")
             # получаем список чертежей, находящихся в этих контейнерах
             blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
@@ -792,15 +761,41 @@ def dump_corp_conveyors(
             """
             # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
             if possible_blueprints:
-                calc_corp_conveyor(
+                # считаем количество материалов в стоке выбранного конвейера
+                if not available_materials_key == settings:
+                    if available_materials:
+                        del available_materials
+                    available_materials: typing.Dict[int, db.QSwaggerMaterial] = \
+                        tools.get_corporation_stock_materials(corporation, settings)
+                # считаем потребности конвейера
+                requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints] = tools.calc_corp_conveyor(
                     glf,
                     # данные (справочники)
                     qid,
                     # настройки генерации отчёта
                     router_settings,
                     settings,
+                    # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
+                    available_materials,
                     # список чертежей, которые необходимо обработать
                     possible_blueprints)
+                """
+                for stack in requirements:
+                    b0: db.QSwaggerCorporationBlueprint = stack.group[0]
+                    glf.write(f"<b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
+                              f" x{len(stack.group)}"
+                              f" {b0.material_efficiency}<sup>me</sup>"
+                              f" {b0.runs}<sup>runs</sup>"
+                              # f"<br>{[_.item_id for _ in stack.group]}"
+                              "<br>")
+                    glf.write(
+                        f"min: {[_.material_type.name + ' x' + str(_.quantity) for _ in stack.required_materials_for_single]} - "
+                        f"<b>{'ENOUGH' if stack.enough_for_single else 'TOO FEW'}</b><br>"
+                        f"group: {[_.material_type.name + ' x' + str(_.quantity) for _ in stack.required_materials_for_stack]} - "
+                        f"<b>{'ENOUGH' if stack.enough_for_stack else 'TOO FEW'}</b><br>")
+                """
+                # выводим в отчёт
+                dump_list_of_possible_blueprints(glf, requirements)
             # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера
             if active_jobs:
                 dump_list_of_active_jobs(
