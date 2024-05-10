@@ -683,33 +683,33 @@ def dump_list_of_jobs(
         installer: str = ''
         installers_count: int = len(set([_.installer_id for _ in group]))
         if installers_count == 1:
-            installer = f'<mute>Оператор</mute>&nbsp;{j0.installer.character_name}'
+            installer = f'<mute>Оператор</mute> {j0.installer.character_name}'
         else:
             installer_names: str = ', '.join(set([_.installer.character_name for _ in group]))
             if len(installer_names) <= 20:
-                installer = f'<mute>Операторы</mute>&nbsp;{installer_names}'
+                installer = f'<mute>Операторы</mute> {installer_names}'
             else:
-                installer = f'<mute>Операторы&nbsp;-&nbsp;</mute><a data-target="#" data-copy="{installer_names}"' \
+                installer = f'<mute>Операторы - </mute><a data-target="#" data-copy="{installer_names}"' \
                             f' data-toggle="tooltip" class="qind-copy-btn">{installers_count} перс</a>'
         output: str = ''
         outputs_count: int = len(set([_.output_location_id for _ in group]))
         if outputs_count == 1:
-            output = f'<mute>Выход</mute>&nbsp;{j0.output_location.name if j0.output_location.name else j0.output_location_id}'
+            output = f'<mute>Выход</mute> {j0.output_location.name if j0.output_location.name else j0.output_location_id}'
         else:
             output_names: str = ', '.join(
                 set([_.output_location.name if _.output_location.name else str(_.output_location_id) for _ in group]))
             if len(output_names) <= 20:
-                output = f'<mute>Выход</mute>&nbsp;{output_names}'
+                output = f'<mute>Выход</mute> {output_names}'
             else:
-                output = f'<mute>Выход&nbsp;-&nbsp;</mute><a data-target="#" data-copy="{output_names}"' \
+                output = f'<mute>Выход - </mute><a data-target="#" data-copy="{output_names}"' \
                          f' data-toggle="tooltip" class="qind-copy-btn">{outputs_count} кор</a>'
         active_label: str = ''
         if is_active_jobs:
             active_label = '<label class="label label-active-job">проект ведётся</label>'
         else:
             active_label = '<label class="label label-completed-job">проект завершён</label>'
-        # <mute>Стоимость</mute>&nbsp;{'{:,.1f}'.format(job.cost)}
-        # </me_tag><tid_tag>&nbsp;({blueprint_type_id})</tid_tag>
+        # <mute>Стоимость</mute> {'{:,.1f}'.format(job.cost)}
+        # </me_tag><tid_tag> ({blueprint_type_id})</tid_tag>
         tr_class: str = 'job-active' if is_active_jobs else 'job-completed'
         tr_class += g_nav_menu_defaults.css(tr_class)
         glf.write(f"""<tr class="{tr_class}">
@@ -718,7 +718,7 @@ def dump_list_of_jobs(
 <td>{blueprint_type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{blueprint_type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 {active_label}<br>
-<mute>Число прогонов&nbsp;-&nbsp;</mute>{sum_runs}
+<mute>Число прогонов - </mute>{sum_runs}
 </td>
 <td>{len(group)}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(product_type_id, 32)}"></td>
@@ -814,8 +814,8 @@ def dump_list_of_phantom_blueprints(
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-phantom-blueprint">фантомный чертёж</label><br
->{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
->{b0.material_efficiency}% {b0.time_efficiency}%</me_tag>&nbsp;<mute>({type_id})</mute></td>
+>{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
+>{b0.material_efficiency}% {b0.time_efficiency}%</me_tag> <mute>({type_id})</mute></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td>
 </tr>""")
@@ -871,11 +871,11 @@ def dump_list_of_possible_blueprints(
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
->{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
 >{b0.material_efficiency}%</me_tag></td>
 <td>{format_quantities(stack.max_possible_for_single, len(stack.group))}</td>
 <td></td><td></td><td></td>
-</tr>""")  # </me_tag><tid_tag>&nbsp;({type_id})</tid_tag>
+</tr>""")  # </me_tag><tid_tag> ({type_id})</tid_tag>
         else:
             def tr_div_class(which: str,
                              __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
@@ -907,7 +907,7 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
             for stack in stacks:
                 b0: db.QSwaggerCorporationBlueprint = stack.group[0]
                 glf.write(f"{tr_div_class('div', stack, True)}" \
-                          f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}" \
+                          f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
                           f"<me_tag>{b0.material_efficiency}%</me_tag>" \
                           f"{tr_div_class('div', None, False)}")
                 quantities += f"{tr_div_class('div', stack, True)}" \
