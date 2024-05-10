@@ -1852,7 +1852,8 @@ class QDatabaseTools:
             history_order_ids = [int(o['order_id']) for o in history_data]
             corp_cache = self.get_corp_cache(self.__cached_corporation_orders, corporation_id)
             obsolete_order_ids = set(corp_cache.keys()) - set(active_order_ids) - set(history_order_ids)
-            self.dbswagger.discard_absent_corporation_orders(corporation_id, list(obsolete_order_ids))
+            if obsolete_order_ids:
+                self.dbswagger.discard_absent_corporation_orders(corporation_id, list(obsolete_order_ids))
 
         del history_data
         del active_data

@@ -2193,13 +2193,16 @@ class QSwaggerInterface:
             data.append(row[0])
         return data
 
-    def discard_absent_corporation_orders(self, corporation_id: int, absert_ids: typing.List[int]):
+    def discard_absent_corporation_orders(self, corporation_id: int, absent_ids: typing.List[int]):
+        # тут иногда происходят исключения, добавляю отладку:
+        print(corporation_id)
+        print(absent_ids)
         self.db.execute(
             "UPDATE esi_corporation_orders "
             "SET ecor_history=true "
             "WHERE NOT ecor_history AND ecor_corporation_id=%s AND ecor_order_id IN (SELECT * FROM UNNEST(%s));",
             corporation_id,
-            absert_ids
+            absent_ids
         )
 
     def discard_obsolete_corporation_orders(self):
