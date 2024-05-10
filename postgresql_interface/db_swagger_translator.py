@@ -402,7 +402,7 @@ WHERE
  a.eca_is_singleton AND
  a.eca_name IS NOT NULL AND
  a.eca_location_flag LIKE 'CorpSAG%%' AND
- t.sdet_group_id in (448,649);
+ t.sdet_group_id in (448,649,12);
 """,
             {'id': corporation_id}
         )
