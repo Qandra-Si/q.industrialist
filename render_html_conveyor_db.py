@@ -119,9 +119,12 @@ table.tbl-summary tbody tr td:nth-child(3),
 table.tbl-summary tbody tr td:nth-child(6) { white-space: nowrap; }
 
 /* table.tbl-summary tbody tr.job-active { color: #bcbcbc; } */
-table.tbl-summary tbody tr.job-active { }
-table.tbl-summary tbody tr.job-completed { color: #515151; }
-table.tbl-summary tbody tr.job-completed td mute { color: #383838; }
+table.tbl-summary tbody tr.job-active td:nth-child(5) { opacity: 0.5; }
+table.tbl-summary tbody tr.job-active :is(td:nth-child(6),td:nth-child(7)) { color: #666; }
+table.tbl-summary tbody tr.job-active :is(td:nth-child(6),td:nth-child(7)) mute { color: #444; }
+table.tbl-summary tbody tr.job-completed td:nth-child(2) { opacity: 0.5; }
+table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { color: #666; }
+table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
 table.tbl-summary tbody tr.lost-blueprints { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
 table.tbl-summary tbody tr.run-possible,
