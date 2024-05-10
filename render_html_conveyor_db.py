@@ -153,6 +153,16 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 """)
 
 
+def declension_of_runs(runs: int) -> str:
+    modulo: int = runs % 10
+    if modulo in (0, 5, 6, 7, 8, 9):
+        return 'прогонов'
+    elif modulo == 1:
+        return 'прогон'
+    elif modulo in (2, 3, 4):
+        return 'прогона'
+
+
 def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
         (True, 'run-possible', 'Доступные для запуска работы'),
@@ -748,7 +758,7 @@ def dump_list_of_phantom_blueprints(
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-phantom-blueprint">фантомный чертёж</label><br
->{'<mute>Копия - </mute>'+str(b0.runs)+'<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
 >{b0.material_efficiency}% {b0.time_efficiency}%</me_tag>&nbsp;<mute>({type_id})</mute></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td>
@@ -800,7 +810,7 @@ def dump_list_of_possible_blueprints(
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
->{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
 >{b0.material_efficiency}%</me_tag></td>
 <td>{format_quantities(stack.max_possible_for_single, len(stack.group))}</td>
 <td></td><td></td><td></td>
@@ -834,8 +844,10 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
             quantities: str = tr_div_class('space')
             for stack in stacks:
                 b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-                glf.write(f"""{tr_div_class('div', stack, True)}{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}
-<me_tag>{b0.material_efficiency}%</me_tag>{tr_div_class('div', None, False)}""")
+                glf.write(f"{tr_div_class('div', stack, True)}" \
+                          f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'}" \
+                          f"<me_tag>{b0.material_efficiency}%</me_tag>" \
+                          f"{tr_div_class('div', None, False)}")
                 quantities += f"{tr_div_class('div', stack, True)}" \
                               f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
                               f"{tr_div_class('div', None, False)}"
