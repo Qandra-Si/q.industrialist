@@ -148,7 +148,7 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 .label-active-job { background-color: #213a42; color: #ccc; }
 .label-completed-job { background-color: #0f1111; color: #aaa; }
 .label-phantom-blueprint { background-color: #4f351d; color: #d6a879; }
-.label-impossible-blueprint { background-color: #f96900; color: #111111; }
+.label-lost-blueprint { background-color: #f96900; color: #111111; }
 </style>
 """)
 
@@ -662,15 +662,16 @@ def dump_list_of_completed_jobs(glf, completed_jobs: typing.List[db.QSwaggerCorp
     dump_list_of_jobs(glf, completed_jobs, is_active_jobs=False)
 
 
-def dump_list_of_impossible_blueprints(
+def dump_list_of_lost_blueprints(
         glf,
         # список чертежей, которые невозможно запустить в выбранном конвейере
-        impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
+        lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
     # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
-    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+    grouped: typing.Dict[typing.Tuple[int, int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
         tools.get_blueprints_grouped_by(
-            impossible_blueprints,
+            lost_blueprints,
             group_by_type_id=True,
+            group_by_station=False,
             group_by_me=False,
             group_by_te=False,
             group_by_runs=False)
@@ -690,7 +691,7 @@ def dump_list_of_impossible_blueprints(
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
-<label class="label label-impossible-blueprint">неподходящий чертёж</label></td>
+<label class="label label-lost-blueprint">неподходящий чертёж</label></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td>
 </tr>""")
@@ -701,10 +702,11 @@ def dump_list_of_phantom_blueprints(
         # список чертежей, которые фантомно присутствуют в коробке конвейера (глюк ССР)
         phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
     # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
-    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+    grouped: typing.Dict[typing.Tuple[int, int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
         tools.get_blueprints_grouped_by(
             phantom_blueprints,
             group_by_type_id=True,
+            group_by_station=False,
             group_by_me=True,
             group_by_te=True,
             group_by_runs=True)
@@ -910,7 +912,7 @@ def dump_corp_conveyors(
             """
             # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
             possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
-            impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
             for a in settings.activities:
                 for b in blueprints:
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
@@ -918,7 +920,7 @@ def dump_corp_conveyors(
                         if b.item_id not in active_blueprint_ids:
                             possible_blueprints.append(b)
                     else:
-                        impossible_blueprints.append(b)
+                        lost_blueprints.append(b)
             # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
             # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
             # чертежа тоже нет, ...вот такие фантомные чертежи мешаются в процессе расчётов (фильтрую чертежи более
@@ -943,9 +945,9 @@ def dump_corp_conveyors(
                         [b for b in possible_blueprints if b.item_id not in phantom_blueprint_ids]
                 del phantom_blueprint_ids
             # составляем список "залётных" чертежей, которые упали не в ту коробку
-            if impossible_blueprints:
-                impossible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
-                    [b for b in impossible_blueprints if b.item_id not in active_blueprint_ids]
+            if lost_blueprints:
+                lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                    [b for b in lost_blueprints if b.item_id not in active_blueprint_ids]
             """
             glf.write(f"<h4>blueprints</h4>{[_.item_id for _ in blueprints]}<br>"
                       f"<h4>active_blueprint_ids</h4>{active_blueprint_ids}<br>"
@@ -953,7 +955,7 @@ def dump_corp_conveyors(
                       f"<h4>used_blueprint_ids</h4>{used_blueprint_ids}<br>"
                       f"<h4>phantom_blueprints</h4>{[_.item_id for _ in phantom_blueprints]}<br>"
                       f"<h4>possible_blueprints</h4>{[_.item_id for _ in possible_blueprints]}<br>"
-                      f"<h4>impossible_blueprints</h4>{[_.item_id for _ in impossible_blueprints]}<br>")
+                      f"<h4>lost_blueprints</h4>{[_.item_id for _ in lost_blueprints]}<br>")
             """
             # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
             if possible_blueprints:
@@ -987,10 +989,10 @@ def dump_corp_conveyors(
                     glf,
                     completed_jobs)  # [b for b in blueprints if b.item_id in completed_blueprint_ids]
             # если в коробке застряли чертежи которых там не должно быть, то выводим об этом сведения
-            if impossible_blueprints:
-                dump_list_of_impossible_blueprints(
+            if lost_blueprints:
+                dump_list_of_lost_blueprints(
                     glf,
-                    impossible_blueprints)
+                    lost_blueprints)
             # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
             if phantom_blueprints:
                 dump_list_of_phantom_blueprints(
@@ -999,7 +1001,7 @@ def dump_corp_conveyors(
         # удаление списков найденных чертежей, предметов и работ
         del phantom_blueprints
         del possible_blueprints
-        del impossible_blueprints
+        del lost_blueprints
         del active_blueprint_ids
         del completed_jobs
         del active_jobs
