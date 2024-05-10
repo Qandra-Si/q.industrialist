@@ -790,7 +790,7 @@ def dump_list_of_possible_blueprints(
             if max_possible >= total:
                 return str(total)
             else:
-                return f'{max_possible} из {total}'
+                return f'<mute>{max_possible} из</mute> {total}'
         # ---
         if len(stacks) == 1:
             stack: tools.ConveyorMaterialRequirements.StackOfBlueprints = stacks[0]
