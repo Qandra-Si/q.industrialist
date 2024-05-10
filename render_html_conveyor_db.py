@@ -510,7 +510,7 @@ def dump_nav_menu_conveyor_dialog(
 </div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
-            if 'manufacturing' in s.activities:
+            if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
                 z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                     [x for x in s.containers_additional_blueprints if x.station_id == station_id],
                     key=lambda x: x.container_name)

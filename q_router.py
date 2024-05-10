@@ -91,6 +91,7 @@ def main():
     # отключаемся от сервера
     qid.disconnect_from_translator()
     del qit
+    qidb.disconnect()
     del qidb
 
     unique_manuf_lines: typing.Set[int] = set()
@@ -254,11 +255,11 @@ def main():
     # вывод на экран того, что получилось
     for (idx0, __s) in enumerate(settings_of_conveyors):
         s: tools.ConveyorSettings = __s
-        corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation_id)
+        corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation.corporation_id)
         if idx0 > 0:
             print()
         print('industry corp: ', corporation.corporation_name)
-        print('activities:    ', ','.join(s.activities))
+        print('activities:    ', ','.join([str(_) for _ in s.activities]))
         stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
                                               [x.station_id for x in s.containers_stocks] +
                                               [x.station_id for x in s.containers_additional_blueprints] +
