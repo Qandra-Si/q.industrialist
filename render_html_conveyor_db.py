@@ -119,14 +119,15 @@ table.tbl-summary tbody tr td:nth-child(3),
 table.tbl-summary tbody tr td:nth-child(6) { white-space: nowrap; }
 
 /* table.tbl-summary tbody tr.job-active { color: #bcbcbc; } */
+table.tbl-summary tbody tr.job-active { }
 table.tbl-summary tbody tr.job-completed { color: #515151; }
 table.tbl-summary tbody tr.job-completed td mute { color: #383838; }
-table.tbl-summary tbody tr.phantom { opacity: 0.15; }
-table.tbl-summary tbody tr.not-enough-materials td {
- background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #821 49.9%, #821 60%, rgba(0, 0, 0, 0) 60%) 
-             fixed,
-             linear-gradient(-45deg, #821 10%, rgba(0, 0, 0, 0) 10%) 
-             fixed;
+table.tbl-summary tbody tr.lost-blueprints { }
+table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
+table.tbl-summary tbody tr.possible { }
+table.tbl-summary tbody tr.impossible td {
+ background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #821 49.9%, #821 60%, rgba(0, 0, 0, 0) 60%) fixed,
+             linear-gradient(-45deg, #821 10%, rgba(0, 0, 0, 0) 10%) fixed;
  background-size: 1em 1em
 }
 
@@ -152,8 +153,12 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 
 def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
+        (True, 'possible', 'Доступные для запуска работы'),
         (True, 'impossible', 'Недоступные для запуска работы'),  # btnToggleImpossible
-        (False, 'active', "Запущенные работы"),  # btnToggleActive
+        (False, 'lost-blueprints', "Неподходящие чертежи"),
+        (False, 'phantom-blueprints', "Фантомные чертежи (рассогласованные)"),
+        (False, 'job-active', "Ведущиеся проекты"),  # btnToggleActive
+        (False, 'job-completed', "Завершённые проекты"),
         None,
         (False, 'used-materials', "Используемые материалы"),  # btnToggleUsedMaterials
         (True, 'not-available', "Недоступные материалы"),  # btnToggleNotAvailable
@@ -678,7 +683,7 @@ def dump_list_of_impossible_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr>
+        glf.write(f"""<tr class="lost-blueprints">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -718,7 +723,7 @@ def dump_list_of_phantom_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr class="phantom">
+        glf.write(f"""<tr class="phantom-blueprints">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -739,7 +744,7 @@ def dump_list_of_possible_blueprints(
         b0: db.QSwaggerCorporationBlueprint = stack.group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr{' class="not-enough-materials"' if not stack.enough_for_single else ''}>
+        glf.write(f"""<tr class="{'impossible' if not stack.enough_for_single else 'possible'}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a

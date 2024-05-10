@@ -123,7 +123,42 @@ function rebuildOptionsMenu() {
 //-----------
 //работа с содержимом страницы
 //-----------
+function changeElemVisibility(el, show){
+ if(show)
+  el.removeClass('hidden');
+ else
+  el.addClass('hidden');
+}
 function rebuildBody() {
+ var show_possible = (getOption('option', 'possible') == 1) ? 1 : 0;
+ var show_impossible = (getOption('option', 'impossible') == 1) ? 1 : 0;
+ var show_lost = (getOption('option', 'lost-blueprints') == 1) ? 1 : 0;
+ var show_phantom = (getOption('option', 'phantom-blueprints') == 1) ? 1 : 0;
+ var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
+ var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
+
+ $('tr.possible').each(function() {
+  changeElemVisibility($(this), show_possible);
+ });
+ $('tr.impossible').each(function() {
+  changeElemVisibility($(this), show_impossible);
+ });
+ $('tr.lost-blueprints').each(function() {
+  changeElemVisibility($(this), show_lost);
+ });
+ $('tr.phantom-blueprints').each(function() {
+  changeElemVisibility($(this), show_phantom);
+ });
+ $('tr.job-active').each(function() {
+  changeElemVisibility($(this), show_active);
+ });
+ $('tr.job-completed').each(function() {
+  changeElemVisibility($(this), show_completed);
+ });
+
+ var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
+ var show_entry_purch = (getOption('option', 'entry-level-purchasing') == 1) ? 1 : 0;
+ var show_interm_manuf = (getOption('option', 'intermediate-manuf') == 1) ? 1 : 0;
 }
 //-----------
 // обработчики нажатий на кнопки
@@ -234,7 +269,7 @@ $(document).ready(function(){
   // first init
   resetOptionsMenuToDefault();
   rebuildOptionsMenu();
-  //rebuildBody();
+  rebuildBody();
   //rebuildStocksDropdown();
   //rebuildStockMaterials();
   // init popover menus
