@@ -115,7 +115,8 @@ class QIndustrialistDatabase:
                     conn.cursor().close()
                 if self.debug and (conn.closed != 0):
                     print('Error on closing database connection: code={}'.format(conn.closed))
-                conn.cancel()
+                if self.__ssh_tunnel is None:
+                    conn.cancel()
             del self.__conn
             self.__conn = None
         if self.__ssh_tunnel is not None:
