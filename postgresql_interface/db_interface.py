@@ -1,7 +1,9 @@
 ﻿# -*- encoding: utf-8 -*-
 import sys
 import json
+import typing
 import psycopg2
+from sshtunnel import SSHTunnelForwarder
 
 
 class QIndustrialistDatabase:
@@ -16,6 +18,7 @@ class QIndustrialistDatabase:
         self.__settings = settings
         self.__debug = debug
 
+        self.__ssh_tunnel: typing.Optional[SSHTunnelForwarder] = None
         self.__conn = None
         self.__module_id = None
         self.__module_settings = []
@@ -63,13 +66,30 @@ class QIndustrialistDatabase:
 
         try:
             self.disconnect()
-            self.__conn = psycopg2.connect(
-                dbname=self.settings["dbname"],
-                user=self.settings["user"],
-                password=self.settings["password"],
-                host=self.settings["host"],
-                port=self.settings["port"]
-            )
+            if "ssh_tunnel" in self.settings:
+                self.__ssh_tunnel = SSHTunnelForwarder(
+                    (self.settings["ssh_tunnel"]["host"], self.settings["ssh_tunnel"]["port"]),
+                    ssh_username=self.settings["ssh_tunnel"]["username"],
+                    ssh_private_key=self.settings["ssh_tunnel"]["private_key"],
+                    ssh_password=self.settings["ssh_tunnel"]["password"],
+                    remote_bind_address=(self.settings["host"], self.settings["port"])
+                )
+                self.__ssh_tunnel.start()
+                self.__conn = psycopg2.connect(
+                    dbname=self.settings["dbname"],
+                    user=self.settings["user"],
+                    password=self.settings["password"],
+                    host="localhost",
+                    port=self.__ssh_tunnel.local_bind_port
+                )
+            else:
+                self.__conn = psycopg2.connect(
+                    dbname=self.settings["dbname"],
+                    user=self.settings["user"],
+                    password=self.settings["password"],
+                    host=self.settings["host"],
+                    port=self.settings["port"]
+                )
             self.execute("SET search_path TO qi")
             __mid = self.select_one_row(
                 "SELECT ml_id FROM modules_list "
@@ -89,15 +109,19 @@ class QIndustrialistDatabase:
             raise e
 
     def disconnect(self):
-        if self.__conn is None:
-            return
-        with self.__conn as conn:
-            if not conn.cursor().closed:
-                conn.cursor().close()
-            if self.debug and (conn.closed != 0):
-                print('Error on closing database connection: code={}'.format(conn.closed))
-            conn.cancel()
-        self.__conn = None
+        if self.__conn is not None:
+            with self.__conn as conn:
+                if not conn.cursor().closed:
+                    conn.cursor().close()
+                if self.debug and (conn.closed != 0):
+                    print('Error on closing database connection: code={}'.format(conn.closed))
+                conn.cancel()
+            del self.__conn
+            self.__conn = None
+        if self.__ssh_tunnel is not None:
+            self.__ssh_tunnel.stop()
+            del self.__ssh_tunnel
+            self.__ssh_tunnel = None
 
     def commit(self):
         self.__conn.commit()

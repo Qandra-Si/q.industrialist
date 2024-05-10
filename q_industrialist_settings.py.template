@@ -19,6 +19,15 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-corporations.read_corporation_membership.v1",  # Requires: access token
                  ]
 g_database = {
+    #"ssh_tunnel": {
+    #    "host": "server.ru",
+    #    "port": 22,
+    #    "username": "user",
+    #    # next, you should specify either a password or a key
+    #    "private_key": "/path/to/private.key",
+    #    "password": None,
+    #    # remove bind address and port will be used from the settings below
+    #},
     "host":     "127.0.0.1",
     "dbname":   "qi_db",
     "port":     5432,
