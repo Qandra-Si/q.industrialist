@@ -12,6 +12,7 @@ class RouterSettings:
         # параметры работы конвейера
         self.station: str = ''
         self.desc: str = ''
+        # список type_id продуктов текущего router-а
         self.output: typing.List[int] = []
 
 
@@ -282,7 +283,6 @@ class ConveyorCorporationStockMaterials:
         # материалы сгруппированы по станциям, т.е. чтобы получить информацию об имеющемся кол-ве материалов, надо
         # знать идентификатор станции
         self.stock_materials: typing.Dict[int, typing.Dict[int, db.QSwaggerMaterial]] = {}  # station:type_id:material
-        self.corporation: typing.Optional[db.QSwaggerCorporation] = None
         self.conveyor_settings: typing.Optional[ConveyorSettings] = None
 
     def calc(self,
@@ -291,16 +291,15 @@ class ConveyorCorporationStockMaterials:
              # настройки генерации отчёта
              conveyor_settings: ConveyorSettings):
         del self.stock_materials
-        self.corporation = corporation
         self.conveyor_settings = conveyor_settings
         # проверка правильности входных данных
-        if not self.conveyor_settings.corporation.corporation_id == self.corporation.corporation_id:
+        if not self.conveyor_settings.corporation.corporation_id == corporation.corporation_id:
             raise Exception("Incompatible conveyor settings and corporation data")
         self.stock_materials: typing.Dict[int, typing.Dict[int, db.QSwaggerMaterial]] = {}
         # составляем список контейнеров, в которых будет выполняться поиск материалов
         container_ids: typing.Set[int] = set([c.container_id for c in conveyor_settings.containers_stocks])
         # перебираем ассеты, ищем материалы
-        for a in self.corporation.assets.values():
+        for a in corporation.assets.values():
             if a.location_id not in container_ids: continue
             s: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(a.station_id)
             if not s:
@@ -345,6 +344,17 @@ class ConveyorCorporationStockMaterials:
             if required_quantity > 0:
                 return False
         return True
+
+
+def calc_available_materials(conveyor_settings: typing.List[ConveyorSettings]) \
+        -> typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]:
+    # считаем количество доступных материалов в стоках выбранных конвейеров
+    available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials] = {}
+    for s in conveyor_settings:
+        a: ConveyorCorporationStockMaterials = ConveyorCorporationStockMaterials()
+        a.calc(s.corporation, s)
+        available_materials[s] = a
+    return available_materials
 
 
 class ConveyorMaterialRequirements:

@@ -260,7 +260,9 @@ def dump_nav_menu(glf) -> None:
 
 def dump_nav_menu_router_dialog(
         glf,
+        # данные (справочники)
         qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
         conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
@@ -272,9 +274,8 @@ def dump_nav_menu_router_dialog(
     # формируем содержимое модального диалога
     row_num: int = 0
     for (idx, s) in enumerate(router_settings):
+        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
         station: db.QSwaggerStation = qid.get_station_by_name(s.station)
-        if idx > 0:
-            glf.write('<hr>')
         containers_stocks: typing.Set[int] = set()
         corporation: typing.Optional[db.QSwaggerCorporation] = None
         for cs in conveyor_settings:
@@ -284,6 +285,9 @@ def dump_nav_menu_router_dialog(
                     if corporation and not corporation == c.corporation:
                         raise Exception(f"There are multiple routes for multiple corporations {corporation.corporation_name} and {c.corporation.corporation_name}")
                     corporation = c.corporation
+        # ---
+        if idx > 0:
+            glf.write('<hr>')
         glf.write(f"<h3 station_id='{station.station_id}'>{station.station_name} "
                   f"<small>({station.station_type_name}, {s.desc})</small>"
                   "</h3>")
@@ -312,7 +316,7 @@ def dump_nav_menu_router_dialog(
             row_num += 1
             product: db.QSwaggerTypeId = qid.get_type_id(product_type_id)
             if not product: continue
-            quantity: int = 0  # resource_dict["q"]
+            quantity: int = 0
             in_progress: int = 0  # = resource_dict["j"]
             not_enough: int = 0  # = resource_dict["ne"]
             # считаем кол-во материалов в стоке
@@ -363,16 +367,25 @@ def dump_nav_menu_router_dialog(
 </thead>
 <tbody>""")
         materials: typing.Set[int] = set()
-        for product_type_id in s.output:
-            activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
-            if not activities: continue
-            for a in activities:
-                mats: db.QSwaggerActivityMaterials = a.materials
-                for m in mats.materials:
-                    materials.add(m.material_id)
+        if s.output:
+            # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+            for product_type_id in s.output:
+                activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
+                if not activities: continue
+                for a in activities:
+                    mats: db.QSwaggerActivityMaterials = a.materials
+                    for m in mats.materials:
+                        materials.add(m.material_id)
+        else:
+            # если список output пустой, то имеет место быть default-ная производственная база,
+            # выводим весь сток материалов на этой базе
+            for a in corporation.assets.values():
+                if a.location_id in containers_stocks:
+                    materials.add(a.type_id)
         for __sort_key, material_type_id in sorted([(qid.get_type_id(x).market_group_id, x) for x in materials]):
+            row_num += 1
             material: db.QSwaggerTypeId = qid.get_type_id(material_type_id)
-            quantity: int = 0  # resource_dict["q"]
+            quantity: int = 0
             not_enough: int = 0  # = resource_dict["ne"]
             # считаем кол-во материалов в стоке
             if corporation and containers_stocks:
@@ -408,7 +421,9 @@ def dump_nav_menu_router_dialog(
 
 def dump_nav_menu_conveyor_dialog(
         glf,
+        # данные (справочники)
         qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
         conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
@@ -826,15 +841,14 @@ def dump_corp_conveyors(
         qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
-        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
+        conveyor_settings: typing.List[tools.ConveyorSettings],
+        # список доступных материалов в стоках конвейеров
+        available_materials: typing.Dict[tools.ConveyorSettings, tools.ConveyorCorporationStockMaterials]) -> None:
     # проверка, пусты ли настройки конвейера?
     if len(conveyor_settings) == 0: return
 
     # инициализируем интервал отсеивания фантомных чертежей из списка corporation blueprints
     phantom_timedelta = datetime.timedelta(hours=3)
-    # хранилище для списка доступных материалов (если коробки конвейера от приоритета к
-    # приоритету не меняются, то и хранилище не будет очищаться)
-    available_materials: tools.ConveyorCorporationStockMaterials = tools.ConveyorCorporationStockMaterials()
 
     # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
     # если нет, то... надо добавить здесь какой-то сворачиваемый список?
@@ -959,12 +973,8 @@ def dump_corp_conveyors(
             """
             # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
             if possible_blueprints:
-                # считаем количество материалов в стоке выбранного конвейера
-                if not available_materials.conveyor_settings == settings:
-                    if available_materials:
-                        del available_materials  # TODO: сохранить для последующих расчётов
-                    available_materials: tools.ConveyorCorporationStockMaterials = tools.ConveyorCorporationStockMaterials()
-                    available_materials.calc(corporation, settings)
+                # получаем количество материалов в стоке выбранного конвейера
+                stock_materials: tools.ConveyorCorporationStockMaterials = available_materials.get(settings)
                 # считаем потребности конвейера
                 requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints] = tools.calc_corp_conveyor(
                     # данные (справочники)
@@ -973,7 +983,7 @@ def dump_corp_conveyors(
                     router_settings,
                     settings,
                     # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
-                    available_materials,
+                    stock_materials,
                     # список чертежей, которые необходимо обработать
                     possible_blueprints)
                 # выводим в отчёт
@@ -1024,20 +1034,26 @@ def dump_router2_into_report(
     glf = open('{dir}/router.html'.format(dir=ws_dir), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(glf, f'Router', use_dark_mode=True)
+        # компоновка отчёта
         dump_additional_stylesheet(glf)
         dump_nav_menu(glf)
         dump_blueprints_overflow_warn(glf, conveyor_settings)
         # инициализация списка материалов, требуемых (и уже используемых) в производстве
+        available_materials: typing.Dict[tools.ConveyorSettings, tools.ConveyorCorporationStockMaterials] = \
+            tools.calc_available_materials(conveyor_settings)
+        # компоновка высшего уровня конвейера
         dump_corp_conveyors(
             glf,
             qid,
             router_settings,
-            conveyor_settings)
+            conveyor_settings,
+            available_materials)
         # сохраняем содержимое диалоговых окон
         dump_nav_menu_router_dialog(glf, qid, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
-        # удаляем более ненужный список материалов
         render_html.__dump_footer(glf)
+        # удаляем более ненужный список материалов
+        del available_materials
     finally:
         glf.close()
