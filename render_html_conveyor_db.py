@@ -124,8 +124,10 @@ table.tbl-summary tbody tr.job-completed { color: #515151; }
 table.tbl-summary tbody tr.job-completed td mute { color: #383838; }
 table.tbl-summary tbody tr.lost-blueprints { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
-table.tbl-summary tbody tr.possible { }
-table.tbl-summary tbody tr.impossible td {
+table.tbl-summary tbody tr.run-possible,
+table.tbl-summary tbody tr td div.run-possible { }
+table.tbl-summary tbody tr.run-impossible td,
+table.tbl-summary tbody tr td div.run-impossible {
  background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #821 49.9%, #821 60%, rgba(0, 0, 0, 0) 60%) fixed,
              linear-gradient(-45deg, #821 10%, rgba(0, 0, 0, 0) 10%) fixed;
  background-size: 1em 1em
@@ -153,8 +155,8 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 
 def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
-        (True, 'possible', 'Доступные для запуска работы'),
-        (True, 'impossible', 'Недоступные для запуска работы'),  # btnToggleImpossible
+        (True, 'run-possible', 'Доступные для запуска работы'),
+        (True, 'run-impossible', 'Недоступные для запуска работы'),  # btnToggleImpossible
         (False, 'lost-blueprints', "Неподходящие чертежи"),
         (False, 'phantom-blueprints', "Фантомные чертежи (рассогласованные)"),
         (False, 'job-active', "Ведущиеся проекты"),  # btnToggleActive
@@ -740,20 +742,80 @@ def dump_list_of_possible_blueprints(
         glf,
         # список чертежей и их потребности (сгруппированные и отсортированные)
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
+    # группируем стеки по названиям чертежей
+    grouped: typing.List[typing.Tuple[str, typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]]] = []
     for stack in requirements:
         b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-        type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr class="{'impossible' if not stack.enough_for_single else 'possible'}">
+        g = next((_ for _ in grouped if _[0] == type_name), None)
+        if g:
+            g[1].append(stack)
+        else:
+            grouped.append((type_name, [stack]))
+    # выводим группами в отчёт
+    for type_name, stacks in grouped:
+        type_id: int = stacks[0].group[0].type_id
+        tr_class: str = ''
+        for stack in stacks:
+            if not tr_class:
+                tr_class = 'run-impossible' if not stack.enough_for_single else 'run-possible'
+            elif tr_class == 'run-impossible':
+                if stack.enough_for_single:
+                    tr_class = ''
+                    break
+            elif tr_class == 'run-possible':
+                if not stack.enough_for_single:
+                    tr_class = ''
+                    break
+        if len(stacks) == 1:
+            stack: tools.ConveyorMaterialRequirements.StackOfBlueprints = stacks[0]
+            b0: db.QSwaggerCorporationBlueprint = stack.group[0]
+            glf.write(f"""<tr class="{tr_class}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
->{'<mute>Копия - </mute>'+str(b0.runs)+'<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
+>{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
 >{b0.material_efficiency}%</me_tag></td>
 <td>{len(stack.group)}</td>
 <td></td><td></td><td></td>
 </tr>""")  # </me_tag><tid_tag>&nbsp;({type_id})</tid_tag>
+        else:
+            def tr_div_class(which: str,
+                             __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
+                             head: typing.Optional[bool] = None) -> str:
+                if which == 'tr':
+                    if tr_class:
+                        return f' class="{tr_class}"'
+                elif which == 'div':
+                    if not tr_class:
+                        if head:
+                            div_class: str = 'run-impossible' if not __stack784.enough_for_single else 'run-possible'
+                            return f'<div class="{div_class}">'
+                        else:
+                            return '</div>'
+                    else:
+                        if head:
+                            return '<br>'
+                elif which == 'space':
+                    if not tr_class:
+                        return '<br>'
+                return ''
+            glf.write(f"""<tr{tr_div_class('tr')}>
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>""")
+            quantities: str = tr_div_class('space')
+            for stack in stacks:
+                b0: db.QSwaggerCorporationBlueprint = stack.group[0]
+                glf.write(f"""{tr_div_class('div', stack, True)}{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}
+<me_tag>{b0.material_efficiency}%</me_tag>{tr_div_class('div', None, False)}""")
+                quantities += f"""{tr_div_class('div', stack, True)}{len(stack.group)}{tr_div_class('div', None, False)}"""
+            glf.write(f"""</td>
+<td>{quantities}</td>
+<td></td><td></td><td></td>
+</tr>""")
 
 
 def dump_corp_conveyors(
