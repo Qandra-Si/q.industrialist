@@ -832,8 +832,7 @@ def dump_corp_conveyors(
     phantom_timedelta = datetime.timedelta(hours=3)
     # хранилище для списка доступных материалов (если коробки конвейера от приоритета к
     # приоритету не меняются, то и хранилище не будет очищаться)
-    available_materials: typing.Dict[int, db.QSwaggerMaterial] = {}
-    available_materials_key: typing.Optional[tools.ConveyorSettings] = None
+    available_materials: tools.ConveyorCorporationStockMaterials = tools.ConveyorCorporationStockMaterials()
 
     # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
     # если нет, то... надо добавить здесь какой-то сворачиваемый список?
@@ -959,11 +958,11 @@ def dump_corp_conveyors(
             # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
             if possible_blueprints:
                 # считаем количество материалов в стоке выбранного конвейера
-                if not available_materials_key == settings:
+                if not available_materials.conveyor_settings == settings:
                     if available_materials:
-                        del available_materials
-                    available_materials: typing.Dict[int, db.QSwaggerMaterial] = \
-                        tools.get_corporation_stock_materials(corporation, settings)
+                        del available_materials  # TODO: сохранить для последующих расчётов
+                    available_materials: tools.ConveyorCorporationStockMaterials = tools.ConveyorCorporationStockMaterials()
+                    available_materials.calc(corporation, settings)
                 # считаем потребности конвейера
                 requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints] = tools.calc_corp_conveyor(
                     # данные (справочники)
@@ -975,21 +974,6 @@ def dump_corp_conveyors(
                     available_materials,
                     # список чертежей, которые необходимо обработать
                     possible_blueprints)
-                """
-                for stack in requirements:
-                    b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-                    glf.write(f"<b>{b0.blueprint_type.blueprint_type.name}</b><sup>({b0.type_id})</sup>"
-                              f" x{len(stack.group)}"
-                              f" {b0.material_efficiency}<sup>me</sup>"
-                              f" {b0.runs}<sup>runs</sup>"
-                              # f"<br>{[_.item_id for _ in stack.group]}"
-                              "<br>")
-                    glf.write(
-                        f"min: {[_.material_type.name + ' x' + str(_.quantity) for _ in stack.required_materials_for_single]} - "
-                        f"<b>{'ENOUGH' if stack.enough_for_single else 'TOO FEW'}</b><br>"
-                        f"group: {[_.material_type.name + ' x' + str(_.quantity) for _ in stack.required_materials_for_stack]} - "
-                        f"<b>{'ENOUGH' if stack.enough_for_stack else 'TOO FEW'}</b><br>")
-                """
                 # выводим в отчёт
                 dump_list_of_possible_blueprints(glf, requirements)
             # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера

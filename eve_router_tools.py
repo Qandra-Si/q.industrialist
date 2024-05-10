@@ -123,17 +123,19 @@ class ConveyorSettings:
 def get_blueprints_grouped_by(
         blueprints: typing.List[db.QSwaggerCorporationBlueprint],
         group_by_type_id: bool = True,
+        group_by_station: bool = True,
         group_by_me: bool = True,
         group_by_te: bool = False,
         group_by_runs: bool = True) \
-        -> typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]]:
-    grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = {}
+        -> typing.Dict[typing.Tuple[int, int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]]:
+    grouped: typing.Dict[typing.Tuple[int, int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = {}
     for b in blueprints:
         type_id: int = b.type_id if group_by_type_id else 0
+        station_id: int = b.station_id if group_by_station else 0
         me: int = b.material_efficiency if group_by_me else -1
         te: int = b.time_efficiency if group_by_te else -1
         runs: int = b.runs if group_by_runs else -10
-        key: typing.Tuple[int, int, int, int] = type_id, me, te, runs
+        key: typing.Tuple[int, int, int, int, int] = type_id, station_id, me, te, runs
         g0: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
         if not g0:
             grouped[key] = []
@@ -275,45 +277,81 @@ def get_materials_list(
     return [m for m in materials_list_with_efficiency.values()]
 
 
-def get_corporation_stock_materials(
-        # данные корпорации для подсчёта кол-ва материалов
-        corporation: db.QSwaggerCorporation,
-        # настройки генерации отчёта
-        conveyor_settings: ConveyorSettings) -> typing.Dict[int, db.QSwaggerMaterial]:
-    if not conveyor_settings.corporation.corporation_id == corporation.corporation_id:
-        raise Exception("Incompatible conveyor settings and corporation data")
-    materials: typing.Dict[int, db.QSwaggerMaterial] = {}
-    # составляем список контейнеров, в которых будет выполняться поиск материалов
-    container_ids: typing.Set[int] = set([c.container_id for c in conveyor_settings.containers_stocks])
-    # перебираем ассеты, ищем материалы
-    for a in corporation.assets.values():
-        if a.location_id not in container_ids: continue
-        m = materials.get(a.type_id)
-        if m:
-            m.increment_quantity(a.quantity)
-        else:
-            materials[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
-    return materials
+class ConveyorCorporationStockMaterials:
+    def __init__(self):
+        # материалы сгруппированы по станциям, т.е. чтобы получить информацию об имеющемся кол-ве материалов, надо
+        # знать идентификатор станции
+        self.stock_materials: typing.Dict[int, typing.Dict[int, db.QSwaggerMaterial]] = {}  # station:type_id:material
+        self.corporation: typing.Optional[db.QSwaggerCorporation] = None
+        self.conveyor_settings: typing.Optional[ConveyorSettings] = None
 
+    def calc(self,
+             # данные корпорации для подсчёта кол-ва материалов
+             corporation: db.QSwaggerCorporation,
+             # настройки генерации отчёта
+             conveyor_settings: ConveyorSettings):
+        del self.stock_materials
+        self.corporation = corporation
+        self.conveyor_settings = conveyor_settings
+        # проверка правильности входных данных
+        if not self.conveyor_settings.corporation.corporation_id == self.corporation.corporation_id:
+            raise Exception("Incompatible conveyor settings and corporation data")
+        self.stock_materials: typing.Dict[int, typing.Dict[int, db.QSwaggerMaterial]] = {}
+        # составляем список контейнеров, в которых будет выполняться поиск материалов
+        container_ids: typing.Set[int] = set([c.container_id for c in conveyor_settings.containers_stocks])
+        # перебираем ассеты, ищем материалы
+        for a in self.corporation.assets.values():
+            if a.location_id not in container_ids: continue
+            s: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(a.station_id)
+            if not s:
+                self.stock_materials[a.station_id] = {}
+                s = self.stock_materials.get(a.station_id)
+            m = s.get(a.type_id)
+            if m:
+                m.increment_quantity(a.quantity)
+            else:
+                s[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
+        return self.stock_materials
 
-def check_enough_materials(
-        # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
-        required_materials: typing.List[db.QSwaggerMaterial],
-        # уникальный справочник доступных (просуммированных) материалов стока
-        available_materials: typing.Dict[int, db.QSwaggerMaterial]) -> bool:
-    for r in required_materials:
-        a = available_materials.get(r.material_id)
-        if not a:
+    def check_enough_materials_at_station(
+            self,
+            # идентификатор станции на которой в коробках стока находятся материалы
+            station_id: int,
+            # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
+            required_materials: typing.List[db.QSwaggerMaterial]) -> bool:
+        available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
+        if not available_materials:
             return False
-        if a.quantity < r.quantity:
-            return False
-    return True
+        for r in required_materials:
+            a = available_materials.get(r.material_id)
+            if not a:
+                return False
+            if a.quantity < r.quantity:
+                return False
+        return True
+
+    def check_enough_materials_everywhere(
+            self,
+            # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
+            required_materials: typing.List[db.QSwaggerMaterial]) -> bool:
+        for r in required_materials:
+            required_quantity: int = r.quantity
+            for station_id in self.stock_materials.keys():
+                available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
+                a = available_materials.get(r.material_id)
+                if not a: continue
+                required_quantity -= a.quantity
+                if required_quantity <= 0: break
+            if required_quantity > 0:
+                return False
+        return True
 
 
 class ConveyorMaterialRequirements:
     class StackOfBlueprints:
-        def __init__(self, name: str, runs: int, me: int, group: typing.List[db.QSwaggerCorporationBlueprint]):
+        def __init__(self, name: str, station_id: int, runs: int, me: int, group: typing.List[db.QSwaggerCorporationBlueprint]):
             self.name: str = name
+            self.station_id: int = station_id
             self.runs: int = runs
             self.me: int = me
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
@@ -344,7 +382,7 @@ class ConveyorMaterialRequirements:
             # настройки генерации отчёта
             conveyor_settings: ConveyorSettings,
             # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
-            available_materials: typing.Dict[int, db.QSwaggerMaterial],
+            available_materials: ConveyorCorporationStockMaterials,
             # список чертежей, которые необходимо обработать
             ready_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) \
             -> typing.List[StackOfBlueprints]:
@@ -354,10 +392,11 @@ class ConveyorMaterialRequirements:
         # входной набор чертежей для проверки потребностей в материалах
         self.blueprints: typing.List[db.QSwaggerCorporationBlueprint] = ready_blueprints
         # группируем чертежи по типу, me и runs кодам, чтобы получить уникальные сочетания с количествами
-        self.__grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
-            get_blueprints_grouped_by(  # type_id:me:te:runs
+        self.__grouped: typing.Dict[typing.Tuple[int, int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = \
+            get_blueprints_grouped_by(  # type_id:station:me:te:runs
                 self.blueprints,
                 group_by_type_id=True,
+                group_by_station=True,
                 group_by_me=True,
                 group_by_te=False,
                 group_by_runs=True)
@@ -368,10 +407,11 @@ class ConveyorMaterialRequirements:
             self.__grouped_and_sorted.append(
                 ConveyorMaterialRequirements.StackOfBlueprints(
                     group[0].blueprint_type.blueprint_type.name,
+                    group[0].station_id,
                     group[0].runs,
                     group[0].material_efficiency,
                     group))
-        self.__grouped_and_sorted.sort(key=lambda x: (x.name, x.runs, -x.me))  # name:runs:me
+        self.__grouped_and_sorted.sort(key=lambda x: (x.name, x.runs, -x.me))  # name:runs:me (длительность произв.)
         # рассчитываем потребности в материалах
         # все чертежи собраны в стеки по одному типу название:длительность_производства (name:runs:me)
         for stack in self.__grouped_and_sorted:
@@ -381,6 +421,7 @@ class ConveyorMaterialRequirements:
                   f" x{len(stack.group)}"
                   f" {b0.material_efficiency}me"
                   f" {b0.runs}runs"
+                  f" at {b0.station_id}"
                   # f"\n{[_.item_id for _ in stack.group]}"
                   "\n")
             """
@@ -397,8 +438,8 @@ class ConveyorMaterialRequirements:
                 stack.group,
                 conveyor_settings.fixed_number_of_runs)
             # проверка доступности материалов имеющихся в стоке
-            enough_for_single: bool = check_enough_materials(materials_single, available_materials)
-            enough_for_stack: bool = check_enough_materials(materials_stack, available_materials)
+            enough_for_single: bool = available_materials.check_enough_materials_at_station(b0.station_id, materials_single)
+            enough_for_stack: bool = available_materials.check_enough_materials_at_station(b0.station_id, materials_stack)
             # сохранение результатов расчёта в стеке чертежей
             stack.apply_materials_for_single(enough_for_single, materials_single)
             stack.apply_materials_for_stack(enough_for_stack, materials_stack)
@@ -412,7 +453,7 @@ def calc_corp_conveyor(
         router_settings: typing.List[RouterSettings],
         conveyor_settings: ConveyorSettings,
         # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
-        available_materials: typing.Dict[int, db.QSwaggerMaterial],
+        available_materials: ConveyorCorporationStockMaterials,
         # список чертежей, которые нобходимо обработать
         ready_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) \
         -> typing.List[ConveyorMaterialRequirements.StackOfBlueprints]:
