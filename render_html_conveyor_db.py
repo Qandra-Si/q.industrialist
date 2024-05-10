@@ -163,14 +163,62 @@ def declension_of_runs(runs: int) -> str:
         return 'прогона'
 
 
+class NavMenuDefaults:
+    def __init__(self):
+        self.run_possible: bool = True
+        self.run_impossible: bool = False
+        self.lost_blueprints: bool = False
+        self.phantom_blueprints: bool = False
+        self.job_active: bool = False
+        self.job_completed: bool = False
+
+    def get(self, label: str) -> bool:
+        if label == 'run-possible':
+            return self.run_possible
+        elif label == 'run-impossible':
+            return self.run_impossible
+        elif label == 'lost-blueprints':
+            return self.lost_blueprints
+        elif label == 'phantom-blueprints':
+            return self.phantom_blueprints
+        elif label == 'job-active':
+            return self.job_active
+        elif label == 'job-completed':
+            return self.job_completed
+        else:
+            raise Exception("Unsupported label to get nav menu defaults")
+
+    def css(self, label: str, prefix: bool = True) -> str:
+        opt: bool = False
+        if label == 'run-possible':
+            opt = self.run_possible
+        elif label == 'run-impossible':
+            opt = self.run_impossible
+        elif label == 'lost-blueprints':
+            opt = self.lost_blueprints
+        elif label == 'phantom-blueprints':
+            opt = self.phantom_blueprints
+        elif label == 'job-active':
+            opt = self.job_active
+        elif label == 'job-completed':
+            opt = self.job_completed
+        else:
+            raise Exception("Unsupported label to get nav menu defaults")
+        return '' if opt else (' hidden' if prefix else 'hidden')
+
+
+g_nav_menu_defaults: NavMenuDefaults = NavMenuDefaults()
+
+
 def dump_nav_menu(glf) -> None:
+    global g_nav_menu_defaults
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
-        (True, 'run-possible', 'Доступные для запуска работы'),
-        (True, 'run-impossible', 'Недоступные для запуска работы'),  # btnToggleImpossible
-        (False, 'lost-blueprints', "Неподходящие чертежи"),
-        (False, 'phantom-blueprints', "Фантомные чертежи (рассогласованные)"),
-        (False, 'job-active', "Ведущиеся проекты"),  # btnToggleActive
-        (False, 'job-completed', "Завершённые проекты"),
+        (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы'),
+        (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы'),  # btnToggleImpossible
+        (g_nav_menu_defaults.lost_blueprints,    'lost-blueprints',    'Неподходящие чертежи'),
+        (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)'),
+        (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты'),  # btnToggleActive
+        (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты'),
         None,
         (False, 'used-materials', "Используемые материалы"),  # btnToggleUsedMaterials
         (True, 'not-available', "Недоступные материалы"),  # btnToggleNotAvailable
@@ -622,6 +670,7 @@ def dump_list_of_jobs(
             group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # выводим в отчёт
+    global g_nav_menu_defaults
     for _, sum_runs, sum_products, group in grouped_and_sorted:
         j0: db.QSwaggerCorporationIndustryJob = group[0]
         blueprint_type_id: int = j0.blueprint_type_id
@@ -658,7 +707,9 @@ def dump_list_of_jobs(
             active_label = '<label class="label label-completed-job">проект завершён</label>'
         # <mute>Стоимость</mute>&nbsp;{'{:,.1f}'.format(job.cost)}
         # </me_tag><tid_tag>&nbsp;({blueprint_type_id})</tid_tag>
-        glf.write(f"""<tr class="{'job-active' if is_active_jobs else 'job-completed'}">
+        tr_class: str = 'job-active' if is_active_jobs else 'job-completed'
+        tr_class += g_nav_menu_defaults.css(tr_class)
+        glf.write(f"""<tr class="{tr_class}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
 <td>{blueprint_type_name}&nbsp;<a
@@ -707,11 +758,12 @@ def dump_list_of_lost_blueprints(
         grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # выводим в отчёт
+    global g_nav_menu_defaults
     for _, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr class="lost-blueprints">
+        glf.write(f"""<tr class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -748,11 +800,12 @@ def dump_list_of_phantom_blueprints(
             group))
     grouped_and_sorted.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
     # выводим в отчёт
+    global g_nav_menu_defaults
     for _, _, _, _, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr class="phantom-blueprints">
+        glf.write(f"""<tr class="phantom-blueprints{g_nav_menu_defaults.css('phantom-blueprints')}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -780,18 +833,23 @@ def dump_list_of_possible_blueprints(
         else:
             grouped.append((type_name, [stack]))
     # выводим группами в отчёт
+    global g_nav_menu_defaults
     for type_name, stacks in grouped:
         type_id: int = stacks[0].group[0].type_id
         # ---
         tr_class: str = ''
         for stack in stacks:
             if not tr_class:
-                tr_class = 'run-possible' if stack.max_possible_for_single > 0 else 'run-impossible'
-            elif tr_class == 'run-impossible':
+                if stack.max_possible_for_single > 0:
+                    tr_class = 'run-possible'
+                else:
+                    tr_class = 'run-impossible'
+                tr_class += g_nav_menu_defaults.css(tr_class)
+            elif tr_class.startswith('run-impossible'):
                 if stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
-            elif tr_class == 'run-possible':
+            elif tr_class.startswith('run-possible'):
                 if not stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
@@ -826,6 +884,7 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
                     if not tr_class:
                         if head:
                             div_class: str = 'run-possible' if __stack784.max_possible_for_single > 0 else 'run-impossible'
+                            div_class += g_nav_menu_defaults.css(div_class)
                             return f'<div class="{div_class}">'
                         else:
                             return '</div>'
