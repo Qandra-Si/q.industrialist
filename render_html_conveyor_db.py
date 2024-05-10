@@ -785,13 +785,13 @@ def dump_list_of_possible_blueprints(
                 if not stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
-        # ---
+
         def format_quantities(max_possible: int, total: int) -> str:
             if max_possible >= total:
                 return str(total)
             else:
                 return f'<mute>{max_possible} из</mute> {total}'
-        # ---
+
         if len(stacks) == 1:
             stack: tools.ConveyorMaterialRequirements.StackOfBlueprints = stacks[0]
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
@@ -937,7 +937,8 @@ def dump_corp_conveyors(
             # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
             possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
             lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
-            for a in settings.activities:
+            for _a in settings.activities:
+                a: tools.ConveyorActivity = _a
                 for b in blueprints:
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
