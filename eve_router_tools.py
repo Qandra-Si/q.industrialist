@@ -317,17 +317,27 @@ class ConveyorCorporationStockMaterials:
             # идентификатор станции на которой в коробках стока находятся материалы
             station_id: int,
             # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
-            required_materials: typing.List[db.QSwaggerMaterial]) -> bool:
+            required_materials: typing.List[db.QSwaggerMaterial]) -> typing.Tuple[bool, int]:  # yes|no, max possible
         available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
         if not available_materials:
-            return False
+            return False, 0
+        max_possible: int = -1
         for r in required_materials:
+            # получаем материал в стоке
             a = available_materials.get(r.material_id)
+            # определяем, достаточно ли имеющегося кол-ва материалов?
             if not a:
-                return False
+                return False, 0
             if a.quantity < r.quantity:
-                return False
-        return True
+                return False, 0
+            # определяем максимально возможное кол-во производственных запусков для этого списка потребностей
+            if max_possible == 1:
+                pass
+            elif max_possible < 0:
+                max_possible = a.quantity // r.quantity
+            else:
+                max_possible = min(max_possible, a.quantity // r.quantity)
+        return True, max_possible
 
     def check_enough_materials_everywhere(
             self,
@@ -365,20 +375,22 @@ class ConveyorMaterialRequirements:
             self.runs: int = runs
             self.me: int = me
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
-            self.enough_for_single: bool = False
+            self.max_possible_for_single: int = 0
             self.required_materials_for_single: typing.List[db.QSwaggerMaterial] = []
             self.enough_for_stack: bool = False
             self.required_materials_for_stack: typing.List[db.QSwaggerMaterial] = []
 
-        def apply_materials_for_single(self, enough: bool, materials: typing.List[db.QSwaggerMaterial]):
-            self.enough_for_single = enough
+        def apply_materials_info(self,
+                                 max_possible: int,
+                                 materials_for_single: typing.List[db.QSwaggerMaterial],
+                                 enough: bool,
+                                 materials_for_stack: typing.List[db.QSwaggerMaterial]):
             del self.required_materials_for_single
-            self.required_materials_for_single = materials
-
-        def apply_materials_for_stack(self, enough: bool, materials: typing.List[db.QSwaggerMaterial]):
-            self.enough_for_stack = enough
             del self.required_materials_for_stack
-            self.required_materials_for_stack = materials
+            self.max_possible_for_single = max_possible
+            self.required_materials_for_single = materials_for_single
+            self.enough_for_stack = enough
+            self.required_materials_for_stack = materials_for_stack
 
     def __init__(self):
         self.blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
@@ -448,11 +460,16 @@ class ConveyorMaterialRequirements:
                 stack.group,
                 conveyor_settings.fixed_number_of_runs)
             # проверка доступности материалов имеющихся в стоке
-            enough_for_single: bool = available_materials.check_enough_materials_at_station(b0.station_id, materials_single)
-            enough_for_stack: bool = available_materials.check_enough_materials_at_station(b0.station_id, materials_stack)
+            enough_for_single, max_possible = \
+                available_materials.check_enough_materials_at_station(b0.station_id, materials_single)
+            enough_for_stack, _ = \
+                available_materials.check_enough_materials_at_station(b0.station_id, materials_stack)
             # сохранение результатов расчёта в стеке чертежей
-            stack.apply_materials_for_single(enough_for_single, materials_single)
-            stack.apply_materials_for_stack(enough_for_stack, materials_stack)
+            stack.apply_materials_info(
+                max_possible if enough_for_single else 0,
+                materials_single,
+                enough_for_stack,
+                materials_stack)
         return self.__grouped_and_sorted
 
 

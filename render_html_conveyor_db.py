@@ -772,18 +772,26 @@ def dump_list_of_possible_blueprints(
     # выводим группами в отчёт
     for type_name, stacks in grouped:
         type_id: int = stacks[0].group[0].type_id
+        # ---
         tr_class: str = ''
         for stack in stacks:
             if not tr_class:
-                tr_class = 'run-impossible' if not stack.enough_for_single else 'run-possible'
+                tr_class = 'run-possible' if stack.max_possible_for_single > 0 else 'run-impossible'
             elif tr_class == 'run-impossible':
-                if stack.enough_for_single:
+                if stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
             elif tr_class == 'run-possible':
-                if not stack.enough_for_single:
+                if not stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
+        # ---
+        def format_quantities(max_possible: int, total: int) -> str:
+            if max_possible >= total:
+                return str(total)
+            else:
+                return f'{max_possible} из {total}'
+        # ---
         if len(stacks) == 1:
             stack: tools.ConveyorMaterialRequirements.StackOfBlueprints = stacks[0]
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
@@ -794,7 +802,7 @@ def dump_list_of_possible_blueprints(
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
 >{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}&nbsp;<me_tag
 >{b0.material_efficiency}%</me_tag></td>
-<td>{len(stack.group)}</td>
+<td>{format_quantities(stack.max_possible_for_single, len(stack.group))}</td>
 <td></td><td></td><td></td>
 </tr>""")  # </me_tag><tid_tag>&nbsp;({type_id})</tid_tag>
         else:
@@ -807,7 +815,7 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
                 elif which == 'div':
                     if not tr_class:
                         if head:
-                            div_class: str = 'run-impossible' if not __stack784.enough_for_single else 'run-possible'
+                            div_class: str = 'run-possible' if __stack784.max_possible_for_single > 0 else 'run-impossible'
                             return f'<div class="{div_class}">'
                         else:
                             return '</div>'
@@ -828,7 +836,9 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
                 b0: db.QSwaggerCorporationBlueprint = stack.group[0]
                 glf.write(f"""{tr_div_class('div', stack, True)}{'<mute>Копия - </mute>' + str(b0.runs) + '<mute> прогонов</mute>' if b0.is_copy else 'Оригинал'}
 <me_tag>{b0.material_efficiency}%</me_tag>{tr_div_class('div', None, False)}""")
-                quantities += f"""{tr_div_class('div', stack, True)}{len(stack.group)}{tr_div_class('div', None, False)}"""
+                quantities += f"{tr_div_class('div', stack, True)}" \
+                              f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
+                              f"{tr_div_class('div', None, False)}"
             glf.write(f"""</td>
 <td>{quantities}</td>
 <td></td><td></td><td></td>
