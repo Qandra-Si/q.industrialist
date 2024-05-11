@@ -130,6 +130,7 @@ table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { 
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
 table.tbl-summary tbody tr.lost-blueprints { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
+table.tbl-summary tbody tr.row-multiple,
 table.tbl-summary tbody tr.row-possible,
 table.tbl-summary tbody tr.row-impossible,
 table.tbl-summary tbody tr td div.run-possible { }
@@ -179,7 +180,7 @@ class NavMenuDefaults:
         self.job_completed: bool = False
 
     def get(self, label: str) -> bool:
-        if label == 'run-possible' or label == 'row-possible':
+        if label == 'run-possible' or label == 'row-possible' or label == 'row-multiple':
             return self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             return self.run_impossible
@@ -196,7 +197,7 @@ class NavMenuDefaults:
 
     def css(self, label: str, prefix: bool = True) -> str:
         opt: bool = False
-        if label == 'run-possible' or label == 'row-possible':
+        if label == 'run-possible' or label == 'row-possible' or label == 'row-multiple':
             opt = self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             opt = self.run_impossible
@@ -878,6 +879,9 @@ def dump_list_of_possible_blueprints(
                 if not stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
+        if not tr_class:
+            tr_class = 'row-multiple'
+            tr_class += g_nav_menu_defaults.css(tr_class)
 
         def tr_div_class(which: str,
                          __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,

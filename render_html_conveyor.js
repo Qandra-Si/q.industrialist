@@ -137,6 +137,9 @@ function rebuildBody() {
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
  var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
 
+ $('tr.row-multiple').each(function() {
+  changeElemVisibility($(this), show_possible + show_impossible);
+ });
  $('tr.row-possible').each(function() {
   changeElemVisibility($(this), show_possible);
  });
