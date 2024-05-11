@@ -104,7 +104,8 @@ table.tbl-summary tbody tr td:nth-child(2),
 table.tbl-summary thead tr th:nth-child(6),
 table.tbl-summary tbody tr td:nth-child(6) { width: 32px; }
 table.tbl-summary tbody tr:hover td:nth-child(3),
-table.tbl-summary tbody tr:hover td:nth-child(7) { border-left: 1px solid #6db09e; }
+table.tbl-summary tbody tr.job-active:hover td:nth-child(7),
+table.tbl-summary tbody tr.job-completed:hover td:nth-child(7) { border-left: 1px solid #6db09e; }
 table.tbl-summary thead tr th { padding: 4px; border-bottom: 1px solid #1d3231; vertical-align: bottom; }
 table.tbl-summary tbody tr td { padding: 4px; border-top: none; vertical-align: top; }
 table.tbl-summary tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
