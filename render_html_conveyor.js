@@ -137,13 +137,13 @@ function rebuildBody() {
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
  var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
 
- $('tr.run-possible').each(function() {
+ $('tr.row-possible').each(function() {
   changeElemVisibility($(this), show_possible);
  });
  $('div.run-possible').each(function() {
   changeElemVisibility($(this), show_possible);
  });
- $('tr.run-impossible').each(function() {
+ $('tr.row-impossible').each(function() {
   changeElemVisibility($(this), show_impossible);
  });
  $('div.run-impossible').each(function() {

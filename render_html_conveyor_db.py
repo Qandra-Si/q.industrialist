@@ -127,12 +127,12 @@ table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { 
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
 table.tbl-summary tbody tr.lost-blueprints { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
-table.tbl-summary tbody tr.run-possible,
+table.tbl-summary tbody tr.row-possible,
+table.tbl-summary tbody tr.row-impossible,
 table.tbl-summary tbody tr td div.run-possible { }
-table.tbl-summary tbody tr.run-impossible td,
 table.tbl-summary tbody tr td div.run-impossible {
- background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #821 49.9%, #821 60%, rgba(0, 0, 0, 0) 60%) fixed,
-             linear-gradient(-45deg, #821 10%, rgba(0, 0, 0, 0) 10%) fixed;
+ background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #421 49.9%, #421 60%, rgba(0, 0, 0, 0) 60%) fixed,
+             linear-gradient(-45deg, #421 10%, rgba(0, 0, 0, 0) 10%) fixed;
  background-size: 1em 1em
 }
 
@@ -176,9 +176,9 @@ class NavMenuDefaults:
         self.job_completed: bool = False
 
     def get(self, label: str) -> bool:
-        if label == 'run-possible':
+        if label == 'run-possible' or label == 'row-possible':
             return self.run_possible
-        elif label == 'run-impossible':
+        elif label == 'run-impossible' or label == 'row-impossible':
             return self.run_impossible
         elif label == 'lost-blueprints':
             return self.lost_blueprints
@@ -193,9 +193,9 @@ class NavMenuDefaults:
 
     def css(self, label: str, prefix: bool = True) -> str:
         opt: bool = False
-        if label == 'run-possible':
+        if label == 'run-possible' or label == 'row-possible':
             opt = self.run_possible
-        elif label == 'run-impossible':
+        elif label == 'run-impossible' or label == 'row-impossible':
             opt = self.run_impossible
         elif label == 'lost-blueprints':
             opt = self.lost_blueprints
@@ -815,7 +815,10 @@ def dump_list_of_phantom_blueprints(
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-phantom-blueprint">фантомный чертёж</label><br
 >{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
->{b0.material_efficiency}% {b0.time_efficiency}%</me_tag> <mute>({type_id})</mute></td>
+>{b0.material_efficiency}% {b0.time_efficiency}%</me_tag><!--
+type_id:{type_id}
+item_id:{[_.item_id for _ in group]}
+location_id:{[_.location_id for _ in group]}--></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td>
 </tr>""")
@@ -844,15 +847,15 @@ def dump_list_of_possible_blueprints(
         for stack in stacks:
             if not tr_class:
                 if stack.max_possible_for_single > 0:
-                    tr_class = 'run-possible'
+                    tr_class = 'row-possible'
                 else:
-                    tr_class = 'run-impossible'
+                    tr_class = 'row-impossible'
                 tr_class += g_nav_menu_defaults.css(tr_class)
-            elif tr_class.startswith('run-impossible'):
+            elif tr_class.startswith('row-impossible'):
                 if stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
-            elif tr_class.startswith('run-possible'):
+            elif tr_class.startswith('row-possible'):
                 if not stack.max_possible_for_single > 0:
                     tr_class = ''
                     break
@@ -863,57 +866,37 @@ def dump_list_of_possible_blueprints(
             else:
                 return f'<mute>{max_possible} из</mute> {total}'
 
-        if len(stacks) == 1:
-            stack: tools.ConveyorMaterialRequirements.StackOfBlueprints = stacks[0]
-            b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-            glf.write(f"""<tr class="{tr_class}">
-<td>{get_tbl_summary_row_num()}</td>
-<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a><br
->{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
->{b0.material_efficiency}%</me_tag></td>
-<td>{format_quantities(stack.max_possible_for_single, len(stack.group))}</td>
-<td></td><td></td><td></td>
-</tr>""")  # </me_tag><tid_tag> ({type_id})</tid_tag>
-        else:
-            def tr_div_class(which: str,
-                             __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
-                             head: typing.Optional[bool] = None) -> str:
-                if which == 'tr':
-                    if tr_class:
-                        return f' class="{tr_class}"'
-                elif which == 'div':
-                    if not tr_class:
-                        if head:
-                            div_class: str = 'run-possible' if __stack784.max_possible_for_single > 0 else 'run-impossible'
-                            div_class += g_nav_menu_defaults.css(div_class)
-                            return f'<div class="{div_class}">'
-                        else:
-                            return '</div>'
-                    else:
-                        if head:
-                            return '<br>'
-                elif which == 'space':
-                    if not tr_class:
-                        return '<br>'
-                return ''
-            glf.write(f"""<tr{tr_div_class('tr')}>
+        def tr_div_class(which: str,
+                         __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
+                         head: typing.Optional[bool] = None) -> str:
+            if which == 'tr':
+                if tr_class:
+                    return f' class="{tr_class}"'
+            elif which == 'div':
+                if head:
+                    div_class: str = 'run-possible' if __stack784.max_possible_for_single > 0 else 'run-impossible'
+                    div_class += g_nav_menu_defaults.css(div_class)
+                    return f'<div class="{div_class}">'
+                else:
+                    return '</div>'
+            return ''
+
+        glf.write(f"""<tr{tr_div_class('tr')}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>""")
-            quantities: str = tr_div_class('space')
-            for stack in stacks:
-                b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-                glf.write(f"{tr_div_class('div', stack, True)}" \
-                          f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
-                          f"<me_tag>{b0.material_efficiency}%</me_tag>" \
-                          f"{tr_div_class('div', None, False)}")
-                quantities += f"{tr_div_class('div', stack, True)}" \
-                              f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
-                              f"{tr_div_class('div', None, False)}"
-            glf.write(f"""</td>
+        quantities: str = '<br>'
+        for stack in stacks:
+            b0: db.QSwaggerCorporationBlueprint = stack.group[0]
+            glf.write(f"{tr_div_class('div', stack, True)}" \
+                      f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
+                      f"<me_tag>{b0.material_efficiency}%</me_tag>" \
+                      f"{tr_div_class('div', None, False)}")
+            quantities += f"{tr_div_class('div', stack, True)}" \
+                          f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
+                          f"{tr_div_class('div', None, False)}"
+        glf.write(f"""</td>
 <td>{quantities}</td>
 <td></td><td></td><td></td>
 </tr>""")
