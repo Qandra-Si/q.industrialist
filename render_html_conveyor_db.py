@@ -840,12 +840,13 @@ def dump_list_of_possible_blueprints(
             return f'<mute>{max_possible} из</mute> {total}'
 
     def format_times(min_max_t: typing.Tuple[int, int]) -> str:
-        res: str = '{:d}:{:02d}'.format(min_max_t[0] // 3600, (min_max_t[0] // 60) % 60)
+        # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
+        res: str = '{:d}:{:02d}'.format(min_max_t[0] // 3600, (((min_max_t[0] // 60) % 60) // 10) * 10)
         if min_max_t[0] == min_max_t[1]:
             return res
         else:
             return f'<mute>от {res} до</mute> ' + \
-                   '{:d}:{:02d}'.format(min_max_t[1] // 3600, (min_max_t[1] // 60) % 60)
+                   '{:d}:{:02d}'.format(min_max_t[1] // 3600, (((min_max_t[1] // 60) % 60 // 10) * 10))
 
     # группируем стеки по названиям чертежей
     grouped: typing.List[typing.Tuple[str, typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]]] = []
