@@ -196,9 +196,22 @@ def get_materials_list(
         conveyor_settings: ConveyorSettings,
         # список чертежей для которых необходимо рассчитать потребность в материалах
         blueprints: typing.List[db.QSwaggerCorporationBlueprint],
-        fixed_number_of_runs: typing.Optional[int] = None) -> typing.List[db.QSwaggerMaterial]:
+        fixed_number_of_runs: typing.Optional[int] = None) \
+        -> typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]:
     # список материалов по набору чертежей с учётом ME
-    materials_list_with_efficiency: typing.Dict[int, db.QSwaggerMaterial] = {}
+    materials_list_with_efficiency: typing.Dict[db.QSwaggerActivity, typing.Dict[int, db.QSwaggerMaterial]] = {}
+
+    def push_into(__a: db.QSwaggerActivity, __m: db.QSwaggerMaterial, __q: int) -> None:
+        __in_cache205: typing.Dict[int, db.QSwaggerMaterial] = materials_list_with_efficiency.get(__a)
+        if not __in_cache205:
+            materials_list_with_efficiency[__a] = {}
+            __in_cache205 = materials_list_with_efficiency.get(__a)
+        __in_cache209: db.QSwaggerMaterial = __in_cache205.get(__m.material_id)
+        if not __in_cache209:
+            __in_cache205[__m.material_id] = db.QSwaggerMaterial(__m.material_type, __q)
+        else:
+            __in_cache209.increment_quantity(__q)
+
     # перебираем все активности и все чертежи
     for a in conveyor_settings.activities:
         for b in blueprints:
@@ -225,12 +238,8 @@ def get_materials_list(
                     b.material_efficiency)  # сведения из корпоративного чертежа
                 # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
                 industry_input *= quantity_of_blueprints
-                # ---
-                in_cache: db.QSwaggerMaterial = materials_list_with_efficiency.get(m.material_id)
-                if not in_cache:
-                    materials_list_with_efficiency[m.material_id] = db.QSwaggerMaterial(m.material_type, industry_input)
-                else:
-                    in_cache.increment_quantity(industry_input)
+                # сохранение информации в справочник материалов
+                push_into(activity, m, industry_input)
             # ---
             if a == ConveyorActivity.CONVEYOR_INVENTION:
                 # Добавляем декрипторы (замечения и ограничения):
@@ -268,14 +277,14 @@ def get_materials_list(
                             b.material_efficiency)  # сведения из корпоративного чертежа
                         # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
                         industry_input *= quantity_of_blueprints
-                        # ---
-                        in_cache: db.QSwaggerMaterial = materials_list_with_efficiency.get(decryptor_type.type_id)
-                        if not in_cache:
-                            materials_list_with_efficiency[decryptor_type.type_id] = db.QSwaggerMaterial(decryptor_type,
-                                                                                                         industry_input)
-                        else:
-                            in_cache.increment_quantity(industry_input)
-    return [m for m in materials_list_with_efficiency.values()]
+                        # сохранение информации в справочник материалов
+                        push_into(activity, db.QSwaggerMaterial(decryptor_type, 0), industry_input)
+    # ---
+    result: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
+    for activity in materials_list_with_efficiency.keys():
+        mm: typing.Dict[int, db.QSwaggerMaterial] = materials_list_with_efficiency.get(activity)
+        result[activity] = [m for m in mm.values()]
+    return result
 
 
 class ConveyorCorporationStockMaterials:
@@ -317,26 +326,28 @@ class ConveyorCorporationStockMaterials:
             # идентификатор станции на которой в коробках стока находятся материалы
             station_id: int,
             # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
-            required_materials: typing.List[db.QSwaggerMaterial]) -> typing.Tuple[bool, int]:  # yes|no, max possible
+            required_materials: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]) \
+            -> typing.Tuple[bool, int]:  # yes|no, max possible
         available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
         if not available_materials:
             return False, 0
         max_possible: int = -1
-        for r in required_materials:
-            # получаем материал в стоке
-            a = available_materials.get(r.material_id)
-            # определяем, достаточно ли имеющегося кол-ва материалов?
-            if not a:
-                return False, 0
-            if a.quantity < r.quantity:
-                return False, 0
-            # определяем максимально возможное кол-во производственных запусков для этого списка потребностей
-            if max_possible == 1:
-                pass
-            elif max_possible < 0:
-                max_possible = a.quantity // r.quantity
-            else:
-                max_possible = min(max_possible, a.quantity // r.quantity)
+        for materials in required_materials.values():
+            for r in materials:
+                # получаем материал в стоке
+                a = available_materials.get(r.material_id)
+                # определяем, достаточно ли имеющегося кол-ва материалов?
+                if not a:
+                    return False, 0
+                if a.quantity < r.quantity:
+                    return False, 0
+                # определяем максимально возможное кол-во производственных запусков для этого списка потребностей
+                if max_possible == 1:
+                    pass
+                elif max_possible < 0:
+                    max_possible = a.quantity // r.quantity
+                else:
+                    max_possible = min(max_possible, a.quantity // r.quantity)
         return True, max_possible
 
     def check_enough_materials_everywhere(
@@ -376,15 +387,15 @@ class ConveyorMaterialRequirements:
             self.me: int = me
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
             self.max_possible_for_single: int = 0
-            self.required_materials_for_single: typing.List[db.QSwaggerMaterial] = []
+            self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
             self.enough_for_stack: bool = False
-            self.required_materials_for_stack: typing.List[db.QSwaggerMaterial] = []
+            self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
 
         def apply_materials_info(self,
                                  max_possible: int,
-                                 materials_for_single: typing.List[db.QSwaggerMaterial],
+                                 materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
                                  enough: bool,
-                                 materials_for_stack: typing.List[db.QSwaggerMaterial]):
+                                 materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]):
             del self.required_materials_for_single
             del self.required_materials_for_stack
             self.max_possible_for_single = max_possible
@@ -393,6 +404,7 @@ class ConveyorMaterialRequirements:
             self.required_materials_for_stack = materials_for_stack
 
     def __init__(self):
+        self.conveyor_settings: typing.Optional[ConveyorSettings] = None
         self.blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
         self.__grouped: typing.Dict[typing.Tuple[int, int, int, int], typing.List[db.QSwaggerCorporationBlueprint]] = {}
         self.__grouped_and_sorted: typing.List[ConveyorMaterialRequirements.StackOfBlueprints] = []
@@ -448,13 +460,13 @@ class ConveyorMaterialRequirements:
                   "\n")
             """
             # вычисляем минимально необходимое кол-во материалов для работ хотя-бы по одному чертежу
-            materials_single = get_materials_list(
+            materials_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = get_materials_list(
                 qid,
                 conveyor_settings,
                 [b0],
                 conveyor_settings.fixed_number_of_runs)
             # считаем общее количество материалов для работ по стеку чертежей
-            materials_stack = get_materials_list(
+            materials_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = get_materials_list(
                 qid,
                 conveyor_settings,
                 stack.group,
@@ -496,3 +508,73 @@ def calc_corp_conveyor(
         ready_blueprints
     )
     return grouped_and_sorted
+
+
+def get_min_max_time(stack: ConveyorMaterialRequirements.StackOfBlueprints) -> typing.Tuple[int, int]:
+    min_time, max_time = None, None
+
+    def apply(min_t: int, max_t: int, t: int) -> typing.Tuple[int, int]:
+        if min_t is None:
+            min_t = t
+            max_t = t
+        else:
+            min_t = min(min_t, t)
+            max_t = max(max_t, t)
+        return min_t, max_t
+
+    for activity in stack.required_materials_for_stack.keys():
+        if isinstance(activity, db.QSwaggerBlueprintManufacturing):
+            for b in stack.group:
+                # считаем бонус чертежа (накладываем TE чертежа на БП)
+                __stage1: float = float(activity.time * (100 - b.time_efficiency) / 100.0)
+                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+                __stage2: float = float(__stage1 * (100.0 - 31.5) / 100.0)
+                # # учитываем бонус установленного модификатора
+                __stage3: float = float(__stage2 * (100.0 - 42.0) / 100.0)
+                # учитываем бонус профиля сооружения
+                __stage4: float = float(__stage3 * (100.0 - 30.0) / 100.0)
+                # округляем вещественное число до старшего целого
+                __stage5: int = int(float(__stage4 + 0.99))
+                # умножаем на кол-во прогонов
+                __stageX: int = __stage5 * b.runs
+                # считаем min/max
+                min_time, max_time = apply(min_time, max_time, __stageX)
+        elif isinstance(activity, db.QSwaggerBlueprintInvention):
+            for b in stack.group:
+                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+                __stage1: float = float(activity.time * (100.0 - 9.0) / 100.0)
+                # учитываем бонус профиля сооружения
+                __stage2: float = float(__stage1 * (100.0 - 30.0) / 100.0)
+                # округляем вещественное число до старшего целого
+                __stage3: int = int(float(__stage2 + 0.99))
+                # умножаем на кол-во прогонов
+                __stageX: int = __stage3 * b.runs
+                # считаем min/max
+                min_time, max_time = apply(min_time, max_time, __stageX)
+        elif isinstance(activity, db.QSwaggerBlueprintReaction):
+            for b in stack.group:
+                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+                __stage1: float = float(activity.time * (100.0 - 16.0) / 100.0)
+                # учитываем бонус установленного модификатора
+                __stage2: float = float(__stage1 * (100.0 - 22.0) / 100.0)
+                # учитываем бонус профиля сооружения
+                __stage3: float = float(__stage2 * (100.0 - 25.0) / 100.0)
+                # округляем вещественное число до старшего целого
+                __stage4: int = int(float(__stage3 + 0.99))
+                # умножаем на кол-во прогонов
+                __stageX: int = __stage4 * b.runs
+                # считаем min/max
+                min_time, max_time = apply(min_time, max_time, __stageX)
+        else:  # подразумевается копирка (или research)
+            for b in stack.group:
+                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+                __stage1: float = float(activity.time * (100.0 - 27.2) / 100.0)
+                # учитываем бонус профиля сооружения
+                __stage2: float = float(__stage1 * (100.0 - 30.0) / 100.0)
+                # округляем вещественное число до старшего целого
+                __stage3: int = int(float(__stage2 + 0.99))
+                # умножаем на кол-во прогонов
+                __stageX: int = __stage3 * b.runs
+                # считаем min/max
+                min_time, max_time = apply(min_time, max_time, __stageX)
+    return min_time, max_time

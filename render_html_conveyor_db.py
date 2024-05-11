@@ -101,27 +101,29 @@ table.tbl-summary thead tr th:nth-child(1),
 table.tbl-summary tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
 table.tbl-summary thead tr th:nth-child(2),
 table.tbl-summary tbody tr td:nth-child(2),
-table.tbl-summary thead tr th:nth-child(5),
-table.tbl-summary tbody tr td:nth-child(5) { width: 32px; }
+table.tbl-summary thead tr th:nth-child(6),
+table.tbl-summary tbody tr td:nth-child(6) { width: 32px; }
 table.tbl-summary tbody tr:hover td:nth-child(3),
-table.tbl-summary tbody tr:hover td:nth-child(6) { border-left: 1px solid #6db09e; }
+table.tbl-summary tbody tr:hover td:nth-child(7) { border-left: 1px solid #6db09e; }
 table.tbl-summary thead tr th { padding: 4px; border-bottom: 1px solid #1d3231; vertical-align: bottom; }
 table.tbl-summary tbody tr td { padding: 4px; border-top: none; vertical-align: top; }
 table.tbl-summary tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
 table.tbl-summary tbody tr td { border-left: 1px solid #1d3231; }
 table.tbl-summary tbody tr td:nth-child(3),
-table.tbl-summary tbody tr td:nth-child(6) { border-left: none; }
+table.tbl-summary tbody tr td:nth-child(7) { border-left: none; }
 table.tbl-summary thead tr th:nth-child(4),
 table.tbl-summary tbody tr td:nth-child(4),
-table.tbl-summary thead tr th:nth-child(7),
-table.tbl-summary tbody tr td:nth-child(7) { text-align: right; }
+table.tbl-summary thead tr th:nth-child(5),
+table.tbl-summary tbody tr td:nth-child(5),
+table.tbl-summary thead tr th:nth-child(8),
+table.tbl-summary tbody tr td:nth-child(8) { text-align: right; }
 table.tbl-summary tbody tr td:nth-child(3),
-table.tbl-summary tbody tr td:nth-child(6) { white-space: nowrap; }
+table.tbl-summary tbody tr td:nth-child(7) { white-space: nowrap; }
 
 /* table.tbl-summary tbody tr.job-active { color: #bcbcbc; } */
-table.tbl-summary tbody tr.job-active td:nth-child(5) { opacity: 0.5; }
-table.tbl-summary tbody tr.job-active :is(td:nth-child(6),td:nth-child(7)) { color: #666; }
-table.tbl-summary tbody tr.job-active :is(td:nth-child(6),td:nth-child(7)) mute { color: #444; }
+table.tbl-summary tbody tr.job-active td:nth-child(6) { opacity: 0.5; }
+table.tbl-summary tbody tr.job-active :is(td:nth-child(7),td:nth-child(8)) { color: #666; }
+table.tbl-summary tbody tr.job-active :is(td:nth-child(7),td:nth-child(8)) mute { color: #444; }
 table.tbl-summary tbody tr.job-completed td:nth-child(2) { opacity: 0.5; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { color: #666; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
@@ -721,6 +723,7 @@ data-target="#" role="button" data-copy="{blueprint_type_name}" class="qind-copy
 <mute>Число прогонов - </mute>{sum_runs}
 </td>
 <td>{len(group)}</td>
+<td></td>
 <td><img class="icn32" src="{render_html.__get_img_src(product_type_id, 32)}"></td>
 <td>{product_type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{product_type_name}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a><br>
@@ -773,7 +776,7 @@ def dump_list_of_lost_blueprints(
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-lost-blueprint">неподходящий чертёж</label></td>
 <td>{len(group)}</td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 </tr>""")
 
 
@@ -820,7 +823,7 @@ type_id:{type_id}
 item_id:{[_.item_id for _ in group]}
 location_id:{[_.location_id for _ in group]}--></td>
 <td>{len(group)}</td>
-<td></td><td></td><td></td>
+<td></td><td></td><td></td><td></td>
 </tr>""")
 
 
@@ -828,6 +831,20 @@ def dump_list_of_possible_blueprints(
         glf,
         # список чертежей и их потребности (сгруппированные и отсортированные)
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
+    def format_quantities(max_possible: int, total: int) -> str:
+        if max_possible >= total:
+            return str(total)
+        else:
+            return f'<mute>{max_possible} из</mute> {total}'
+
+    def format_times(min_max_t: typing.Tuple[int, int]) -> str:
+        res: str = '{:d}:{:02d}'.format(min_max_t[0] // 3600, (min_max_t[0] // 60) % 60)
+        if min_max_t[0] == min_max_t[1]:
+            return res
+        else:
+            return f'<mute>от {res} до</mute> ' + \
+                   '{:d}:{:02d}'.format(min_max_t[1] // 3600, (min_max_t[1] // 60) % 60)
+
     # группируем стеки по названиям чертежей
     grouped: typing.List[typing.Tuple[str, typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]]] = []
     for stack in requirements:
@@ -838,6 +855,7 @@ def dump_list_of_possible_blueprints(
             g[1].append(stack)
         else:
             grouped.append((type_name, [stack]))
+
     # выводим группами в отчёт
     global g_nav_menu_defaults
     for type_name, stacks in grouped:
@@ -860,12 +878,6 @@ def dump_list_of_possible_blueprints(
                     tr_class = ''
                     break
 
-        def format_quantities(max_possible: int, total: int) -> str:
-            if max_possible >= total:
-                return str(total)
-            else:
-                return f'<mute>{max_possible} из</mute> {total}'
-
         def tr_div_class(which: str,
                          __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
                          head: typing.Optional[bool] = None) -> str:
@@ -887,17 +899,23 @@ def dump_list_of_possible_blueprints(
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>""")
         quantities: str = '<br>'
+        times: str = '<br>'
         for stack in stacks:
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-            glf.write(f"{tr_div_class('div', stack, True)}" \
-                      f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
-                      f"<me_tag>{b0.material_efficiency}%</me_tag>" \
+            tt: typing.Tuple[int, int] = tools.get_min_max_time(stack)
+            glf.write(f"{tr_div_class('div', stack, True)}"
+                      f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
+                      f"<me_tag>{b0.material_efficiency}%</me_tag>"
                       f"{tr_div_class('div', None, False)}")
             quantities += f"{tr_div_class('div', stack, True)}" \
                           f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
                           f"{tr_div_class('div', None, False)}"
+            times += f"{tr_div_class('div', stack, True)}" \
+                     f"{format_times(tt)}" \
+                     f"{tr_div_class('div', None, False)}"
         glf.write(f"""</td>
 <td>{quantities}</td>
+<td>{times}</td>
 <td></td><td></td><td></td>
 </tr>""")
 
@@ -948,9 +966,10 @@ def dump_corp_conveyors(
   <th></th><!--2-->
   <th>Названия чертежей</th><!--3-->
   <th>Кол-во</th><!--4-->
-  <th></th><!--5-->
-  <th>Названия предметов</th><!--6-->
-  <th>Кол-во</th><!--7-->
+  <th>Длит.</th><!--5-->
+  <th></th><!--6-->
+  <th>Названия предметов</th><!--7-->
+  <th>Кол-во</th><!--8-->
  </tr>
 </thead>
 <tbody>
@@ -964,7 +983,7 @@ def dump_corp_conveyors(
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
             glf.write(f"""<tr>
-<td class="qind-summary" colspan="7">Приоритет {priority} <span class="text-muted">{', '.join([str(_) for _ in settings.activities])}</span></td>
+<td class="qind-summary" colspan="8">Приоритет {priority} <span class="text-muted">{', '.join([str(_) for _ in settings.activities])}</span></td>
 </tr>
 """)
             """
