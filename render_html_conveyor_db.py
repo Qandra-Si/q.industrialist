@@ -1,5 +1,7 @@
-﻿import typing
+﻿import json
+import typing
 import datetime
+import itertools
 
 import render_html
 from render_html import get_span_glyphicon as glyphicon
@@ -139,13 +141,13 @@ table.tbl-summary tbody tr td div.run-impossible {
  background-size: 1em 1em
 }
 
-table.tbl-summary tbody tr td.qind-summary {
- font-size: medium;
- text-align: left;
- background: #111b1b;
- border-bottom: 1px solid #111b1b; }
-table.tbl-summary tbody tr:hover td.qind-summary {
- border-bottom: 1px solid #6db09e; }
+table.tbl-summary tbody tr td.qind-summary { font-size: medium; text-align: left; background: #111b1b; border-bottom: 1px solid #111b1b; }
+table.tbl-summary tbody tr:hover td.qind-summary { border-bottom: 1px solid #6db09e; }
+ 
+table.tbl-summary tbody tr td qmaterials { font-size: 85%; }
+table.tbl-summary tbody tr td qmaterials qmat { border: 1px solid transparent; }
+table.tbl-summary tbody tr td qmaterials qmat:hover { border: 1px dashed #6db09e; }
+table.tbl-summary tbody tr td qmaterials qmat.choose { border: 1px solid #57b69f; color: #cdd6d9; background-color: #375861; }
 
 bp_tag { color: #777; }
 me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px solid #383739; }
@@ -247,6 +249,9 @@ class NavMenuDefaults:
         self.phantom_blueprints: bool = False
         self.job_active: bool = False
         self.job_completed: bool = False
+        # ---
+        self.used_materials: bool = False
+        self.not_available: bool = False
 
     def get(self, label: str) -> bool:
         if label == 'run-possible' or label == 'row-possible' or label == 'row-multiple':
@@ -259,8 +264,11 @@ class NavMenuDefaults:
             return self.phantom_blueprints
         elif label == 'job-active':
             return self.job_active
-        elif label == 'job-completed':
-            return self.job_completed
+        # ---
+        elif label == 'used-materials':
+            return self.used_materials
+        elif label == 'not-available':
+            return self.not_available
         else:
             raise Exception("Unsupported label to get nav menu defaults")
 
@@ -278,6 +286,11 @@ class NavMenuDefaults:
             opt = self.job_active
         elif label == 'job-completed':
             opt = self.job_completed
+        # ---
+        elif label == 'used-materials':
+            opt = self.used_materials
+        elif label == 'not-available':
+            opt = self.not_available
         else:
             raise Exception("Unsupported label to get nav menu defaults")
         return '' if opt else (' hidden' if prefix else 'hidden')
@@ -296,8 +309,8 @@ def dump_nav_menu(glf) -> None:
         (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты'),  # btnToggleActive
         (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты'),
         None,
-        (False, 'used-materials', "Используемые материалы"),  # btnToggleUsedMaterials
-        (True, 'not-available', "Недоступные материалы"),  # btnToggleNotAvailable
+        (g_nav_menu_defaults.used_materials,     'used-materials',     'Используемые материалы'),  # btnToggleUsedMaterials
+        (g_nav_menu_defaults.not_available,      'not-available',      'Недоступные материалы'),  # btnToggleNotAvailable
         None,
         (True, 'end-level-manuf', "Производство последнего уровня"),  # btnToggleEndLevelManuf
         (False, 'entry-level-purchasing', "Список для закупки"),  # btnToggleEntryLevelPurchasing
@@ -483,7 +496,7 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><qmaterial tid="{tid}" icn="24" cl="qind-sign"></qmaterial>{mat_tag}</td>'
+                '<td><qmaterial tid="{tid}" cl="qind-sign"></qmaterial>{mat_tag}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '<td>{ip}</td>'
@@ -555,7 +568,7 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><qmaterial tid="{tid}" icn="24" cl="qind-sign"></qmaterial></td>'
+                '<td><qmaterial tid="{tid}" cl="qind-sign"></qmaterial></td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '</tr>\n'.
@@ -996,9 +1009,11 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
         for stack in stacks:
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
             tt: typing.Tuple[int, int] = tools.get_min_max_time(stack)
+            js = [(_.material_type.type_id,_.quantity) for _ in itertools.chain(*stack.required_materials_for_stack.values())]
             glf.write(f"{tr_div_class('div', stack, True)}"
                       f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
                       f"<me_tag>{b0.material_efficiency}%</me_tag>"
+                      f"<qmaterials data-arr='{json.dumps(js,separators=(',', ':'))}'></qmaterials>"
                       f"{tr_div_class('div', None, False)}")
             quantities += f"{tr_div_class('div', stack, True)}" \
                           f"{format_num_of_num(stack.max_possible_for_single, len(stack.group))}" \

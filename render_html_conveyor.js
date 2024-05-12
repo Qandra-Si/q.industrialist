@@ -123,6 +123,9 @@ function rebuildOptionsMenu() {
 //-----------
 //работа с динамическим содержимым страницы
 //-----------
+function getMaterialImg(tid, sz) {
+ return '<img class="icn'+sz+'" src="'+g_tbl_stock_img_src.replace("{tid}", tid)+'">';
+}
 function initMaterialNames() {
  $('table.tbl-stock tbody tr td qnm').each(function() {
   var data_tid = $(this).data('tid');
@@ -135,22 +138,63 @@ function initMaterialNames() {
  $('table.tbl-stock tbody tr td qimg24').each(function() {
   var data_tid = $(this).data('tid');
   if (!(data_tid === undefined)) {
-   $(this).replaceWith('<img class="icn24" src="'+g_tbl_stock_img_src.replace("{tid}", data_tid)+'">');
+   $(this).replaceWith(getMaterialImg(data_tid, 24));
   }
  });
  $('table.tbl-stock tbody tr td qmaterial').each(function() {
   var tid = $(this).attr('tid');
   var icn = $(this).attr('icn');
   var cl = $(this).attr('cl');
-  if (!(tid === undefined) && !(icn === undefined)) {
+  if (!(tid === undefined)) {
    var nm = getSdeItemName(tid);
    if (nm === null) nm = tid;
+   if (icn === undefined) icn = 24;
    if (cl === undefined) cl = ''; else cl = ' '+cl;
-   s = '<img class="icn'+icn+'" src="'+g_tbl_stock_img_src.replace("{tid}", tid)+'"> '+nm+'&nbsp;<a' +
+   s = getMaterialImg(tid, icn)+' '+nm+'&nbsp;<a' +
        ' data-target="#" role="button" data-tid="'+tid+'" class="qind-copy-btn'+cl+'" data-toggle="tooltip"' +
        ' data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>';
    $(this).replaceWith(s);
   }
+ });
+}
+function initMaterialsOfBlueprints(show_used) {
+ $('table.tbl-summary tbody tr td div qmaterials').each(function() {
+  if (!show_used) {
+   $(this).html('');
+  } else {
+   var data_arr = $(this).data('arr');
+   if (!(data_arr === undefined) && !(data_arr === "") && (data_arr.length>0)) {
+    var s = '';
+    for (var i=0; i<data_arr.length; ++i) {
+     if (i>0) s += ' ';
+     s += '<qmat>'+getMaterialImg(data_arr[i][0], 16)+' '+data_arr[i][1]+'</qmat>';
+    }
+    $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
+   }
+  }
+ });
+}
+function getTypeIdOfMaterial(qmat) {
+ var qmaterials = qmat.parent();
+ if (qmaterials === undefined) return null;
+ var data_arr = qmaterials.data('arr');
+ if ((data_arr === undefined) || (data_arr === "") || (data_arr.length==0)) return null;
+ var idx = qmat.index()-1; // первый <br>
+ if (idx >= data_arr.length) return null;
+ var tid = data_arr[idx][0];
+ return tid;
+}
+function chooseMaterial(qmat) {
+ var tid = getTypeIdOfMaterial(qmat);
+ if (tid === null) return
+ //var q = data_arr[idx][1];
+ var is_choose = qmat.hasClass('choose') == false;
+ $('qmaterials qmat').each(function() {
+  if (tid != getTypeIdOfMaterial($(this))) return;
+  if (is_choose)
+   $(this).addClass('choose');
+  else
+   $(this).removeClass('choose');
  });
 }
 //-----------
@@ -197,6 +241,9 @@ function rebuildBody() {
  $('tr.job-completed').each(function() {
   changeElemVisibility($(this), show_completed);
  });
+
+ var show_used = (getOption('option', 'used-materials') == 1) ? 1 : 0;
+ initMaterialsOfBlueprints(show_used);
 
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
  var show_entry_purch = (getOption('option', 'entry-level-purchasing') == 1) ? 1 : 0;
@@ -318,6 +365,9 @@ $(document).ready(function(){
   //rebuildStockMaterials();
   // init popover menus
   //initPopoverMenus();
+  $('qmaterials qmat').bind('click', function () {
+   chooseMaterial($(this));
+  });
   // Working with clipboard
   $('a.qind-copy-btn').each(function() {
     $(this).tooltip();
