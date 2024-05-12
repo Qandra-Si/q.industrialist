@@ -126,6 +126,20 @@ function rebuildOptionsMenu() {
 function getMaterialImg(tid, sz) {
  return '<img class="icn'+sz+'" src="'+g_tbl_stock_img_src.replace("{tid}", tid)+'">';
 }
+function getMaterialText(choose, q, na, nm) {
+ if (choose == false) {
+  if (na > 0)
+   return q+' нет '+na;
+  else
+   return q;
+ }
+ if (na == 0)
+  return nm+' <b>x'+q+'</b>';
+ else if (q == na)
+  return nm+' <b>x'+q+'</b> (нет в наличии)';
+ else
+  return nm+' <b>x'+q+'</b> (нет '+na+')';
+}
 function initMaterialNames() {
  $('table.tbl-stock tbody tr td qnm').each(function() {
   var data_tid = $(this).data('tid');
@@ -168,34 +182,39 @@ function initMaterialsOfBlueprints(show_used) {
     for (var i=0; i<data_arr.length; ++i) {
      if (i>0) s += ' ';
      if (data_arr[i][2]>0) s += '<qmat class="absent">'; else s += '<qmat>';
-     s += getMaterialImg(data_arr[i][0], 16)+' '+data_arr[i][1]+'</qmat>';
+     s += getMaterialImg(data_arr[i][0], 16)+' <txt>'+getMaterialText(false, data_arr[i][1], data_arr[i][2])+'</txt></qmat>';
     }
     $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
    }
   }
  });
 }
-function getTypeIdOfMaterial(qmat) {
+function getMaterialInfo(qmat) {
  var qmaterials = qmat.parent();
  if (qmaterials === undefined) return null;
  var data_arr = qmaterials.data('arr');
  if ((data_arr === undefined) || (data_arr === "") || (data_arr.length==0)) return null;
  var idx = qmat.index()-1; // первый <br>
  if (idx >= data_arr.length) return null;
- var tid = data_arr[idx][0];
- return tid;
+ return data_arr[idx];
 }
 function chooseMaterial(qmat) {
- var tid = getTypeIdOfMaterial(qmat);
- if (tid === null) return
- //var q = data_arr[idx][1];
+ var info = getMaterialInfo(qmat);
+ if (info === null) return
+ var tid = info[0];
+ var nm = getSdeItemName(tid);
+ if (nm === null) nm = tid;
  var is_choose = qmat.hasClass('choose') == false;
  $('qmaterials qmat').each(function() {
-  if (tid != getTypeIdOfMaterial($(this))) return;
-  if (is_choose)
+  i = getMaterialInfo($(this));
+  if (tid != i[0]) return;
+  if (is_choose) {
+   $(this).find('txt').html(getMaterialText(true, i[1], i[2], nm));
    $(this).addClass('choose');
-  else
+  } else {
+   $(this).find('txt').html(getMaterialText(false, i[1], i[2]));
    $(this).removeClass('choose');
+  }
  });
 }
 //-----------
