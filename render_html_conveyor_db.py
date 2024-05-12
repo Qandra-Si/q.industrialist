@@ -170,6 +170,34 @@ def declension_of_runs(runs: int) -> str:
         return 'прогона'
 
 
+def format_num_of_num(possible: int, total: int, mute_possible: bool = True) -> str:
+    if possible >= total:
+        return str(total)
+    elif mute_possible:
+        return f'<mute>{possible} из</mute> {total}'
+    else:
+        return f'{possible} из{total}'
+
+
+def sec_to_timestr(time: int, trim_to_10min: bool = True) -> str:
+    if trim_to_10min:
+        time = (time // 600) * 600
+    # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
+    res: str = f'{time // 3600:d}:{(time // 60) % 60:02d}'
+    return res
+
+
+def format_time_to_time(min_num: int, max_num: int, mute_min: bool = True) -> str:
+    # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
+    res: str = sec_to_timestr(min_num)
+    if min_num == max_num:
+        return res
+    elif mute_min:
+        return f'<mute>от {res} до</mute> ' + sec_to_timestr(max_num)
+    else:
+        return f'от {res} до ' + sec_to_timestr(max_num)
+
+
 class NavMenuDefaults:
     def __init__(self):
         self.run_possible: bool = True
@@ -833,21 +861,6 @@ def dump_list_of_possible_blueprints(
         glf,
         # список чертежей и их потребности (сгруппированные и отсортированные)
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
-    def format_quantities(max_possible: int, total: int) -> str:
-        if max_possible >= total:
-            return str(total)
-        else:
-            return f'<mute>{max_possible} из</mute> {total}'
-
-    def format_times(min_max_t: typing.Tuple[int, int]) -> str:
-        # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
-        res: str = '{:d}:{:02d}'.format(min_max_t[0] // 3600, (((min_max_t[0] // 60) % 60) // 10) * 10)
-        if min_max_t[0] == min_max_t[1]:
-            return res
-        else:
-            return f'<mute>от {res} до</mute> ' + \
-                   '{:d}:{:02d}'.format(min_max_t[1] // 3600, (((min_max_t[1] // 60) % 60 // 10) * 10))
-
     # группируем стеки по названиям чертежей
     grouped: typing.List[typing.Tuple[str, typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]]] = []
     for stack in requirements:
@@ -914,10 +927,10 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
                       f"<me_tag>{b0.material_efficiency}%</me_tag>"
                       f"{tr_div_class('div', None, False)}")
             quantities += f"{tr_div_class('div', stack, True)}" \
-                          f"{format_quantities(stack.max_possible_for_single, len(stack.group))}" \
+                          f"{format_num_of_num(stack.max_possible_for_single, len(stack.group))}" \
                           f"{tr_div_class('div', None, False)}"
             times += f"{tr_div_class('div', stack, True)}" \
-                     f"{format_times(tt)}" \
+                     f"{format_time_to_time(tt[0], tt[1])}" \
                      f"{tr_div_class('div', None, False)}"
         glf.write(f"""</td>
 <td>{quantities}</td>
