@@ -459,13 +459,13 @@ def dump_nav_menu_router_dialog(
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><img class="icn24" src="{src}"> {nm}{clbrd}{mat_tag}</td>'
+                '<td><img class="icn24" src="{src}"> <qind-nm>{tid}</qind-nm>{clbrd}{mat_tag}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '<td>{ip}</td>'
                 '</tr>\n'.
                 format(num=row_num,
-                       nm=product.name,
+                       tid=product.type_id,
                        src=render_html.__get_img_src(product_type_id, 32),
                        clbrd=copy2clpbrd,
                        mat_tag=material_tag,
@@ -506,8 +506,11 @@ def dump_nav_menu_router_dialog(
                     materials.add(a.type_id)
         # сохраняем в глобальный справочник материалов и продуктов используемых конвейером
         global_dictionary.load_type_ids(materials)
+        # сортируем по market-группам (внимание! market-group м.б. неизвестной, например для копий чертежей)
+        sorted_materials = [(qid.get_type_id(x).market_group_id, x) for x in materials]
+        sorted_materials.sort(key=lambda x: x[0] if x[0] else 0)
         # выводим в отчёт
-        for __sort_key, material_type_id in sorted([(qid.get_type_id(x).market_group_id, x) for x in materials]):
+        for __sort_key, material_type_id in sorted_materials:
             row_num += 1
             material: db.QSwaggerTypeId = qid.get_type_id(material_type_id)
             quantity: int = 0
