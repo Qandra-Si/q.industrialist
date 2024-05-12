@@ -60,21 +60,20 @@ tr.qind-em td, /* enough materials */
 tr.qind-em th
 { color: #aaa; }
 
-#tblStock tr { font-size: small; }
-#tbl-stock tr { font-size: small; }
-#tbl-stock tbody tr td:nth-child(2) img /* material icon (compact view) */
+table.tbl-stock tr { font-size: small; }
+table.tbl-stock tbody tr td:nth-child(2) img /* material icon (compact view) */
 { margin-top: -2px; margin-bottom: -1px; }
-#tbl-stock tbody tr td { padding: 1px; font-size: smaller; }
-#tbl-stock thead tr { height: 50px; }
-#tbl-stock thead tr th:nth-child(1),
-#tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; }
-#tbl-stock tbody tr td:nth-child(2) { white-space: nowrap; }
-#tbl-stock thead tr th:nth-child(3),
-#tbl-stock thead tr th:nth-child(4),
-#tbl-stock thead tr th:nth-child(5),
-#tbl-stock tbody tr td:nth-child(3),
-#tbl-stock tbody tr td:nth-child(4),
-#tbl-stock tbody tr td:nth-child(5) { text-align: right; }
+table.tbl-stock tbody tr td { padding: 1px; font-size: smaller; }
+table.tbl-stock thead tr { height: 50px; }
+table.tbl-stock thead tr th:nth-child(1),
+table.tbl-stock tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; padding-left: 4px; }
+table.tbl-stock tbody tr td:nth-child(2) { white-space: nowrap; }
+table.tbl-stock thead tr th:nth-child(3),
+table.tbl-stock thead tr th:nth-child(4),
+table.tbl-stock thead tr th:nth-child(5),
+table.tbl-stock tbody tr td:nth-child(3),
+table.tbl-stock tbody tr td:nth-child(4),
+table.tbl-stock tbody tr td:nth-child(5) { text-align: right; }
 
 table.tbl-conveyor tr { font-size: small; }
 table.tbl-conveyor tbody tr td { padding: 1px; font-size: smaller; }
@@ -420,9 +419,12 @@ def dump_nav_menu_router_dialog(
             z0 = sorted([corporation.assets.get(x).name for x in containers_stocks], key=lambda x: x)
             glf.write("<small>Сток контейнеры: <ul><li><mark>" + "</mark><li><mark>".join(z0) + "</mark></ul></small>")
         glf.write(f"""
+<script>
+g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
+</script>
 <div class="row">
  <div class="col-md-6">
-<table id="tbl-stock" class="table table-condensed table-hover">
+<table class="table table-condensed table-hover tbl-stock">
 <thead>
  <tr>
   <th>#</th>
@@ -459,14 +461,13 @@ def dump_nav_menu_router_dialog(
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><img class="icn24" src="{src}"> <qind-nm>{tid}</qind-nm>{clbrd}{mat_tag}</td>'
+                '<td><qimg24 data-tid="{tid}"></qimg24> <qnm data-tid="{tid}"></qnm>{clbrd}{mat_tag}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '<td>{ip}</td>'
                 '</tr>\n'.
                 format(num=row_num,
                        tid=product.type_id,
-                       src=render_html.__get_img_src(product_type_id, 32),
                        clbrd=copy2clpbrd,
                        mat_tag=material_tag,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
@@ -478,7 +479,7 @@ def dump_nav_menu_router_dialog(
 </table>
 </div> <!-- col -->
 <div class="col-md-6">
-<table id="tbl-stock" class="table table-condensed table-hover">
+<table class="table table-condensed table-hover tbl-stock">
 <thead>
  <tr>
   <th>#</th>
@@ -525,13 +526,12 @@ def dump_nav_menu_router_dialog(
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><img class="icn24" src="{src}"> {nm}{clbrd}</td>'
+                '<td><qimg24 data-tid="{tid}"></qimg24> <qnm data-tid="{tid}"></qnm>{clbrd}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '</tr>\n'.
                 format(num=row_num,
-                       nm=material.name,
-                       src=render_html.__get_img_src(material_type_id, 32),
+                       tid=material.type_id,
                        clbrd=copy2clpbrd,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
                        ne="" if not_enough == 0 else '{:,d}'.format(not_enough))

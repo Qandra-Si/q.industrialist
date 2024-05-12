@@ -121,6 +121,25 @@ function rebuildOptionsMenu() {
  toggleSortMarkers(getOptionValue('sort', 'mode'));
 }
 //-----------
+//работа с динамическим содержимым страницы
+//-----------
+function initMaterialNames() {
+ $('table.tbl-stock tbody tr td qnm').each(function() {
+  var data_tid = $(this).data('tid');
+  if (!(data_tid === undefined)) {
+   var nm = getSdeItemName(data_tid);
+   if (!(nm === null)) $(this).html(nm);
+   else $(this).html(data_tid);
+  }
+ });
+ $('table.tbl-stock tbody tr td qimg24').each(function() {
+  var data_tid = $(this).data('tid');
+  if (!(data_tid === undefined)) {
+   $(this).html('<img class="icn24" src="'+g_tbl_stock_img_src.replace("{tid}", data_tid)+'">');
+  }
+ });
+}
+//-----------
 //работа с содержимом страницы
 //-----------
 function changeElemVisibility(el, show){
@@ -279,6 +298,7 @@ $(document).ready(function(){
   // first init
   resetOptionsMenuToDefault();
   rebuildOptionsMenu();
+  initMaterialNames();
   rebuildBody();
   //rebuildStocksDropdown();
   //rebuildStockMaterials();
