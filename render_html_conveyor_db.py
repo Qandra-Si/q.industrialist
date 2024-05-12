@@ -277,7 +277,7 @@ def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
         (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы'),
         (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы'),  # btnToggleImpossible
-        (g_nav_menu_defaults.lost_blueprints,    'lost-blueprints',    'Неподходящие чертежи'),
+        (g_nav_menu_defaults.lost_blueprints,    'lost-blueprints',    'Потерянные чертежи (не на своём месте)'),
         (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)'),
         (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты'),  # btnToggleActive
         (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты'),
@@ -825,6 +825,8 @@ def dump_list_of_completed_jobs(glf, completed_jobs: typing.List[db.QSwaggerCorp
 
 def dump_list_of_lost_blueprints(
         glf,
+        # справочники
+        corporation: db.QSwaggerCorporation,
         # список чертежей, которые невозможно запустить в выбранном конвейере
         lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
     # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
@@ -842,18 +844,26 @@ def dump_list_of_lost_blueprints(
         group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
         grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
     grouped_and_sorted.sort(key=lambda x: x[0])
+    # локальные переменные
+    container_prefix: str = '<br><mute>Контейнер - </mute>'
     # выводим в отчёт
     global g_nav_menu_defaults
     for _, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
+        containers: typing.Set[str] = set()
+        for b in group:
+            c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(b.location_id)
+            containers.add(c.name if c and c.name else str(b.location_id))
+        containers: typing.List[str] = sorted(containers)
+        containers: str = container_prefix.join(containers)
         glf.write(f"""<tr class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
-<label class="label label-lost-blueprint">неподходящий чертёж</label></td>
+<label class="label label-lost-blueprint">потерянный чертёж</label>{container_prefix}{containers}</td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td><td></td>
 </tr>""")
@@ -1085,6 +1095,10 @@ def dump_corp_conveyors(
             for _a in settings.activities:
                 a: tools.ConveyorActivity = _a
                 for b in blueprints:
+                    if b.is_copy and a in (tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME,
+                                           tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL):
+                        lost_blueprints.append(b)
+                        continue
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
                         if b.item_id not in active_blueprint_ids:
@@ -1158,6 +1172,7 @@ def dump_corp_conveyors(
             if lost_blueprints:
                 dump_list_of_lost_blueprints(
                     glf,
+                    corporation,
                     lost_blueprints)
             # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
             if phantom_blueprints:
