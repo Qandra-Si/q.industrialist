@@ -160,6 +160,34 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 """)
 
 
+def dump_materials_to_js(glf, dictionary: tools.ConveyorDictionary) -> None:
+    type_id_keys = dictionary.materials
+    sorted_type_id_keys = sorted(type_id_keys, key=lambda x: int(x))
+    glf.write(f"""<script>
+var g_sde_max_type_id={sorted_type_id_keys[-1]};
+var g_sde_type_len={len(sorted_type_id_keys)};
+var g_sde_type_ids=[""")
+    for (idx, type_id) in enumerate(sorted_type_id_keys):
+        # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
+        glf.write('{end}[{id},"{nm}"]'.format(
+            id=type_id,
+            nm=dictionary.qid.get_type_id(type_id).name.replace('"', '\\\"'),
+            end=',' if idx else "\n"))
+    glf.write("""
+];
+function getSdeItemName(t) {
+ if ((t < 0) || (t > g_sde_max_type_id)) return null;
+ for (var i=0; i<g_sde_type_len; ++i) {
+  var ti = g_sde_type_ids[i][0];
+  if (t == ti) return g_sde_type_ids[i][1];
+  if (ti >= g_sde_max_type_id) break;
+ }
+ return null;
+}
+</script>
+""")
+
+
 def declension_of_runs(runs: int) -> str:
     modulo: int = runs % 10
     if modulo in (0, 5, 6, 7, 8, 9):
@@ -355,6 +383,7 @@ def dump_nav_menu_router_dialog(
         glf,
         # данные (справочники)
         qid: db.QSwaggerDictionary,
+        global_dictionary: tools.ConveyorDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
         conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
@@ -425,12 +454,12 @@ def dump_nav_menu_router_dialog(
             #    material_tag = ' <span class="label label-warning">research material</span></small>'
             #else:
             #    material_tag = ' <span class="label label-danger">non material</span></small>'
-            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-copy="{product.name}" class="qind-copy-btn' \
+            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-tid="{product.type_id}" class="qind-copy-btn' \
                           f' qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}{mat_tag}</td>'
+                '<td><img class="icn24" src="{src}"> {nm}{clbrd}{mat_tag}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '<td>{ip}</td>'
@@ -475,6 +504,9 @@ def dump_nav_menu_router_dialog(
             for a in corporation.assets.values():
                 if a.location_id in containers_stocks:
                     materials.add(a.type_id)
+        # сохраняем в глобальный справочник материалов и продуктов используемых конвейером
+        global_dictionary.load_type_ids(materials)
+        # выводим в отчёт
         for __sort_key, material_type_id in sorted([(qid.get_type_id(x).market_group_id, x) for x in materials]):
             row_num += 1
             material: db.QSwaggerTypeId = qid.get_type_id(material_type_id)
@@ -485,12 +517,12 @@ def dump_nav_menu_router_dialog(
                 for a in corporation.assets.values():
                     if a.type_id == material_type_id and a.location_id in containers_stocks:
                         quantity += a.quantity
-            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-copy="{material.name}" class="qind-copy-btn' \
-                          f'qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
+            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-tid="{material.type_id}" class="qind-copy-btn' \
+                          f' qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td data-nm="{nm}"><img class="icn24" src="{src}"> {nm}{clbrd}</td>'
+                '<td><img class="icn24" src="{src}"> {nm}{clbrd}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '</tr>\n'.
@@ -943,6 +975,7 @@ def dump_corp_conveyors(
         glf,
         # данные (справочники)
         qid: db.QSwaggerDictionary,
+        global_dictionary: tools.ConveyorDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
         conveyor_settings: typing.List[tools.ConveyorSettings],
@@ -1144,6 +1177,9 @@ def dump_router2_into_report(
         dump_additional_stylesheet(glf)
         dump_nav_menu(glf)
         dump_blueprints_overflow_warn(glf, conveyor_settings)
+        # инициализация справочника материалов, в которых будут хранится все используемые предметы
+        global_dictionary: tools.ConveyorDictionary = tools.ConveyorDictionary(qid)
+        global_dictionary.load_router_settings(router_settings)
         # инициализация списка материалов, требуемых (и уже используемых) в производстве
         available_materials: typing.Dict[tools.ConveyorSettings, tools.ConveyorCorporationStockMaterials] = \
             tools.calc_available_materials(conveyor_settings)
@@ -1151,15 +1187,18 @@ def dump_router2_into_report(
         dump_corp_conveyors(
             glf,
             qid,
+            global_dictionary,
             router_settings,
             conveyor_settings,
             available_materials)
         # сохраняем содержимое диалоговых окон
-        dump_nav_menu_router_dialog(glf, qid, router_settings, conveyor_settings)
+        dump_nav_menu_router_dialog(glf, qid, global_dictionary, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
+        dump_materials_to_js(glf, global_dictionary)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
         render_html.__dump_footer(glf)
-        # удаляем более ненужный список материалов
+        # удаляем более ненужные списки
         del available_materials
+        del global_dictionary
     finally:
         glf.close()

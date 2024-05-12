@@ -578,3 +578,24 @@ def get_min_max_time(stack: ConveyorMaterialRequirements.StackOfBlueprints) -> t
                 # считаем min/max
                 min_time, max_time = apply(min_time, max_time, __stageX)
     return min_time, max_time
+
+
+# ConveyorDictionary - долговременный справочник материалов конвейера, хранится долго и накапливает информацию из
+# экземпляров QSwaggerTypeId
+class ConveyorDictionary:
+    def __init__(self, qid: db.QSwaggerDictionary):
+        # сохраняем ссылку на ПОЛНЫЙ справочник загруженный из БД
+        self.qid: db.QSwaggerDictionary = qid
+        # подготовка списка-справочника, который будет хранить идентификаторы  все продуктов, используемых конвейером
+        self.materials: typing.Set[int] = set()
+
+    def __del__(self):
+        # уничтожаем свой список-справочник, остальные (не наши) не трогаем
+        del self.materials
+
+    def load_router_settings(self, router_settings: typing.List[RouterSettings]) -> None:
+        for r in router_settings:
+            self.materials = self.materials | set(r.output)
+
+    def load_type_ids(self, type_ids: typing.Set[int]):
+        self.materials = self.materials | set(type_ids)

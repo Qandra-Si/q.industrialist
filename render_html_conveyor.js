@@ -222,6 +222,7 @@ function doCopyToClipboard(elem) {
  if (!(data_tid === undefined)) {
   var nm = getSdeItemName(data_tid);
   if (!(nm === null)) copyToClipboard(elem, nm);
+  else copyToClipboard(elem, data_tid);
   return;
  }
  var data_copy = elem.data('copy');
