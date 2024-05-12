@@ -456,19 +456,26 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
             #    material_tag = ' <span class="label label-warning">research material</span></small>'
             #else:
             #    material_tag = ' <span class="label label-danger">non material</span></small>'
-            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-tid="{product.type_id}" class="qind-copy-btn' \
-                          f' qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
+            # --- --- ---
+            # <qmaterial tid="16663" icn="24" cl="qind-sign"></qmaterial>
+            # эквивалентно:
+            #   <qimg24 data-tid="16663"></qimg24> <qnm data-tid="16663"></qnm>&nbsp;<a data-target="#" role="button"
+            #   data-tid="16663" class="qind-copy-btn qind-sign" data-toggle="tooltip"><span class="glyphicon
+            #   glyphicon-copy" aria-hidden="true"></span></a>
+            # эквивалентно:
+            #   <img class="icn24" src="http://imageserver.eveonline.com/Type/16663_32.png"> Caesarium Cadmide&nbsp;<a
+            #   data-target="#" role="button" data-tid="16663" class="qind-copy-btn qind-sign" data-toggle="tooltip"
+            #   data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><qimg24 data-tid="{tid}"></qimg24> <qnm data-tid="{tid}"></qnm>{clbrd}{mat_tag}</td>'
+                '<td><qmaterial tid="{tid}" icn="24" cl="qind-sign"></qmaterial>{mat_tag}</td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '<td>{ip}</td>'
                 '</tr>\n'.
                 format(num=row_num,
                        tid=product.type_id,
-                       clbrd=copy2clpbrd,
                        mat_tag=material_tag,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
                        ne="" if not_enough == 0 else '{:,d}'.format(not_enough),
@@ -521,18 +528,25 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
                 for a in corporation.assets.values():
                     if a.type_id == material_type_id and a.location_id in containers_stocks:
                         quantity += a.quantity
-            copy2clpbrd = f'&nbsp;<a data-target="#" role="button" data-tid="{material.type_id}" class="qind-copy-btn' \
-                          f' qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>'
+            # --- --- ---
+            # <qmaterial tid="16663" icn="24" cl="qind-sign"></qmaterial>
+            # эквивалентно:
+            #   <qimg24 data-tid="16663"></qimg24> <qnm data-tid="16663"></qnm>&nbsp;<a data-target="#" role="button"
+            #   data-tid="16663" class="qind-copy-btn qind-sign" data-toggle="tooltip"><span class="glyphicon
+            #   glyphicon-copy" aria-hidden="true"></span></a>
+            # эквивалентно:
+            #   <img class="icn24" src="http://imageserver.eveonline.com/Type/16663_32.png"> Caesarium Cadmide&nbsp;<a
+            #   data-target="#" role="button" data-tid="16663" class="qind-copy-btn qind-sign" data-toggle="tooltip"
+            #   data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>
             glf.write(
                 '<tr>'
                 '<td scope="row">{num}</td>'
-                '<td><qimg24 data-tid="{tid}"></qimg24> <qnm data-tid="{tid}"></qnm>{clbrd}</td>'
+                '<td><qmaterial tid="{tid}" icn="24" cl="qind-sign"></qmaterial></td>'
                 '<td>{q}</td>'
                 '<td>{ne}</td>'
                 '</tr>\n'.
                 format(num=row_num,
                        tid=material.type_id,
-                       clbrd=copy2clpbrd,
                        q="" if quantity == 0 else '{:,d}'.format(quantity),
                        ne="" if not_enough == 0 else '{:,d}'.format(not_enough))
             )

@@ -128,14 +128,28 @@ function initMaterialNames() {
   var data_tid = $(this).data('tid');
   if (!(data_tid === undefined)) {
    var nm = getSdeItemName(data_tid);
-   if (!(nm === null)) $(this).html(nm);
-   else $(this).html(data_tid);
+   if (!(nm === null)) $(this).replaceWith(nm);
+   else $(this).replaceWith(data_tid);
   }
  });
  $('table.tbl-stock tbody tr td qimg24').each(function() {
   var data_tid = $(this).data('tid');
   if (!(data_tid === undefined)) {
-   $(this).html('<img class="icn24" src="'+g_tbl_stock_img_src.replace("{tid}", data_tid)+'">');
+   $(this).replaceWith('<img class="icn24" src="'+g_tbl_stock_img_src.replace("{tid}", data_tid)+'">');
+  }
+ });
+ $('table.tbl-stock tbody tr td qmaterial').each(function() {
+  var tid = $(this).attr('tid');
+  var icn = $(this).attr('icn');
+  var cl = $(this).attr('cl');
+  if (!(tid === undefined) && !(icn === undefined)) {
+   var nm = getSdeItemName(tid);
+   if (nm === null) nm = tid;
+   if (cl === undefined) cl = ''; else cl = ' '+cl;
+   s = '<img class="icn'+icn+'" src="'+g_tbl_stock_img_src.replace("{tid}", tid)+'"> '+nm+'&nbsp;<a' +
+       ' data-target="#" role="button" data-tid="'+tid+'" class="qind-copy-btn'+cl+'" data-toggle="tooltip"' +
+       ' data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>';
+   $(this).replaceWith(s);
   }
  });
 }
