@@ -145,9 +145,11 @@ table.tbl-summary tbody tr td.qind-summary { font-size: medium; text-align: left
 table.tbl-summary tbody tr:hover td.qind-summary { border-bottom: 1px solid #6db09e; }
  
 table.tbl-summary tbody tr td qmaterials { font-size: 85%; }
-table.tbl-summary tbody tr td qmaterials qmat { border: 1px solid transparent; }
+table.tbl-summary tbody tr td qmaterials qmat { border: 1px solid transparent; cursor: pointer; }
 table.tbl-summary tbody tr td qmaterials qmat:hover { border: 1px dashed #6db09e; }
-table.tbl-summary tbody tr td qmaterials qmat.choose { border: 1px solid #57b69f; color: #cdd6d9; background-color: #375861; }
+table.tbl-summary tbody tr td qmaterials qmat.choose { border: 1px solid #57b69f; color: #eee; background-color: #375861; }
+table.tbl-summary tbody tr td qmaterials qmat.absent { border: 1px dashed #fd9700; }
+table.tbl-summary tbody tr td qmaterials qmat.absent.choose { border: 1px solid #fd9700; color: #eee; background-color: #5c2d19; }
 
 bp_tag { color: #777; }
 me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px solid #383739; }
@@ -1007,9 +1009,14 @@ data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data
         quantities: str = '<br>'
         times: str = '<br>'
         for stack in stacks:
+            # TODO: здесь какая-то путаница с activity(ies)
+            na = []
+            js = [(_.material_type.type_id, _.quantity) for _ in itertools.chain(*stack.required_materials_for_stack.values())]
+            for _ in stack.not_available_materials_for_stack.values(): na.extend(_)
+            js = [(tid, q, next((_.quantity for _ in na if _.material_type.type_id == tid), 0)) for (tid, q) in js]
+            # ---
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
             tt: typing.Tuple[int, int] = tools.get_min_max_time(stack)
-            js = [(_.material_type.type_id,_.quantity) for _ in itertools.chain(*stack.required_materials_for_stack.values())]
             glf.write(f"{tr_div_class('div', stack, True)}"
                       f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
                       f"<me_tag>{b0.material_efficiency}%</me_tag>"

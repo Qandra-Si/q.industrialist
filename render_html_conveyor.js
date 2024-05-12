@@ -167,7 +167,8 @@ function initMaterialsOfBlueprints(show_used) {
     var s = '';
     for (var i=0; i<data_arr.length; ++i) {
      if (i>0) s += ' ';
-     s += '<qmat>'+getMaterialImg(data_arr[i][0], 16)+' '+data_arr[i][1]+'</qmat>';
+     if (data_arr[i][2]>0) s += '<qmat class="absent">'; else s += '<qmat>';
+     s += getMaterialImg(data_arr[i][0], 16)+' '+data_arr[i][1]+'</qmat>';
     }
     $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
    }
