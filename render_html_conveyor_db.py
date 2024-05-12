@@ -197,6 +197,20 @@ def declension_of_runs(runs: int) -> str:
         return 'прогона'
 
 
+def declension_of_blueprints(blueprints: int) -> str:
+    if blueprints == 1:
+        return 'чертёж'
+    else:
+        return 'чертежи'
+
+
+def declension_of_lost_blueprints(blueprints: int) -> str:
+    if blueprints == 1:
+        return 'потерянный чертёж'
+    else:
+        return 'потерянные чертежи'
+
+
 def format_num_of_num(possible: int, total: int, mute_possible: bool = True) -> str:
     if possible >= total:
         return str(total)
@@ -863,7 +877,8 @@ def dump_list_of_lost_blueprints(
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
-<label class="label label-lost-blueprint">потерянный чертёж</label>{container_prefix}{containers}</td>
+<label class="label label-lost-blueprint">{declension_of_lost_blueprints(len(group))}</label>{container_prefix}{containers}<!--
+item_ids: {[_.item_id for _ in group]}--></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td><td></td>
 </tr>""")
@@ -1092,19 +1107,25 @@ def dump_corp_conveyors(
             # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
             possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
             lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
-            for _a in settings.activities:
-                a: tools.ConveyorActivity = _a
-                for b in blueprints:
+            for b in blueprints:
+                possible: bool = False
+                lost: bool = False
+                for _a in settings.activities:
+                    a: tools.ConveyorActivity = _a
                     if b.is_copy and a in (tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME,
                                            tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL):
-                        lost_blueprints.append(b)
-                        continue
+                        lost, possible = True, False
+                        break
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
                         if b.item_id not in active_blueprint_ids:
-                            possible_blueprints.append(b)
+                            possible = True
                     else:
-                        lost_blueprints.append(b)
+                        lost = True
+                if possible:
+                    possible_blueprints.append(b)
+                elif lost:
+                    lost_blueprints.append(b)
             # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
             # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
             # чертежа тоже нет, ...вот такие фантомные чертежи мешаются в процессе расчётов (фильтрую чертежи более
