@@ -136,6 +136,11 @@ table.tbl-summary tbody tr.row-possible,
 table.tbl-summary tbody tr.row-optional,
 table.tbl-summary tbody tr.row-impossible,
 table.tbl-summary tbody tr td div.run-possible { }
+table.tbl-summary tbody tr td div.run-optional {
+ background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #541 49.9%, #541 60%, rgba(0, 0, 0, 0) 60%) fixed,
+             linear-gradient(-45deg, #541 10%, rgba(0, 0, 0, 0) 10%) fixed;
+ background-size: 1em 1em
+}
 table.tbl-summary tbody tr td div.run-impossible {
  background: linear-gradient(-45deg, rgba(0, 0, 0, 0) 49.9%, #421 49.9%, #421 60%, rgba(0, 0, 0, 0) 60%) fixed,
              linear-gradient(-45deg, #421 10%, rgba(0, 0, 0, 0) 10%) fixed;
