@@ -255,7 +255,7 @@ def get_materials_list(
                 product_blueprint_id: int = invention.products[0].product_id
                 product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
                 if product_blueprint_type and product_blueprint_type.manufacturing:
-                    market_group_id: int = product_blueprint_type.manufacturing.product_type.market_group_id
+                    market_group_id: int = b.blueprint_type.blueprint_type.market_group_id
                     decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
                     while market_group_id is not None:
                         if market_group_id == 204:  # Ships
