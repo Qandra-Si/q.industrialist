@@ -321,27 +321,51 @@ class ConveyorCorporationStockMaterials:
                 s[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
         return self.stock_materials
 
+    class CheckEnoughResult:
+        def __init__(self,
+                     enough: bool,
+                     max_possible: int,
+                     not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]):
+            self.non_decryptors_missing: bool = not enough
+            self.decryptors_missing: typing.Optional[bool] = None
+            self.max_possible: int = max_possible
+            self.not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = not_available
+
+        @property
+        def enough(self):
+            return not self.non_decryptors_missing
+
+        @property
+        def only_decryptors_missing(self):
+            return not self.non_decryptors_missing and self.decryptors_missing
+
     def check_enough_materials_at_station(
             self,
             # идентификатор станции на которой в коробках стока находятся материалы
             station_id: int,
             # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
             required_materials: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]) \
-            -> typing.Tuple[bool, int, typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]]:  # yes|no, max possible, not_available
+            -> CheckEnoughResult:
         available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
         if not available_materials:
-            return False, 0, required_materials
+            return ConveyorCorporationStockMaterials.CheckEnoughResult(False, 0, required_materials)
 
-        max_possible: int = -1
-        not_available_materials: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
+        result: ConveyorCorporationStockMaterials.CheckEnoughResult = \
+            ConveyorCorporationStockMaterials.CheckEnoughResult(True, -1, {})
 
-        def push(a338: db.QSwaggerActivity, m338: db.QSwaggerMaterial, q338: int) -> None:
+        def push(a338: db.QSwaggerActivity, m338: db.QSwaggerMaterial, q338: int) -> bool:
             m340: db.QSwaggerMaterial = db.QSwaggerMaterial(m338.material_type, q338)
-            mm334: typing.List[db.QSwaggerMaterial] = not_available_materials.get(a338)
+            mm334: typing.List[db.QSwaggerMaterial] = result.not_available.get(a338)
             if mm334 is None:
-                not_available_materials[a338] = [m340]
+                result.not_available[a338] = [m340]
             else:
                 mm334.append(m340)
+            is_decryptor: bool = m338.material_type.market_group_id == 1873
+            if is_decryptor:
+                result.decryptors_missing = True
+            else:
+                result.non_decryptors_missing = True
+            return is_decryptor
 
         for activity, materials in required_materials.items():
             for r in materials:
@@ -349,19 +373,25 @@ class ConveyorCorporationStockMaterials:
                 a = available_materials.get(r.material_id)
                 # определяем, достаточно ли имеющегося кол-ва материалов?
                 if not a:
-                    push(activity, r, r.quantity)
-                    max_possible = 0
+                    if push(activity, r, r.quantity):
+                        # отсутствие декрипторов не мешает запуску работы
+                        continue
+                    else:
+                        result.max_possible = 0
                 elif a.quantity < r.quantity:
-                    push(activity, r, r.quantity - a.quantity)
-                    max_possible = 0
+                    if push(activity, r, r.quantity - a.quantity):
+                        # отсутствие декрипторов не мешает запуску работы
+                        continue
+                    else:
+                        result.max_possible = 0
                 # определяем максимально возможное кол-во производственных запусков для этого списка потребностей
-                if max_possible in (0, 1):
+                if result.max_possible in (0, 1):
                     pass
-                elif max_possible < 0:
-                    max_possible = a.quantity // r.quantity
+                elif result.max_possible < 0:
+                    result.max_possible = a.quantity // r.quantity
                 else:
-                    max_possible = min(max_possible, a.quantity // r.quantity)
-        return len(not_available_materials) == 0, max_possible, not_available_materials
+                    result.max_possible = min(result.max_possible, a.quantity // r.quantity)
+        return result
 
     def check_enough_materials_everywhere(
             self,
@@ -402,23 +432,38 @@ class ConveyorMaterialRequirements:
             self.max_possible_for_single: int = 0
             self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
             self.enough_for_stack: bool = False
+            self.only_decryptors_missing_for_stack: bool = True
             self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
             self.not_available_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
 
         def apply_materials_info(self,
+                                 materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
+                                 enough_for_single: ConveyorCorporationStockMaterials.CheckEnoughResult,
+                                 materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
+                                 enough_for_stack: ConveyorCorporationStockMaterials.CheckEnoughResult):
+            """max_possible if enough_for_single else 0,
+            materials_single,
+            enough_for_stack,
+            materials_stack,
+            not_available_materials_stack)
                                  max_possible: int,
                                  materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
                                  enough: bool,
                                  materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
-                                 not_available_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]):
+                                 not_available_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]
+            """
+
             del self.required_materials_for_single
             del self.required_materials_for_stack
             del self.not_available_materials_for_stack
-            self.max_possible_for_single = max_possible
+            # ---
+            self.max_possible_for_single = enough_for_single.max_possible
             self.required_materials_for_single = materials_for_single
-            self.enough_for_stack = enough
+            # ---
+            self.enough_for_stack = enough_for_stack.enough
+            self.only_decryptors_missing_for_stack = enough_for_stack.only_decryptors_missing
             self.required_materials_for_stack = materials_for_stack
-            self.not_available_materials_for_stack = not_available_for_stack
+            self.not_available_materials_for_stack = enough_for_stack.not_available
 
     def __init__(self):
         self.conveyor_settings: typing.Optional[ConveyorSettings] = None
@@ -489,17 +534,12 @@ class ConveyorMaterialRequirements:
                 stack.group,
                 conveyor_settings.fixed_number_of_runs)
             # проверка доступности материалов имеющихся в стоке
-            enough_for_single, max_possible, _ = \
+            enough_for_single: ConveyorCorporationStockMaterials.CheckEnoughResult = \
                 available_materials.check_enough_materials_at_station(b0.station_id, materials_single)
-            enough_for_stack, _, not_available_materials_stack = \
+            enough_for_stack: ConveyorCorporationStockMaterials.CheckEnoughResult = \
                 available_materials.check_enough_materials_at_station(b0.station_id, materials_stack)
             # сохранение результатов расчёта в стеке чертежей
-            stack.apply_materials_info(
-                max_possible if enough_for_single else 0,
-                materials_single,
-                enough_for_stack,
-                materials_stack,
-                not_available_materials_stack)
+            stack.apply_materials_info(materials_single, enough_for_single, materials_stack, enough_for_stack)
         return self.__grouped_and_sorted
 
 

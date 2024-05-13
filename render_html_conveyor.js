@@ -289,6 +289,8 @@ function rebuildBody() {
      changeElemVisibility($(this), hide_conveyor * show_possible);
     else if ($(this).hasClass('run-impossible'))
      changeElemVisibility($(this), hide_conveyor * show_impossible);
+    else if ($(this).hasClass('run-optional'))
+     changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
    });
   }
   else if (tr.hasClass('row-possible')) {
@@ -303,6 +305,13 @@ function rebuildBody() {
    tr.find('td div').each(function() {
     if ($(this).hasClass('run-impossible'))
      changeElemVisibility($(this), hide_conveyor * show_impossible);
+   });
+  }
+  else if (tr.hasClass('row-optional')) {
+   changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
+   tr.find('td div').each(function() {
+    if ($(this).hasClass('run-optional'))
+     changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
    });
   }
   else if (tr.hasClass('lost-blueprints'))
