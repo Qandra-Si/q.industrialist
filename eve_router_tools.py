@@ -441,18 +441,6 @@ class ConveyorMaterialRequirements:
                                  enough_for_single: ConveyorCorporationStockMaterials.CheckEnoughResult,
                                  materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
                                  enough_for_stack: ConveyorCorporationStockMaterials.CheckEnoughResult):
-            """max_possible if enough_for_single else 0,
-            materials_single,
-            enough_for_stack,
-            materials_stack,
-            not_available_materials_stack)
-                                 max_possible: int,
-                                 materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
-                                 enough: bool,
-                                 materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
-                                 not_available_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]
-            """
-
             del self.required_materials_for_single
             del self.required_materials_for_stack
             del self.not_available_materials_for_stack
