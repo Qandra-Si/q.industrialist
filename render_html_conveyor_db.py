@@ -167,7 +167,9 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 .qind-btn-hide-open:hover { color: #337ab7; } /*d94c16 4d91cf*/
 .qind-btn-hide-close { color: #66341f; }
 .qind-btn-hide-close:hover { color: #d94c16; } /*d94c16 4d91cf*/
-
+/* поведение кнопки копирования около названия декриптора */
+qdecr { color: #8dc169; }
+.qind-copy-btn:hover + * + qdecr { color: #ec5c5c; }
 </style>
 """)
 
@@ -1010,11 +1012,21 @@ def dump_list_of_possible_blueprints(
                     return '</div>'
             return ''
 
+        decryptor: str = ''
+        m0: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = stacks[0].required_materials_for_stack
+        if len(m0) == 1:
+            activity: db.QSwaggerActivity = next(iter(m0.keys()))
+            if isinstance(activity, db.QSwaggerBlueprintInvention):
+                d: typing.Optional[db.QSwaggerMaterial] = \
+                    next((_ for _ in itertools.chain(*m0.values()) if _.material_type.market_group_id == 1873), None)
+                if d:
+                    decryptor = f'<mute> - модернизируй с </mute><qdecr>{d.material_type.name}</qdecr>'
+
         glf.write(f"""<tr{tr_div_class('tr')}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>""")
+data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}""")
         quantities: str = '<br>'
         times: str = '<br>'
         for stack in stacks:
