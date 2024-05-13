@@ -141,9 +141,9 @@ table.tbl-summary tbody tr td div.run-impossible {
  background-size: 1em 1em
 }
 
-table.tbl-summary tbody tr td.qind-summary { font-size: medium; text-align: left; background: #111b1b; border-bottom: 1px solid #111b1b; }
-table.tbl-summary tbody tr:hover td.qind-summary { border-bottom: 1px solid #6db09e; }
- 
+table.tbl-summary tbody tr.row-conveyor td { font-size: medium; text-align: left; background: #111b1b; border-bottom: 1px solid #111b1b; }
+table.tbl-summary tbody tr.row-conveyor:hover td { border-bottom: 1px solid #6db09e; }
+
 table.tbl-summary tbody tr td qmaterials { font-size: 85%; }
 table.tbl-summary tbody tr td qmaterials qmat { border: 1px solid transparent; cursor: pointer; }
 table.tbl-summary tbody tr td qmaterials qmat:hover { border: 1px dashed #6db09e; }
@@ -159,6 +159,15 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 .label-completed-job { background-color: #0f1111; color: #aaa; }
 .label-phantom-blueprint { background-color: #4f351d; color: #d6a879; }
 .label-lost-blueprint { background-color: #f96900; color: #111111; }
+
+/* кнопка включения видимости контейнера */
+.qind-btn-hide { opacity: 0.75; }
+.qind-btn-hide:hover { opacity: 1.0; } /*d94c16 4d91cf*/
+.qind-btn-hide-open { color: #23527c; }
+.qind-btn-hide-open:hover { color: #337ab7; } /*d94c16 4d91cf*/
+.qind-btn-hide-close { color: #66341f; }
+.qind-btn-hide-close:hover { color: #d94c16; } /*d94c16 4d91cf*/
+
 </style>
 """)
 
@@ -1095,11 +1104,16 @@ def dump_corp_conveyors(
     for priority in sorted(prioritized.keys()):
         p0 = prioritized.get(priority)
         for settings in p0.keys():
+            # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
+            tag = {"p": priority, "a": [_.to_int() for _ in settings.activities]}
             # получаем список контейнеров с чертежами для производства
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
-            glf.write(f"""<tr>
-<td class="qind-summary" colspan="8">Приоритет {priority} <span class="text-muted">{', '.join([str(_) for _ in settings.activities])}</span></td>
+            glf.write(f"""<tr class="row-conveyor" data-tag='{json.dumps(tag,separators=(',', ':')).replace("'",'"')}'>
+<td colspan="8">Приоритет {priority}
+<mute>{', '.join([str(_) for _ in settings.activities])}</mute>
+<a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a>
+</td>
 </tr>
 """)
             """
