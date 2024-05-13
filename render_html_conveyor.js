@@ -128,13 +128,16 @@ function conveyorTagToStr(row) {
  if (tag === undefined) return;
  return tag.p+'_'+tag.a.join('_');
 }
-function toggleConveyorVisibility(btn) {
+function toggleConveyorVisibility(btn, hide) {
  var tr = btn.parent().parent();
  var tag = conveyorTagToStr(tr);
  //-
  var icon = btn.find('span');
- var hidden = icon.hasClass('glyphicon-eye-close') == true;
- if (hidden) {
+ if (hide === undefined) {
+  var already_hidden = icon.hasClass('glyphicon-eye-close') == true;
+  hide = already_hidden == false;
+ }
+ if (hide == false) {
   setOption('conveyor', tag, 0); // 0 = show
   icon.removeClass('glyphicon-eye-close');
   icon.addClass('glyphicon-eye-open');
@@ -154,7 +157,7 @@ function initConveyorVisibility() {
   var tr = $(this).parent().parent();
   var tag = conveyorTagToStr(tr);
   var hide = getOption('conveyor', tag) == 1;
-  if (hide) toggleConveyorVisibility($(this));
+  toggleConveyorVisibility($(this), hide);
  });
 }
 //-----------
@@ -424,12 +427,12 @@ $(document).ready(function(){
     ls.clear();
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
+    initConveyorVisibility();
     rebuildBody();
   });
   // first init
   resetOptionsMenuToDefault();
   rebuildOptionsMenu();
-  initMaterialNames();
   initConveyorVisibility();
   rebuildBody();
   //rebuildStocksDropdown();
@@ -462,4 +465,6 @@ $(document).ready(function(){
       $(this).addClass('hidden');
     })
   }
+  // Delayed and low priority operations
+  initMaterialNames();
 });
