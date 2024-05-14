@@ -448,7 +448,7 @@ $(document).ready(function(){
   //rebuildStockMaterials();
   // init popover menus
   //initPopoverMenus();
-  $('qmaterials qmat').bind('click', function () {
+  $('body').delegate('qmat', 'click', function () {
    chooseMaterial($(this));
   });
   $('.qind-btn-hide').bind('click', function () {
