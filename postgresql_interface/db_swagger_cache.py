@@ -33,8 +33,51 @@ class QSwaggerMarketGroup:
         return self.__icon_id
 
 
-class QSwaggerTypeId:
+class QSwaggerCategory:
     def __init__(self, row):
+        self.__category_id: int = row[0]
+        self.__name: str = row[1]
+        self.__published: bool = row[2]
+
+    @property
+    def category_id(self) -> int:
+        return self.__category_id
+
+    @property
+    def name(self) -> str:
+        return self.__name
+
+
+class QSwaggerGroup:
+    def __init__(self, universe_category: typing.Optional[QSwaggerCategory], row):
+        self.__group_id: int = row[0]
+        self.__category_id: int = row[1]
+        self.__category: typing.Optional[QSwaggerCategory] = universe_category
+        self.__name: str = row[2]
+        self.__published: bool = row[3]
+
+    @property
+    def group_id(self) -> int:
+        return self.__group_id
+
+    @property
+    def category_id(self) -> int:
+        return self.__category_id
+
+    @property
+    def category(self) -> typing.Optional[QSwaggerCategory]:
+        return self.__category
+
+    @property
+    def name(self) -> str:
+        return self.__name
+
+
+class QSwaggerTypeId:
+    def __init__(self,
+                 market_group: typing.Optional[QSwaggerMarketGroup],
+                 universe_group: typing.Optional[QSwaggerGroup],
+                 row):
         self.__type_id: int = row[0]
         self.__name: str = row[1]
         self.__volume: typing.Optional[float] = row[2]
@@ -42,10 +85,13 @@ class QSwaggerTypeId:
         self.__base_price: typing.Optional[float] = row[4]
         self.__published: bool = True
         self.__market_group_id: typing.Optional[int] = row[5]
+        self.__market_group: typing.Optional[QSwaggerMarketGroup] = market_group
         self.__meta_group_id: typing.Optional[int] = row[6]
         self.__tech_level: typing.Optional[int] = row[7]
         self.__icon_id: typing.Optional[int] = row[8]
         self.__packaged_volume: typing.Optional[float] = row[9]
+        self.__group_id: int = row[10]
+        self.__group: typing.Optional[QSwaggerGroup] = universe_group
 
     @property
     def type_id(self) -> int:
@@ -76,6 +122,10 @@ class QSwaggerTypeId:
         return self.__market_group_id
 
     @property
+    def market_group(self) -> typing.Optional[QSwaggerMarketGroup]:
+        return self.__market_group
+
+    @property
     def meta_group_id(self) -> typing.Optional[int]:
         return self.__meta_group_id
 
@@ -90,6 +140,14 @@ class QSwaggerTypeId:
     @property
     def packaged_volume(self) -> typing.Optional[float]:
         return self.__packaged_volume
+
+    @property
+    def group_id(self) -> int:
+        return self.__group_id
+
+    @property
+    def group(self) -> typing.Optional[QSwaggerGroup]:
+        return self.__group
 
 
 class QSwaggerProduct:

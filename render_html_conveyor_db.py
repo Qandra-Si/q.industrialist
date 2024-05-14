@@ -129,7 +129,8 @@ table.tbl-summary tbody tr.job-active :is(td:nth-child(7),td:nth-child(8)) mute 
 table.tbl-summary tbody tr.job-completed td:nth-child(2) { opacity: 0.5; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { color: #666; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
-table.tbl-summary tbody tr.lost-blueprints { }
+table.tbl-summary tbody tr.lost-blueprints,
+table.tbl-summary tbody tr.lost-assets { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
 table.tbl-summary tbody tr.row-multiple,
 table.tbl-summary tbody tr.row-possible,
@@ -164,7 +165,8 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 .label-active-job { background-color: #213a42; color: #ccc; }
 .label-completed-job { background-color: #0f1111; color: #aaa; }
 .label-phantom-blueprint { background-color: #4f351d; color: #d6a879; }
-.label-lost-blueprint { background-color: #f96900; color: #111111; }
+.label-lost-blueprints { background-color: #f96900; color: #111111; }
+.label-lost-assets { background-color: #f96900; color: #111111; }
 
 /* кнопка включения видимости контейнера */
 .qind-btn-hide { opacity: 0.75; }
@@ -232,6 +234,13 @@ def declension_of_lost_blueprints(blueprints: int) -> str:
         return 'потерянные чертежи'
 
 
+def declension_of_lost_assets(assets: int) -> str:
+    if assets == 1:
+        return 'потерянный предмет'
+    else:
+        return 'потерянные предметы'
+
+
 def format_num_of_num(possible: int, total: int, mute_possible: bool = True) -> str:
     if possible >= total:
         return str(total)
@@ -264,7 +273,7 @@ class NavMenuDefaults:
     def __init__(self):
         self.run_possible: bool = True
         self.run_impossible: bool = False
-        self.lost_blueprints: bool = False
+        self.lost_items: bool = False
         self.phantom_blueprints: bool = False
         self.job_active: bool = False
         self.job_completed: bool = False
@@ -277,8 +286,8 @@ class NavMenuDefaults:
             return self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             return self.run_impossible
-        elif label == 'lost-blueprints':
-            return self.lost_blueprints
+        elif label == 'lost-blueprints' or label == 'lost-assets':
+            return self.lost_items
         elif label == 'phantom-blueprints':
             return self.phantom_blueprints
         elif label == 'job-active':
@@ -297,8 +306,8 @@ class NavMenuDefaults:
             opt = self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             opt = self.run_impossible
-        elif label == 'lost-blueprints':
-            opt = self.lost_blueprints
+        elif label == 'lost-blueprints' or label == 'lost-assets':
+            opt = self.lost_items
         elif label == 'phantom-blueprints':
             opt = self.phantom_blueprints
         elif label == 'job-active':
@@ -323,7 +332,7 @@ def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
         (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы'),
         (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы'),  # btnToggleImpossible
-        (g_nav_menu_defaults.lost_blueprints,    'lost-blueprints',    'Потерянные чертежи (не на своём месте)'),
+        (g_nav_menu_defaults.lost_items,         'lost-items',         'Потерянные предметы (не на своём месте)'),
         (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)'),
         (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты'),  # btnToggleActive
         (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты'),
@@ -898,18 +907,66 @@ def dump_list_of_lost_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
+        # ---
         containers: typing.Set[str] = set()
         for b in group:
             c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(b.location_id)
             containers.add(c.name if c and c.name else str(b.location_id))
         containers: typing.List[str] = sorted(containers)
         containers: str = container_prefix.join(containers)
+        # ---
         glf.write(f"""<tr class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
-<label class="label label-lost-blueprint">{declension_of_lost_blueprints(len(group))}</label>{container_prefix}{containers}<!--
+<label class="label label-lost-blueprints">{declension_of_lost_blueprints(len(group))}</label>{container_prefix}{containers}<!--
+item_ids: {[_.item_id for _ in group]}--></td>
+<td>{len(group)}</td>
+<td></td><td></td><td></td><td></td>
+</tr>""")
+
+
+def dump_list_of_lost_asset_items(
+        glf,
+        # справочники
+        corporation: db.QSwaggerCorporation,
+        # список ассетов, которые "потерялись" в конвейере
+        lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem]) -> None:
+    # группируем ассеты по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = \
+        tools.get_asset_items_grouped_by(
+            lost_asset_items,
+            group_by_type_id=True,
+            group_by_station=False)
+    # сортируем уже сгруппированные чертежи
+    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationAssetsItem]]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationAssetsItem] = grouped.get(key)
+        grouped_and_sorted.append((group[0].item_type.name, group))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # локальные переменные
+    container_prefix: str = '<br><mute>Контейнер - </mute>'
+    # выводим в отчёт
+    global g_nav_menu_defaults
+    for _, group in grouped_and_sorted:
+        a0: db.QSwaggerCorporationAssetsItem = group[0]
+        type_id: int = a0.type_id
+        type_name: str = a0.item_type.name
+        # ---
+        containers: typing.Set[str] = set()
+        for a in group:
+            c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(a.location_id)
+            containers.add(c.name if c and c.name else str(a.location_id))
+        containers: typing.List[str] = sorted(containers)
+        containers: str = container_prefix.join(containers)
+        # ---
+        glf.write(f"""<tr class="lost-assets{g_nav_menu_defaults.css('lost-assets')}">
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
+<label class="label label-lost-assets">{declension_of_lost_assets(len(group))}</label>{container_prefix}{containers}<!--
 item_ids: {[_.item_id for _ in group]}--></td>
 <td>{len(group)}</td>
 <td></td><td></td><td></td><td></td>
@@ -1183,10 +1240,12 @@ def dump_corp_conveyors(
                 lost: bool = False
                 for _a in settings.activities:
                     a: tools.ConveyorActivity = _a
+                    # проверка, что в коробку research не попали копии
                     if b.is_copy and a in (tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME,
                                            tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL):
                         lost, possible = True, False
                         break
+                    # проверка, что чертёж можно запускать в работу с выбранной activity
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
                         if b.item_id not in active_blueprint_ids:
@@ -1224,22 +1283,27 @@ def dump_corp_conveyors(
             if lost_blueprints:
                 lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
                     [b for b in lost_blueprints if b.item_id not in active_blueprint_ids]
+            # составляем список потенциально-задействованных в текущем конвейере материалов (по типу производства)
+            involved_materials = set(itertools.chain.from_iterable([global_dictionary.involved_materials[_] for _ in settings.activities]))
             # составляем список "залётных" предметов (материалов и продактов), которые упали не в ту коробку
+            lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
             for _a in corporation.assets.values():
                 a: db.QSwaggerCorporationAssetsItem = _a
                 if a.location_id not in container_ids: continue
-                if a.item_id in corporation.blueprints.keys(): continue
+                # проверка справочника категорий/групп, к которым относятся чертежи
+                if a.item_type.group and a.item_type.group.category_id == 9: continue  # 9 = Blueprints
                 # не всякий чертёж есть в blueprints (м.б. только в assets), т.ч. проверяем цепочку market_groups
-                pass  # print(a.type_id, a.name)
-            """
-            glf.write(f"<h4>blueprints</h4>{[_.item_id for _ in blueprints]}<br>"
-                      f"<h4>active_blueprint_ids</h4>{active_blueprint_ids}<br>"
-                      f"<h4>completed_blueprint_ids</h4>{completed_blueprint_ids}<br>"
-                      f"<h4>used_blueprint_ids</h4>{used_blueprint_ids}<br>"
-                      f"<h4>phantom_blueprints</h4>{[_.item_id for _ in phantom_blueprints]}<br>"
-                      f"<h4>possible_blueprints</h4>{[_.item_id for _ in possible_blueprints]}<br>"
-                      f"<h4>lost_blueprints</h4>{[_.item_id for _ in lost_blueprints]}<br>")
-            """
+                if settings.same_stock_container:
+                    # в случае, если коробка является стоком, то в ней разрешено держать все возможные предметы,
+                    # соответствующие текущей activity
+                    if a.type_id in involved_materials:
+                        continue
+                    elif tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
+                        if a.item_type.group_id == 1304:  # 1304 = Generic Decryptor
+                            continue
+                # если коробка не является стоком, то в ней ничего не должно валяться, кроме чертежей
+                # (конвейер не свалка, д.б. порядок)
+                lost_asset_items.append(a)
             # если чертежей для продолжения расчётов нет (коробки пустые), то пропускаем приоритет
             if possible_blueprints:
                 # получаем количество материалов в стоке выбранного конвейера
@@ -1269,17 +1333,22 @@ def dump_corp_conveyors(
                 dump_list_of_completed_jobs(
                     glf,
                     completed_jobs)  # [b for b in blueprints if b.item_id in completed_blueprint_ids]
+            # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
+            if phantom_blueprints:
+                dump_list_of_phantom_blueprints(
+                    glf,
+                    phantom_blueprints)
             # если в коробке застряли чертежи которых там не должно быть, то выводим об этом сведения
             if lost_blueprints:
                 dump_list_of_lost_blueprints(
                     glf,
                     corporation,
                     lost_blueprints)
-            # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
-            if phantom_blueprints:
-                dump_list_of_phantom_blueprints(
+            if lost_asset_items:
+                dump_list_of_lost_asset_items(
                     glf,
-                    phantom_blueprints)
+                    corporation,
+                    lost_asset_items)
         # удаление списков найденных чертежей, предметов и работ
         del phantom_blueprints
         del possible_blueprints

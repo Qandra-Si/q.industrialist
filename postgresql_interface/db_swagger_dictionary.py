@@ -13,6 +13,8 @@ class QSwaggerDictionary:
         # справочники
         self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
+        self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
+        self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
         self.sde_type_ids: typing.Dict[int, QSwaggerTypeId] = {}
         self.sde_blueprints: typing.Dict[int, QSwaggerBlueprint] = {}
         self.sde_activities: typing.Dict[int, typing.List[QSwaggerActivity]] = {}  # id=product_id
@@ -32,6 +34,8 @@ class QSwaggerDictionary:
         del self.sde_activities
         del self.sde_blueprints
         del self.sde_type_ids
+        del self.sde_groups
+        del self.sde_categories
         del self.sde_market_groups
 
     def disconnect_from_translator(self):
@@ -49,6 +53,33 @@ class QSwaggerDictionary:
         self.sde_market_groups = self.__qit.get_market_groups()
         return self.sde_market_groups
 
+    def get_category(self, category_id: int) -> typing.Optional[QSwaggerCategory]:
+        cached_category: QSwaggerCategory = self.sde_categories.get(category_id)
+        return cached_category
+
+    def load_universe_categories(self) -> typing.Dict[int, QSwaggerCategory]:
+        if self.sde_categories:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load categories twice")
+        self.sde_categories = self.__qit.get_universe_categories()
+        return self.sde_categories
+
+    def get_group(self, group_id: int) -> typing.Optional[QSwaggerGroup]:
+        cached_group: QSwaggerGroup = self.sde_groups.get(group_id)
+        return cached_group
+
+    def load_universe_groups(self) -> typing.Dict[int, QSwaggerGroup]:
+        if self.sde_groups:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load groups twice")
+        if not self.sde_categories:  # загружайте предварительно категории
+            raise Exception("You should load universe categories firstly")
+        self.sde_groups = self.__qit.get_universe_groups(
+            # справочники
+            self.sde_categories
+        )
+        return self.sde_groups
+
     def get_type_id(self, type_id: int) -> typing.Optional[QSwaggerTypeId]:
         cached_type_id: QSwaggerTypeId = self.sde_type_ids.get(type_id)
         return cached_type_id
@@ -57,7 +88,10 @@ class QSwaggerDictionary:
         if self.sde_type_ids:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
             raise Exception("Unable to load type ids twice")
-        self.sde_type_ids = self.__qit.get_published_type_ids()
+        self.sde_type_ids = self.__qit.get_published_type_ids(
+            # справочники
+            self.sde_market_groups,
+            self.sde_groups)
         return self.sde_type_ids
 
     def get_blueprint(self, blueprint_type_id: int) -> typing.Optional[QSwaggerBlueprint]:
@@ -202,7 +236,14 @@ class QSwaggerDictionary:
             load_unknown_type_assets=load_unknown_type_assets,
             load_asseted_blueprints=load_asseted_blueprints)
         # поиск Secure Containers, Audit Log Containers, Freight Containers, Standard Containers, Station Containers
-        corporation.container_ids = [int(a.item_id) for a in corporation.assets.values() if a.item_type and a.item_type.market_group_id in {1651, 1652, 1653, 1657, 1658}]
+        corporation.container_ids = [
+            int(a.item_id)
+            for a in corporation.assets.values()
+            # 12 = Cargo Container
+            # 448 = Audit Log Secure Container
+            # 649 Freight Container
+            # исправь также get_corporation_container_places
+            if a.item_type and a.item_type.group_id in {12, 448, 649}]
         return corporation.assets
 
     def load_corporation_blueprints(

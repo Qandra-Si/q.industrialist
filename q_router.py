@@ -56,6 +56,8 @@ def main():
     qid: db.QSwaggerDictionary = db.QSwaggerDictionary(qit)
     # загрузка справочников
     qid.load_market_groups()
+    qid.load_universe_categories()
+    qid.load_universe_groups()
     qid.load_published_type_ids()
     qid.load_blueprints()
     # загрузка информации, связанной с корпорациями

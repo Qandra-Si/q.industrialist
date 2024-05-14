@@ -145,6 +145,24 @@ def get_blueprints_grouped_by(
     return grouped
 
 
+def get_asset_items_grouped_by(
+        asset_items: typing.List[db.QSwaggerCorporationAssetsItem],
+        group_by_type_id: bool = True,
+        group_by_station: bool = True) \
+        -> typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]]:
+    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = {}
+    for b in asset_items:
+        type_id: int = b.type_id if group_by_type_id else 0
+        station_id: int = b.station_id if group_by_station else 0
+        key: typing.Tuple[int, int] = type_id, station_id
+        g0: typing.List[db.QSwaggerCorporationAssetsItem] = grouped.get(key)
+        if not g0:
+            grouped[key] = []
+            g0 = grouped.get(key)
+        g0.append(b)
+    return grouped
+
+
 def get_jobs_grouped_by(
         jobs: typing.List[db.QSwaggerCorporationIndustryJob],
         group_by_product: bool = True,
@@ -630,12 +648,44 @@ class ConveyorDictionary:
     def __init__(self, qid: db.QSwaggerDictionary):
         # сохраняем ссылку на ПОЛНЫЙ справочник загруженный из БД
         self.qid: db.QSwaggerDictionary = qid
-        # подготовка списка-справочника, который будет хранить идентификаторы  все продуктов, используемых конвейером
+        # подготовка списка-справочника, который будет хранить идентификаторы всех продуктов, используемых конвейером
         self.materials: typing.Set[int] = set()
+        # подготовка списка-справочника, который будет хранить используемые материалы в различных activity (скопом)
+        self.involved_materials: typing.Dict[ConveyorActivity, typing.Set[int]] = {}
+        self._fill_involved_materials()
 
     def __del__(self):
         # уничтожаем свой список-справочник, остальные (не наши) не трогаем
         del self.materials
+
+    def _fill_involved_materials(self):
+        self.involved_materials: typing.Dict[ConveyorActivity, typing.Set[int]] = {
+            ConveyorActivity.CONVEYOR_MANUFACTURING: set(),
+            ConveyorActivity.CONVEYOR_INVENTION: set(),
+            ConveyorActivity.CONVEYOR_COPYING: set(),
+            ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL: set(),
+            ConveyorActivity.CONVEYOR_RESEARCH_TIME: set(),
+            ConveyorActivity.CONVEYOR_REACTION: set()
+        }
+        for by_products in self.qid.sde_activities.values():
+            for activity in by_products:
+                ids: typing.Set[int] = set([_.material_id for _ in activity.materials.materials])
+                if isinstance(activity, db.QSwaggerBlueprintManufacturing):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_MANUFACTURING
+                elif isinstance(activity, db.QSwaggerBlueprintInvention):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_INVENTION
+                elif isinstance(activity, db.QSwaggerBlueprintCopying):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_COPYING
+                elif isinstance(activity, db.QSwaggerBlueprintResearchMaterial):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL
+                elif isinstance(activity, db.QSwaggerBlueprintResearchTime):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_RESEARCH_TIME
+                elif isinstance(activity, db.QSwaggerBlueprintReaction):
+                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_REACTION
+                else:
+                    raise Exception("Unknown type of activity")
+                involved: typing.Set[int] = self.involved_materials.get(a)
+                involved.update(ids)
 
     def load_router_settings(self, router_settings: typing.List[RouterSettings]) -> None:
         for r in router_settings:

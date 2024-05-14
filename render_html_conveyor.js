@@ -269,7 +269,7 @@ function changeElemVisibility(el, show){
 function rebuildBody() {
  var show_possible = (getOption('option', 'run-possible') == 1) ? 1 : 0;
  var show_impossible = (getOption('option', 'run-impossible') == 1) ? 1 : 0;
- var show_lost = (getOption('option', 'lost-blueprints') == 1) ? 1 : 0;
+ var show_lost = (getOption('option', 'lost-items') == 1) ? 1 : 0;
  var show_phantom = (getOption('option', 'phantom-blueprints') == 1) ? 1 : 0;
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
  var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
@@ -314,7 +314,7 @@ function rebuildBody() {
      changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
    });
   }
-  else if (tr.hasClass('lost-blueprints'))
+  else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets'))
    changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
   else if (tr.hasClass('phantom-blueprints'))
    changeElemVisibility(tr, hide_conveyor * show_phantom);

@@ -19,8 +19,8 @@ class QSwaggerTranslator:
         del self.db
 
     # -------------------------------------------------------------------------
-    # /market/groups/
-    # /market/groups/{market_group_id}/
+    # /markets/groups/
+    # /markets/groups/{market_group_id}/
     # -------------------------------------------------------------------------
 
     def get_market_groups(self) -> typing.Dict[int, QSwaggerMarketGroup]:
@@ -43,11 +43,65 @@ class QSwaggerTranslator:
         return data
 
     # -------------------------------------------------------------------------
+    # /universe/categories/
+    # /universe/categories/{category_id}/
+    # -------------------------------------------------------------------------
+
+    def get_universe_categories(self) -> typing.Dict[int, QSwaggerCategory]:
+        # группа м.б. неизвестна (неопубликована), например у 'Liminal Zirnitra Wreck' группа 'Wreck' не published
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " sdec_category_id,"
+            " sdec_category_name,"
+            " sdec_published "
+            "FROM eve_sde_category_ids;"
+        )
+        if rows is None:
+            return {}
+        data = {}
+        for row in rows:
+            category_id: int = row[0]
+            data[category_id] = QSwaggerCategory(row)
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
+    # /universe/groups/
+    # /universe/groups/{group_id}/
+    # -------------------------------------------------------------------------
+
+    def get_universe_groups(
+            self,
+            categories: typing.Dict[int, QSwaggerCategory]) -> typing.Dict[int, QSwaggerGroup]:
+        # группа м.б. неизвестна (неопубликована), например у 'Liminal Zirnitra Wreck' группа 'Wreck' не published
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " sdecg_group_id,"
+            " sdecg_category_id,"
+            " sdecg_group_name,"
+            " sdecg_published "
+            "FROM eve_sde_group_ids;"
+        )
+        if rows is None:
+            return {}
+        data = {}
+        for row in rows:
+            group_id: int = row[0]
+            category_id: int = row[1]
+            cached_category: typing.Optional[QSwaggerCategory] = categories.get(category_id)
+            data[group_id] = QSwaggerGroup(cached_category, row)
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
     # /universe/types/
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
 
-    def get_published_type_ids(self) -> typing.Dict[int, QSwaggerTypeId]:
+    def get_published_type_ids(
+            self,
+            market_groups: typing.Dict[int, QSwaggerMarketGroup],
+            groups: typing.Dict[int, QSwaggerGroup]) -> typing.Dict[int, QSwaggerTypeId]:
         rows = self.db.select_all_rows(
             "SELECT"
             " sdet_type_id,"
@@ -59,7 +113,9 @@ class QSwaggerTranslator:
             " sdet_meta_group_id,"
             " sdet_tech_level,"
             " sdet_icon_id,"
-            " sdet_packaged_volume "
+            " sdet_packaged_volume,"
+            " sdet_group_id,"
+            " sdet_tech_level "
             "FROM eve_sde_type_ids "
             "WHERE sdet_published;"
         )
@@ -68,7 +124,18 @@ class QSwaggerTranslator:
         data = {}
         for row in rows:
             type_id: int = row[0]
-            data[type_id] = QSwaggerTypeId(row)
+            market_group_id: typing.Optional[int] = row[5]
+            group_id: int = row[10]
+
+            cached_market_group: typing.Optional[QSwaggerMarketGroup] = market_groups.get(market_group_id)
+            # группа м.б. неизвестна (неопубликована), например у 'Liminal Zirnitra Wreck' группа 'Wreck' не published
+            cached_group: typing.Optional[QSwaggerGroup] = groups.get(group_id)
+
+            data[type_id] = QSwaggerTypeId(
+                cached_market_group,
+                cached_group,
+                row)
+
         del rows
         return data
 
@@ -404,6 +471,10 @@ WHERE
  a.eca_location_flag LIKE 'CorpSAG%%' AND
  t.sdet_group_id in (448,649,12);
 """,
+            # 12 = Cargo Container
+            # 448 = Audit Log Secure Container
+            # 649 Freight Container
+            # исправь также load_corporation_assets
             {'id': corporation_id}
         )
         # Инициализирует контейнеры указанной корпорации, которые имели название и располагались в корпангаре.
