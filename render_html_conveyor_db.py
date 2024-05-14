@@ -184,7 +184,7 @@ def dump_materials_to_js(glf, dictionary: tools.ConveyorDictionary) -> None:
     type_id_keys = dictionary.materials
     sorted_type_id_keys = sorted(type_id_keys, key=lambda x: int(x))
     glf.write(f"""<script>
-var g_sde_max_type_id={sorted_type_id_keys[-1]};
+var g_sde_max_type_id={sorted_type_id_keys[-1] if len(sorted_type_id_keys) else 0};
 var g_sde_type_len={len(sorted_type_id_keys)};
 var g_sde_type_ids=[""")
     for (idx, type_id) in enumerate(sorted_type_id_keys):
@@ -843,7 +843,7 @@ def dump_list_of_jobs(
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
 <td>{blueprint_type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{blueprint_type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+data-target="#" role="button" data-tid="{blueprint_type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 {active_label}<br>
 <mute>Число прогонов - </mute>{sum_runs}
 </td>
@@ -851,7 +851,7 @@ data-target="#" role="button" data-copy="{blueprint_type_name}" class="qind-copy
 <td></td>
 <td><img class="icn32" src="{render_html.__get_img_src(product_type_id, 32)}"></td>
 <td>{product_type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{product_type_name}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a><br>
+data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a><br>
 <small>{installer} {output}</small>
 </td>
 <td>{sum_products}</td>
@@ -908,7 +908,7 @@ def dump_list_of_lost_blueprints(
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-lost-blueprint">{declension_of_lost_blueprints(len(group))}</label>{container_prefix}{containers}<!--
 item_ids: {[_.item_id for _ in group]}--></td>
 <td>{len(group)}</td>
@@ -951,7 +951,7 @@ def dump_list_of_phantom_blueprints(
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-phantom-blueprint">фантомный чертёж</label><br
 >{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
 >{b0.material_efficiency}% {b0.time_efficiency}%</me_tag><!--
@@ -1040,7 +1040,7 @@ def dump_list_of_possible_blueprints(
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
-data-target="#" role="button" data-copy="{type_name}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}""")
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}""")
         quantities: str = '<br>'
         times: str = '<br>'
         for stack in stacks:
@@ -1158,6 +1158,12 @@ def dump_corp_conveyors(
             # составляем новый (уменьшенный) список тех чертежей, запуск которых возможен
             active_blueprint_ids: typing.Set[int] = \
                 set([j.blueprint_id for j in active_jobs])
+            # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
+            global_dictionary.load_type_ids(set([_.type_id for _ in blueprints]))
+            global_dictionary.load_type_ids(set([_.blueprint_type_id for _ in active_jobs]))
+            global_dictionary.load_type_ids(set([_.product_type_id for _ in active_jobs]))
+            global_dictionary.load_type_ids(set([_.blueprint_type_id for _ in completed_jobs]))
+            global_dictionary.load_type_ids(set([_.product_type_id for _ in completed_jobs]))
             """
             completed_blueprint_ids: typing.Set[int] = \
                 set([j.blueprint_id for j in completed_jobs if j.blueprint_id not in active_blueprint_ids])
@@ -1241,6 +1247,8 @@ def dump_corp_conveyors(
                     possible_blueprints)
                 # выводим в отчёт
                 dump_list_of_possible_blueprints(glf, requirements)
+                # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
+                global_dictionary.load_requirements(requirements)
             # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера
             if active_jobs:
                 dump_list_of_active_jobs(
@@ -1298,6 +1306,7 @@ def dump_router2_into_report(
         # инициализация списка материалов, требуемых (и уже используемых) в производстве
         available_materials: typing.Dict[tools.ConveyorSettings, tools.ConveyorCorporationStockMaterials] = \
             tools.calc_available_materials(conveyor_settings)
+        global_dictionary.load_available_materials(available_materials)
         # компоновка высшего уровня конвейера
         dump_corp_conveyors(
             glf,

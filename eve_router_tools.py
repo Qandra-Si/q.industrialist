@@ -645,3 +645,13 @@ class ConveyorDictionary:
 
     def load_type_ids(self, type_ids: typing.Set[int]):
         self.materials = self.materials | set(type_ids)
+
+    def load_available_materials(self, available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]):
+        for stocks in available_materials.values():
+            for materials in stocks.stock_materials.values():
+                self.load_type_ids(materials.keys())
+
+    def load_requirements(self, requirements: typing.List[ConveyorMaterialRequirements.StackOfBlueprints]):
+        for stack in requirements:
+            for materials in stack.required_materials_for_single.values():
+                self.load_type_ids(set([_.material_id for _ in materials]))
