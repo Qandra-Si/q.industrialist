@@ -458,7 +458,7 @@ $(document).ready(function(){
   $('a.qind-copy-btn').each(function() {
     $(this).tooltip();
   });
-  $('a.qind-copy-btn').bind('click', function () {
+  $('body').delegate('a.qind-copy-btn', 'click', function () {
     doCopyToClipboard($(this));
   });
   $('a.qind-copy-btn').bind('copied', function(event, message) {
