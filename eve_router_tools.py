@@ -255,21 +255,19 @@ def get_materials_list(
                 product_blueprint_id: int = invention.products[0].product_id
                 product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
                 if product_blueprint_type and product_blueprint_type.manufacturing:
-                    market_group_id: int = b.blueprint_type.blueprint_type.market_group_id
-                    decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
-                    while market_group_id is not None:
-                        if market_group_id == 204:  # Ships
-                            decryptor_type = qid.get_type_id(34201)  # Accelerant Decryptor
-                        elif market_group_id == 943:  # Ship Modifications
-                            decryptor_type = qid.get_type_id(34206)  # Symmetry Decryptor
-                        elif market_group_id == 1909:  # Ancient Relics
-                            decryptor_type = qid.get_type_id(34204)  # Parity Decryptor
-                        if decryptor_type: break
-                        market_group: db.QSwaggerMarketGroup = qid.get_market_group(market_group_id)
-                        if not market_group: break
-                        market_group_id = market_group.parent_id
-                    # расчёт кол-ва декрипторов с учётом эффективности производства
-                    if decryptor_type:
+                    market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
+                        b.blueprint_type.blueprint_type,
+                        {204, 943, 1909})
+                    if market_group:
+                        if market_group.group_id == 204:  # Ships
+                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34201)  # Accelerant Decryptor
+                        elif market_group.group_id == 943:  # Ship Modifications
+                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34206)  # Symmetry Decryptor
+                        elif market_group.group_id == 1909:  # Ancient Relics
+                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34204)  # Parity Decryptor
+                        else:
+                            raise Exception("This shouldn't have happened")
+                        # расчёт кол-ва декрипторов с учётом эффективности производства
                         industry_input = eve_efficiency.get_industry_material_efficiency(
                             str(a),
                             quantity_of_runs,
@@ -431,7 +429,7 @@ class ConveyorMaterialRequirements:
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
             self.max_possible_for_single: int = 0
             self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
-            self.enough_for_stack: bool = False
+            self.run_possible: bool = False
             self.only_decryptors_missing_for_stack: bool = True
             self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
             self.not_available_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
@@ -448,7 +446,7 @@ class ConveyorMaterialRequirements:
             self.max_possible_for_single = enough_for_single.max_possible
             self.required_materials_for_single = materials_for_single
             # ---
-            self.enough_for_stack = enough_for_stack.enough
+            self.run_possible = enough_for_single.enough
             self.only_decryptors_missing_for_stack = enough_for_stack.only_decryptors_missing
             self.required_materials_for_stack = materials_for_stack
             self.not_available_materials_for_stack = enough_for_stack.not_available

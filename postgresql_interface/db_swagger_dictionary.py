@@ -294,3 +294,26 @@ class QSwaggerDictionary:
         station_ids: typing.Set[int] = assets_stations | blueprints_stations
         return self.load_stations(station_ids)
 
+    def get_market_group_chain(self, item_type: QSwaggerTypeId) -> typing.List[int]:
+        chain: typing.List[int] = []
+        market_group_id: typing.Optional[int] = item_type.market_group_id
+        while market_group_id is not None:
+            chain.append(market_group_id)
+            market_group: QSwaggerMarketGroup = self.get_market_group(market_group_id)
+            if not market_group: break
+            market_group_id = market_group.parent_id
+        return chain
+
+    def there_is_market_group_in_chain(
+            self,
+            item_type: QSwaggerTypeId,
+            market_group_ids: typing.Set[int]) -> typing.Optional[QSwaggerMarketGroup]:
+        chain: typing.List[int] = []
+        market_group_id: typing.Optional[int] = item_type.market_group_id
+        while market_group_id is not None:
+            market_group: QSwaggerMarketGroup = self.get_market_group(market_group_id)
+            if not market_group: break
+            if market_group_id in market_group_ids:
+                return market_group
+            market_group_id = market_group.parent_id
+        return None

@@ -985,24 +985,27 @@ def dump_list_of_possible_blueprints(
         # ---
         tr_class: str = ''
         for stack in stacks:
+            x1: bool = not stack.run_possible
+            x2: bool = stack.run_possible and stack.only_decryptors_missing_for_stack
+            x3: bool = stack.run_possible and not stack.only_decryptors_missing_for_stack
             if not tr_class:
-                if not stack.enough_for_stack:
+                if x1:
                     tr_class = 'row-impossible'
-                elif stack.only_decryptors_missing_for_stack:
+                elif x2:
                     tr_class = 'row-optional'
-                else:
+                else:  # x3
                     tr_class = 'row-possible'
                 tr_class += g_nav_menu_defaults.css(tr_class)
             elif tr_class.startswith('row-impossible'):
-                if stack.enough_for_stack and stack.only_decryptors_missing_for_stack or stack.enough_for_stack:
+                if not x1:
                     tr_class = ''
                     break
             elif tr_class.startswith('row-optional'):
-                if not stack.enough_for_stack or stack.enough_for_stack and not stack.only_decryptors_missing_for_stack:
+                if x1 or x3:
                     tr_class = ''
                     break
             elif tr_class.startswith('row-possible'):
-                if not stack.enough_for_stack or stack.enough_for_stack and stack.only_decryptors_missing_for_stack:
+                if x1 or x2:
                     tr_class = ''
                     break
         if not tr_class:
@@ -1017,7 +1020,7 @@ def dump_list_of_possible_blueprints(
                     return f' class="{tr_class}"'
             elif which == 'div':
                 if head:
-                    div_class: str = ('run-impossible' if not __stack784.enough_for_stack else  # нельзя запустить (нет материалов)
+                    div_class: str = ('run-impossible' if not __stack784.run_possible else  # нельзя запустить (нет материалов)
                                       ('run-possible' if not __stack784.only_decryptors_missing_for_stack else  # можно запустить (все материалы есть)
                                        'run-optional'))  # можно запустить (не хватает декрипторов)
                     div_class += g_nav_menu_defaults.css(div_class)
@@ -1221,6 +1224,13 @@ def dump_corp_conveyors(
             if lost_blueprints:
                 lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
                     [b for b in lost_blueprints if b.item_id not in active_blueprint_ids]
+            # составляем список "залётных" предметов (материалов и продактов), которые упали не в ту коробку
+            for _a in corporation.assets.values():
+                a: db.QSwaggerCorporationAssetsItem = _a
+                if a.location_id not in container_ids: continue
+                if a.item_id in corporation.blueprints.keys(): continue
+                # не всякий чертёж есть в blueprints (м.б. только в assets), т.ч. проверяем цепочку market_groups
+                pass  # print(a.type_id, a.name)
             """
             glf.write(f"<h4>blueprints</h4>{[_.item_id for _ in blueprints]}<br>"
                       f"<h4>active_blueprint_ids</h4>{active_blueprint_ids}<br>"

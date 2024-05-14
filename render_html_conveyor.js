@@ -315,7 +315,7 @@ function rebuildBody() {
    });
   }
   else if (tr.hasClass('lost-blueprints'))
-   changeElemVisibility(tr, hide_conveyor * show_lost);
+   changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
   else if (tr.hasClass('phantom-blueprints'))
    changeElemVisibility(tr, hide_conveyor * show_phantom);
   else if (tr.hasClass('job-active'))
