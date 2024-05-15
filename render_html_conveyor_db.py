@@ -129,6 +129,7 @@ table.tbl-summary tbody tr.job-active :is(td:nth-child(7),td:nth-child(8)) mute 
 table.tbl-summary tbody tr.job-completed td:nth-child(2) { opacity: 0.5; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { color: #666; }
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
+table.tbl-summary tbody tr.lost-jobs,
 table.tbl-summary tbody tr.lost-blueprints,
 table.tbl-summary tbody tr.lost-assets { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
@@ -165,8 +166,9 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 .label-active-job { background-color: #213a42; color: #ccc; }
 .label-completed-job { background-color: #0f1111; color: #aaa; }
 .label-phantom-blueprint { background-color: #4f351d; color: #d6a879; }
-.label-lost-blueprints { background-color: #f96900; color: #111111; }
-.label-lost-assets { background-color: #f96900; color: #111111; }
+.label-lost-blueprints,
+.label-lost-assets,
+.label-lost-jobs { background-color: #f96900; color: #111111; }
 
 /* кнопка включения видимости контейнера */
 .qind-btn-hide { opacity: 0.75; }
@@ -286,7 +288,7 @@ class NavMenuDefaults:
             return self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             return self.run_impossible
-        elif label == 'lost-blueprints' or label == 'lost-assets':
+        elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             return self.lost_items
         elif label == 'phantom-blueprints':
             return self.phantom_blueprints
@@ -306,7 +308,7 @@ class NavMenuDefaults:
             opt = self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             opt = self.run_impossible
-        elif label == 'lost-blueprints' or label == 'lost-assets':
+        elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             opt = self.lost_items
         elif label == 'phantom-blueprints':
             opt = self.phantom_blueprints
@@ -431,6 +433,22 @@ def dump_nav_menu(glf) -> None:
     g_menu_sort_default = next((m[1] for m in menu_sort if m[0]), 'name')
     glf.write(f"var g_menu_sort_default='{g_menu_sort_default}';\n")
     glf.write("</script>\n")
+
+
+g_tbl_summary_row_num: int = 0
+g_tbl_conveyor_row_num: int = 0
+
+
+def get_tbl_summary_row_num() -> int:
+    global g_tbl_summary_row_num
+    g_tbl_summary_row_num += 1
+    return g_tbl_summary_row_num
+
+
+def get_tbl_conveyor_row_num() -> int:
+    global g_tbl_conveyor_row_num
+    g_tbl_conveyor_row_num += 1
+    return g_tbl_conveyor_row_num
 
 
 def dump_nav_menu_router_dialog(
@@ -630,16 +648,39 @@ def dump_nav_menu_conveyor_dialog(
         modal_size="modal-lg")
     # формируем содержимое модального диалога
     glf.write("""<p>Ниже перечислены контейнеры, которые "увидел" конвейер и содержимое которых учитывает в расчётах. Названия
-контейнеров должны выбираться по специальным шаблонам (см. корпоративные биллютени). В контейнерах из раздела <mark>Чертежи</mark>
+контейнеров должны выбираться по специальным шаблонам (см. корпоративные биллютени). В контейнерах из раздела <span style="color:#ffa600">Чертежи</span>
 должны находиться BPC или BPO для расчёта производственных процессов, процессов инвента или варки реакций. Содержимое
-контейнеров из раздела <mark>Оверсток</mark> учитывается в расчётах таким образом, что непроданная продукция не будет
-снова попадать в расчёт производства (даже если в контейнерах <mark>Чертежи</mark> имеются чертежи для этой продукции).
-Материалы для производства будут браться в расчёт из контейнеров группы <mark>Сток</mark> (у инвента как правило свой
+контейнеров из раздела <span style="color:#ffa600">Оверсток</span> учитывается в расчётах таким образом, что непроданная продукция не будет
+снова попадать в расчёт производства (даже если в контейнерах <span style="color:#ffa600">Чертежи</span> имеются чертежи для этой продукции).
+Материалы для производства будут браться в расчёт из контейнеров группы <span style="color:#ffa600">Сток</span> (у инвента как правило свой
 сток, совпадающий с расположением BPO, а у производства и реакций свой). Для расчёта промежуточных этапов производства
-выбираются контейнеры из раздела <mark>Дополнительные чертежи</mark>, - следите за тем, чтобы в этот раздел не попадали
-лишние названия, например персональные коробки или коробки 'Ночного цеха'.</p><hr>
-""")
-    row_num: int = 1
+выбираются контейнеры из раздела <span style="color:#ffa600">Дополнительные чертежи</span>, - следите за тем, чтобы в этот раздел не попадали
+лишние названия, например персональные коробки или коробки 'Ночного цеха', в противном случае их содержимое попадёт в
+расчёт конвейера. Контейнеры из раздела <span style="color:#ffa600">Выход</span> должны выбираться в настройках производства как "Склад
+готовой продукции", в противном случае активные и завершённые производственные проекты на странице конвейера будут
+просигнализированы предупреждениями.</p>
+<hr>""")
+
+    def dump_table(label646: str,
+                   corp_name646: str,
+                   boxes646: typing.List[tools.ConveyorSettingsContainer],
+                   color646: typing.Optional[str] = None) -> None:
+        if not boxes646: return
+        glf.write(f"""
+<table class="table table-condensed table-hover tbl-conveyor">
+<thead><tr><th>#</th><th>{label646} <mute>{corp_name646}</mute></th></tr></thead>
+<tbody>\n""")
+        if color646:
+            color646 = f" style='color:{color646}'"
+        else:
+            color646 = ""
+        for box667 in boxes646:
+            glf.write(f"<tr container_id='{box667.container_id}'>"
+                      f"<td>{get_tbl_conveyor_row_num()}</td>"
+                      f"<td{color646}>{box667.container_name}</td>"
+                      "</tr>\n")
+        glf.write("</tbody></table>\n")
+
     for (idx, s) in enumerate(conveyor_settings):
         if idx:
             glf.write('<hr>')
@@ -658,47 +699,29 @@ def dump_nav_menu_conveyor_dialog(
             station_id: int = station.station_id if station else None
             station_name: str = station.station_name if station else None
             station_type: str = station.station_type_name if station else None
+
             glf.write(f"""
 <h4 station_id='{station_id}'>{station_name} <small>{station_type}</small></h4>
 <div class="row">
- <div class="col-md-4">
-""")
+ <div class="col-md-4">""")
+
             z: typing.List[tools.ConveyorSettingsPriorityContainer] = sorted(
                 [x for x in s.containers_sources if x.station_id == station_id],
                 key=lambda x: x.container_name)
-            if z:
-                glf.write("""
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Чертежи</th></tr></thead>
-<tbody>""")
-                for container in z:
-                    glf.write(f"<tr container_id='{container.container_id}'>"
-                              f"<td>{row_num}</td>"
-                              f"<td>{container.container_name}</td>"
-                              "</tr>")
-                    row_num += 1
-                glf.write("""
-</tbody>
-</table>""")
+            dump_table("Чертежи", corporation.corporation_name, z)
+            del z
+
             glf.write("""
 </div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
+
             z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                 [x for x in s.containers_stocks if x.station_id == station_id],
                 key=lambda x: x.container_name)
-            if z:
-                glf.write(f"""
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Сток <span style="color:#777">{corporation.corporation_name}</span></th></tr><thead>
-<tbody>""")
-                for container in z:
-                    glf.write(f"<tr container_id='{container.container_id}'>"
-                              f"<td>{row_num}</td>"
-                              f"<td>{container.container_name}</td>"
-                              "</tr>")
-                    row_num += 1
-                glf.write("</tbody></table>")
+            dump_table("Сток", corporation.corporation_name, z)
+            del z
+
             z: typing.List[tools.ConveyorSettingsSaleContainer] = sorted(
                 [x for x in s.trade_sale_stock if x.station_id == station_id],
                 key=lambda x: x.container_name)
@@ -706,53 +729,33 @@ def dump_nav_menu_conveyor_dialog(
                 w0: typing.List[str] = list(set([x.trade_corporation.corporation_name for x in z]))
                 w1: typing.List[str] = sorted(w0, key=lambda x: x)
                 for corporation_name in w1:
-                    glf.write(f"""
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Оверсток <span style="color:#777">{corporation_name}</span></th></tr></thead>
-<tbody>""")
-                    for container in z:
-                        if container.trade_corporation.corporation_name == corporation_name:
-                            glf.write(f"<tr container_id='{container.container_id}'>"
-                                      f"<td>{row_num}</td>"
-                                      f"<td style='color:#ffa600'>{container.container_name}</td>"
-                                      "</tr>")
-                            row_num += 1
-                glf.write("</tbody></table>")
+                    dump_table("Оверсток", corporation_name,
+                               [_ for _ in z if _.trade_corporation.corporation_name == corporation_name],
+                               color646="#ffa600")
+
+            z: typing.List[tools.ConveyorSettingsContainer] = sorted(
+                [x for x in s.containers_output if x.station_id == station_id],
+                key=lambda x: x.container_name)
+            dump_table("Выход", corporation.corporation_name, z)
+            del z
+
             glf.write("""
 </div> <!-- col -->
 <!-- -->
 <div class="col-md-4">""")
+
             if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
                 z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                     [x for x in s.containers_additional_blueprints if x.station_id == station_id],
                     key=lambda x: x.container_name)
-                if z:
-                    glf.write("""
-<table class="table table-condensed table-hover tbl-conveyor">
-<thead><tr><th>#</th><th>Дополнительные чертежи</th></tr></thead>
-<tbody>""")
-                    for container in z:
-                        glf.write(f"<tr container_id='{container.container_id}'>"
-                                  f"<td>{row_num}</td>"
-                                  f"<td>{container.container_name}</td>"
-                                  "</tr>")
-                        row_num += 1
-                    glf.write("</tbody></table>")
+                dump_table("Дополнительные чертежи", corporation.corporation_name, z)
+
             glf.write("""
  </div> <!-- col -->
 </div> <!-- row -->
 """)
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)
-
-
-g_tbl_summary_row_num: int = 0
-
-
-def get_tbl_summary_row_num() -> int:
-    global g_tbl_summary_row_num
-    g_tbl_summary_row_num += 1
-    return g_tbl_summary_row_num
 
 
 def dump_blueprints_overflow_warn(
@@ -787,8 +790,11 @@ def dump_blueprints_overflow_warn(
 
 def dump_list_of_jobs(
         glf,
+        settings: tools.ConveyorSettings,
         jobs: typing.List[db.QSwaggerCorporationIndustryJob],
         is_active_jobs: bool) -> None:
+    # готовим список контейнеров выхода в проверке
+    containers_output_ids: typing.Set[int] = set([_.container_id for _ in settings.containers_output])
     # группируем работы по типу, чтобы получить уникальные сочетания с количествами
     grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = \
         tools.get_jobs_grouped_by(
@@ -816,6 +822,7 @@ def dump_list_of_jobs(
         blueprint_type_name: str = j0.blueprint_type.blueprint_type.name
         product_type_id: int = j0.product_type_id
         product_type_name: str = j0.product_type.name
+        # --- --- ---
         installer: str = ''
         installers_count: int = len(set([_.installer_id for _ in group]))
         if installers_count == 1:
@@ -827,28 +834,53 @@ def dump_list_of_jobs(
             else:
                 installer = f'<mute>Операторы - </mute><a data-target="#" data-copy="{installer_names}"' \
                             f' data-toggle="tooltip" class="qind-copy-btn">{installers_count} перс</a>'
+        # --- --- ---
         output: str = ''
         outputs_count: int = len(set([_.output_location_id for _ in group]))
         if outputs_count == 1:
-            output = f'<mute>Выход</mute> {j0.output_location.name if j0.output_location.name else j0.output_location_id}'
+            nm: str = j0.output_location.name if j0.output_location.name else str(j0.output_location_id)
+            output = '<mute>Выход</mute>' + nm
         else:
-            output_names: str = ', '.join(
+            nms: str = ', '.join(
                 set([_.output_location.name if _.output_location.name else str(_.output_location_id) for _ in group]))
-            if len(output_names) <= 20:
-                output = f'<mute>Выход</mute> {output_names}'
+            if len(nms) <= 20:
+                output = '<mute>Выход</mute>' + nms
             else:
-                output = f'<mute>Выход - </mute><a data-target="#" data-copy="{output_names}"' \
+                output = f'<mute>Выход - </mute><a data-target="#" data-copy="{nms}"' \
                          f' data-toggle="tooltip" class="qind-copy-btn">{outputs_count} кор</a>'
+        # --- --- ---
         active_label: str = ''
         if is_active_jobs:
             active_label = '<label class="label label-active-job">проект ведётся</label>'
         else:
             active_label = '<label class="label label-completed-job">проект завершён</label>'
+        # --- --- ---
+        lost_label: str = ''
+        lost_output: str = ''
+        lost_class: str = ''
+        if containers_output_ids:
+            lost_outputs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [_ for _ in group if _.output_location_id not in containers_output_ids]
+            if lost_outputs:
+                container_prefix: str = '<br><mute>Контейнер - </mute>'
+                lost_outputs_count: int = len(set([_.output_location_id for _ in lost_outputs]))
+                nms: typing.List[str] = sorted(set([
+                    _.output_location.name if _.output_location.name else str(_.output_location_id)
+                    for _ in lost_outputs]))
+                lost_output: str = \
+                    container_prefix + \
+                    container_prefix.join(nms) + \
+                    f"<!--\njob_ids: {[_.job_id for _ in lost_outputs]}-->"
+                if j0.product_type.group and j0.product_type.group.category_id == 9:  # 9 = Blueprints
+                    lost_label = f" <label class='label label-lost-jobs'>{declension_of_lost_blueprints(lost_outputs_count)}</label>"
+                else:
+                    lost_label = f" <label class='label label-lost-jobs'>{declension_of_lost_assets(lost_outputs_count)}</label>"
+                lost_class = ' lost-jobs'
         # <mute>Стоимость</mute> {'{:,.1f}'.format(job.cost)}
         # </me_tag><tid_tag> ({blueprint_type_id})</tid_tag>
         tr_class: str = 'job-active' if is_active_jobs else 'job-completed'
         tr_class += g_nav_menu_defaults.css(tr_class)
-        glf.write(f"""<tr class="{tr_class}">
+        glf.write(f"""<tr class="{tr_class}{lost_class}">
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
 <td>{blueprint_type_name}&nbsp;<a
@@ -860,8 +892,9 @@ data-target="#" role="button" data-tid="{blueprint_type_id}" class="qind-copy-bt
 <td></td>
 <td><img class="icn32" src="{render_html.__get_img_src(product_type_id, 32)}"></td>
 <td>{product_type_name}&nbsp;<a
-data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a><br>
+data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>{lost_label}<br>
 <small>{installer} {output}</small>
+{lost_output}
 </td>
 <td>{sum_products}</td>
 </tr>""")
@@ -870,12 +903,18 @@ data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn 
     del grouped
 
 
-def dump_list_of_active_jobs(glf, active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
-    dump_list_of_jobs(glf, active_jobs, is_active_jobs=True)
+def dump_list_of_active_jobs(
+        glf,
+        settings: tools.ConveyorSettings,
+        active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    dump_list_of_jobs(glf, settings, active_jobs, is_active_jobs=True)
 
 
-def dump_list_of_completed_jobs(glf, completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
-    dump_list_of_jobs(glf, completed_jobs, is_active_jobs=False)
+def dump_list_of_completed_jobs(
+        glf,
+        settings: tools.ConveyorSettings,
+        completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
+    dump_list_of_jobs(glf, settings, completed_jobs, is_active_jobs=False)
 
 
 def dump_list_of_lost_blueprints(
@@ -1327,11 +1366,13 @@ def dump_corp_conveyors(
             if active_jobs:
                 dump_list_of_active_jobs(
                     glf,
+                    settings,
                     active_jobs)  # [b for b in blueprints if b.item_id in active_blueprint_ids]
             # вывести информацию о работах, которые прямо недавно закончились
             if completed_jobs:
                 dump_list_of_completed_jobs(
                     glf,
+                    settings,
                     completed_jobs)  # [b for b in blueprints if b.item_id in completed_blueprint_ids]
             # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
             if phantom_blueprints:

@@ -737,7 +737,7 @@ WHERE
             "WHERE"
             " ecj_corporation_id=%(id)s AND"
             " (ecj_status<>'active' OR ecj_completed_date IS NOT NULL) AND"
-            " (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' < (ecj_end_date+interval '180 minute'));",
+            " (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' < (ecj_end_date+interval '1440 minute'));",
             {'id': corporation_id}
         )
         if rows is None:

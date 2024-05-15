@@ -168,6 +168,7 @@ def main():
                     source_box: bool = False
                     stock_box: bool = False
                     formulas_box: bool = False
+                    output_box: bool = False
                     # превращаем названия (шаблоны названий) в номера контейнеров
                     for priority in conveyor['blueprints'].keys():
                         if next((1 for tmplt in conveyor['blueprints'][priority] if re.search(tmplt, container_name)), None):
@@ -194,10 +195,16 @@ def main():
                             if next((1 for tmplt in conveyor['reactions']['stock'] if re.search(tmplt, container_name)), None):
                                 settings.containers_react_stock.append(container_id)
                                 stock_box = True
+                    # получаем информацию по коробкам, куда можно направлять выход готовой продукции
+                    if conveyor.get('output'):
+                        if next((1 for tmplt in conveyor['output'] if re.search(tmplt, container_name)), None):
+                            scs = tools.ConveyorSettingsContainer(settings, corporation, container)
+                            settings.containers_output.append(scs)
+                            output_box = True
                     # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например сток T1)
                     if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in settings.activities:
                         blueprints_box: bool = True
-                        if source_box or stock_box or formulas_box:
+                        if source_box or stock_box or formulas_box or output_box:
                             blueprints_box = False
                         else:
                             if conveyor.get('exclude_hangars') and int(container_hangar[-1:]) in conveyor['exclude_hangars']:
@@ -264,6 +271,7 @@ def main():
         print('activities:    ', ','.join([str(_) for _ in s.activities]))
         stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
                                               [x.station_id for x in s.containers_stocks] +
+                                              [x.station_id for x in s.containers_output] +
                                               [x.station_id for x in s.containers_additional_blueprints] +
                                               [x.station_id for x in s.trade_sale_stock]))
         stations: typing.List[int] = sorted(stations, key=lambda x: qid.get_station(x).station_name if x else '')
@@ -275,6 +283,9 @@ def main():
             z = sorted([x for x in s.containers_stocks if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
                 print('>stock:        ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+            z = sorted([x for x in s.containers_output if x.station_id == station_id], key=lambda x: x.container_name)
+            if z:
+                print('>output:       ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
                 z = sorted([x for x in s.containers_additional_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:

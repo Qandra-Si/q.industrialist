@@ -314,7 +314,7 @@ function rebuildBody() {
      changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
    });
   }
-  else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets'))
+  else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets') || tr.hasClass('lost-jobs'))
    changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
   else if (tr.hasClass('phantom-blueprints'))
    changeElemVisibility(tr, hide_conveyor * show_phantom);

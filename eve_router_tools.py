@@ -113,6 +113,7 @@ class ConveyorSettings:
         # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
         self.containers_sources: typing.List[ConveyorSettingsPriorityContainer] = []  # station:container:priority
         self.containers_stocks: typing.List[ConveyorSettingsContainer] = []  # station:container
+        self.containers_output: typing.List[ConveyorSettingsContainer] = []  # station:container
         self.containers_additional_blueprints: typing.List[ConveyorSettingsContainer] = []  # station:container
         self.containers_react_formulas: typing.List[int] = []
         self.containers_react_stock: typing.List[int] = []
