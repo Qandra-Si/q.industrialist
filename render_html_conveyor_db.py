@@ -243,8 +243,8 @@ def declension_of_lost_assets(assets: int) -> str:
         return 'потерянные предметы'
 
 
-def format_num_of_num(possible: int, total: int, mute_possible: bool = True) -> str:
-    if possible >= total:
+def format_num_of_num(possible: typing.Optional[int], total: int, mute_possible: bool = True) -> str:
+    if possible is None or possible < 0 or possible >= total:
         return str(total)
     elif mute_possible:
         return f'<mute>{possible} из</mute> {total}'
@@ -1061,6 +1061,7 @@ location_id:{[_.location_id for _ in group]}--></td>
 
 def dump_list_of_possible_blueprints(
         glf,
+        settings: tools.ConveyorSettings,
         # список чертежей и их потребности (сгруппированные и отсортированные)
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
     # группируем стеки по названиям чертежей
@@ -1126,14 +1127,15 @@ def dump_list_of_possible_blueprints(
             return ''
 
         decryptor: str = ''
-        m0: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = stacks[0].required_materials_for_stack
-        if len(m0) == 1:
-            activity: db.QSwaggerActivity = next(iter(m0.keys()))
-            if isinstance(activity, db.QSwaggerBlueprintInvention):
-                d: typing.Optional[db.QSwaggerMaterial] = \
-                    next((_ for _ in itertools.chain(*m0.values()) if _.material_type.market_group_id == 1873), None)
-                if d:
-                    decryptor = f'<mute> - модернизируй с </mute><qdecr>{d.material_type.name}</qdecr>'
+        if tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
+            m0: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = stacks[0].required_materials_for_stack
+            if len(m0) == 1:  # тут проверяется, что activity одна единственная
+                activity: db.QSwaggerActivity = next(iter(m0.keys()))
+                if isinstance(activity, db.QSwaggerBlueprintInvention):
+                    d: typing.Optional[db.QSwaggerMaterial] = \
+                        next((_ for _ in itertools.chain(*m0.values()) if _.material_type.market_group_id == 1873), None)
+                    if d:
+                        decryptor = f'<mute> - модернизируй с </mute><qdecr>{d.material_type.name}</qdecr>'
 
         glf.write(f"""<tr{tr_div_class('tr')}>
 <td>{get_tbl_summary_row_num()}</td>
@@ -1150,7 +1152,7 @@ data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-to
             js = [(tid, q, next((_.quantity for _ in na if _.material_type.type_id == tid), 0)) for (tid, q) in js]
             # ---
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
-            tt: typing.Tuple[int, int] = tools.get_min_max_time(stack)
+            tt: typing.Tuple[int, int] = tools.get_min_max_time(settings.activities, stack)
             glf.write(f"{tr_div_class('div', stack, True)}"
                       f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
                       f"<me_tag>{b0.material_efficiency}%</me_tag>"
@@ -1324,6 +1326,9 @@ def dump_corp_conveyors(
                     [b for b in lost_blueprints if b.item_id not in active_blueprint_ids]
             # составляем список потенциально-задействованных в текущем конвейере материалов (по типу производства)
             involved_materials = set(itertools.chain.from_iterable([global_dictionary.involved_materials[_] for _ in settings.activities]))
+            # TODO: надо придумать как от избавиться от костыля (в коробке с инвентом хранятся ассеты для копирки)
+            if tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
+                involved_materials |= global_dictionary.involved_materials[tools.ConveyorActivity.CONVEYOR_COPYING]
             # составляем список "залётных" предметов (материалов и продактов), которые упали не в ту коробку
             lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
             for _a in corporation.assets.values():
@@ -1359,7 +1364,10 @@ def dump_corp_conveyors(
                     # список чертежей, которые необходимо обработать
                     possible_blueprints)
                 # выводим в отчёт
-                dump_list_of_possible_blueprints(glf, requirements)
+                dump_list_of_possible_blueprints(
+                    glf,
+                    settings,
+                    requirements)
                 # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
                 global_dictionary.load_requirements(requirements)
             # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера

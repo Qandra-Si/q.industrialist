@@ -341,11 +341,11 @@ class ConveyorCorporationStockMaterials:
     class CheckEnoughResult:
         def __init__(self,
                      enough: bool,
-                     max_possible: int,
+                     max_possible: typing.Optional[int],
                      not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]):
             self.non_decryptors_missing: bool = not enough
             self.decryptors_missing: typing.Optional[bool] = None
-            self.max_possible: int = max_possible
+            self.max_possible: typing.Optional[int] = max_possible
             self.not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = not_available
 
         @property
@@ -365,7 +365,10 @@ class ConveyorCorporationStockMaterials:
             -> CheckEnoughResult:
         available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
         if not available_materials:
-            return ConveyorCorporationStockMaterials.CheckEnoughResult(False, 0, required_materials)
+            if not required_materials:
+                return ConveyorCorporationStockMaterials.CheckEnoughResult(True, None, {})
+            else:
+                return ConveyorCorporationStockMaterials.CheckEnoughResult(False, 0, required_materials)
 
         result: ConveyorCorporationStockMaterials.CheckEnoughResult = \
             ConveyorCorporationStockMaterials.CheckEnoughResult(True, -1, {})
@@ -573,7 +576,9 @@ def calc_corp_conveyor(
     return grouped_and_sorted
 
 
-def get_min_max_time(stack: ConveyorMaterialRequirements.StackOfBlueprints) -> typing.Tuple[int, int]:
+def get_min_max_time(
+        activities: typing.List[ConveyorActivity],
+        stack: ConveyorMaterialRequirements.StackOfBlueprints) -> typing.Tuple[int, int]:
     min_time, max_time = None, None
 
     def apply(min_t: int, max_t: int, t: int) -> typing.Tuple[int, int]:
@@ -585,51 +590,56 @@ def get_min_max_time(stack: ConveyorMaterialRequirements.StackOfBlueprints) -> t
             max_t = max(max_t, t)
         return min_t, max_t
 
-    for activity in stack.required_materials_for_stack.keys():
-        if isinstance(activity, db.QSwaggerBlueprintManufacturing):
-            for b in stack.group:
-                # считаем бонус чертежа (накладываем TE чертежа на БП)
-                __stage1: float = float(activity.time * (100 - b.time_efficiency) / 100.0)
-                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
-                __stage2: float = float(__stage1 * (100.0 - 31.5) / 100.0)
-                # # учитываем бонус установленного модификатора
-                __stage3: float = float(__stage2 * (100.0 - 42.0) / 100.0)
-                # учитываем бонус профиля сооружения
-                __stage4: float = float(__stage3 * (100.0 - 30.0) / 100.0)
-                # округляем вещественное число до старшего целого
-                __stage5: int = int(float(__stage4 + 0.99))
-                # умножаем на кол-во прогонов
-                __stageX: int = __stage5 * b.runs
-                # считаем min/max
-                min_time, max_time = apply(min_time, max_time, __stageX)
-        elif isinstance(activity, db.QSwaggerBlueprintInvention):
-            for b in stack.group:
-                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
-                __stage1: float = float(activity.time * (100.0 - 9.0) / 100.0)
-                # учитываем бонус профиля сооружения
-                __stage2: float = float(__stage1 * (100.0 - 30.0) / 100.0)
-                # округляем вещественное число до старшего целого
-                __stage3: int = int(float(__stage2 + 0.99))
-                # умножаем на кол-во прогонов
-                __stageX: int = __stage3 * b.runs
-                # считаем min/max
-                min_time, max_time = apply(min_time, max_time, __stageX)
-        elif isinstance(activity, db.QSwaggerBlueprintReaction):
-            for b in stack.group:
-                # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
-                __stage1: float = float(activity.time * (100.0 - 16.0) / 100.0)
-                # учитываем бонус установленного модификатора
-                __stage2: float = float(__stage1 * (100.0 - 22.0) / 100.0)
-                # учитываем бонус профиля сооружения
-                __stage3: float = float(__stage2 * (100.0 - 25.0) / 100.0)
-                # округляем вещественное число до старшего целого
-                __stage4: int = int(float(__stage3 + 0.99))
-                # умножаем на кол-во прогонов
-                __stageX: int = __stage4 * b.runs
-                # считаем min/max
-                min_time, max_time = apply(min_time, max_time, __stageX)
-        else:  # подразумевается копирка (или research)
-            for b in stack.group:
+    for b in stack.group:
+        if ConveyorActivity.CONVEYOR_MANUFACTURING in activities and b.blueprint_type.manufacturing:
+            activity: db.QSwaggerBlueprintManufacturing = b.blueprint_type.manufacturing
+            # считаем бонус чертежа (накладываем TE чертежа на БП)
+            __stage1: float = float(activity.time * (100 - b.time_efficiency) / 100.0)
+            # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+            __stage2: float = float(__stage1 * (100.0 - 31.5) / 100.0)
+            # # учитываем бонус установленного модификатора
+            __stage3: float = float(__stage2 * (100.0 - 42.0) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage4: float = float(__stage3 * (100.0 - 30.0) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage5: int = int(float(__stage4 + 0.99))
+            # умножаем на кол-во прогонов
+            __stageX: int = __stage5 * b.runs
+            # считаем min/max
+            min_time, max_time = apply(min_time, max_time, __stageX)
+        if ConveyorActivity.CONVEYOR_INVENTION in activities and b.blueprint_type.invention:
+            activity: db.QSwaggerBlueprintInvention = b.blueprint_type.invention
+            # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+            __stage1: float = float(activity.time * (100.0 - 9.0) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage2: float = float(__stage1 * (100.0 - 30.0) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage3: int = int(float(__stage2 + 0.99))
+            # умножаем на кол-во прогонов
+            __stageX: int = __stage3 * b.runs
+            # считаем min/max
+            min_time, max_time = apply(min_time, max_time, __stageX)
+        if ConveyorActivity.CONVEYOR_REACTION in activities and b.blueprint_type.reaction:
+            activity: db.QSwaggerBlueprintReaction = b.blueprint_type.reaction
+            # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
+            __stage1: float = float(activity.time * (100.0 - 16.0) / 100.0)
+            # учитываем бонус установленного модификатора
+            __stage2: float = float(__stage1 * (100.0 - 22.0) / 100.0)
+            # учитываем бонус профиля сооружения
+            __stage3: float = float(__stage2 * (100.0 - 25.0) / 100.0)
+            # округляем вещественное число до старшего целого
+            __stage4: int = int(float(__stage3 + 0.99))
+            # умножаем на кол-во прогонов
+            __stageX: int = __stage4 * b.runs
+            # считаем min/max
+            min_time, max_time = apply(min_time, max_time, __stageX)
+        if b.is_original:
+            for a in [ConveyorActivity.CONVEYOR_COPYING,
+                      ConveyorActivity.CONVEYOR_RESEARCH_TIME,
+                      ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL]:
+                if a not in activities: continue
+                activity: db.QSwaggerActivity = b.blueprint_type.get_activity(a.to_int())
+                if not activity: continue
                 # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
                 __stage1: float = float(activity.time * (100.0 - 27.2) / 100.0)
                 # учитываем бонус профиля сооружения
@@ -637,7 +647,7 @@ def get_min_max_time(stack: ConveyorMaterialRequirements.StackOfBlueprints) -> t
                 # округляем вещественное число до старшего целого
                 __stage3: int = int(float(__stage2 + 0.99))
                 # умножаем на кол-во прогонов
-                __stageX: int = __stage3 * b.runs
+                __stageX: int = __stage3  # нельзя умножать на runs, оно равно -1
                 # считаем min/max
                 min_time, max_time = apply(min_time, max_time, __stageX)
     return min_time, max_time
