@@ -211,21 +211,22 @@ function initMaterialNames() {
   }
  });
 }
-function initMaterialsOfBlueprints(show_used) {
+function initMaterialsOfBlueprints(used_materials, not_available) {
  $('table.tbl-summary tbody tr td div qmaterials').each(function() {
-  if (!show_used) {
+  if (!used_materials && !not_available) {
    $(this).html('');
   } else {
+   var s = '';
    var data_arr = $(this).data('arr');
    if (!(data_arr === undefined) && !(data_arr === "") && (data_arr.length>0)) {
-    var s = '';
     for (var i=0; i<data_arr.length; ++i) {
-     if (i>0) s += ' ';
+     if (!used_materials && not_available && data_arr[i][2]==0) continue;
+     if (s) s += ' ';
      if (data_arr[i][2]>0) s += '<qmat class="absent">'; else s += '<qmat>';
      s += getMaterialImg(data_arr[i][0], 16)+' <txt>'+getMaterialText(false, data_arr[i][1], data_arr[i][2])+'</txt></qmat>';
     }
-    $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
    }
+   $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
   }
  });
 }
@@ -324,8 +325,9 @@ function rebuildBody() {
    changeElemVisibility(tr, hide_conveyor * show_completed);
  }
 
- var show_used = (getOption('option', 'used-materials') == 1) ? 1 : 0;
- initMaterialsOfBlueprints(show_used);
+ var used_materials = (getOption('option', 'used-materials') == 1) ? 1 : 0;
+ var not_available = (getOption('option', 'not-available') == 1) ? 1 : 0;
+ initMaterialsOfBlueprints(used_materials, not_available);
 
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
  var show_entry_purch = (getOption('option', 'entry-level-purchasing') == 1) ? 1 : 0;
@@ -338,6 +340,10 @@ $('a.qind-btn-settings').on('click', function () {
  var opt = $(this).attr('qind-group');
  var val = (getOption('option', opt) == 1) ? 0 : 1;
  setOption('option', opt, val);
+ if (opt == 'used-materials')
+  setOption('option', 'not-available', (val==1)?0:1);
+ else if (opt == 'not-available')
+  setOption('option', 'used-materials', (val==1)?0:1);
  rebuildOptionsMenu();
  rebuildBody();
 });
