@@ -222,11 +222,13 @@ function initMaterialsOfBlueprints(used_materials, not_available) {
     for (var i=0; i<data_arr.length; ++i) {
      if (!used_materials && not_available && data_arr[i][2]==0) continue;
      if (s) s += ' ';
-     if (data_arr[i][2]>0) s += '<qmat class="absent">'; else s += '<qmat>';
+     s += '<qmat';
+     if (data_arr[i][2]>0) s += ' class="absent"';
+     s += ' data-idx="'+i+'">';
      s += getMaterialImg(data_arr[i][0], 16)+' <txt>'+getMaterialText(false, data_arr[i][1], data_arr[i][2])+'</txt></qmat>';
     }
    }
-   $(this).html('<br>'+s); // при изменении откорректируй использование index() ниже
+   $(this).html('<br>'+s);
   }
  });
 }
@@ -235,13 +237,13 @@ function getMaterialInfo(qmat) {
  if (qmaterials === undefined) return null;
  var data_arr = qmaterials.data('arr');
  if ((data_arr === undefined) || (data_arr === "") || (data_arr.length==0)) return null;
- var idx = qmat.index()-1; // первый <br>
+ var idx = qmat.data('idx');
  if (idx >= data_arr.length) return null;
  return data_arr[idx];
 }
 function chooseMaterial(qmat) {
  var info = getMaterialInfo(qmat);
- if (info === null) return
+ if ((info === null) || (info === undefined)) return
  var tid = info[0];
  var nm = getSdeItemName(tid);
  if (nm === null) nm = tid;
