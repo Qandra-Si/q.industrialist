@@ -340,10 +340,14 @@ $('a.qind-btn-settings').on('click', function () {
  var opt = $(this).attr('qind-group');
  var val = (getOption('option', opt) == 1) ? 0 : 1;
  setOption('option', opt, val);
- if (opt == 'used-materials')
-  setOption('option', 'not-available', (val==1)?0:1);
- else if (opt == 'not-available')
-  setOption('option', 'used-materials', (val==1)?0:1);
+ if (opt == 'used-materials') {
+  if (val == 1)
+    setOption('option', 'not-available', 0);
+ }
+ else if (opt == 'not-available') {
+  if (val == 1)
+   setOption('option', 'used-materials', 0);
+ }
  rebuildOptionsMenu();
  rebuildBody();
 });
