@@ -358,6 +358,43 @@ $('button.qind-btn-sort').on('click', function () {
  rebuildOptionsMenu();
  rebuildBody();
 });
+//---
+function formatTime(sec) {
+  const seconds = Math.floor(Math.abs(sec));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  const t = [h, m > 9 ? m : h ? '0' + m : m || '0', s > 9 ? s : '0' + s]
+    .filter(Boolean)
+    .join(':');
+  return sec < 0 && seconds ? `-${t}` : t;
+}
+function recalcLifetimeTimestamps() {
+ var now = new Date();
+ var utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+ let js_ts = Math.floor(utc / 1000); // browser time
+ let js_offset = js_ts - g_server_time;
+ var s = now.toISOString();
+ s = s.replace('T',' ').replace('Z','');
+ $('#browser-time').html(s);
+ $('table.tbl-lifetime * left').each(function() {
+  var data_ts = $(this).data('ts');
+  var data_w = $(this).data('w');
+  if (!(data_ts === undefined) && !(data_w === undefined)) {
+   var left_ts = 0 + (g_server_time - data_ts) + js_offset;
+   if (data_w == 'a' || data_w == 'b')
+    left_ts = 3600 - left_ts;
+   else if (data_w == 'o')
+    left_ts = 1200 - left_ts;
+   else if (data_w == 'j')
+    left_ts = 300 - left_ts;
+   if (Math.abs(left_ts) >= 86400)
+    $(this).html('');
+   else
+    $(this).html(formatTime(left_ts));
+  }
+ });
+}
 //-----------
 // работа с пунктами меню
 //-----------
@@ -470,6 +507,9 @@ $(document).ready(function(){
   });
   $('body').delegate('a.qind-copy-btn', 'click', function () {
     doCopyToClipboard($(this));
+  });
+  $('#modalLifetime').on('shown.bs.modal', function () {
+   recalcLifetimeTimestamps();
   });
   $('a.qind-copy-btn').bind('copied', function(event, message) {
     $(this).attr('title', message)

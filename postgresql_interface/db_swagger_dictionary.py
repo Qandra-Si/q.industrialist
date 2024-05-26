@@ -12,6 +12,7 @@ class QSwaggerDictionary:
         self.__qit: QSwaggerTranslator = qit
         # справочники
         self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
+        self.sde_lifetime: typing.Dict[typing.Tuple[str, int], datetime.datetime] = {}  # what:corporation_id
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
         self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
@@ -37,10 +38,15 @@ class QSwaggerDictionary:
         del self.sde_groups
         del self.sde_categories
         del self.sde_market_groups
+        del self.sde_lifetime
 
     def disconnect_from_translator(self):
         # после отключения использовать load_xxx методы запрещено
         self.__qit = None
+
+    def load_lifetime(self, corporation_ids: typing.List[int]) -> typing.Dict[typing.Tuple[str, int], datetime.datetime]:
+        self.sde_lifetime = self.__qit.get_lifetime(corporation_ids)
+        return self.sde_lifetime
 
     def get_market_group(self, market_group_id: int) -> typing.Optional[QSwaggerMarketGroup]:
         cached_market_group: QSwaggerMarketGroup = self.sde_market_groups.get(market_group_id)

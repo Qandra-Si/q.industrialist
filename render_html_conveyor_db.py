@@ -83,6 +83,13 @@ table.tbl-conveyor thead tr th:nth-child(1),
 table.tbl-conveyor tbody tr td:nth-child(1) { width: 24px; font-weight: bold; text-align: right; }
 table.tbl-conveyor tbody tr td:nth-child(2) { padding-left: 4px; white-space: nowrap; }
 
+table.tbl-lifetime tr { font-size: small; }
+table.tbl-lifetime tbody tr td { padding: 1px; font-size: smaller; }
+table.tbl-lifetime thead tr th:nth-child(1),
+table.tbl-lifetime tbody tr td:nth-child(1) { width: 49%; font-weight: bold; text-align: right; }
+table.tbl-lifetime tbody tr td:nth-child(2) { padding-left: 4px; }
+table.tbl-lifetime tbody tr td left { color: #ffa600; }
+
 .badge-light { color: #212529; background-color: #f8f9fa; }
 .label-time { color: #131313; background-color: #7adee3; }
 .label-not-enough { color: #fff; background-color: #f0ad4e; }
@@ -405,6 +412,7 @@ def dump_nav_menu(glf) -> None:
     </li>
     <li><a data-target="#modalRouter" role="button" data-toggle="modal">Станции</a></li>
     <li><a data-target="#modalConveyor" role="button" data-toggle="modal">Конвейер</a></li>
+    <li><a data-target="#modalLifetime" role="button" data-toggle="modal">Время</a></li>
    </ul>
    <form class="navbar-form navbar-right">
     <label>Сортировка:&nbsp;</label>
@@ -756,6 +764,57 @@ def dump_nav_menu_conveyor_dialog(
  </div> <!-- col -->
 </div> <!-- row -->
 """)
+    # закрываем footer модального диалога
+    render_html.__dump_any_into_modal_footer(glf)
+
+
+def dump_nav_menu_lifetime_dialog(
+        glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary) -> None:
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    render_html.__dump_any_into_modal_header_wo_button(
+        glf,
+        "Актуализация ассетов",
+        unique_id="Lifetime",
+        modal_size="modal-lg")
+    # "текущее" время сервера БД (может отличаться от текущего времени построения отчёта
+    server_time = qid.sde_lifetime.get(('current', None))
+    glf.write(f"""
+<script>
+var g_server_time={int(server_time.timestamp())};
+</script>
+<table class="table table-condensed table-hover tbl-lifetime">
+<tbody>
+<tr><td>Время сервера</td><td>{server_time}</td></tr>
+<tr><td>Время браузера</td><td id="browser-time"></td></tr>
+</tbody>
+</table>""")
+    for corporation in qid.corporations.values():
+        corporation_id: int = corporation.corporation_id
+        assets: datetime.datetime = qid.sde_lifetime.get(('assets', corporation_id))
+        blueprints: datetime.datetime = qid.sde_lifetime.get(('blueprints', corporation_id))
+        jobs: datetime.datetime = qid.sde_lifetime.get(('jobs', corporation_id))
+        orders: datetime.datetime = qid.sde_lifetime.get(('orders', corporation_id))
+        # ---
+        assets_left: int = int(assets.timestamp())
+        blueprints_left: int = int(blueprints.timestamp())
+        jobs_left: int = int(jobs.timestamp())
+        orders_left: int = int(orders.timestamp())
+        # ---
+        glf.write(f"""
+<h4>{corporation.corporation_name}</h4>
+<table class="table table-condensed table-hover tbl-lifetime">
+<thead><tr><th>#</th><th>Время</th></tr></thead>
+<tbody>
+<tr><td>Ассеты</td><td>{assets} <left data-ts="{assets_left}" data-w="a"></left></td></tr>
+<tr><td>Чертежи</td><td>{blueprints} <left data-ts="{blueprints_left}" data-w="b"></left></td></tr>
+<tr><td>Производство</td><td>{jobs} <left data-ts="{jobs_left}" data-w="j"></left></td></tr>
+<tr><td>Маркет</td><td>{orders} <left data-ts="{orders_left}" data-w="o"></left></td></tr>
+</tbody>
+</table>
+""")
+    # формируем содержимое модального диалога
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)
 
@@ -1448,6 +1507,7 @@ def dump_router2_into_report(
         # сохраняем содержимое диалоговых окон
         dump_nav_menu_router_dialog(glf, qid, global_dictionary, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
+        dump_nav_menu_lifetime_dialog(glf, qid)
         dump_materials_to_js(glf, global_dictionary)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
         render_html.__dump_footer(glf)

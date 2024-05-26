@@ -85,6 +85,8 @@ def main():
                     job.output_location.name if job.output_location else '?',
                     job.facility.station_name if job.facility else '?'))
         """
+    # загрузка информации об обновлении сведений в БД для загруженных корпораций
+    qid.load_lifetime(list(qid.corporations.keys()))
     # загружаем сведения о станциях, которые есть в настройках маршрутизатора
     for r in q_router_settings.g_routes:
         station: typing.Optional[db.QSwaggerStation] = qid.load_station_by_name(r['station'])

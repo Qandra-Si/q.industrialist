@@ -19,6 +19,47 @@ class QSwaggerTranslator:
         del self.db
 
     # -------------------------------------------------------------------------
+    # /{all}/updated_at
+    # -------------------------------------------------------------------------
+    def get_lifetime(self, corporation_ids: typing.List[int]) -> typing.Dict[typing.Tuple[str, int], datetime.datetime]:
+        # EXTRACT(EPOCH FROM ())::integer
+        rows = self.db.select_all_rows("""
+select 'assets' as what, eca_corporation_id, max(eca_updated_at) updated_at
+from esi_corporation_assets
+where eca_corporation_id in (select * from unnest(%(ids)s))
+group by 2
+union
+select 'blueprints', ecb_corporation_id, max(ecb_updated_at)
+from esi_corporation_blueprints
+where ecb_corporation_id in (select * from unnest(%(ids)s))
+group by 2
+union
+select 'jobs', ecj_corporation_id, max(ecj_updated_at)
+from esi_corporation_industry_jobs
+where ecj_corporation_id in (select * from unnest(%(ids)s))
+group by 2
+union
+select 'orders', ecor_corporation_id, max(ecor_updated_at)
+from esi_corporation_orders
+where ecor_corporation_id in (select * from unnest(%(ids)s))
+group by 2
+union
+select 'current', null, current_timestamp at time zone 'GMT'
+;""",
+            {'ids': corporation_ids}
+        )
+        if rows is None:
+            return {}
+        data = {}
+        for row in rows:
+            what: str = row[0]
+            corporation_id: int = row[1]
+            updated_at: datetime.datetime = row[2]
+            data[(what, corporation_id)] = updated_at
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
     # /markets/groups/
     # /markets/groups/{market_group_id}/
     # -------------------------------------------------------------------------
