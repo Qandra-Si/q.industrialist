@@ -508,8 +508,13 @@ $(document).ready(function(){
   $('body').delegate('a.qind-copy-btn', 'click', function () {
     doCopyToClipboard($(this));
   });
+  var lifetime_timer = 0;
   $('#modalLifetime').on('shown.bs.modal', function () {
    recalcLifetimeTimestamps();
+   lifetime_timer = setInterval(() => recalcLifetimeTimestamps(), 1000);
+  });
+  $('#modalLifetime').on('hide.bs.modal', function () {
+   clearInterval(lifetime_timer);
   });
   $('a.qind-copy-btn').bind('copied', function(event, message) {
     $(this).attr('title', message)
