@@ -331,29 +331,29 @@ g_nav_menu_defaults: NavMenuDefaults = NavMenuDefaults()
 
 def dump_nav_menu(glf) -> None:
     global g_nav_menu_defaults
-    menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
-        (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы'),
-        (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы'),  # btnToggleImpossible
-        (g_nav_menu_defaults.lost_items,         'lost-items',         'Потерянные предметы (не на своём месте)'),
-        (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)'),
-        (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты'),  # btnToggleActive
-        (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты'),
+    menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str, bool]]] = [
+        (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы', True),
+        (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы', True),
+        (g_nav_menu_defaults.lost_items,         'lost-items',         'Потерянные предметы (не на своём месте)', True),
+        (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)', True),
+        (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты', True),
+        (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты', True),
         None,
-        (g_nav_menu_defaults.used_materials,     'used-materials',     'Используемые материалы'),  # btnToggleUsedMaterials
-        (g_nav_menu_defaults.not_available,      'not-available',      'Недоступные материалы'),  # btnToggleNotAvailable
+        (g_nav_menu_defaults.used_materials,     'used-materials',     'Используемые материалы', True),
+        (g_nav_menu_defaults.not_available,      'not-available',      'Недоступные материалы', True),
         None,
-        (True, 'end-level-manuf', "Производство последнего уровня"),  # btnToggleEndLevelManuf
-        (False, 'entry-level-purchasing', "Список для закупки"),  # btnToggleEntryLevelPurchasing
-        (True, 'intermediate-manuf', "Материалы промежуточного производства"),  # btnToggleIntermediateManuf
-        (False, 'enough-materials', "Материалы, которых достаточно"),  # btnToggleEnoughMaterials
-        (False, 'assets-movement', "Список перемещений материалов"),  # btnToggleAssetsMovement
+        (True, 'end-level-manuf', "Производство последнего уровня", False),  # btnToggleEndLevelManuf
+        (False, 'entry-level-purchasing', "Список для закупки", False),  # btnToggleEntryLevelPurchasing
+        (True, 'intermediate-manuf', "Материалы промежуточного производства", False),  # btnToggleIntermediateManuf
+        (False, 'enough-materials', "Материалы, которых достаточно", False),  # btnToggleEnoughMaterials
+        (False, 'assets-movement', "Список перемещений материалов", False),  # btnToggleAssetsMovement
     ]
-    menu_table: typing.List[typing.Optional[typing.Tuple[bool, str, str]]] = [
-        (True, 'recommended-runs', "Рекомендуемое кол-во запусков"),  # btnToggleRecommendedRuns
-        (False, 'planned-materials', "Кол-во запланированных материалов"),  # btnTogglePlannedMaterials
-        (False, 'consumed-materials', "Рассчитанное кол-во материалов"),  # btnToggleConsumedMaterials
-        (False, 'exist-in-stock', "Кол-во материалов в стоке"),  # btnToggleExistInStock
-        (False, 'in-progress', "Кол-во материалов, находящихся в производстве"),  # btnToggleInProgress
+    menu_table: typing.List[typing.Optional[typing.Tuple[bool, str, str, bool]]] = [
+        (True, 'recommended-runs', "Рекомендуемое кол-во запусков", False),  # btnToggleRecommendedRuns
+        (False, 'planned-materials', "Кол-во запланированных материалов", False),  # btnTogglePlannedMaterials
+        (False, 'consumed-materials', "Рассчитанное кол-во материалов", False),  # btnToggleConsumedMaterials
+        (False, 'exist-in-stock', "Кол-во материалов в стоке", False),  # btnToggleExistInStock
+        (False, 'in-progress', "Кол-во материалов, находящихся в производстве", False),  # btnToggleInProgress
     ]
     menu_sort: typing.List[typing.Tuple[bool, str, str]] = [
         (False, 'name', "Название"),  # btnSortByName
@@ -383,7 +383,8 @@ def dump_nav_menu(glf) -> None:
         if m is None:
             glf.write('<li role="separator" class="divider"></li>\n')
         else:
-            glf.write(f"<li><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
+            disabled: str = '' if m[3] else ' class="disabled"'
+            glf.write(f"<li{disabled}><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
     glf.write("""
        <li role="separator" class="divider"></li>
        <li><a data-target="#" role="button" id="qind-btn-reset">Сбросить настройки</a></li>
@@ -397,7 +398,8 @@ def dump_nav_menu(glf) -> None:
         if m is None:
             glf.write('<li role="separator" class="divider"></li>\n')
         else:
-            glf.write(f"<li><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
+            disabled: str = '' if m[3] else ' class="disabled"'
+            glf.write(f"<li{disabled}><a data-target='#' role='button' class='qind-btn-settings' qind-group='{m[1]}'>{glyphicon('star')} {m[2]}</a></li>\n")
     glf.write("""
       </ul>
     </li>
