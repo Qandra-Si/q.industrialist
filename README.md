@@ -176,7 +176,7 @@ ls -1 *_settings.py.template
 #   q_logist_settings.py.template
 #   q_workflow_settings.py.template
 # copy each of them except q_industrialist_settings (see previous step)
-cp q_blueprints_settings.py.template q_industrialist_settings.py
+cp q_industrialist_settings.py.template q_industrialist_settings.py
 cp q_conveyor_settings.py.template q_conveyor_settings.py
 cp q_logist_settings.py.template q_logist_settings.py
 cp q_workflow_settings.py.template q_workflow_settings.py

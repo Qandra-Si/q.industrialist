@@ -311,7 +311,7 @@ CREATE TABLE qi.eve_sde_type_ids
     CONSTRAINT fk_sdet_market_group_id FOREIGN KEY (sdet_market_group_id)
         REFERENCES qi.eve_sde_market_groups(sdeg_group_id) MATCH SIMPLE
         ON UPDATE NO ACTION
-        ON DELETE NO ACTION
+        ON DELETE NO ACTION,
     CONSTRAINT fk_sdet_group_id FOREIGN KEY (sdet_group_id)
         REFERENCES qi.eve_sde_group_ids(sdecg_group_id) MATCH SIMPLE
         ON UPDATE NO ACTION
