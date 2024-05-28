@@ -392,7 +392,7 @@ function recalcLifetimeTimestamps() {
    if (left_cacheed >= -270 && left_cacheed <= 0)
     $(this).html(formatTime(left_cacheed)); // cron timeout
    else if (left_cacheed > 0)
-     $(this).html(formatTime(left_cacheed) % esi_cacheed);
+     $(this).html(formatTime(left_cacheed % esi_cacheed));
    else /*if (left_cacheed < 0)*/ {
      let left_cacheed_abs = left_cacheed % esi_cacheed;
      $(this).html(formatTime(esi_cacheed + left_cacheed_abs));
