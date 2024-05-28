@@ -67,7 +67,7 @@ DROP INDEX IF EXISTS qi.idx_epj_pk;
 DROP TABLE IF EXISTS qi.esi_pilot_industry_jobs;
 
 ---
-DROP INDEX IS EXISTS qi.idx_ecor_corporation_location_id;
+DROP INDEX IF EXISTS qi.idx_ecor_corporation_location_id;
 DROP INDEX IF EXISTS qi.idx_ecor_history;
 DROP INDEX IF EXISTS qi.idx_ecor_issued_by;
 DROP INDEX IF EXISTS qi.idx_ecor_issued;
