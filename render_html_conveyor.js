@@ -384,16 +384,19 @@ function recalcLifetimeTimestamps() {
   var data_w = $(this).data('w');
   if (!(data_ts === undefined) && !(data_w === undefined)) {
    var left_ts = 0 + (g_server_time - data_ts) + js_offset;
-   if (data_w == 'a' || data_w == 'b')
-    left_ts = 3600 - left_ts;
-   else if (data_w == 'o')
-    left_ts = 1200 - left_ts;
-   else if (data_w == 'j')
-    left_ts = 300 - left_ts;
-   if (Math.abs(left_ts) >= 86400)
-    $(this).html('');
-   else
-    $(this).html(formatTime(left_ts));
+   var esi_cacheed;
+   if (data_w == 'o') esi_cacheed = 1200;
+   else if (data_w == 'j') esi_cacheed = 300;
+   else /*if (data_w == 'a' || data_w == 'b')*/ esi_cacheed = 3600;
+   let left_cacheed = esi_cacheed - left_ts;
+   if (left_cacheed >= -270 && left_cacheed <= 0)
+    $(this).html(formatTime(left_cacheed)); // cron timeout
+   else if (left_cacheed > 0)
+     $(this).html(formatTime(left_cacheed) % esi_cacheed);
+   else /*if (left_cacheed < 0)*/ {
+     let left_cacheed_abs = left_cacheed % esi_cacheed;
+     $(this).html(formatTime(esi_cacheed + left_cacheed_abs));
+   }
   }
  });
 }
