@@ -116,6 +116,7 @@ class ConveyorSettings:
         self.containers_output: typing.List[ConveyorSettingsContainer] = []  # station:container
         self.containers_additional_blueprints: typing.List[ConveyorSettingsContainer] = []  # station:container
         self.containers_react_formulas: typing.List[ConveyorSettingsContainer] = []  # station:container
+        self.containers_exclude: typing.List[ConveyorSettingsContainer] = []  # station:container
         # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу производства)
         self.trade_sale_stock: typing.List[ConveyorSettingsSaleContainer] = []  # station:container:trade_corporation
 
@@ -659,11 +660,13 @@ class ConveyorCorporationOutputProducts:
             raise Exception("Something wrong: incompatible corporations for conveyor/router settings")
         # containers_stocks: typing.Set[int] = router_details[2]
         containers_output: typing.Set[int] = router_details[3]
+        containers_exclude: typing.Set[int] = set([_.container_id for x in conveyor_settings for _ in x.containers_exclude])
         # перебираем ассеты, ищем материалы
         if containers_output:
             station_id: int = self.station.station_id
             for a in corporation.assets.values():
                 if not a.station_id == station_id: continue
+                if a.location_id in containers_exclude: continue
                 # проверям "заблудился" ли продукт, или лежит на своём месте?
                 type_id: int = a.type_id
                 # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что

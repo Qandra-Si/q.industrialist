@@ -161,6 +161,7 @@ def main():
                     container_name: str = container.name
                     if not container_name:
                         continue
+                    # проверяем, что контейнер лежит в ангаре станции (а не в карго джампака)
                     container_hangar: str = container.location_flag
                     if container_hangar[:-1] != 'CorpSAG':
                         continue
@@ -169,6 +170,7 @@ def main():
                     stock_box: bool = False
                     formulas_box: bool = False
                     output_box: bool = False
+                    exclude_box: bool = False
                     # превращаем названия (шаблоны названий) в номера контейнеров
                     for priority in conveyor['blueprints'].keys():
                         if next((1 for tmplt in conveyor['blueprints'][priority] if re.search(tmplt, container_name)), None):
@@ -208,22 +210,25 @@ def main():
                             scs = tools.ConveyorSettingsContainer(settings, corporation, container)
                             settings.containers_output.append(scs)
                             output_box = True
-                    # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например сток T1)
-                    if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in settings.activities:
-                        blueprints_box: bool = True
-                        if source_box or stock_box or formulas_box or output_box:
-                            blueprints_box = False
+                    # проверяем контейнеры, которые являются исключениями из списка, где роется конвейер
+                    # (по остаточному принципу)
+                    if not source_box and not stock_box and not formulas_box and not output_box:
+                        if conveyor.get('exclude_hangars') and int(container_hangar[-1:]) in conveyor['exclude_hangars']:
+                            exclude_box = True
+                        if conveyor.get('exclude'):
+                            if next((1 for tmplt in conveyor['exclude'] if re.search(tmplt, container_name)), None):
+                                exclude_box = True
+                        if exclude_box:
+                            scs = tools.ConveyorSettingsContainer(settings, corporation, container)
+                            settings.containers_exclude.append(scs)
                         else:
-                            if conveyor.get('exclude_hangars') and int(container_hangar[-1:]) in conveyor['exclude_hangars']:
-                                blueprints_box = False
-                            if conveyor.get('exclude'):
-                                if next((1 for tmplt in conveyor['exclude'] if re.search(tmplt, container_name)), None):
-                                    blueprints_box = False
-                        if blueprints_box:
-                            scb = tools.ConveyorSettingsContainer(settings, corporation, container)
-                            settings.containers_additional_blueprints.append(scb)
+                            # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например T1)
+                            if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in settings.activities:
+                                scb = tools.ConveyorSettingsContainer(settings, corporation, container)
+                                settings.containers_additional_blueprints.append(scb)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
                 if not settings.containers_sources:
+                    del settings
                     continue
                 # уточняем настройки поведения конвейера (секция behavior)
                 if 'behavior' in conveyor:
