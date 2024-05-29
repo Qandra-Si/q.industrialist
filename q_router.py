@@ -154,8 +154,6 @@ def main():
                 settings.activities = [tools.ConveyorActivity.from_str(a) for a in activities]
                 settings.conveyor_with_reactions = conveyor.get('reactions', False)
                 # получаем информацию по реакциям (если включены)
-                if settings.conveyor_with_reactions:
-                    settings.manufacturing_groups = conveyor['reactions'].get('manufacturing_groups', [])
                 for container_id in corporation.container_ids:
                     container: db.QSwaggerCorporationAssetsItem = corporation.assets.get(container_id)
                     if not container:
@@ -191,12 +189,19 @@ def main():
                     # получаем информацию по реакциям (если включены)
                     if settings.conveyor_with_reactions:
                         if next((1 for tmplt in conveyor['reactions']['formulas'] if re.search(tmplt, container_name)), None):
-                            settings.containers_react_formulas.append(container_id)
+                            scs = tools.ConveyorSettingsContainer(settings, corporation, container)
+                            settings.containers_react_formulas.append(scs)
                             formulas_box = True
-                        if 'stock' in conveyor['reactions']:
-                            if next((1 for tmplt in conveyor['reactions']['stock'] if re.search(tmplt, container_name)), None):
-                                settings.containers_react_stock.append(container_id)
+                            if conveyor['reactions'].get('same_stock_container', False):
+                                scs = tools.ConveyorSettingsContainer(settings, corporation, container)
+                                settings.containers_stocks.append(scs)
                                 stock_box = True
+                        if not conveyor['reactions'].get('same_stock_container', False):
+                            if 'stock' in conveyor['reactions']:
+                                if next((1 for tmplt in conveyor['reactions']['stock'] if re.search(tmplt, container_name)), None):
+                                    scs = tools.ConveyorSettingsContainer(settings, corporation, container)
+                                    settings.containers_stocks.append(scs)
+                                    stock_box = True
                     # получаем информацию по коробкам, куда можно направлять выход готовой продукции
                     if conveyor.get('output'):
                         if next((1 for tmplt in conveyor['output'] if re.search(tmplt, container_name)), None):
@@ -300,7 +305,6 @@ def main():
             print('fixed runs:    ', s.fixed_number_of_runs)
         if s.conveyor_with_reactions:
             print('formulas:      ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_formulas], key=lambda x: x)))
-            print('react stock:   ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_stock], key=lambda x: x)))
     """
 
     # вывод в отчёт результатов работы роутера

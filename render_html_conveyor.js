@@ -153,11 +153,51 @@ function toggleConveyorVisibility(btn, hide) {
  rebuildBody();
 }
 function initConveyorVisibility() {
- $('.qind-btn-hide').each(function() {
+ $('tr.row-conveyor * a.qind-btn-hide').each(function() {
   var tr = $(this).parent().parent();
   var tag = conveyorTagToStr(tr);
   var hide = getOption('conveyor', tag) == 1;
   toggleConveyorVisibility($(this), hide);
+ });
+}
+//-----------
+//работа с видимостью станций роутеров
+//-----------
+function routerTagToStr(row) {
+ var tag = row.data('tag');
+ if (tag === undefined) return;
+ return tag.r;
+}
+function toggleRouterVisibility(btn, hide) {
+ var tr = btn.parent().parent();
+ var tag = routerTagToStr(tr);
+ //-
+ var icon = btn.find('span');
+ if (hide === undefined) {
+  var already_hidden = icon.hasClass('glyphicon-eye-close') == true;
+  hide = already_hidden == false;
+ }
+ if (hide == false) {
+  setOption('router', tag, 0); // 0 = show
+  icon.removeClass('glyphicon-eye-close');
+  icon.addClass('glyphicon-eye-open');
+  btn.removeClass('qind-btn-hide-close');
+  btn.addClass('qind-btn-hide-open');
+ } else {
+  setOption('router', tag, 1); // 1 = hide
+  icon.removeClass('glyphicon-eye-open');
+  icon.addClass('glyphicon-eye-close');
+  btn.removeClass('qind-btn-hide-open');
+  btn.addClass('qind-btn-hide-close');
+ }
+ rebuildBody();
+}
+function initRouterVisibility() {
+ $('tr.row-station * a.qind-btn-hide').each(function() {
+  var tr = $(this).parent().parent();
+  var tag = routerTagToStr(tr);
+  var hide = getOption('router', tag) == 1;
+  toggleRouterVisibility($(this), hide);
  });
 }
 //-----------
@@ -334,6 +374,18 @@ function rebuildBody() {
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
  var show_entry_purch = (getOption('option', 'entry-level-purchasing') == 1) ? 1 : 0;
  var show_interm_manuf = (getOption('option', 'intermediate-manuf') == 1) ? 1 : 0;
+
+ var hide_router = 0;
+ var rows = $('table.tbl-router tbody').children('tr');
+ for (var i=0,cnt=rows.length;i<cnt;++i) {
+  var tr = rows.eq(i);
+  if (tr.hasClass('row-station')) {
+   var tag = routerTagToStr(tr);
+   hide_router = (getOption('router', tag) == 1) ? 0 : 1;
+  } else {
+   changeElemVisibility(tr, hide_router);
+  }
+ }
 }
 //-----------
 // обработчики нажатий на кнопки
@@ -489,12 +541,14 @@ $(document).ready(function(){
     resetOptionsMenuToDefault();
     rebuildOptionsMenu();
     initConveyorVisibility();
+    initRouterVisibility();
     rebuildBody();
   });
   // first init
   resetOptionsMenuToDefault();
   rebuildOptionsMenu();
   initConveyorVisibility();
+  initRouterVisibility();
   rebuildBody();
   //rebuildStocksDropdown();
   //rebuildStockMaterials();
@@ -503,8 +557,11 @@ $(document).ready(function(){
   $('body').delegate('qmat', 'click', function () {
    chooseMaterial($(this));
   });
-  $('.qind-btn-hide').bind('click', function () {
+  $('tr.row-conveyor * a.qind-btn-hide').bind('click', function () {
    toggleConveyorVisibility($(this));
+  });
+  $('tr.row-station * a.qind-btn-hide').bind('click', function () {
+   toggleRouterVisibility($(this));
   });
   // Working with clipboard
   $('a.qind-copy-btn').each(function() {

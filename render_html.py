@@ -1,4 +1,6 @@
 ﻿import time
+import typing
+
 import tzlocal
 import re
 from datetime import datetime
@@ -67,7 +69,11 @@ def get_span_glyphicon(icon: str) -> str:
     return '<span class="glyphicon glyphicon-{}" aria-hidden="true"></span>'.format(icon)
 
 
-def __dump_header(glf, header_name, use_dark_mode=False):
+def __dump_header(
+        glf,
+        header_name,
+        use_dark_mode: bool = False,
+        additional_stylesheets: typing.Optional[typing.List[str]] = None):
     # см. https://github.com/gokulkrishh/awesome-meta-and-manifest
     # см. https://developer.mozilla.org/ru/docs/Web/Manifest
     # рекомендуемый набор favicon-ок, см. https://stackoverflow.com/a/52322368
@@ -137,9 +143,11 @@ def __dump_header(glf, header_name, use_dark_mode=False):
 """)
     if use_dark_mode:
         glf.write(' <!-- Q.Industrialist -->\n')
-        glf.write(f' <link rel="stylesheet" href="{__get_file_src("render_stylesheet_dark.css")}">')
-    glf.write("""
-</head>
+        glf.write(f' <link rel="stylesheet" href="{__get_file_src("render_stylesheet_dark.css")}">\n')
+    if additional_stylesheets:
+        for filename in additional_stylesheets:
+            glf.write(f' <link rel="stylesheet" href="{__get_file_src(filename)}">\n')
+    glf.write("""</head>
 <body>
 """)
     if header_name is None:

@@ -68,7 +68,12 @@ g_entities = [
                 # реакциями, но производство которых по blueprints ведётся на reaction-станции.
                 "reactions": {
                     "formulas": [r"^\.\[PROD\] formulas$"],   # .[PROD] formulas
-                    "stock": [r"^\.\.\[STOCK\] composite$"],  # ..[STOCK] composite
+                    # опционально: признак того, что контейнер с формулами является также стоком материалов, если не
+                    # задан, то используется значение stock, даже если пусто
+                    "same_stock_container": True,
+                    # опционально: настраиваемый сток конвейера реакций
+                    #"stock": [ r"^\.\.\[STOCK\] composite$" ],  # ..[STOCK] composite
+                    # ???
                     "manufacturing_groups": [1870],  # market-group:1870 это Fuel Blocks, которые варятся на Athanor
                 },
                 # опционально: настройки, определяющие поведение конвейера (действия, которые надо предпринять
