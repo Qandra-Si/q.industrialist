@@ -1308,6 +1308,64 @@ def dump_corp_conveyors(
 """)
 
 
+def dump_list_of_ready_products(glf, products_ready: typing.List[db.QSwaggerMaterial]) -> None:
+    for p in products_ready:
+        type_id: int = p.material_type.type_id
+        glf.write(f"""<tr class="hidden">
+<td>{get_tbl_router_row_num()}</td>
+<td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{p.material_type.name}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a></td>
+<td>{p.quantity:,d}</td>
+<td>{int(p.quantity * p.material_type.packaged_volume + 0.9):,d}</td>
+</tr>""")
+
+
+def dump_list_of_lost_products(
+        glf,
+        corporation: db.QSwaggerCorporation,
+        products_lost: typing.List[db.QSwaggerCorporationAssetsItem]) -> None:
+    # группируем ассеты по типу, чтобы получить уникальные сочетания с количествами
+    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = \
+        tools.get_asset_items_grouped_by(
+            products_lost,
+            group_by_type_id=True,
+            group_by_station=False)
+    # сортируем уже сгруппированные чертежи
+    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationAssetsItem]]] = []
+    for key in grouped.keys():
+        group: typing.List[db.QSwaggerCorporationAssetsItem] = grouped.get(key)
+        grouped_and_sorted.append((group[0].item_type.name, group))
+    grouped_and_sorted.sort(key=lambda x: x[0])
+    # локальные переменные
+    container_prefix: str = '<br><mute>Контейнер - </mute>'
+    # выводим в отчёт
+    for _, group in grouped_and_sorted:
+        a0: db.QSwaggerCorporationAssetsItem = group[0]
+        type_id: int = a0.type_id
+        type_name: str = a0.item_type.name
+        quantity: int = sum([_.quantity for _ in group])
+        # ---
+        containers: typing.Set[str] = set()
+        for a in group:
+            c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(a.location_id)
+            containers.add(c.name if c and c.name else str(a.location_id))
+        containers: typing.List[str] = sorted(containers)
+        containers: str = container_prefix.join(containers)
+        # ---
+        warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign'])
+        glf.write(f"""<tr class="hidden lost-assets">
+<td>{get_tbl_router_row_num()}</td>
+<td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{warn_sign} {type_name}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
+<label class='label label-lost-assets'>{declension_of_lost_assets(quantity)}</label>{container_prefix}{containers}<!--
+item_ids: {[_.item_id for _ in group]}--></td>
+<td>{quantity:,d}</td>
+<td>{warn_sign} {int(quantity * a0.item_type.packaged_volume + 0.9):,d}</td>
+</tr>""")
+
+
 def dump_corp_router(
         glf,
         # данные (справочники)
@@ -1353,28 +1411,17 @@ def dump_corp_router(
 <td>{sum_volume:,d} m<sup>3</sup></td>
 </tr>
 """)
-        z: typing.List[db.QSwaggerMaterial] = list(products.output_products.values())
-        z.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
-        for p in z:
-            type_id: int = p.material_type.type_id
-            lost_glyphicon: str = ''
-            lost_class: str = ''
-            lost_label: str = ''
-            if router_settings.output:
-                # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что
-                # сконфигурированы на других станциях)
-                if type_id not in router_settings.output:
-                    lost_glyphicon = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
-                    lost_class = ' lost-assets'  # {g_nav_menu_defaults.css('lost-assets')}
-                    lost_label = f" <label class='label label-lost-assets'>{declension_of_lost_assets(p.quantity)}</label>"
-            glf.write(f"""<tr class="hidden{lost_class}">
-<td>{get_tbl_router_row_num()}</td>
-<td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{lost_glyphicon}{p.material_type.name}&nbsp;<a
-data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>{lost_label}</td>
-<td>{p.quantity:,d}</td>
-<td>{int(p.quantity*p.material_type.packaged_volume+0.9):,d}</td>
-</tr>""")
+        products_ready: typing.List[db.QSwaggerMaterial] = list(products.output_products.values())
+        if products_ready:
+            products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
+            dump_list_of_ready_products(glf, products_ready)
+        del products_ready
+        # ---
+        products_lost: typing.List[db.QSwaggerCorporationAssetsItem] = [_ for x in products.lost_products.values() for _ in x]
+        if products_lost:
+            products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
+            dump_list_of_lost_products(glf, products.corporation, products_lost)
+        del products_lost
     glf.write("""
 </tbody>
 </table>

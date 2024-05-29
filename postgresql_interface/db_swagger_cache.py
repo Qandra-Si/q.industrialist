@@ -83,14 +83,14 @@ class QSwaggerTypeId:
         self.__volume: typing.Optional[float] = row[2]
         self.__capacity: typing.Optional[float] = row[3]
         self.__base_price: typing.Optional[float] = row[4]
-        self.__published: bool = True
-        self.__market_group_id: typing.Optional[int] = row[5]
+        self.__published: bool = row[5]
+        self.__market_group_id: typing.Optional[int] = row[6]
         self.__market_group: typing.Optional[QSwaggerMarketGroup] = market_group
-        self.__meta_group_id: typing.Optional[int] = row[6]
-        self.__tech_level: typing.Optional[int] = row[7]
-        self.__icon_id: typing.Optional[int] = row[8]
-        self.__packaged_volume: typing.Optional[float] = row[9]
-        self.__group_id: int = row[10]
+        self.__meta_group_id: typing.Optional[int] = row[7]
+        self.__tech_level: typing.Optional[int] = row[8]
+        self.__icon_id: typing.Optional[int] = row[9]
+        self.__packaged_volume: typing.Optional[float] = row[10]
+        self.__group_id: int = row[11]
         self.__group: typing.Optional[QSwaggerGroup] = universe_group
 
     @property

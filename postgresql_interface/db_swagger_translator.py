@@ -139,10 +139,11 @@ select 'current', null, current_timestamp at time zone 'GMT'
     # /universe/types/{type_id}/
     # -------------------------------------------------------------------------
 
-    def get_published_type_ids(
+    def get_type_ids(
             self,
             market_groups: typing.Dict[int, QSwaggerMarketGroup],
-            groups: typing.Dict[int, QSwaggerGroup]) -> typing.Dict[int, QSwaggerTypeId]:
+            groups: typing.Dict[int, QSwaggerGroup],
+            only_published: bool = True) -> typing.Dict[int, QSwaggerTypeId]:
         rows = self.db.select_all_rows(
             "SELECT"
             " sdet_type_id,"
@@ -150,6 +151,7 @@ select 'current', null, current_timestamp at time zone 'GMT'
             " sdet_volume,"
             " sdet_capacity,"
             " sdet_base_price,"
+            " sdet_published,"
             " sdet_market_group_id,"
             " sdet_meta_group_id,"
             " sdet_tech_level,"
@@ -157,16 +159,16 @@ select 'current', null, current_timestamp at time zone 'GMT'
             " sdet_packaged_volume,"
             " sdet_group_id,"
             " sdet_tech_level "
-            "FROM eve_sde_type_ids "
-            "WHERE sdet_published;"
+            "FROM eve_sde_type_ids"
+            f"{' WHERE sdet_published' if only_published else ''};"
         )
         if rows is None:
             return {}
         data = {}
         for row in rows:
             type_id: int = row[0]
-            market_group_id: typing.Optional[int] = row[5]
-            group_id: int = row[10]
+            market_group_id: typing.Optional[int] = row[6]
+            group_id: int = row[11]
 
             cached_market_group: typing.Optional[QSwaggerMarketGroup] = market_groups.get(market_group_id)
             # группа м.б. неизвестна (неопубликована), например у 'Liminal Zirnitra Wreck' группа 'Wreck' не published

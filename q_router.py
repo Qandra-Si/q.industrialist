@@ -58,7 +58,7 @@ def main():
     qid.load_market_groups()
     qid.load_universe_categories()
     qid.load_universe_groups()
-    qid.load_published_type_ids()
+    qid.load_all_known_type_ids()
     qid.load_blueprints()
     # загрузка информации, связанной с корпорациями
     for corporation_name in argv_prms['corporation']:

@@ -614,6 +614,7 @@ class ConveyorCorporationOutputProducts:
     def __init__(self, index: int):
         self.index: int = index
         self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:material
+        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}  # type_id:list(assets)
         self.corporation: typing.Optional[db.QSwaggerCorporation] = None
         self.station: typing.Optional[db.QSwaggerStation] = None
         self.router_settings: typing.Optional[RouterSettings] = None
@@ -633,9 +634,11 @@ class ConveyorCorporationOutputProducts:
             -> typing.Dict[int, db.QSwaggerMaterial]:
         del self.activities
         del self.conveyor_settings
+        del self.lost_products
         del self.output_products
         # ---
         self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}
+        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}
         self.corporation: db.QSwaggerCorporation = corporation
         self.station: db.QSwaggerStation = None
         self.router_settings: RouterSettings = router_settings
@@ -660,13 +663,33 @@ class ConveyorCorporationOutputProducts:
         if containers_output:
             station_id: int = self.station.station_id
             for a in corporation.assets.values():
-                if a.location_id not in containers_output: continue
                 if not a.station_id == station_id: continue
-                p = self.output_products.get(a.type_id)
-                if p:
-                    p.increment_quantity(a.quantity)
+                # проверям "заблудился" ли продукт, или лежит на своём месте?
+                type_id: int = a.type_id
+                # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что
+                # сконфигурированы на других станциях)
+                correct_container: bool = a.location_id in containers_output
+                correct_product: bool = True
+                if router_settings.output:
+                    if type_id not in router_settings.output:
+                        correct_product = False
+                elif not correct_container:
+                    continue
+                # ---
+                if not correct_container and not correct_product:
+                    continue
+                elif correct_container and correct_product:
+                    p = self.output_products.get(a.type_id)
+                    if p:
+                        p.increment_quantity(a.quantity)
+                    else:
+                        self.output_products[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
                 else:
-                    self.output_products[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
+                    p = self.lost_products.get(a.type_id)
+                    if p:
+                        p.append(a)
+                    else:
+                        self.lost_products[a.type_id] = [a]
         return self.output_products
 
 
@@ -859,6 +882,7 @@ class ConveyorDictionary:
     def load_ready_products(self, ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]):
         for products in ready_products.values():
             self.load_type_ids(products.output_products.keys())
+            self.load_type_ids(products.lost_products.keys())
 
     def load_requirements(self, requirements: typing.List[ConveyorMaterialRequirements.StackOfBlueprints]):
         for stack in requirements:

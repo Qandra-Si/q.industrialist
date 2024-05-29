@@ -171,7 +171,6 @@ table.tbl-router tbody tr.row-station td { font-size: medium; text-align: left; 
 table.tbl-router tbody tr.row-station td:nth-child(2) { font-size: 110%; text-align: right; vertical-align: bottom; white-space: nowrap; }
 table.tbl-router tbody tr.row-station:hover td { border-bottom: 1px solid #6db09e; }
 
-table.tbl-router tbody tr.lost-assets td { background-color: #180f09; }
 table.tbl-router tbody tr.lost-assets td span.lost-sign { color: #e28552; }
 
 bp_tag { color: #777; }

@@ -94,10 +94,22 @@ class QSwaggerDictionary:
         if self.sde_type_ids:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
             raise Exception("Unable to load type ids twice")
-        self.sde_type_ids = self.__qit.get_published_type_ids(
+        self.sde_type_ids = self.__qit.get_type_ids(
             # справочники
             self.sde_market_groups,
-            self.sde_groups)
+            self.sde_groups,
+            only_published=True)
+        return self.sde_type_ids
+
+    def load_all_known_type_ids(self) -> typing.Dict[int, QSwaggerTypeId]:
+        if self.sde_type_ids:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load type ids twice")
+        self.sde_type_ids = self.__qit.get_type_ids(
+            # справочники
+            self.sde_market_groups,
+            self.sde_groups,
+            only_published=False)
         return self.sde_type_ids
 
     def get_blueprint(self, blueprint_type_id: int) -> typing.Optional[QSwaggerBlueprint]:
