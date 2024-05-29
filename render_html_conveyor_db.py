@@ -1402,26 +1402,36 @@ def dump_corp_router(
         # containers_output: typing.Set[int] = router_details[3]
         station_id: int = station.station_id
         sum_volume: int = int(sum([_.quantity * _.material_type.packaged_volume for _ in products.output_products.values()]) + 0.9)
-        # ---
         tag = {"r": station_id}
+        warn_sign: str = ''
+
+        products_ready: typing.List[db.QSwaggerMaterial] = list(products.output_products.values())
+        if products_ready:
+            products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
+
+        products_lost: typing.List[db.QSwaggerCorporationAssetsItem] = [_ for x in products.lost_products.values() for _ in x]
+        if products_lost:
+            products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
+            warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
+
         glf.write(f"""<tr class="row-station" data-tag='{json.dumps(tag, separators=(',', ':')).replace("'", '"')}'>
 <td colspan="4">{station.station_name}
 <mute>({station.station_type_name}, {router_settings.desc})</mute>
 <a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a></td>
-<td>{sum_volume:,d} m<sup>3</sup></td>
+<td>{warn_sign}{sum_volume:,d} m<sup>3</sup></td>
 </tr>
 """)
-        products_ready: typing.List[db.QSwaggerMaterial] = list(products.output_products.values())
+
         if products_ready:
             products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
             dump_list_of_ready_products(glf, products_ready)
-        del products_ready
-        # ---
-        products_lost: typing.List[db.QSwaggerCorporationAssetsItem] = [_ for x in products.lost_products.values() for _ in x]
         if products_lost:
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
             dump_list_of_lost_products(glf, products.corporation, products_lost)
+
+        del products_ready
         del products_lost
+
     glf.write("""
 </tbody>
 </table>
