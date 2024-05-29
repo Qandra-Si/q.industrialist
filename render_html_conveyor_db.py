@@ -5,6 +5,7 @@ import itertools
 
 import render_html
 from render_html import get_span_glyphicon as glyphicon
+from render_html import get_span_glyphicon_ex as glyphicon_ex
 
 import postgresql_interface as db
 import eve_router_tools as tools
@@ -769,7 +770,7 @@ def dump_list_of_jobs(
                 if j0.product_type.group and j0.product_type.group.category_id == 9:  # 9 = Blueprints
                     lost_label = f" <label class='label label-lost-jobs'>{declension_of_lost_blueprints(lost_outputs_count)}</label>"
                 else:
-                    lost_label = f" <label class='label label-lost-jobs'>{declension_of_lost_assets(lost_outputs_count)}</label>"
+                    lost_label = f" <label class='label label-lost-assets'>{declension_of_lost_assets(lost_outputs_count)}</label>"
                 lost_class = ' lost-jobs'
         # <mute>Стоимость</mute> {'{:,.1f}'.format(job.cost)}
         # </me_tag><tid_tag> ({blueprint_type_id})</tid_tag>
@@ -1356,13 +1357,21 @@ def dump_corp_router(
         z.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
         for p in z:
             type_id: int = p.material_type.type_id
-            # пример: class="lost-assets{g_nav_menu_defaults.css('lost-assets')}
-            glf.write(f"""<tr class="hidden">
+            lost_glyphicon: str = ''
+            lost_class: str = ''
+            lost_label: str = ''
+            if router_settings.output:
+                # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что
+                # сконфигурированы на других станциях)
+                if type_id not in router_settings.output:
+                    lost_glyphicon = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
+                    lost_class = ' lost-assets'  # {g_nav_menu_defaults.css('lost-assets')}
+                    lost_label = f" <label class='label label-lost-assets'>{declension_of_lost_assets(p.quantity)}</label>"
+            glf.write(f"""<tr class="hidden{lost_class}">
 <td>{get_tbl_router_row_num()}</td>
 <td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{p.material_type.name}&nbsp;<a
-data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
-</td>
+<td>{lost_glyphicon}{p.material_type.name}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>{lost_label}</td>
 <td>{p.quantity:,d}</td>
 <td>{int(p.quantity*p.material_type.packaged_volume+0.9):,d}</td>
 </tr>""")

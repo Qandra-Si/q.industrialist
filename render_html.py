@@ -66,7 +66,12 @@ def __get_file_src(filename: str) -> str:
 
 
 def get_span_glyphicon(icon: str) -> str:
-    return '<span class="glyphicon glyphicon-{}" aria-hidden="true"></span>'.format(icon)
+    return f'<span class="glyphicon glyphicon-{icon}" aria-hidden="true"></span>'
+
+
+def get_span_glyphicon_ex(icon: str, additional_classes: typing.List[str]) -> str:
+    classes: str = ' ' + ' '.join(additional_classes) if additional_classes else ''
+    return f'<span class="glyphicon glyphicon-{icon}{classes}" aria-hidden="true"></span>'
 
 
 def __dump_header(
