@@ -875,13 +875,20 @@ class QDatabaseTools:
     def load_corporation_assets_names_from_esi(self, corporation_id: int):
         # получение названий контейнеров, станций, и т.п. - всё что переименовывается ingame
         corp_cache = self.__cached_corporation_assets.get(corporation_id)
-        item_ids: typing.List[int] = []
+        # если ассеты не загружены, то нечего и переименовывать
+        if not corp_cache:
+            return None
 
+        item_ids: typing.List[int] = []
         for (item_id, in_cache) in corp_cache.items():
-            if not self.can_assets_item_be_renamed(in_cache.obj):
-                continue
-            item_ids.append(item_id)
+            if self.can_assets_item_be_renamed(in_cache.obj):
+                item_ids.append(item_id)
         del corp_cache
+
+        # если ничего не переименовывается, то и загружать названия не требуется
+        if not item_ids:
+            del item_ids
+            return None
 
         # Requires role(s): Director
         url: str = self.get_corporation_assets_names_url(corporation_id)

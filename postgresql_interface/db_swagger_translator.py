@@ -415,6 +415,8 @@ select 'current', null, current_timestamp at time zone 'GMT'
             ids: typing.List[int] = list(station_ids)
         else:
             raise Exception("Unable to determine type of station ids")
+        if not ids:
+            return {}
         rows = self.db.select_all_rows(
             "SELECT"
             " location_id,"

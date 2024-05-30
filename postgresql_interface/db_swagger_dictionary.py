@@ -212,6 +212,9 @@ class QSwaggerDictionary:
             ids: typing.List[int] = list(station_ids - self.stations.keys())
         else:
             raise Exception("Unable to determine type of station ids")
+        # проверка исключений
+        if not ids:
+            return {}
         # загрузка сведений о станции из БД
         cached_stations: typing.Dict[int, QSwaggerStation] = self.__qit.get_stations(ids, self.sde_type_ids)
         if not cached_stations:
