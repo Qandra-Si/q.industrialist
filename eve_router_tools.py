@@ -1,7 +1,6 @@
 ﻿""" Router and Conveyor tools and utils
 """
 import typing
-from enum import Enum
 
 import eve_efficiency
 import postgresql_interface as db
@@ -57,58 +56,13 @@ class ConveyorSettingsSaleContainer(ConveyorSettingsContainer):
         self.trade_corporation: db.QSwaggerCorporation = trade_corporation
 
 
-class ConveyorActivity(Enum):
-    CONVEYOR_MANUFACTURING = 1
-    CONVEYOR_INVENTION = 8
-    CONVEYOR_COPYING = 5
-    CONVEYOR_RESEARCH_MATERIAL = 4
-    CONVEYOR_RESEARCH_TIME = 3
-    CONVEYOR_REACTION = 9
-
-    def __str__(self) -> str:
-        if self == ConveyorActivity.CONVEYOR_MANUFACTURING:
-            return 'manufacturing'
-        elif self == ConveyorActivity.CONVEYOR_INVENTION:
-            return 'invention'
-        elif self == ConveyorActivity.CONVEYOR_COPYING:
-            return 'copying'
-        elif self == ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL:
-            return 'research_material'
-        elif self == ConveyorActivity.CONVEYOR_RESEARCH_TIME:
-            return 'research_time'
-        elif self == ConveyorActivity.CONVEYOR_REACTION:
-            return 'reaction'
-        else:
-            raise Exception('Unknown conveyor activity')
-
-    def to_int(self) -> int:
-        return int(self.value)
-
-    @staticmethod
-    def from_str(label):
-        if label == 'manufacturing':
-            return ConveyorActivity.CONVEYOR_MANUFACTURING
-        elif label == 'invention':
-            return ConveyorActivity.CONVEYOR_INVENTION
-        elif label == 'copying':
-            return ConveyorActivity.CONVEYOR_COPYING
-        elif label == 'research_material':
-            return ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL
-        elif label == 'research_time':
-            return ConveyorActivity.CONVEYOR_RESEARCH_TIME
-        elif label == 'reaction':
-            return ConveyorActivity.CONVEYOR_REACTION
-        else:
-            raise Exception('Unknown conveyor activity label')
-
-
 class ConveyorSettings:
     def __init__(self, corporation: db.QSwaggerCorporation):
         # параметры работы конвейера
         self.corporation: db.QSwaggerCorporation = corporation
         self.fixed_number_of_runs: typing.Optional[int] = None
         self.same_stock_container: bool = False
-        self.activities: typing.List[ConveyorActivity] = [ConveyorActivity.CONVEYOR_MANUFACTURING]
+        self.activities: typing.List[db.QSwaggerActivityCode] = [db.QSwaggerActivityCode.MANUFACTURING]
         self.conveyor_with_reactions: bool = False
         # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
         self.containers_sources: typing.List[ConveyorSettingsPriorityContainer] = []  # station:container:priority
@@ -186,19 +140,19 @@ def get_product_quantity(
         product_type_id: int,
         blueprint: db.QSwaggerBlueprint) -> int:
     activity = blueprint.get_activity(activity_id=activity_id)
-    if ConveyorActivity.CONVEYOR_MANUFACTURING.to_int() == activity_id:
+    if db.QSwaggerActivityCode.MANUFACTURING.to_int() == activity_id:
         manufacturing: db.QSwaggerBlueprintManufacturing = activity
         return manufacturing.quantity
-    elif ConveyorActivity.CONVEYOR_INVENTION.to_int() == activity_id:
+    elif db.QSwaggerActivityCode.INVENTION.to_int() == activity_id:
         invention: db.QSwaggerBlueprintInvention = activity
         return next((p.quantity for p in invention.products if p.product_id == product_type_id), 1)
-    elif ConveyorActivity.CONVEYOR_COPYING.to_int() == activity_id:
+    elif db.QSwaggerActivityCode.COPYING.to_int() == activity_id:
         return 1  # copying: db.QSwaggerBlueprintCopying = activity
-    elif ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL.to_int() == activity_id:
+    elif db.QSwaggerActivityCode.RESEARCH_MATERIAL.to_int() == activity_id:
         return 1  # research_material: db.QSwaggerBlueprintResearchMaterial = activity
-    elif ConveyorActivity.CONVEYOR_RESEARCH_TIME.to_int() == activity_id:
+    elif db.QSwaggerActivityCode.RESEARCH_TIME.to_int() == activity_id:
         return 1  # research_time: db.QSwaggerBlueprintResearchTime = activity
-    elif ConveyorActivity.CONVEYOR_REACTION.to_int() == activity_id:
+    elif db.QSwaggerActivityCode.REACTION.to_int() == activity_id:
         reaction: db.QSwaggerBlueprintReaction = activity
         return reaction.quantity
 
@@ -259,7 +213,7 @@ def get_materials_list(
                 # сохранение информации в справочник материалов
                 push_into(activity, m, industry_input)
             # ---
-            if a == ConveyorActivity.CONVEYOR_INVENTION:
+            if a == db.QSwaggerActivityCode.INVENTION:
                 # Добавляем декрипторы (замечения и ограничения):
                 # - всегда все хулы запускаются с декриптором Accelerant Decryptor
                 # - всегда все риги запускаются с декриптором Symmetry Decryptor
@@ -620,7 +574,7 @@ class ConveyorCorporationOutputProducts:
         self.station: typing.Optional[db.QSwaggerStation] = None
         self.router_settings: typing.Optional[RouterSettings] = None
         self.conveyor_settings: typing.List[ConveyorSettings] = []
-        self.activities: typing.Set[ConveyorActivity] = set()
+        self.activities: typing.Set[db.QSwaggerActivityCode] = set()
 
     def calc(self,
              # данные (справочники)
@@ -631,7 +585,7 @@ class ConveyorCorporationOutputProducts:
              conveyor_settings: typing.List[ConveyorSettings],
              router_settings: RouterSettings,
              # список активностей, которые выполняются для получения продуктов роутера
-             activities: typing.Set[ConveyorActivity]) \
+             activities: typing.Set[db.QSwaggerActivityCode]) \
             -> typing.Dict[int, db.QSwaggerMaterial]:
         del self.activities
         del self.conveyor_settings
@@ -644,7 +598,7 @@ class ConveyorCorporationOutputProducts:
         self.station: db.QSwaggerStation = None
         self.router_settings: RouterSettings = router_settings
         self.conveyor_settings: typing.List[ConveyorSettings] = conveyor_settings[:]
-        self.activities: typing.Set[ConveyorActivity] = activities
+        self.activities: typing.Set[db.QSwaggerActivityCode] = activities
         # ---
         # проверка правильности входных данных
         if next((_ for _ in self.conveyor_settings if not _.corporation.corporation_id == self.corporation.corporation_id), None) is not None:
@@ -713,32 +667,32 @@ def calc_ready_products(
     ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts] = {}
     for index, rs in enumerate(router_settings):
         # надо определиться, является ли конвейер manufacturing или reaction
-        activities: typing.Set[ConveyorActivity] = set()
+        activities: typing.Set[db.QSwaggerActivityCode] = set()
         if rs.output:
             # если список производства задан, то это "внешняя станция" со своими настройками производства
             for b in qid.sde_blueprints.values():
                 if b.manufacturing and b.manufacturing.product_id in rs.output:
-                    activities.add(ConveyorActivity.CONVEYOR_MANUFACTURING)
+                    activities.add(db.QSwaggerActivityCode.MANUFACTURING)
                 if b.reaction and b.reaction.product_id in rs.output:
-                    activities.add(ConveyorActivity.CONVEYOR_REACTION)
+                    activities.add(db.QSwaggerActivityCode.REACTION)
         else:
             # если список производства не задан, то это основная станция на которой производится всё, кроме
             # перечисленного (хотя при наличии чертежей, можно запускать что угодно вообще, и реакции?)
-            activities.add(ConveyorActivity.CONVEYOR_MANUFACTURING)
+            activities.add(db.QSwaggerActivityCode.MANUFACTURING)
         local_conveyor_settings: typing.List[ConveyorSettings] = []
         for cs in conveyor_settings:
             # также можно проверять: if not _.corporation.corporation_id == corporation.corporation_id: continue
-            if ConveyorActivity.CONVEYOR_REACTION in cs.activities:
-                if ConveyorActivity.CONVEYOR_REACTION in activities:
+            if db.QSwaggerActivityCode.REACTION in cs.activities:
+                if db.QSwaggerActivityCode.REACTION in activities:
                     # local_conveyor_settings.append(cs)
                     # continue
                     # Внимание! это неподдерживаемый способ настройки конвейера
                     pass
-            if ConveyorActivity.CONVEYOR_MANUFACTURING in cs.activities:
-                if ConveyorActivity.CONVEYOR_MANUFACTURING in activities:
+            if db.QSwaggerActivityCode.MANUFACTURING in cs.activities:
+                if db.QSwaggerActivityCode.MANUFACTURING in activities:
                     local_conveyor_settings.append(cs)
                     continue
-                if cs.conveyor_with_reactions and ConveyorActivity.CONVEYOR_REACTION in activities:
+                if cs.conveyor_with_reactions and db.QSwaggerActivityCode.REACTION in activities:
                     local_conveyor_settings.append(cs)
                     continue
         if not local_conveyor_settings:
@@ -751,7 +705,7 @@ def calc_ready_products(
 
 
 def get_min_max_time(
-        activities: typing.List[ConveyorActivity],
+        activities: typing.List[db.QSwaggerActivityCode],
         stack: ConveyorMaterialRequirements.StackOfBlueprints) -> typing.Tuple[int, int]:
     min_time, max_time = None, None
 
@@ -765,7 +719,7 @@ def get_min_max_time(
         return min_t, max_t
 
     for b in stack.group:
-        if ConveyorActivity.CONVEYOR_MANUFACTURING in activities and b.blueprint_type.manufacturing:
+        if db.QSwaggerActivityCode.MANUFACTURING in activities and b.blueprint_type.manufacturing:
             activity: db.QSwaggerBlueprintManufacturing = b.blueprint_type.manufacturing
             # считаем бонус чертежа (накладываем TE чертежа на БП)
             __stage1: float = float(activity.time * (100 - b.time_efficiency) / 100.0)
@@ -781,7 +735,7 @@ def get_min_max_time(
             __stageX: int = __stage5 * b.runs
             # считаем min/max
             min_time, max_time = apply(min_time, max_time, __stageX)
-        if ConveyorActivity.CONVEYOR_INVENTION in activities and b.blueprint_type.invention:
+        if db.QSwaggerActivityCode.INVENTION in activities and b.blueprint_type.invention:
             activity: db.QSwaggerBlueprintInvention = b.blueprint_type.invention
             # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
             __stage1: float = float(activity.time * (100.0 - 9.0) / 100.0)
@@ -793,7 +747,7 @@ def get_min_max_time(
             __stageX: int = __stage3 * b.runs
             # считаем min/max
             min_time, max_time = apply(min_time, max_time, __stageX)
-        if ConveyorActivity.CONVEYOR_REACTION in activities and b.blueprint_type.reaction:
+        if db.QSwaggerActivityCode.REACTION in activities and b.blueprint_type.reaction:
             activity: db.QSwaggerBlueprintReaction = b.blueprint_type.reaction
             # навыки и импланты (базовые навыки начинающего производственника, который "ничего не умеет делать")
             __stage1: float = float(activity.time * (100.0 - 16.0) / 100.0)
@@ -808,9 +762,9 @@ def get_min_max_time(
             # считаем min/max
             min_time, max_time = apply(min_time, max_time, __stageX)
         if b.is_original:
-            for a in [ConveyorActivity.CONVEYOR_COPYING,
-                      ConveyorActivity.CONVEYOR_RESEARCH_TIME,
-                      ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL]:
+            for a in [db.QSwaggerActivityCode.COPYING,
+                      db.QSwaggerActivityCode.RESEARCH_TIME,
+                      db.QSwaggerActivityCode.RESEARCH_MATERIAL]:
                 if a not in activities: continue
                 activity: db.QSwaggerActivity = b.blueprint_type.get_activity(a.to_int())
                 if not activity: continue
@@ -836,7 +790,7 @@ class ConveyorDictionary:
         # подготовка списка-справочника, который будет хранить идентификаторы всех продуктов, используемых конвейером
         self.materials: typing.Set[int] = set()
         # подготовка списка-справочника, который будет хранить используемые материалы в различных activity (скопом)
-        self.involved_materials: typing.Dict[ConveyorActivity, typing.Set[int]] = {}
+        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {}
         self._fill_involved_materials()
 
     def __del__(self):
@@ -844,29 +798,29 @@ class ConveyorDictionary:
         del self.materials
 
     def _fill_involved_materials(self):
-        self.involved_materials: typing.Dict[ConveyorActivity, typing.Set[int]] = {
-            ConveyorActivity.CONVEYOR_MANUFACTURING: set(),
-            ConveyorActivity.CONVEYOR_INVENTION: set(),
-            ConveyorActivity.CONVEYOR_COPYING: set(),
-            ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL: set(),
-            ConveyorActivity.CONVEYOR_RESEARCH_TIME: set(),
-            ConveyorActivity.CONVEYOR_REACTION: set()
+        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {
+            db.QSwaggerActivityCode.MANUFACTURING: set(),
+            db.QSwaggerActivityCode.INVENTION: set(),
+            db.QSwaggerActivityCode.COPYING: set(),
+            db.QSwaggerActivityCode.RESEARCH_MATERIAL: set(),
+            db.QSwaggerActivityCode.RESEARCH_TIME: set(),
+            db.QSwaggerActivityCode.REACTION: set()
         }
         for by_products in self.qid.sde_activities.values():
             for activity in by_products:
                 ids: typing.Set[int] = set([_.material_id for _ in activity.materials.materials])
                 if isinstance(activity, db.QSwaggerBlueprintManufacturing):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_MANUFACTURING
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.MANUFACTURING
                 elif isinstance(activity, db.QSwaggerBlueprintInvention):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_INVENTION
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.INVENTION
                 elif isinstance(activity, db.QSwaggerBlueprintCopying):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_COPYING
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.COPYING
                 elif isinstance(activity, db.QSwaggerBlueprintResearchMaterial):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_MATERIAL
                 elif isinstance(activity, db.QSwaggerBlueprintResearchTime):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_RESEARCH_TIME
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_TIME
                 elif isinstance(activity, db.QSwaggerBlueprintReaction):
-                    a: ConveyorActivity = ConveyorActivity.CONVEYOR_REACTION
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.REACTION
                 else:
                     raise Exception("Unknown type of activity")
                 involved: typing.Set[int] = self.involved_materials.get(a)
@@ -893,3 +847,21 @@ class ConveyorDictionary:
         for stack in requirements:
             for materials in stack.required_materials_for_single.values():
                 self.load_type_ids(set([_.material_id for _ in materials]))
+
+
+def get_conveyor_table_sort_data(
+        priority: int,
+        activities: typing.List[db.QSwaggerActivityCode],
+        row_num: typing.Optional[int],
+        duration: typing.Optional[typing.Tuple[int, int]]):
+    sort = {'p': priority, 'a': [_.to_int() for _ in activities]}
+    if row_num is not None:
+        sort.update({'n': row_num})
+    if duration is not None:
+        if duration[0] == duration[1]:  # 0-min, 1-max
+            sort.update({'d': duration[0]})
+        else:
+            sort.update({'d1': duration[0], 'd2': duration[1]})
+    elif row_num is not None:
+        sort.update({'lp': 1})   # нижняя часть (несортируемая)
+    return sort

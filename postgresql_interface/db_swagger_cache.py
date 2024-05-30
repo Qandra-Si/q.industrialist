@@ -2,6 +2,7 @@
 import typing
 import datetime
 import pytz
+from enum import Enum
 
 
 class QSwaggerMarketGroup:
@@ -231,13 +232,63 @@ class QSwaggerActivityMaterials:
         return self.__materials
 
 
+class QSwaggerActivityCode(Enum):
+    MANUFACTURING = 1
+    INVENTION = 8
+    COPYING = 5
+    RESEARCH_MATERIAL = 4
+    RESEARCH_TIME = 3
+    REACTION = 9
+
+    def __str__(self) -> str:
+        if self == QSwaggerActivityCode.MANUFACTURING:
+            return 'manufacturing'
+        elif self == QSwaggerActivityCode.INVENTION:
+            return 'invention'
+        elif self == QSwaggerActivityCode.COPYING:
+            return 'copying'
+        elif self == QSwaggerActivityCode.RESEARCH_MATERIAL:
+            return 'research_material'
+        elif self == QSwaggerActivityCode.RESEARCH_TIME:
+            return 'research_time'
+        elif self == QSwaggerActivityCode.REACTION:
+            return 'reaction'
+        else:
+            raise Exception('Unknown activity')
+
+    def to_int(self) -> int:
+        return int(self.value)
+
+    @staticmethod
+    def from_str(label):
+        if label == 'manufacturing':
+            return QSwaggerActivityCode.MANUFACTURING
+        elif label == 'invention':
+            return QSwaggerActivityCode.INVENTION
+        elif label == 'copying':
+            return QSwaggerActivityCode.COPYING
+        elif label == 'research_material':
+            return QSwaggerActivityCode.RESEARCH_MATERIAL
+        elif label == 'research_time':
+            return QSwaggerActivityCode.RESEARCH_TIME
+        elif label == 'reaction':
+            return QSwaggerActivityCode.REACTION
+        else:
+            raise Exception('Unknown activity label')
+
+
 class QSwaggerActivity:
-    def __init__(self, time: int):
+    def __init__(self, time: int, code: QSwaggerActivityCode):
+        self.__code: QSwaggerActivityCode = code
         self.__time: int = time
         self.__materials = QSwaggerActivityMaterials()
 
     def __del__(self):
         del self.__materials
+
+    @property
+    def code(self) -> QSwaggerActivityCode:
+        return self.__code
 
     @property
     def time(self) -> int:
@@ -250,7 +301,7 @@ class QSwaggerActivity:
 
 class QSwaggerBlueprintManufacturing(QSwaggerActivity):
     def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.MANUFACTURING)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
 
     def __del__(self):
@@ -279,7 +330,7 @@ class QSwaggerBlueprintManufacturing(QSwaggerActivity):
 
 class QSwaggerBlueprintInvention(QSwaggerActivity):
     def __init__(self, time: int):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.INVENTION)
         self.__products: typing.List[QSwaggerInventionProduct] = []
 
     def __del__(self):
@@ -304,7 +355,7 @@ class QSwaggerBlueprintInvention(QSwaggerActivity):
 
 class QSwaggerBlueprintCopying(QSwaggerActivity):
     def __init__(self, time: int, product_type: QSwaggerTypeId):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.COPYING)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, 1)
 
     def __del__(self):
@@ -329,7 +380,7 @@ class QSwaggerBlueprintCopying(QSwaggerActivity):
 
 class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
     def __init__(self, time: int):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.RESEARCH_MATERIAL)
 
     def __del__(self):
         pass
@@ -341,7 +392,7 @@ class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
 
 class QSwaggerBlueprintResearchTime(QSwaggerActivity):
     def __init__(self, time: int):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.RESEARCH_TIME)
 
     def __del__(self):
         pass
@@ -353,7 +404,7 @@ class QSwaggerBlueprintResearchTime(QSwaggerActivity):
 
 class QSwaggerBlueprintReaction(QSwaggerActivity):
     def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time)
+        super().__init__(time, QSwaggerActivityCode.REACTION)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
 
     def __del__(self):

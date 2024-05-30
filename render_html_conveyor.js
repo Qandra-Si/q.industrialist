@@ -1,6 +1,7 @@
 ﻿//var g_menu_options_default=[[1,"impossible"],[1,"not-available"],[1,"end-level-manuf"],[1,"intermediate-manuf"],[1,"recommended-runs"]];
 //var g_menu_options_default_len=5;
-//var g_menu_sort_default='priority';
+//var g_menu_sort_default='name';
+//var g_menu_sort_order_default=1; // 0-desc, 1-asc
 
 // Conveyor Options storage (prepare)
 ls = window.localStorage;
@@ -105,12 +106,23 @@ function toggleMenuMarker(btn, show){
   btn.find('span').addClass('hidden');
  }
 }
-function toggleSortMarkers(mode){
+function toggleSortMarkers(mode, asc){
  $('button.qind-btn-sort').each(function() {
-  if ($(this).attr('qind-group') == mode)
+  if ($(this).attr('qind-group') == mode) {
    $(this).addClass('active');
-  else
+   if (asc) {
+    $(this).find('span.asc').removeClass('hidden');
+    $(this).find('span.desc').addClass('hidden');
+   } else {
+    $(this).find('span.asc').addClass('hidden');
+    $(this).find('span.desc').removeClass('hidden');
+   }
+  }
+  else {
    $(this).removeClass('active');
+   $(this).find('span.asc').addClass('hidden');
+   $(this).find('span.desc').addClass('hidden');
+  }
  });
 }
 function rebuildOptionsMenu() {
@@ -118,7 +130,85 @@ function rebuildOptionsMenu() {
   var opt = $(this).attr('qind-group');
   toggleMenuMarker($(this), getOption('option', opt));
  });
- toggleSortMarkers(getOptionValue('sort', 'mode'));
+ toggleSortMarkers(
+  getOptionValue('sort', 'mode'),
+  (getOption('sort', 'order') == 1) ? true : false
+ );
+}
+//-----------
+//сортировка содержимого таблицы конвейера
+//-----------
+const g_tbl_summary_priority_multiplier = 1000000000; // приоритетов десять: 0..9
+const g_tbl_summary_activity_multiplier = Math.floor(g_tbl_summary_priority_multiplier / 10); // activity от 1 до 9
+const g_tbl_summary_half_activity = Math.floor(g_tbl_summary_activity_multiplier / 2);
+//-----------
+function getSortKey(x, asc, what) { // what: 0-name, 1-duration
+  var row = $(x);
+  var priority = -1;
+  var activity = 0;
+  var val = 0;
+  if (row.hasClass('row-conveyor')) {
+   var tag = row.data('tag');
+   if (!(tag === undefined)) {
+    priority = tag.p;
+    activity = asc ? Math.min(tag.a) : Math.max(tag.a);
+    val = asc ? 0 : g_tbl_summary_activity_multiplier - 1;
+   }
+  } else {
+   var sort = row.data('sort');
+   if (!(sort === undefined)) {
+    priority = sort.p;
+    activity = asc ? Math.min(sort.a) : Math.max(sort.a);
+    switch (what) {
+    case 0: // name
+    case 2: // priority
+     if (sort.lp == undefined)
+      val = asc ? sort.n : (g_tbl_summary_half_activity + sort.n);
+     else // незапускаемые работы/строки всегда внизу
+      val = asc ? (g_tbl_summary_half_activity + sort.n) : sort.n;
+     break;
+    case 1: // duration
+     if (!(sort.d == undefined))
+      val = sort.d;
+     else if (!(sort.d1 == undefined))
+      val = asc ? sort.d1 : sort.d2;
+     else // duration неизвестен (это не чертёж для запуска) - всегда внизу
+      val = asc ? ((g_tbl_summary_activity_multiplier - 1) - sort.n) : sort.n;
+     break;
+    }
+   }
+  }
+  return [g_tbl_summary_priority_multiplier * (priority+1) + g_tbl_summary_activity_multiplier * activity, val];
+}
+function sortConveyorInternal(table, asc, what) {
+ var tbody = table.find('tbody');
+ tbody.find('tr').sort(function(a, b) {
+  const keyA = getSortKey(a, asc, what);
+  const keyB = getSortKey(b, asc, what);
+  if (keyA[0] == keyB[0]) {
+   if (keyA[1] == keyB[1]) return 0;
+   return asc ? (keyA[1] - keyB[1]) : (keyB[1] - keyA[1]);
+  }
+  if (what != 2) // 2=priority
+   return keyA[0] - keyB[0];
+  else
+   return asc ? (keyA[0] - keyB[0]) : (keyB[0] - keyA[0]);
+ }).appendTo(tbody);
+ return 0;
+}
+function sortConveyor() {
+ var sort_by = getOptionValue('sort', 'mode');
+ var what = 0;
+ switch (sort_by) {
+ //case 'name': what = 0; break;
+ case 'duration': what = 1; break;
+ case 'priority': what = 2; break;
+ }
+ sortConveyorInternal(
+  $('table.tbl-summary'),
+  (getOption('sort', 'order') == 1) ? true : false,
+  what
+ );
 }
 //-----------
 //работа с видимостью контейнеров (групп по приоритетам)
@@ -301,13 +391,6 @@ function chooseMaterial(qmat) {
  });
 }
 //-----------
-//сортировка содержимого таблицы конвейера
-//-----------
-let g_tbl_summary_col_orders = [-1,+1]; // -1:desc, +1:asc
-let g_tbl_summary_col_types = [0,1];
-function sortConveyor(table, order, what, typ) {
-}
-//-----------
 //работа с содержимом страницы
 //-----------
 function changeElemVisibility(el, show){
@@ -393,8 +476,6 @@ function rebuildBody() {
    changeElemVisibility(tr, hide_router);
   }
  }
-
- sortConveyor();
 }
 //-----------
 // обработчики нажатий на кнопки
@@ -411,13 +492,6 @@ $('a.qind-btn-settings').on('click', function () {
   if (val == 1)
    setOption('option', 'used-materials', 0);
  }
- rebuildOptionsMenu();
- rebuildBody();
-});
-//---
-$('button.qind-btn-sort').on('click', function () {
- var mode = $(this).attr('qind-group');
- setOption('sort', 'mode', mode);
  rebuildOptionsMenu();
  rebuildBody();
 });
@@ -471,6 +545,7 @@ function resetOptionsMenuToDefault() {
   resetOptionToDefault('option', opt, show);
  }
  resetOptionToDefault('sort', 'mode', g_menu_sort_default);
+ resetOptionToDefault('sort', 'order', g_menu_sort_order_default);
 }
 //-----------
 // работа с буфером обмена
@@ -543,22 +618,26 @@ function doCopyToClipboard(elem) {
  }
  if (data_copy) copyToClipboard(elem, data_copy);
 }
+//-----------
+// начальное заполнение страницы
+//-----------
+function firstInit() {
+ resetOptionsMenuToDefault();
+ rebuildOptionsMenu();
+ initConveyorVisibility();
+ initRouterVisibility();
+ rebuildBody();
+ sortConveyor();
+}
 
 $(document).ready(function(){
   $('#qind-btn-reset').on('click', function () {
     ls.clear();
-    resetOptionsMenuToDefault();
-    rebuildOptionsMenu();
-    initConveyorVisibility();
-    initRouterVisibility();
-    rebuildBody();
+    firstInit();
   });
   // first init
-  resetOptionsMenuToDefault();
-  rebuildOptionsMenu();
-  initConveyorVisibility();
-  initRouterVisibility();
-  rebuildBody();
+  firstInit();
+  sortConveyor();
   //rebuildStocksDropdown();
   //rebuildStockMaterials();
   // init popover menus
@@ -571,6 +650,18 @@ $(document).ready(function(){
   });
   $('tr.row-station * a.qind-btn-hide').bind('click', function () {
    toggleRouterVisibility($(this));
+  });
+  $('button.qind-btn-sort').on('click', function () {
+   var mode = $(this).attr('qind-group');
+   if (getOptionValue('sort', 'mode') == mode) {
+    var asc = getOption('sort', 'order');
+    setOption('sort', 'order', asc ? 0 : 1);
+   } else {
+    setOption('sort', 'mode', mode);
+    setOption('sort', 'order', 1);
+   }
+   rebuildOptionsMenu();
+   sortConveyor();
   });
   // Working with clipboard
   $('a.qind-copy-btn').each(function() {

@@ -183,10 +183,10 @@ def dump_nav_menu(glf) -> None:
         (False, 'exist-in-stock', "Кол-во материалов в стоке", False),  # btnToggleExistInStock
         (False, 'in-progress', "Кол-во материалов, находящихся в производстве", False),  # btnToggleInProgress
     ]
-    menu_sort: typing.List[typing.Tuple[bool, str, str]] = [
-        (False, 'name', "Название"),  # btnSortByName
-        (False, 'duration', "Длительность"),  # btnSortByDuration
-        (True, 'priority', "Приоритет"),  # btnSortByPriority
+    menu_sort: typing.List[typing.Tuple[bool, str, str, str, str]] = [
+        (True,  'name',     'Название',     'sort-by-alphabet',   'sort-by-alphabet-alt'),
+        (False, 'duration', 'Длительность', 'sort-by-attributes', 'sort-by-attributes-alt'),
+        (False, 'priority', 'Приоритет',    'sort-by-order',      'sort-by-order-alt'),
     ]
     glf.write("""
 <nav class="navbar navbar-default">
@@ -240,7 +240,9 @@ def dump_nav_menu(glf) -> None:
     <div class="btn-group" role="group" aria-label="Sort">
 """)
     for m in menu_sort:
-        glf.write(f"<button type='button' class='btn btn-default qind-btn-sort' qind-group='{m[1]}'>{m[2]}</button>")
+        glf.write(f"<button type='button' class='btn btn-default qind-btn-sort' qind-group='{m[1]}'>"
+                  f"{m[2]}{glyphicon_ex(m[3],['asc','hidden'])}{glyphicon_ex(m[4], ['desc','hidden'])}"
+                  "</button>")
     glf.write("""
     </div>
    </form>
@@ -263,6 +265,7 @@ def dump_nav_menu(glf) -> None:
     # ---
     g_menu_sort_default = next((m[1] for m in menu_sort if m[0]), 'name')
     glf.write(f"var g_menu_sort_default='{g_menu_sort_default}';\n")
+    glf.write("var g_menu_sort_order_default=1; // 0-desc, 1-asc\n")
     glf.write("</script>\n")
 
 
@@ -271,9 +274,10 @@ g_tbl_conveyor_row_num: int = 0
 g_tbl_router_row_num: int = 0
 
 
-def get_tbl_summary_row_num() -> int:
+def get_tbl_summary_row_num(increment: bool = True) -> int:
     global g_tbl_summary_row_num
-    g_tbl_summary_row_num += 1
+    if increment:
+        g_tbl_summary_row_num += 1
     return g_tbl_summary_row_num
 
 
@@ -589,7 +593,7 @@ def dump_nav_menu_conveyor_dialog(
 <!-- -->
 <div class="col-md-4">""")
 
-            if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
+            if db.QSwaggerActivityCode.MANUFACTURING in s.activities:
                 z: typing.List[tools.ConveyorSettingsContainer] = sorted(
                     [x for x in s.containers_additional_blueprints if x.station_id == station_id],
                     key=lambda x: x.container_name)
@@ -686,7 +690,11 @@ def dump_blueprints_overflow_warn(
 
 def dump_list_of_jobs(
         glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        # настройки генерации отчёта
         settings: tools.ConveyorSettings,
+        # работы
         jobs: typing.List[db.QSwaggerCorporationIndustryJob],
         is_active_jobs: bool) -> None:
     # готовим список контейнеров выхода в проверке
@@ -776,7 +784,12 @@ def dump_list_of_jobs(
         # </me_tag><tid_tag> ({blueprint_type_id})</tid_tag>
         tr_class: str = 'job-active' if is_active_jobs else 'job-completed'
         tr_class += g_nav_menu_defaults.css(tr_class)
-        glf.write(f"""<tr class="{tr_class}{lost_class}">
+        # --- --- ---
+        sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=None)
+        # --- --- ---
+        glf.write(f"""<tr
+ class="{tr_class}{lost_class}"
+ data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
 <td>{blueprint_type_name}&nbsp;<a
@@ -801,20 +814,25 @@ data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn 
 
 def dump_list_of_active_jobs(
         glf,
+        priority: int,
         settings: tools.ConveyorSettings,
         active_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
-    dump_list_of_jobs(glf, settings, active_jobs, is_active_jobs=True)
+    dump_list_of_jobs(glf, priority, settings, active_jobs, is_active_jobs=True)
 
 
 def dump_list_of_completed_jobs(
         glf,
+        priority: int,
         settings: tools.ConveyorSettings,
         completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob]) -> None:
-    dump_list_of_jobs(glf, settings, completed_jobs, is_active_jobs=False)
+    dump_list_of_jobs(glf, priority, settings, completed_jobs, is_active_jobs=False)
 
 
 def dump_list_of_lost_blueprints(
         glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        activities: typing.List[db.QSwaggerActivityCode],
         # справочники
         corporation: db.QSwaggerCorporation,
         # список чертежей, которые невозможно запустить в выбранном конвейере
@@ -842,6 +860,7 @@ def dump_list_of_lost_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
+        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
         # ---
         containers: typing.Set[str] = set()
         for b in group:
@@ -850,7 +869,9 @@ def dump_list_of_lost_blueprints(
         containers: typing.List[str] = sorted(containers)
         containers: str = container_prefix.join(containers)
         # ---
-        glf.write(f"""<tr class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}">
+        glf.write(f"""<tr
+ class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}"
+ data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -864,6 +885,9 @@ item_ids: {[_.item_id for _ in group]}--></td>
 
 def dump_list_of_lost_asset_items(
         glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        activities: typing.List[db.QSwaggerActivityCode],
         # справочники
         corporation: db.QSwaggerCorporation,
         # список ассетов, которые "потерялись" в конвейере
@@ -888,6 +912,7 @@ def dump_list_of_lost_asset_items(
         a0: db.QSwaggerCorporationAssetsItem = group[0]
         type_id: int = a0.type_id
         type_name: str = a0.item_type.name
+        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
         # ---
         containers: typing.Set[str] = set()
         for a in group:
@@ -896,7 +921,9 @@ def dump_list_of_lost_asset_items(
         containers: typing.List[str] = sorted(containers)
         containers: str = container_prefix.join(containers)
         # ---
-        glf.write(f"""<tr class="lost-assets{g_nav_menu_defaults.css('lost-assets')}">
+        glf.write(f"""<tr
+ class="lost-assets{g_nav_menu_defaults.css('lost-assets')}"
+ data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -910,6 +937,9 @@ item_ids: {[_.item_id for _ in group]}--></td>
 
 def dump_list_of_phantom_blueprints(
         glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        activities: typing.List[db.QSwaggerActivityCode],
         # список чертежей, которые фантомно присутствуют в коробке конвейера (глюк ССР)
         phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint]) -> None:
     # группируем чертежи по типу, чтобы получить уникальные сочетания с количествами
@@ -939,7 +969,11 @@ def dump_list_of_phantom_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        glf.write(f"""<tr class="phantom-blueprints{g_nav_menu_defaults.css('phantom-blueprints')}">
+        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
+
+        glf.write(f"""<tr
+ class="phantom-blueprints{g_nav_menu_defaults.css('phantom-blueprints')}"
+ data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{type_name}&nbsp;<a
@@ -957,6 +991,9 @@ location_id:{[_.location_id for _ in group]}--></td>
 
 def dump_list_of_possible_blueprints(
         glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        # настройки генерации отчёта
         settings: tools.ConveyorSettings,
         # список чертежей и их потребности (сгруппированные и отсортированные)
         requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
@@ -1023,7 +1060,7 @@ def dump_list_of_possible_blueprints(
             return ''
 
         decryptor: str = ''
-        if tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
+        if db.QSwaggerActivityCode.INVENTION in settings.activities:
             m0: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = stacks[0].required_materials_for_stack
             if len(m0) == 1:  # тут проверяется, что activity одна единственная
                 activity: db.QSwaggerActivity = next(iter(m0.keys()))
@@ -1033,15 +1070,11 @@ def dump_list_of_possible_blueprints(
                     if d:
                         decryptor = f'<mute> - модернизируй с </mute><qdecr>{d.material_type.name}</qdecr>'
 
-        glf.write(f"""<tr{tr_div_class('tr')}>
-<td>{get_tbl_summary_row_num()}</td>
-<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
-data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}""")
+        details: str = ''
         quantities: str = '<br>'
         times: str = '<br>'
-        min_tt: int = 0
-        max_tt: int = 0
+        min_duration: int = 0
+        max_duration: int = 0
         for stack in stacks:
             # TODO: здесь какая-то путаница с activity(ies)
             na = []
@@ -1051,26 +1084,33 @@ data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-to
             # ---
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
             tt: typing.Tuple[int, int] = tools.get_min_max_time(settings.activities, stack)
-            if min_tt == 0:
-                min_tt, max_tt = tt
+            if min_duration == 0:
+                min_duration, max_duration = tt
             else:
-                min_tt, max_tt = min(min_tt, tt[0]), max(max_tt, tt[1])
-            glf.write(f"{tr_div_class('div', stack, True)}"
-                      f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
-                      f"<me_tag>{b0.material_efficiency}%</me_tag>"
-                      f"<qmaterials data-arr='{json.dumps(js,separators=(',', ':'))}'></qmaterials>"
-                      f"{tr_div_class('div', None, False)}")
+                min_duration, max_duration = min(min_duration, tt[0]), max(max_duration, tt[1])
+            details += f"{tr_div_class('div', stack, True)}" \
+                       f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
+                       f"<me_tag>{b0.material_efficiency}%</me_tag>" \
+                       f"<qmaterials data-arr='{json.dumps(js,separators=(',', ':'))}'></qmaterials>" \
+                       f"{tr_div_class('div', None, False)}"
             quantities += f"{tr_div_class('div', stack, True)}" \
                           f"{format_num_of_num(stack.max_possible_for_single, len(stack.group))}" \
                           f"{tr_div_class('div', None, False)}"
             times += f"{tr_div_class('div', stack, True)}" \
                      f"{format_time_to_time(tt[0], tt[1])}" \
                      f"{tr_div_class('div', None, False)}"
-        min_duration: str = f' data-midur="{min_tt}"'
-        max_duration: str = f' data-madur="{max_tt}"' if min_tt != max_tt else ''
-        glf.write(f"""</td>
+
+        sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=(min_duration, max_duration))
+
+        glf.write(f"""
+<tr{tr_div_class('tr')} data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{type_name}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}
+{details}</td>
 <td>{quantities}</td>
-<td{min_duration}{max_duration}>{times}</td>
+<td>{times}</td>
 <td></td><td></td><td></td>
 </tr>""")
 
@@ -1135,7 +1175,7 @@ def dump_corp_conveyors(
         p0 = prioritized.get(priority)
         for settings in p0.keys():
             # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
-            tag = {"p": priority, "a": [_.to_int() for _ in settings.activities]}
+            tag = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=None, duration=None)
             # получаем список контейнеров с чертежами для производства
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
@@ -1183,10 +1223,10 @@ def dump_corp_conveyors(
                 possible: bool = False
                 lost: bool = False
                 for _a in settings.activities:
-                    a: tools.ConveyorActivity = _a
+                    a: db.QSwaggerActivityCode = _a
                     # проверка, что в коробку research не попали копии
-                    if b.is_copy and a in (tools.ConveyorActivity.CONVEYOR_RESEARCH_TIME,
-                                           tools.ConveyorActivity.CONVEYOR_RESEARCH_MATERIAL):
+                    if b.is_copy and a in (db.QSwaggerActivityCode.RESEARCH_TIME,
+                                           db.QSwaggerActivityCode.RESEARCH_MATERIAL):
                         lost, possible = True, False
                         break
                     # проверка, что чертёж можно запускать в работу с выбранной activity
@@ -1230,8 +1270,8 @@ def dump_corp_conveyors(
             # составляем список потенциально-задействованных в текущем конвейере материалов (по типу производства)
             involved_materials = set(itertools.chain.from_iterable([global_dictionary.involved_materials[_] for _ in settings.activities]))
             # TODO: надо придумать как от избавиться от костыля (в коробке с инвентом хранятся ассеты для копирки)
-            if tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
-                involved_materials |= global_dictionary.involved_materials[tools.ConveyorActivity.CONVEYOR_COPYING]
+            if db.QSwaggerActivityCode.INVENTION in settings.activities:
+                involved_materials |= global_dictionary.involved_materials[db.QSwaggerActivityCode.COPYING]
             # составляем список "залётных" предметов (материалов и продактов), которые упали не в ту коробку
             lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
             for _a in corporation.assets.values():
@@ -1245,7 +1285,7 @@ def dump_corp_conveyors(
                     # соответствующие текущей activity
                     if a.type_id in involved_materials:
                         continue
-                    elif tools.ConveyorActivity.CONVEYOR_INVENTION in settings.activities:
+                    elif db.QSwaggerActivityCode.INVENTION in settings.activities:
                         if a.item_type.group_id == 1304:  # 1304 = Generic Decryptor
                             continue
                 # если коробка не является стоком, то в ней ничего не должно валяться, кроме чертежей
@@ -1269,6 +1309,7 @@ def dump_corp_conveyors(
                 # выводим в отчёт
                 dump_list_of_possible_blueprints(
                     glf,
+                    priority,
                     settings,
                     requirements)
                 # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
@@ -1277,28 +1318,36 @@ def dump_corp_conveyors(
             if active_jobs:
                 dump_list_of_active_jobs(
                     glf,
+                    priority,
                     settings,
                     active_jobs)  # [b for b in blueprints if b.item_id in active_blueprint_ids]
             # вывести информацию о работах, которые прямо недавно закончились
             if completed_jobs:
                 dump_list_of_completed_jobs(
                     glf,
+                    priority,
                     settings,
                     completed_jobs)  # [b for b in blueprints if b.item_id in completed_blueprint_ids]
             # возможно появление корпоративных чертежей, которых нет в ассетах (приём довольно длительное время)
             if phantom_blueprints:
                 dump_list_of_phantom_blueprints(
                     glf,
+                    priority,
+                    settings.activities,
                     phantom_blueprints)
             # если в коробке застряли чертежи которых там не должно быть, то выводим об этом сведения
             if lost_blueprints:
                 dump_list_of_lost_blueprints(
                     glf,
+                    priority,
+                    settings.activities,
                     corporation,
                     lost_blueprints)
             if lost_asset_items:
                 dump_list_of_lost_asset_items(
                     glf,
+                    priority,
+                    settings.activities,
                     corporation,
                     lost_asset_items)
         # удаление списков найденных чертежей, предметов и работ

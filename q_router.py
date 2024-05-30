@@ -151,7 +151,7 @@ def main():
                 # читаем настройки производственной активности
                 settings.fixed_number_of_runs = conveyor.get('fixed_number_of_runs', None)
                 settings.same_stock_container = conveyor.get('same_stock_container', True)
-                settings.activities = [tools.ConveyorActivity.from_str(a) for a in activities]
+                settings.activities = [db.QSwaggerActivityCode.from_str(a) for a in activities]
                 settings.conveyor_with_reactions = conveyor.get('reactions', False)
                 # получаем информацию по реакциям (если включены)
                 for container_id in corporation.container_ids:
@@ -223,7 +223,7 @@ def main():
                             settings.containers_exclude.append(scs)
                         else:
                             # получаем информацию по коробкам, откуда можно брать дополнительные чертежи (например T1)
-                            if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in settings.activities:
+                            if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
                                 scb = tools.ConveyorSettingsContainer(settings, corporation, container)
                                 settings.containers_additional_blueprints.append(scb)
                 # если в этой корпорации не найдены основные параметры (контейнеры по названиям, то пропускаем корпу)
@@ -298,7 +298,7 @@ def main():
                 z = sorted([x for x in s.containers_output if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:
                     print('   output:     ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
-                if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
+                if db.QSwaggerActivityCode.MANUFACTURING in s.activities:
                     z = sorted([x for x in s.containers_additional_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
                     if z:
                         print('   blueprints: ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
