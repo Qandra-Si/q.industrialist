@@ -703,6 +703,8 @@ def calc_ready_products(
         router_settings: typing.List[RouterSettings],
         conveyor_settings: typing.List[ConveyorSettings]) \
         -> typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]:
+    if not conveyor_settings or not router_settings:
+        return {}
     # проверям, что конвейер - поддерживается только одна производственная корпорация
     corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
     if next((_ for _ in conveyor_settings if not _.corporation.corporation_id == corporation.corporation_id), None) is not None:

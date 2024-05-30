@@ -259,7 +259,7 @@ def main():
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
 
-    """
+    """"""
     # вывод на экран того, что получилось
     for (idx, __s) in enumerate(settings_of_router):
         s: tools.RouterSettings = __s
@@ -271,8 +271,8 @@ def main():
             product: typing.Optional[db.QSwaggerTypeId] = qid.get_type_id(p)
             print(f'  {product.type_id} {product.name}')
     print()
-    """
-    """
+    """"""
+    """"""
     # вывод на экран того, что получилось
     for (idx0, __s) in enumerate(settings_of_conveyors):
         s: tools.ConveyorSettings = __s
@@ -288,29 +288,31 @@ def main():
                                               [x.station_id for x in s.trade_sale_stock]))
         stations: typing.List[int] = sorted(stations, key=lambda x: qid.get_station(x).station_name if x else '')
         for station_id in stations:
-            print('station:       ', station_id, qid.get_station(station_id).station_name if station_id else None)
+            print(' station:      ', station_id, qid.get_station(station_id).station_name if station_id else None)
             z = sorted([x for x in s.containers_sources if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
-                print('>source:       ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+                print('   source:     ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             z = sorted([x for x in s.containers_stocks if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
-                print('>stock:        ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+                print('   stock:      ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             z = sorted([x for x in s.containers_output if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
-                print('>output:       ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+                print('   output:     ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             if tools.ConveyorActivity.CONVEYOR_MANUFACTURING in s.activities:
                 z = sorted([x for x in s.containers_additional_blueprints if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:
-                    print('>blueprints:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+                    print('   blueprints: ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+            if s.conveyor_with_reactions:
+                z = sorted([x for x in s.containers_react_formulas if x.station_id == station_id], key=lambda x: x.container_name)
+                if z:
+                    print('   formulas:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             z = sorted([x for x in s.trade_sale_stock if x.station_id == station_id], key=lambda x: x.container_name)
             if z:
-                print('>trader corp:  ', '\n                '.join([f'{x.trade_corporation.corporation_id} {x.trade_corporation.corporation_name}' for x in z]))
-                print('>sale stock:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
+                print('   trader corp:', '\n                '.join([f'{x.trade_corporation.corporation_id} {x.trade_corporation.corporation_name}' for x in z]))
+                print('   sale stock: ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
         if s.fixed_number_of_runs is not None:
             print('fixed runs:    ', s.fixed_number_of_runs)
-        if s.conveyor_with_reactions:
-            print('formulas:      ', ';'.join(sorted([corporation.assets.get(x).name for x in s.containers_react_formulas], key=lambda x: x)))
-    """
+    """"""
 
     # вывод в отчёт результатов работы роутера
     render_html_conveyor_db.dump_router2_into_report(

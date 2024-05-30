@@ -1040,6 +1040,8 @@ def dump_list_of_possible_blueprints(
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}""")
         quantities: str = '<br>'
         times: str = '<br>'
+        min_tt: int = 0
+        max_tt: int = 0
         for stack in stacks:
             # TODO: здесь какая-то путаница с activity(ies)
             na = []
@@ -1049,6 +1051,10 @@ data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-to
             # ---
             b0: db.QSwaggerCorporationBlueprint = stack.group[0]
             tt: typing.Tuple[int, int] = tools.get_min_max_time(settings.activities, stack)
+            if min_tt == 0:
+                min_tt, max_tt = tt
+            else:
+                min_tt, max_tt = min(min_tt, tt[0]), max(max_tt, tt[1])
             glf.write(f"{tr_div_class('div', stack, True)}"
                       f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} "
                       f"<me_tag>{b0.material_efficiency}%</me_tag>"
@@ -1060,9 +1066,11 @@ data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-to
             times += f"{tr_div_class('div', stack, True)}" \
                      f"{format_time_to_time(tt[0], tt[1])}" \
                      f"{tr_div_class('div', None, False)}"
+        min_duration: str = f' data-midur="{min_tt}"'
+        max_duration: str = f' data-madur="{max_tt}"' if min_tt != max_tt else ''
         glf.write(f"""</td>
 <td>{quantities}</td>
-<td>{times}</td>
+<td{min_duration}{max_duration}>{times}</td>
 <td></td><td></td><td></td>
 </tr>""")
 

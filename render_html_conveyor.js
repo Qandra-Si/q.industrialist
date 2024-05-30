@@ -301,6 +301,13 @@ function chooseMaterial(qmat) {
  });
 }
 //-----------
+//сортировка содержимого таблицы конвейера
+//-----------
+let g_tbl_summary_col_orders = [-1,+1]; // -1:desc, +1:asc
+let g_tbl_summary_col_types = [0,1];
+function sortConveyor(table, order, what, typ) {
+}
+//-----------
 //работа с содержимом страницы
 //-----------
 function changeElemVisibility(el, show){
@@ -386,6 +393,8 @@ function rebuildBody() {
    changeElemVisibility(tr, hide_router);
   }
  }
+
+ sortConveyor();
 }
 //-----------
 // обработчики нажатий на кнопки
