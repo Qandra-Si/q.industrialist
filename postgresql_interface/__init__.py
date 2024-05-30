@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+﻿# -*- encoding: utf-8 -*-
 """ Entry point of qind_postgresql_db, also contains shortcuts for all required objects """
 
 from .db_interface import QIndustrialistDatabase  # noqa
