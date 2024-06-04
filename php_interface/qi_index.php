@@ -182,6 +182,8 @@ EOD;
     $trade_hubs = pg_fetch_all($trade_hubs_cursor);
     //---
     if ($trade_hubs)
+    {
+        ?><h4>Профит вывоза из ларька и продажи в Jita</h4><?php
         foreach ($trade_hubs as &$hub)
         {
             $location_id = $hub['id'];
@@ -189,6 +191,15 @@ EOD;
             $solar_system_name = $hub['sys'];
             ?><a class="btn btn-success" href="/qi_trade_hub_profits.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
         }
+        ?><h4>Профит закупа в Jita и продажи в ларьке</h4><?php
+        foreach ($trade_hubs as &$hub)
+        {
+            $location_id = $hub['id'];
+            $trade_hub_name = $hub['nm'];
+            $solar_system_name = $hub['sys'];
+            ?><a class="btn btn-success" href="/qi_trade_hub_shortfalls.php?trade_hub_id=<?=$location_id?>" role="button" data-toggle="tooltip" data-placement="top" title="<?=$trade_hub_name?>"><?=$solar_system_name?></a> <?php
+        }
+    }
 ?>
  </p>
 </div> <!--container-fluid-->
