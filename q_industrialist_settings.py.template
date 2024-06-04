@@ -46,8 +46,14 @@ g_market_hubs = [
     # },
 ]
 g_market_structures = [
-    { "structure_id": 1028858195912 },  # Perimeter - Tranquility Trading Tower (Keepstar)
+    # { "structure_id": 1028858195912 },  # Perimeter - Tranquility Trading Tower (Keepstar)
     # { "structure_id": 1023968078820 },  # Ashab - Tranquility Trade & Prod Center (Sotiyo)
+
+    # дальнейший доступ к публичным структурам типа Perimeter - Tranquility Trading Tower. (Astrahus) или
+    # Ashab - Tranquility T2 Refinery теперь сопровождается ошибкой:
+    # 403 Client Error: Forbidden for url: https://esi.evetech.net/latest/markets/structures/1036106515863/?page=1
+    # {'error': 'Market access denied'}
+    # так что добавлять структуры в этот список следует крайне осторожно, пожно схлопотать бан
 
     { "structure_id": 1034323745897,  # P-ZMZV - SUSLIK Q STAR (Keepstar)
       "corporation_name": "R Initiative 4",  # название корпорации, от имени которой считывать market-данные (д.б. доступ)

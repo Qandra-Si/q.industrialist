@@ -174,7 +174,7 @@ EOD;
 select distinct th.ethp_location_id as id, nm.name as nm, nm.solar_system_name as sys
 from qi.esi_trade_hub_prices th
   left outer join qi.esi_known_stations nm on (nm.location_id=th.ethp_location_id)
-where th.ethp_location_id<>60003760
+where th.ethp_location_id<>60003760 and not nm.forbidden
 order by 2, 1;
 EOD;
     $trade_hubs_cursor = pg_query($conn, $query)
