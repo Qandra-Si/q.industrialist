@@ -190,13 +190,11 @@ function sortConveyorInternal(table, asc, what) {
    return // -3 .. +3
     (asc?1:-1) * (((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0)) +
     ((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0);
-   break;
   case 0: // name
   case 1: // duration
    return // -3 .. +3
     ((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0) +
     (asc?1:-1) * (((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0));
-   break;
   }
   //if (keyA[0] == keyB[0]) {
   // if (keyA[1] == keyB[1]) return 0;
