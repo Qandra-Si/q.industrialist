@@ -185,14 +185,27 @@ function sortConveyorInternal(table, asc, what) {
  tbody.find('tr').sort(function(a, b) {
   const keyA = getSortKey(a, asc, what);
   const keyB = getSortKey(b, asc, what);
-  if (keyA[0] == keyB[0]) {
-   if (keyA[1] == keyB[1]) return 0;
-   return asc ? (keyA[1] - keyB[1]) : (keyB[1] - keyA[1]);
+  switch (what) {
+  case 2: // priority
+   return // -3 .. +3
+    (asc?1:-1) * (((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0)) +
+    ((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0);
+   break;
+  case 0: // name
+  case 1: // duration
+   return // -3 .. +3
+    ((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0) +
+    (asc?1:-1) * (((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0));
+   break;
   }
-  if (what != 2) // 2=priority
-   return keyA[0] - keyB[0];
-  else
-   return asc ? (keyA[0] - keyB[0]) : (keyB[0] - keyA[0]);
+  //if (keyA[0] == keyB[0]) {
+  // if (keyA[1] == keyB[1]) return 0;
+  // return asc ? (keyA[1] - keyB[1]) : (keyB[1] - keyA[1]);
+  //}
+  //if (what != 2) // 2=priority
+  // return keyA[0] - keyB[0];
+  //else
+  // return asc ? (keyA[0] - keyB[0]) : (keyB[0] - keyA[0]);
  }).appendTo(tbody);
  return 0;
 }
