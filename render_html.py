@@ -58,6 +58,29 @@ def __get_icon_src(icon_id, sde_icon_ids):
         return ""
 
 
+def __get_industry_icon_src(activity_code: int) -> str:
+    if activity_code == 1:
+        return 'images/industry/manufacturing-color.png'
+    elif activity_code == 8:
+        return 'images/industry/invention-color.png'
+    elif activity_code == 5:
+        return 'images/industry/copying-color.png'
+    elif activity_code == 3 or activity_code == 4:
+        return 'images/industry/research-color.png'
+    elif activity_code == 9:
+        return 'images/industry/reaction-color.png'
+    else:
+        raise Exception('Unknown activity')
+
+
+def __get_industry_icon_img_ex(activity_code: int, icn_class: str) -> str:
+    return f'<img class="{icn_class}" src="{__get_industry_icon_src(activity_code)}">'
+
+
+def __get_industry_icon_img(activity_code: int, size: int = 24) -> str:
+    return __get_industry_icon_img_ex(activity_code, f'icn{size}')
+
+
 def __get_file_src(filename: str) -> str:
     if q_industrialist_settings.g_use_filesystem_resources:
         return f'../{filename}'

@@ -856,7 +856,7 @@ def get_conveyor_table_sort_data(
         duration: typing.Optional[typing.Tuple[int, int]]):
     sort = {'p': priority, 'a': [_.to_int() for _ in activities]}
     if row_num is not None:
-        sort.update({'n': row_num})
+        sort.update({'n': row_num + 1})  # не м.б. 0, т.к. 0 зарезервирован для banner-а
     if duration is not None:
         if duration[0] == duration[1]:  # 0-min, 1-max
             sort.update({'d': duration[0]})

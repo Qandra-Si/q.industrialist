@@ -1,4 +1,8 @@
-﻿table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
+﻿/* see https://www.eveonline.com/news/view/industry-ui */
+.icn12 { width:12px; height:12px; }
+.icn_industry { width:12px; height:12px; margin-bottom:1px; }
+
+table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
 
 table.qind-table-materials tbody > tr > td:nth-child(2) > img /* material icon (compact view) */
 { margin-top: -2px; margin-bottom: -1px; }

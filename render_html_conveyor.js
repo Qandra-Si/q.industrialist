@@ -73,6 +73,12 @@ function eveCeiling(isk) {
   else isk = null;
   return isk;
 }
+function changeElemVisibility(el, show){
+ if(show)
+  el.removeClass('hidden');
+ else
+  el.addClass('hidden');
+}
 //-----------
 // работа с локальным хранилищем
 //-----------
@@ -100,28 +106,23 @@ function getOptionValue(grp, opt) { // for strings and numbers
 function toggleMenuMarker(btn, show){
  if(show){
   btn.addClass('qind-btn-active');
-  btn.find('span').removeClass('hidden');
+  changeElemVisibility(btn.find('span'), 1);
  }else{
   btn.removeClass('qind-btn-active');
-  btn.find('span').addClass('hidden');
+  changeElemVisibility(btn.find('span'), 0);
  }
 }
 function toggleSortMarkers(mode, asc){
  $('button.qind-btn-sort').each(function() {
   if ($(this).attr('qind-group') == mode) {
    $(this).addClass('active');
-   if (asc) {
-    $(this).find('span.asc').removeClass('hidden');
-    $(this).find('span.desc').addClass('hidden');
-   } else {
-    $(this).find('span.asc').addClass('hidden');
-    $(this).find('span.desc').removeClass('hidden');
-   }
+   changeElemVisibility($(this).find('span.asc'), asc);
+   changeElemVisibility($(this).find('span.desc'), !asc);
   }
   else {
    $(this).removeClass('active');
-   $(this).find('span.asc').addClass('hidden');
-   $(this).find('span.desc').addClass('hidden');
+   changeElemVisibility($(this).find('span.asc'), 0);
+   changeElemVisibility($(this).find('span.desc'), 0);
   }
  });
 }
@@ -138,72 +139,93 @@ function rebuildOptionsMenu() {
 //-----------
 //сортировка содержимого таблицы конвейера
 //-----------
-const g_tbl_summary_priority_multiplier = 1000000000; // приоритетов десять: 0..9
+const g_tbl_summary_unused_priority = -1;
+const g_tbl_summary_priority_multiplier = 100000; // приоритетов десять: 0..9
 const g_tbl_summary_activity_multiplier = Math.floor(g_tbl_summary_priority_multiplier / 10); // activity от 1 до 9
 const g_tbl_summary_half_activity = Math.floor(g_tbl_summary_activity_multiplier / 2);
 //-----------
 function getSortKey(x, asc, what) { // what: 0-name, 1-duration
-  var row = $(x);
-  var priority = -1;
-  var activity = 0;
-  var val = 0;
-  if (row.hasClass('row-conveyor')) {
-   var tag = row.data('tag');
-   if (!(tag === undefined)) {
-    priority = tag.p;
-    activity = asc ? Math.min(tag.a) : Math.max(tag.a);
-    val = asc ? 0 : g_tbl_summary_activity_multiplier - 1;
-   }
-  } else {
-   var sort = row.data('sort');
-   if (!(sort === undefined)) {
-    priority = sort.p;
-    activity = asc ? Math.min(sort.a) : Math.max(sort.a);
-    switch (what) {
-    case 0: // name
-    case 2: // priority
-     if (sort.lp == undefined)
-      val = asc ? sort.n : (g_tbl_summary_half_activity + sort.n);
-     else // незапускаемые работы/строки всегда внизу
-      val = asc ? (g_tbl_summary_half_activity + sort.n) : sort.n;
-     break;
-    case 1: // duration
-     if (!(sort.d == undefined))
-      val = sort.d;
-     else if (!(sort.d1 == undefined))
-      val = asc ? sort.d1 : sort.d2;
-     else // duration неизвестен (это не чертёж для запуска) - всегда внизу
-      val = asc ? ((g_tbl_summary_activity_multiplier - 1) - sort.n) : sort.n;
-     break;
-    }
-   }
+ var row = $(x);
+ var priority = g_tbl_summary_unused_priority;
+ var activity = 0;
+ var val = 0;
+ if (row.hasClass('row-conveyor')) {
+  var tag = row.data('tag');
+  if (tag === undefined) return 0;
+  priority = (tag.p === null) ? g_tbl_summary_unused_priority : tag.p;
+  activity = asc ? Math.min(...tag.a) : Math.max(...tag.a);
+  val = 0;
+ } else {
+  var sort = row.data('sort');
+  if (sort === undefined) return 0;
+  priority = sort.p;
+  activity = asc ? Math.min(...sort.a) : Math.max(...sort.a);
+  switch (what) {
+  case 0: // name
+   priority = g_tbl_summary_unused_priority;
+   let txt = row.find('qname').html();
+   if (sort.lp == undefined)
+    val = asc ? txt : ('±' + txt);
+   else // незапускаемые работы/строки всегда внизу
+    val = asc ? ('±' + txt) : txt;
+   break;
+  case 2: // priority
+   if (sort.lp == undefined)
+    val = asc ? sort.n : (g_tbl_summary_half_activity + sort.n);
+   else // незапускаемые работы/строки всегда внизу
+    val = asc ? (g_tbl_summary_half_activity + sort.n) : sort.n;
+   break;
+  case 1: // duration
+   priority = g_tbl_summary_unused_priority;
+   if (!(sort.d == undefined))
+    val = sort.d;
+   else if (!(sort.d1 == undefined))
+    val = (asc ? sort.d1 : sort.d2);
+   else // duration неизвестен (это не чертёж для запуска) - всегда внизу
+    val = -sort.n;
+   break;
   }
-  return [g_tbl_summary_priority_multiplier * (priority+1) + g_tbl_summary_activity_multiplier * activity, val];
+ }
+ return [g_tbl_summary_priority_multiplier * (priority+1) + g_tbl_summary_activity_multiplier * activity, val];
 }
 function sortConveyorInternal(table, asc, what) {
  var tbody = table.find('tbody');
  tbody.find('tr').sort(function(a, b) {
   const keyA = getSortKey(a, asc, what);
   const keyB = getSortKey(b, asc, what);
+  /*console.log(
+   'a:', keyA,
+   'b:', keyB,
+   'x:', $(a).find('td:eq(0)').html().substring(0, 11),
+   'y:', $(b).find('td:eq(0)').html().substring(0, 11),
+   keyA[0] == keyB[0],
+   (keyA[1]>keyB[1])?1:-1,
+   (asc?1:-1) * ((keyA[0]>keyB[0])?1:-1));*/
   switch (what) {
   case 2: // priority
-   return // -3 .. +3
-    (asc?1:-1) * (((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0)) +
-    ((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0);
+   if (keyA[0] == keyB[0]) {
+    if (keyA[1] == 0) return -1;
+    if (keyB[1] == 0) return 1;
+    if (keyA[1] == keyB[1]) return 0;
+    return (keyA[1]>keyB[1])?1:-1;
+   }
+   return (asc?1:-1) * ((keyA[0]>keyB[0])?1:-1);
   case 0: // name
   case 1: // duration
-   return // -3 .. +3
-    ((keyA[0]>keyB[0])?2:0) - ((keyB[0]>keyA[0])?2:0) +
-    (asc?1:-1) * (((keyA[1]>keyB[1])?1:0) - ((keyB[1]>keyA[1])?1:0));
+   if (keyA[0] == keyB[0]) {
+    if (keyA[1] == 0) return -1;
+    if (keyB[1] == 0) return 1;
+    if (keyA[1] == keyB[1]) return 0;
+    if (keyA[1] < 0) {
+     if (keyB[1] < 0) return (keyA[1]<keyB[1])?1:-1;
+     return 1;
+    } else if (keyB[1] < 0) {
+     return -1;
+    }
+    return (asc?1:-1) * ((keyA[1]>keyB[1])?1:-1);
+   }
+   return (keyA[0]>keyB[0])?1:-1;
   }
-  //if (keyA[0] == keyB[0]) {
-  // if (keyA[1] == keyB[1]) return 0;
-  // return asc ? (keyA[1] - keyB[1]) : (keyB[1] - keyA[1]);
-  //}
-  //if (what != 2) // 2=priority
-  // return keyA[0] - keyB[0];
-  //else
-  // return asc ? (keyA[0] - keyB[0]) : (keyB[0] - keyA[0]);
  }).appendTo(tbody);
  return 0;
 }
@@ -215,6 +237,11 @@ function sortConveyor() {
  case 'duration': what = 1; break;
  case 'priority': what = 2; break;
  }
+ $('tr.row-conveyor').each(function() {
+  var tag = $(this).data('tag');
+  if (tag === undefined) return;
+  changeElemVisibility($(this), ((tag.p === null)?-1:2) == ((what==2)?2:-1));
+ });
  sortConveyorInternal(
   $('table.tbl-summary'),
   (getOption('sort', 'order') == 1) ? true : false,
@@ -251,7 +278,7 @@ function toggleConveyorVisibility(btn, hide) {
   btn.removeClass('qind-btn-hide-open');
   btn.addClass('qind-btn-hide-close');
  }
- rebuildBody();
+ rebuildConveyorTable();
 }
 function initConveyorVisibility() {
  $('tr.row-conveyor * a.qind-btn-hide').each(function() {
@@ -291,7 +318,7 @@ function toggleRouterVisibility(btn, hide) {
   btn.removeClass('qind-btn-hide-open');
   btn.addClass('qind-btn-hide-close');
  }
- rebuildBody();
+ rebuildRouterTable();
 }
 function initRouterVisibility() {
  $('tr.row-station * a.qind-btn-hide').each(function() {
@@ -404,13 +431,7 @@ function chooseMaterial(qmat) {
 //-----------
 //работа с содержимом страницы
 //-----------
-function changeElemVisibility(el, show){
- if(show)
-  el.removeClass('hidden');
- else
-  el.addClass('hidden');
-}
-function rebuildBody() {
+function rebuildConveyorTable() {
  var show_possible = (getOption('option', 'run-possible') == 1) ? 1 : 0;
  var show_impossible = (getOption('option', 'run-impossible') == 1) ? 1 : 0;
  var show_lost = (getOption('option', 'lost-items') == 1) ? 1 : 0;
@@ -471,7 +492,8 @@ function rebuildBody() {
  var used_materials = (getOption('option', 'used-materials') == 1) ? 1 : 0;
  var not_available = (getOption('option', 'not-available') == 1) ? 1 : 0;
  initMaterialsOfBlueprints(used_materials, not_available);
-
+}
+function rebuildRouterTable() {
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
  var show_entry_purch = (getOption('option', 'entry-level-purchasing') == 1) ? 1 : 0;
  var show_interm_manuf = (getOption('option', 'intermediate-manuf') == 1) ? 1 : 0;
@@ -504,7 +526,7 @@ $('a.qind-btn-settings').on('click', function () {
    setOption('option', 'used-materials', 0);
  }
  rebuildOptionsMenu();
- rebuildBody();
+ rebuildConveyorTable();
 });
 //---
 function formatTime(sec) {
@@ -637,8 +659,9 @@ function firstInit() {
  rebuildOptionsMenu();
  initConveyorVisibility();
  initRouterVisibility();
- rebuildBody();
- sortConveyor();
+ sortConveyor(); // используется до rebuildConveyorTable
+ rebuildConveyorTable();
+ rebuildRouterTable();
 }
 
 $(document).ready(function(){
@@ -648,7 +671,6 @@ $(document).ready(function(){
   });
   // first init
   firstInit();
-  sortConveyor();
   //rebuildStocksDropdown();
   //rebuildStockMaterials();
   // init popover menus
@@ -673,6 +695,7 @@ $(document).ready(function(){
    }
    rebuildOptionsMenu();
    sortConveyor();
+   rebuildConveyorTable();
   });
   // Working with clipboard
   $('a.qind-copy-btn').each(function() {
@@ -698,9 +721,7 @@ $(document).ready(function(){
   });
   if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
     // какой-то код ...
-    $('a.qind-copy-btn').each(function() {
-      $(this).addClass('hidden');
-    })
+    $('a.qind-copy-btn').each(function() { changeElemVisibility($(this), 0); });
   }
   // Delayed and low priority operations
   initMaterialNames();

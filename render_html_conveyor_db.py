@@ -99,6 +99,12 @@ def format_time_to_time(min_num: int, max_num: int, mute_min: bool = True) -> st
         return f'от {res} до ' + sec_to_timestr(max_num)
 
 
+def get_industry_icons(activities: typing.List[db.QSwaggerActivityCode], delimiter: str = ' ') -> str:
+    activity_distinct: typing.Set[int] = set([3 if _ == 4 else _ for _ in [_.to_int() for _ in activities]])
+    activity_icons: str = delimiter.join([render_html.__get_industry_icon_img_ex(_, 'icn_industry') for _ in activity_distinct])
+    return activity_icons
+
+
 class NavMenuDefaults:
     def __init__(self):
         self.run_possible: bool = True
@@ -787,12 +793,14 @@ def dump_list_of_jobs(
         # --- --- ---
         sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=None)
         # --- --- ---
+        activity_icon: str = get_industry_icons(db.get_activities_by_nums([j0.activity_id]))
+        # --- --- ---
         glf.write(f"""<tr
  class="{tr_class}{lost_class}"
  data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
-<td>{blueprint_type_name}&nbsp;<a
+<td>{activity_icon}&nbsp;<qname>{blueprint_type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{blueprint_type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 {active_label}<br>
 <mute>Число прогонов - </mute>{sum_runs}
@@ -874,7 +882,7 @@ def dump_list_of_lost_blueprints(
  data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
+<td><qname>{type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-lost-blueprints">{declension_of_lost_blueprints(len(group))}</label>{container_prefix}{containers}<!--
 item_ids: {[_.item_id for _ in group]}--></td>
@@ -926,7 +934,7 @@ def dump_list_of_lost_asset_items(
  data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
+<td><qname>{type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-lost-assets">{declension_of_lost_assets(len(group))}</label>{container_prefix}{containers}<!--
 item_ids: {[_.item_id for _ in group]}--></td>
@@ -976,7 +984,7 @@ def dump_list_of_phantom_blueprints(
  data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
+<td><qname>{type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class="label label-phantom-blueprint">фантомный чертёж</label><br
 >{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} <me_tag
@@ -1070,6 +1078,7 @@ def dump_list_of_possible_blueprints(
                     if d:
                         decryptor = f'<mute> - модернизируй с </mute><qdecr>{d.material_type.name}</qdecr>'
 
+        # если активностей в одном конвейере несколько, то настройки скорее всего неправильные
         details: str = ''
         quantities: str = '<br>'
         times: str = '<br>'
@@ -1101,18 +1110,40 @@ def dump_list_of_possible_blueprints(
                      f"{tr_div_class('div', None, False)}"
 
         sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=(min_duration, max_duration))
+        activity_icons: str = get_industry_icons(settings.activities)
 
         glf.write(f"""
 <tr{tr_div_class('tr')} data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{type_name}&nbsp;<a
+<td>{activity_icons}&nbsp;<qname>{type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}
 {details}</td>
 <td>{quantities}</td>
 <td>{times}</td>
 <td></td><td></td><td></td>
 </tr>""")
+
+
+def dump_conveyor_banner(
+        glf,
+        label: str,
+        priority: typing.Optional[int],
+        activities: typing.List[db.QSwaggerActivityCode],
+        additional_class: typing.Optional[typing.List[str]] = None) -> None:
+    if label: label += ' '
+    if additional_class:
+        additional_class: str = ' ' + ' '.join(additional_class)
+    else:
+        additional_class: str = ''
+    # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
+    tag = tools.get_conveyor_table_sort_data(priority, activities, row_num=None, duration=None)
+    glf.write(f"""<tr class="row-conveyor{additional_class}" data-tag='{json.dumps(tag, separators=(',', ':')).replace("'", '"')}'>
+<td colspan="8">{label}<mute>{', '.join([str(_) for _ in activities])}</mute>
+<a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a>
+</td>
+</tr>
+""")
 
 
 def dump_corp_conveyors(
@@ -1170,22 +1201,17 @@ def dump_corp_conveyors(
 <tbody>
 """)
 
+    for s in conveyor_settings:
+        dump_conveyor_banner(glf, '', None, s.activities, additional_class=['hidden'])
+
     # перебираем сгруппированные преоритизированные группы
     for priority in sorted(prioritized.keys()):
         p0 = prioritized.get(priority)
         for settings in p0.keys():
-            # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
-            tag = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=None, duration=None)
+            dump_conveyor_banner(glf, f'Приоритет {priority}', priority, settings.activities)
             # получаем список контейнеров с чертежами для производства
             containers: typing.List[tools.ConveyorSettingsPriorityContainer] = p0.get(settings)
             container_ids: typing.Set[int] = set([_.container_id for _ in containers])
-            glf.write(f"""<tr class="row-conveyor" data-tag='{json.dumps(tag,separators=(',', ':')).replace("'",'"')}'>
-<td colspan="8">Приоритет {priority}
-<mute>{', '.join([str(_) for _ in settings.activities])}</mute>
-<a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a>
-</td>
-</tr>
-""")
             """
             glf.write(f"containers: {[f'{_.container_id}:<mark>{_.container_name}</mark>' for _ in containers]}<br>")
             """

@@ -259,6 +259,20 @@ class QSwaggerActivityCode(Enum):
     def to_int(self) -> int:
         return int(self.value)
 
+    def to_rus(self) -> str:
+        if self == QSwaggerActivityCode.MANUFACTURING:
+            return 'производство'
+        elif self == QSwaggerActivityCode.INVENTION:
+            return 'модернизация'
+        elif self == QSwaggerActivityCode.COPYING:
+            return 'копирование'
+        elif self == QSwaggerActivityCode.RESEARCH_MATERIAL or QSwaggerActivityCode.RESEARCH_TIME:
+            return 'исследование'
+        elif self == QSwaggerActivityCode.REACTION:
+            return 'реакция'
+        else:
+            raise Exception('Unknown activity')
+
     @staticmethod
     def from_str(label):
         if label == 'manufacturing':
@@ -275,6 +289,26 @@ class QSwaggerActivityCode(Enum):
             return QSwaggerActivityCode.REACTION
         else:
             raise Exception('Unknown activity label')
+
+
+def get_activities_by_nums(codes: typing.List[int]) -> typing.List[QSwaggerActivityCode]:
+    res: typing.List[QSwaggerActivityCode] = list()
+    for num in codes:
+        if num == QSwaggerActivityCode.MANUFACTURING.value:
+            res.append(QSwaggerActivityCode.MANUFACTURING)
+        elif num == QSwaggerActivityCode.INVENTION.value:
+            res.append(QSwaggerActivityCode.INVENTION)
+        elif num == QSwaggerActivityCode.COPYING.value:
+            res.append(QSwaggerActivityCode.COPYING)
+        elif num == QSwaggerActivityCode.RESEARCH_MATERIAL.value:
+            res.append(QSwaggerActivityCode.RESEARCH_MATERIAL)
+        elif num == QSwaggerActivityCode.RESEARCH_TIME.value:
+            res.append(QSwaggerActivityCode.RESEARCH_TIME)
+        elif num == QSwaggerActivityCode.REACTION.value:
+            res.append(QSwaggerActivityCode.REACTION)
+        else:
+            raise Exception('Unknown activity num')
+    return res
 
 
 class QSwaggerActivity:
