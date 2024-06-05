@@ -16,9 +16,9 @@ def dump_materials_to_js(glf, dictionary: tools.ConveyorDictionary) -> None:
     type_id_keys = dictionary.materials
     sorted_type_id_keys = sorted(type_id_keys, key=lambda x: int(x))
     glf.write(f"""<script>
-var g_sde_max_type_id={sorted_type_id_keys[-1] if len(sorted_type_id_keys) else 0};
-var g_sde_type_len={len(sorted_type_id_keys)};
-var g_sde_type_ids=[""")
+const g_sde_max_type_id={sorted_type_id_keys[-1] if len(sorted_type_id_keys) else 0};
+const g_sde_type_len={len(sorted_type_id_keys)};
+const g_sde_type_ids=[""")
     for (idx, type_id) in enumerate(sorted_type_id_keys):
         # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
         glf.write('{end}[{id},"{nm}"]'.format(
@@ -27,14 +27,25 @@ var g_sde_type_ids=[""")
             end=',' if idx else "\n"))
     glf.write("""
 ];
-function getSdeItemName(t) {
- if ((t < 0) || (t > g_sde_max_type_id)) return null;
- for (var i=0; i<g_sde_type_len; ++i) {
-  var ti = g_sde_type_ids[i][0];
-  if (t == ti) return g_sde_type_ids[i][1];
-  if (ti >= g_sde_max_type_id) break;
+let iterativeSdeItem = function (arr, x) {
+ let start = 0, end = g_sde_type_len - 1;
+ while (start <= end) {
+  let mid = Math.floor((start + end) / 2);
+  let ti = arr[mid][0];
+  if (ti == x)
+   return arr[mid];
+  else if (ti < x)
+   start = mid + 1;
+  else
+   end = mid - 1;
  }
  return null;
+}
+function getSdeItemName(t) {
+ if ((t < 0) || (t > g_sde_max_type_id)) return null;
+ let x = iterativeSdeItem(g_sde_type_ids, t, 0, g_sde_type_ids.length - 1);
+ if (x === null) return null;
+ return x[1];
 }
 </script>
 """)
