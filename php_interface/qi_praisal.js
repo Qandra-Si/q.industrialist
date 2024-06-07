@@ -180,6 +180,7 @@ function refreshMarketOrdersAndHistory(type_id, hub, corp) {
  setOption('Selected Market Hub', hub);
  setOption('Selected Trader Corp', corp);
  for (const h of g_market_hubs) {
+  if (h === null) break;
   if (h[0] != hub) continue;
   if (h[1] != corp) continue;
   $('#dtlsSelMarketHub ul').find('li').each(function() {
