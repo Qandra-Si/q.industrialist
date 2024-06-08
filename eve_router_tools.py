@@ -1206,7 +1206,7 @@ class ConveyorManufacturingAnalysis:
                 ])
         self.product_tier1_num_in_sell: int = sum([_.volume_remain for _ in self.product_tier1_in_sell])
         # проверка избыточного количества продукта
-        self.product_tier1_overstock: bool = self.num_ready >= 50
+        self.product_tier1_overstock: bool = self.num_ready >= 1000
 
     @property
     def num_ready(self) -> int:
