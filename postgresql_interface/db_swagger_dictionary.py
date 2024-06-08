@@ -340,6 +340,21 @@ class QSwaggerDictionary:
             load_unknown_type_blueprints=load_unknown_type_blueprints)
         return corporation.industry_jobs_completed
 
+    def load_corporation_orders_active(
+            self,
+            corporation: QSwaggerCorporation) -> typing.Dict[int, QSwaggerCorporationOrder]:
+        if not isinstance(corporation, QSwaggerCorporation):
+            raise Exception("Illegal corporation descriptor")
+        corporation.orders = self.__qit.get_corporation_orders_active(
+            # идентификаторы
+            corporation.corporation_id,
+            # справочники
+            self.sde_type_ids,
+            # публичные сведения (пилоты, структуры, станции)
+            self.characters,
+            self.stations)
+        return corporation.orders
+
     def load_corporation_stations(
             self,
             corporation: QSwaggerCorporation) -> typing.Dict[int, QSwaggerStation]:
@@ -353,7 +368,10 @@ class QSwaggerDictionary:
         blueprints_stations: typing.Set[int] = set()
         if corporation.blueprints:
             blueprints_stations = set([b.station_id for b in corporation.blueprints.values() if b.station_id is not None])
-        station_ids: typing.Set[int] = assets_stations | blueprints_stations
+        market_stations: typing.Set[int] = set()
+        if corporation.orders:
+            market_stations = set([o.location_id for o in corporation.orders.values() if o.location_id is not None])
+        station_ids: typing.Set[int] = assets_stations | blueprints_stations | market_stations
         return self.load_stations(station_ids)
 
     def get_market_group_chain(self, item_type: QSwaggerTypeId) -> typing.List[int]:

@@ -110,6 +110,11 @@ def format_time_to_time(min_num: int, max_num: int, mute_min: bool = True) -> st
         return f'от {res} до ' + sec_to_timestr(max_num)
 
 
+def format_json_data(data_name: str, data_val: typing.Any) -> str:
+    val: str = json.dumps(data_val, separators=(',', ':')).replace("'", '"')
+    return f"data-{data_name}='{val}'"
+
+
 def get_industry_icons(activities: typing.List[db.QSwaggerActivityCode], delimiter: str = ' ') -> str:
     activity_distinct: typing.Set[int] = set([3 if _ == 4 else _ for _ in [_.to_int() for _ in activities]])
     activity_icons: str = delimiter.join([render_html.__get_industry_icon_img_ex(_, 'icn_industry') for _ in activity_distinct])
@@ -120,6 +125,7 @@ class NavMenuDefaults:
     def __init__(self):
         self.run_possible: bool = True
         self.run_impossible: bool = False
+        self.overstock_products: bool = False
         self.lost_items: bool = False
         self.phantom_blueprints: bool = False
         self.job_active: bool = False
@@ -129,10 +135,14 @@ class NavMenuDefaults:
         self.not_available: bool = False
 
     def get(self, label: str) -> bool:
-        if label == 'run-possible' or label == 'row-possible' or label == 'row-multiple' or label == 'run-optional' or label == 'row-optional':
+        if label == 'row-multiple' or \
+           label == 'run-possible' or label == 'row-possible' or \
+           label == 'run-optional' or label == 'row-optional':
             return self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             return self.run_impossible
+        elif label == 'overstock-product' or label == 'row-overstock':
+            return self.overstock_products
         elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             return self.lost_items
         elif label == 'phantom-blueprints':
@@ -149,10 +159,14 @@ class NavMenuDefaults:
 
     def css(self, label: str, prefix: bool = True) -> str:
         opt: bool = False
-        if label == 'run-possible' or label == 'row-possible' or label == 'row-multiple' or label == 'run-optional' or label == 'row-optional':
+        if label == 'row-multiple' or \
+           label == 'run-possible' or label == 'row-possible' or \
+           label == 'run-optional' or label == 'row-optional':
             opt = self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
             opt = self.run_impossible
+        elif label == 'overstock-product' or label == 'row-overstock':
+            opt = self.overstock_products
         elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             opt = self.lost_items
         elif label == 'phantom-blueprints':
@@ -179,6 +193,7 @@ def dump_nav_menu(glf) -> None:
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str, bool]]] = [
         (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы', True),
         (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы', True),
+        (g_nav_menu_defaults.overstock_products, 'overstock-product',  'Избыточные чертежи (перепроизводство)', True),
         (g_nav_menu_defaults.lost_items,         'lost-items',         'Потерянные предметы (не на своём месте)', True),
         (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)', True),
         (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты', True),
@@ -328,7 +343,6 @@ def dump_nav_menu_router_dialog(
     row_num: int = 0
     for (idx, s) in enumerate(router_settings):
         # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
-        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
         router_details: typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]] = tools.get_router_details(
             qid,
             s,
@@ -344,16 +358,30 @@ def dump_nav_menu_router_dialog(
         glf.write(f"<h3 station_id='{station.station_id}'>{station.station_name} "
                   f"<small>({station.station_type_name}, {s.desc})</small>"
                   "</h3>")
+        stock_names: str = ''
         if not corporation or not containers_stocks:
-            glf.write("<span style='color:#ffa600'>Внимание! Не найдены stock-контейнеры, следует проверить настройки "
-                      "конвейера.</span>")
+            glf.write("<p style='color:#ffa600'>Внимание! Не найдены сток контейнеры, "
+                      "следует проверить настройки конвейера.</p>")
         else:
             z0 = sorted([corporation.assets.get(x).name for x in containers_stocks], key=lambda x: x)
-            glf.write("<small>Сток контейнеры: <ul><li><mark>" + "</mark><li><mark>".join(z0) + "</mark></ul></small>")
+            stock_names = "</mark><li><mark>".join(z0)
+        output_names: str = ''
+        if not corporation or not containers_output:
+            glf.write("<p style='color:#ffa600'>Внимание! Не найдены контейнеры готовой продукции, "
+                      "следует проверить настройки конвейера.</p>")
+        else:
+            z0 = sorted([corporation.assets.get(x).name for x in containers_output], key=lambda x: x)
+            output_names = "</mark><li><mark>".join(z0)
         glf.write(f"""
 <script>
 g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
 </script>
+
+<div class="row">
+ <div class="col-md-6"><small>Сток контейнеры:<ul><li><mark>{stock_names}</mark></ul></small></div>
+ <div class="col-md-6"><small>Контейнеры готовой продукции:<ul><li><mark>{output_names}</mark></ul></small></div>
+</div> <!-- row -->
+
 <div class="row">
 <div class="col-md-6">
 <table class="table table-condensed table-hover tbl-stock">
@@ -367,6 +395,7 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
 </thead>
 <tbody>""")
         materials: typing.Set[int] = set()
+        products: typing.Set[int] = set()
         if s.output:
             # если список output сконфигурирован, то имеет место быть станция из настроек router-а
             for product_type_id in s.output:
@@ -376,14 +405,21 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
                     mats: db.QSwaggerActivityMaterials = a.materials
                     for m in mats.materials:
                         materials.add(m.material_id)
+            products = set(s.output)
         else:
             # если список output пустой, то имеет место быть default-ная производственная база,
             # выводим весь сток материалов на этой базе
-            for a in corporation.assets.values():
-                if a.location_id in containers_stocks:
-                    materials.add(a.type_id)
+            for cs in conveyor_settings:
+                for type_id in cs.assets.stock.keys():
+                    if next((_ for _ in cs.assets.stock[type_id] if _.station_id == station.station_id), None):
+                        materials.add(type_id)
+            for cs in conveyor_settings:
+                for type_id in cs.assets.output.keys():
+                    if next((_ for _ in cs.assets.output[type_id] if _.station_id == station.station_id), None):
+                        products.add(type_id)
         # сохраняем в глобальный справочник материалов и продуктов используемых конвейером
         global_dictionary.load_type_ids(materials)
+        global_dictionary.load_type_ids(products)
         # сортируем по market-группам (внимание! market-group м.б. неизвестной, например для копий чертежей)
         sorted_materials = [(qid.get_type_id(x).market_group_id, x) for x in materials]
         sorted_materials.sort(key=lambda x: x[0] if x[0] else 0)
@@ -394,10 +430,13 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
             quantity: int = 0
             not_enough: int = 0  # = resource_dict["ne"]
             # считаем кол-во материалов в стоке
-            if corporation and containers_stocks:
-                for a in corporation.assets.values():
-                    if a.type_id == material_type_id and a.location_id in containers_stocks:
-                        quantity += a.quantity
+            for cs in conveyor_settings:
+                aa = cs.assets.get_with_unique_items(
+                    material_type_id,
+                    [tools.ConveyorPlace.STOCK],
+                    station.station_id)
+                if not aa: continue
+                quantity += sum([_.quantity for _ in aa])
             # --- --- ---
             # <qmaterial tid="16663" icn="24" cl="qind-sign"></qmaterial>
             # эквивалентно:
@@ -431,25 +470,41 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
  <tr>
   <th>#</th>
   <th>Продукция</th>
-  <th><small>В стоке</small></th>
+  <th><small>Готово</small></th>
   <th><small>Не хватает</small></th>
   <th><small>Произво-<br>-дится</small></th>
  </tr>
 </thead>
 <tbody>
 """)
-        for product_type_id in s.output:
+        # сортируем по market-группам (внимание! market-group м.б. неизвестной, например для копий чертежей)
+        sorted_products = [(qid.get_type_id(x).market_group_id, x) for x in products]
+        sorted_products.sort(key=lambda x: x[0] if x[0] else 0)
+        # выводим в отчёт
+        for __sort_key, product_type_id in sorted_products:
             row_num += 1
             product: db.QSwaggerTypeId = qid.get_type_id(product_type_id)
             if not product: continue
             quantity: int = 0
-            in_progress: int = 0  # = resource_dict["j"]
+            in_progress: int = 0
             not_enough: int = 0  # = resource_dict["ne"]
-            # считаем кол-во материалов в стоке
-            if corporation and containers_stocks:
-                for a in corporation.assets.values():
-                    if a.type_id == product_type_id and a.location_id in containers_stocks:
-                        quantity += a.quantity
+            # считаем кол-во продуктов в стоке/выходе
+            for cs in conveyor_settings:
+                aa = cs.assets.get_with_unique_items(
+                    product_type_id,
+                    [tools.ConveyorPlace.STOCK, tools.ConveyorPlace.OUTPUT, tools.ConveyorPlace.SALE_STOCK],
+                    station.station_id)
+                if aa:
+                    quantity += sum([_.quantity for _ in aa])
+                # ---
+                jj = cs.industry_jobs.get_with_unique_items(
+                    None,
+                    product_type_id,
+                    [tools.ConveyorJobPlace.BLUEPRINT, tools.ConveyorJobPlace.OUTPUT],
+                    station.station_id)
+                if jj:
+                    single_run_output: int = tools.get_single_run_output_quantity(product_type_id, jj[0].activity_id, qid)
+                    in_progress += single_run_output * sum([_.runs for _ in jj])
             # проверяем списки метариалов, используемых в исследованиях и производстве
             material_tag: str = ""
             #if product_type_id in materials_for_bps:
@@ -551,7 +606,7 @@ def dump_nav_menu_conveyor_dialog(
         stations: typing.List[int] = list(set([x.station_id for x in s.containers_sources] +
                                               [x.station_id for x in s.containers_stocks] +
                                               [x.station_id for x in s.containers_additional_blueprints] +
-                                              [x.station_id for x in s.trade_sale_stock]))
+                                              [x.station_id for x in s.containers_sale_stocks]))
         stations: typing.List[db.QSwaggerStation] = sorted(
             [qid.get_station(x) for x in stations],
             key=lambda x: x.station_name if x else '')
@@ -589,7 +644,7 @@ def dump_nav_menu_conveyor_dialog(
             del z
 
             z: typing.List[tools.ConveyorSettingsSaleContainer] = sorted(
-                [x for x in s.trade_sale_stock if x.station_id == station_id],
+                [x for x in s.containers_sale_stocks if x.station_id == station_id],
                 key=lambda x: x.container_name)
             if z:
                 w0: typing.List[str] = list(set([x.trade_corporation.corporation_name for x in z]))
@@ -636,6 +691,7 @@ def dump_nav_menu_lifetime_dialog(
         modal_size="modal-lg")
     # "текущее" время сервера БД (может отличаться от текущего времени построения отчёта
     server_time = qid.sde_lifetime.get(('current', None))
+    # формируем содержимое модального диалога
     glf.write(f"""
 <script>
 var g_server_time={int(server_time.timestamp())};
@@ -670,7 +726,23 @@ var g_server_time={int(server_time.timestamp())};
 </tbody>
 </table>
 """)
+    # закрываем footer модального диалога
+    render_html.__dump_any_into_modal_footer(glf)
+
+
+def dump_invent_product_dialog(glf) -> None:
+    # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
+    render_html.__dump_any_into_modal_header_wo_button(
+        glf,
+        "<icon></icon>&nbsp;<span id='product-name'></span>",
+        unique_id="IndustryProduct",
+        modal_size="modal-sm")
     # формируем содержимое модального диалога
+    glf.write("""<p>
+Хранится в ассетах: <span id="product-in-assets" class="quantity"></span><br>
+Производится: <span id="product-in-jobs" class="quantity"></span><br>
+Выставлено на продажу: <span id="product-in-sale" class="quantity"></span>
+</p>""")
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)
 
@@ -806,9 +878,7 @@ def dump_list_of_jobs(
         # --- --- ---
         activity_icon: str = get_industry_icons(db.get_activities_by_nums([j0.activity_id]))
         # --- --- ---
-        glf.write(f"""<tr
- class="{tr_class}{lost_class}"
- data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+        glf.write(f"""<tr class="{tr_class}{lost_class}" {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(blueprint_type_id, 32)}"></td>
 <td>{activity_icon}&nbsp;<qname>{blueprint_type_name}</qname>&nbsp;<a
@@ -890,7 +960,7 @@ def dump_list_of_lost_blueprints(
         # ---
         glf.write(f"""<tr
  class="lost-blueprints{g_nav_menu_defaults.css('lost-blueprints')}"
- data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+ {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td><qname>{type_name}</qname>&nbsp;<a
@@ -942,7 +1012,7 @@ def dump_list_of_lost_asset_items(
         # ---
         glf.write(f"""<tr
  class="lost-assets{g_nav_menu_defaults.css('lost-assets')}"
- data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+ {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td><qname>{type_name}</qname>&nbsp;<a
@@ -992,7 +1062,7 @@ def dump_list_of_phantom_blueprints(
 
         glf.write(f"""<tr
  class="phantom-blueprints{g_nav_menu_defaults.css('phantom-blueprints')}"
- data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+ {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td><qname>{type_name}</qname>&nbsp;<a
@@ -1015,7 +1085,9 @@ def dump_list_of_possible_blueprints(
         # настройки генерации отчёта
         settings: tools.ConveyorSettings,
         # список чертежей и их потребности (сгруппированные и отсортированные)
-        requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]) -> None:
+        requirements: typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints],
+        # набор проанализированных производственных активностей на предмет случившегося перепроизводства
+        industry_analysis: tools.ConveyorIndustryAnalysis) -> None:
     # группируем стеки по названиям чертежей
     grouped: typing.List[typing.Tuple[str, typing.List[tools.ConveyorMaterialRequirements.StackOfBlueprints]]] = []
     for stack in requirements:
@@ -1046,7 +1118,7 @@ def dump_list_of_possible_blueprints(
                     tr_class = 'row-possible'
                 tr_class += g_nav_menu_defaults.css(tr_class)
             elif tr_class.startswith('row-impossible'):
-                if not x1:
+                if x2 or x3:
                     tr_class = ''
                     break
             elif tr_class.startswith('row-optional'):
@@ -1057,9 +1129,11 @@ def dump_list_of_possible_blueprints(
                 if x1 or x2:
                     tr_class = ''
                     break
-        if not tr_class:
-            tr_class = 'row-multiple'
-            tr_class += g_nav_menu_defaults.css(tr_class)
+            if not tr_class:
+                tr_class = 'row-multiple'
+                tr_class += g_nav_menu_defaults.css(tr_class)
+            if industry_analysis.is_all_variants_overstock(type_id, settings):
+                tr_class += ' row-overstock'
 
         def tr_div_class(which: str,
                          __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
@@ -1069,9 +1143,12 @@ def dump_list_of_possible_blueprints(
                     return f' class="{tr_class}"'
             elif which == 'div':
                 if head:
-                    div_class: str = ('run-impossible' if not __stack784.run_possible else  # нельзя запустить (нет материалов)
-                                      ('run-possible' if not __stack784.only_decryptors_missing_for_stack else  # можно запустить (все материалы есть)
-                                       'run-optional'))  # можно запустить (не хватает декрипторов)
+                    if not __stack784.run_possible:  # нельзя запустить (нет материалов)
+                        div_class: str = 'run-impossible'
+                    elif not __stack784.only_decryptors_missing_for_stack:  # можно запустить (все материалы есть)
+                        div_class: str = 'run-possible'
+                    else:  # можно запустить (не хватает декрипторов)
+                        div_class: str = 'run-optional'
                     div_class += g_nav_menu_defaults.css(div_class)
                     return f'<div class="{div_class}">'
                 else:
@@ -1111,7 +1188,7 @@ def dump_list_of_possible_blueprints(
             details += f"{tr_div_class('div', stack, True)}" \
                        f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
                        f"<me_tag>{b0.material_efficiency}%</me_tag>" \
-                       f"<qmaterials data-arr='{json.dumps(js,separators=(',', ':'))}'></qmaterials>" \
+                       f"<qmaterials {format_json_data('arr', js)}></qmaterials>" \
                        f"{tr_div_class('div', None, False)}"
             quantities += f"{tr_div_class('div', stack, True)}" \
                           f"{format_num_of_num(stack.max_possible_for_single, len(stack.group))}" \
@@ -1120,16 +1197,60 @@ def dump_list_of_possible_blueprints(
                      f"{format_time_to_time(tt[0], tt[1])}" \
                      f"{tr_div_class('div', None, False)}"
 
+        variants: str = ''
+        if db.QSwaggerActivityCode.INVENTION in settings.activities:
+            invent_analysis: typing.Optional[tools.ConveyorInventProductsAnalysis] = \
+                industry_analysis.invent_analysis.get(type_id)
+            if invent_analysis and invent_analysis.products:
+                for ia in invent_analysis.products:
+                    if ia.product_tier2 is None: continue
+                    num_ready: int = ia.num_ready
+                    # формирование отчёта со сведениями об инвенте
+                    variants += f'<div class="industry-products">' \
+                                f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>'
+                    if num_ready > 0:
+                        info = {'p': ia.product_tier2.product_id,
+                                'a': ia.product_tier2_num_in_assets,
+                                'j': ia.product_tier2_num_in_jobs,
+                                's': ia.product_tier2_num_in_sell}
+                        variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
+                                    f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
+                                    f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                        # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                        if ia.product_tier2_overstock:
+                            variants += ' <label class="label label-overstock">перепроизводство</label>'
+                    variants += '</div>'
+        if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
+            manufacturing_analysis: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = \
+                industry_analysis.manufacturing_analysis.get(type_id)
+            if manufacturing_analysis and manufacturing_analysis.product and manufacturing_analysis.product.product_tier1:
+                ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
+                num_ready: int = ma.num_ready
+                # формирование отчёта со сведениями о производстве
+                variants += f'<div class="industry-products">' \
+                            f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>'
+                if num_ready > 0:
+                    info = {'p': ma.product_tier1.product_id,
+                            'a': ma.product_tier1_num_in_assets,
+                            'j': ma.product_tier1_num_in_jobs,
+                            's': ma.product_tier1_num_in_sell}
+                    variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
+                                f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
+                                f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                    # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                    if ma.product_tier1_overstock:
+                        variants += ' <label class="label label-overstock">перепроизводство</label>'
+                variants += '</div>'
+
         sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=(min_duration, max_duration))
         activity_icons: str = get_industry_icons(settings.activities)
 
-        glf.write(f"""
-<tr{tr_div_class('tr')} data-sort='{json.dumps(sort,separators=(',', ':')).replace("'",'"')}'>
+        glf.write(f"""<tr{tr_div_class('tr')} {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{activity_icons}&nbsp;<qname>{type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}
-{details}</td>
+{details}{variants}</td>
 <td>{quantities}</td>
 <td>{times}</td>
 <td></td><td></td><td></td>
@@ -1149,7 +1270,7 @@ def dump_conveyor_banner(
         additional_class: str = ''
     # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
     tag = tools.get_conveyor_table_sort_data(priority, activities, row_num=None, duration=None)
-    glf.write(f"""<tr class="row-conveyor{additional_class}" data-tag='{json.dumps(tag, separators=(',', ':')).replace("'", '"')}'>
+    glf.write(f"""<tr class="row-conveyor{additional_class}" {format_json_data('tag', tag)}>
 <td colspan="8">{label}<mute>{', '.join([str(_) for _ in activities])}</mute>
 <a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a>
 </td>
@@ -1266,6 +1387,9 @@ def dump_corp_conveyors(
                                            db.QSwaggerActivityCode.RESEARCH_MATERIAL):
                         lost, possible = True, False
                         break
+                    if b.is_original and a == db.QSwaggerActivityCode.INVENTION:
+                        lost, possible = True, False
+                        break
                     # проверка, что чертёж можно запускать в работу с выбранной activity
                     activity = b.blueprint_type.get_activity(activity_id=a.to_int())
                     if activity:
@@ -1295,11 +1419,20 @@ def dump_corp_conveyors(
                     if (b.updated_at + phantom_timedelta) < qid.eve_now:
                         phantom_blueprint_ids.add(b.item_id)
                         phantom_blueprints.append(b)
-                # корректируем составляем список возможных к постройке чертежей
+                # корректируем список возможных к постройке чертежей (вычитаем фантомные)
                 if phantom_blueprint_ids:
                     possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
                         [b for b in possible_blueprints if b.item_id not in phantom_blueprint_ids]
                 del phantom_blueprint_ids
+            # анализируем чертежи на предмет перепроизводства (список possible чертежей не сокращаем)
+            industry_analysis: tools.ConveyorIndustryAnalysis = tools.ConveyorIndustryAnalysis()
+            if possible_blueprints:
+                industry_analysis.analyse_industry(
+                    qid,
+                    global_dictionary,
+                    conveyor_settings,
+                    settings,
+                    possible_blueprints)
             # составляем список "залётных" чертежей, которые упали не в ту коробку
             if lost_blueprints:
                 lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
@@ -1309,7 +1442,7 @@ def dump_corp_conveyors(
             # TODO: надо придумать как от избавиться от костыля (в коробке с инвентом хранятся ассеты для копирки)
             if db.QSwaggerActivityCode.INVENTION in settings.activities:
                 involved_materials |= global_dictionary.involved_materials[db.QSwaggerActivityCode.COPYING]
-            # составляем список "залётных" предметов (материалов и продактов), которые упали не в ту коробку
+            # составляем список "залётных" предметов (материалов и продуктов), которые упали не в ту коробку
             lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
             for _a in corporation.assets.values():
                 a: db.QSwaggerCorporationAssetsItem = _a
@@ -1348,7 +1481,8 @@ def dump_corp_conveyors(
                     glf,
                     priority,
                     settings,
-                    requirements)
+                    requirements,
+                    industry_analysis)
                 # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
                 global_dictionary.load_requirements(requirements)
             # вывести информацию о работах, которые прямо сейчас ведутся с чертежами в коробке конвейера
@@ -1508,7 +1642,7 @@ def dump_corp_router(
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
             warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
 
-        glf.write(f"""<tr class="row-station" data-tag='{json.dumps(tag, separators=(',', ':')).replace("'", '"')}'>
+        glf.write(f"""<tr class="row-station" {format_json_data('tag', tag)}>
 <td colspan="4">{station.station_name}
 <mute>({station.station_type_name}, {router_settings.desc})</mute>
 <a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a></td>
@@ -1578,6 +1712,7 @@ def dump_router2_into_report(
         dump_nav_menu_router_dialog(glf, qid, global_dictionary, router_settings, conveyor_settings)
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
         dump_nav_menu_lifetime_dialog(glf, qid)
+        dump_invent_product_dialog(glf)
         dump_materials_to_js(glf, global_dictionary)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
         render_html.__dump_footer(glf)

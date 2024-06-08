@@ -70,6 +70,7 @@ def main():
         qid.load_corporation_container_places(corporation)
         qid.load_corporation_industry_jobs_active(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_industry_jobs_completed(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_orders_active(corporation)
         qid.load_corporation_stations(corporation)
         """
         # отладка
@@ -241,21 +242,22 @@ def main():
                         # поиск корпорации, которая торгует (видимо в Jita? но это не обязательно)
                         for trade_corporation_name in trade_corporation_names:
                             trade_corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(trade_corporation_name)
-                            if trade_corporation:
-                                for container_id in trade_corporation.container_ids:
-                                    container: db.QSwaggerCorporationAssetsItem = trade_corporation.assets.get(container_id)
-                                    if not container:
-                                        continue
-                                    container_name: str = container.name
-                                    if not container_name:
-                                        continue
-                                    container_hangar: str = container.location_flag
-                                    if container_hangar[:-1] != 'CorpSAG':
-                                        continue
-                                    # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
-                                    if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
-                                        cssc = tools.ConveyorSettingsSaleContainer(settings, trade_corporation, container)
-                                        settings.trade_sale_stock.append(cssc)
+                            if trade_corporation is None: continue
+                            settings.trade_corporations.append(trade_corporation)
+                            for container_id in trade_corporation.container_ids:
+                                container: db.QSwaggerCorporationAssetsItem = trade_corporation.assets.get(container_id)
+                                if not container:
+                                    continue
+                                container_name: str = container.name
+                                if not container_name:
+                                    continue
+                                container_hangar: str = container.location_flag
+                                if container_hangar[:-1] != 'CorpSAG':
+                                    continue
+                                # получаем информацию по коробкам где находится сток (оверсток) торговой корпы
+                                if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
+                                    cssc = tools.ConveyorSettingsSaleContainer(settings, trade_corporation, container)
+                                    settings.containers_sale_stocks.append(cssc)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
 
@@ -276,7 +278,7 @@ def main():
         # вывод на экран того, что получилось
         for (idx0, __s) in enumerate(settings_of_conveyors):
             s: tools.ConveyorSettings = __s
-            corporation: db.QSwaggerCorporation = qid.get_corporation(s.corporation.corporation_id)
+            corporation: db.QSwaggerCorporation = s.corporation
             if idx0 > 0:
                 print()
             print('industry corp: ', corporation.corporation_name)
@@ -285,7 +287,7 @@ def main():
                                                   [x.station_id for x in s.containers_stocks] +
                                                   [x.station_id for x in s.containers_output] +
                                                   [x.station_id for x in s.containers_additional_blueprints] +
-                                                  [x.station_id for x in s.trade_sale_stock]))
+                                                  [x.station_id for x in s.containers_sale_stocks]))
             stations: typing.List[int] = sorted(stations, key=lambda x: qid.get_station(x).station_name if x else '')
             for station_id in stations:
                 print(' station:      ', station_id, qid.get_station(station_id).station_name if station_id else None)
@@ -306,12 +308,17 @@ def main():
                     z = sorted([x for x in s.containers_react_formulas if x.station_id == station_id], key=lambda x: x.container_name)
                     if z:
                         print('   formulas:   ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
-                z = sorted([x for x in s.trade_sale_stock if x.station_id == station_id], key=lambda x: x.container_name)
+                z = sorted([x for x in s.containers_sale_stocks if x.station_id == station_id], key=lambda x: x.container_name)
                 if z:
                     print('   trader corp:', '\n                '.join([f'{x.trade_corporation.corporation_id} {x.trade_corporation.corporation_name}' for x in z]))
                     print('   sale stock: ', '\n                '.join([f'{x.container_id}   {x.container_name}' for x in z]))
             if s.fixed_number_of_runs is not None:
                 print('fixed runs:    ', s.fixed_number_of_runs)
+
+    # учитываем загруженные настройки и каталогизируем ассеты, чертежи и прочее всоответствии с ними
+    for __s in settings_of_conveyors:
+        s: tools.ConveyorSettings = __s
+        s.recalc_container_locations()
 
     # вывод в отчёт результатов работы роутера
     render_html_conveyor_db.dump_router2_into_report(

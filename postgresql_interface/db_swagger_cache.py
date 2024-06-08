@@ -872,6 +872,84 @@ class QSwaggerCorporationIndustryJob:
         return self.__end_date
 
 
+class QSwaggerCorporationOrder:
+    def __init__(self,
+                 item_type: typing.Optional[QSwaggerTypeId],
+                 issuer: typing.Optional[QSwaggerCharacter],
+                 location: typing.Optional[QSwaggerStation],
+                 row):
+        self.__order_id: int = row[0]
+        self.__type_id: int = row[1]
+        self.__type: typing.Optional[QSwaggerTypeId] = item_type
+        self.__location_id: int = row[2]
+        self.__location: typing.Optional[QSwaggerStation] = location
+        self.__is_buy_order: bool = row[3]
+        self.__price: float = row[4]
+        self.__volume_total: int = row[5]
+        self.__volume_remain: int = row[6]
+        self.__issued: datetime.datetime = row[7]
+        self.__issuer_id: int = row[8]
+        self.__issuer: typing.Optional[QSwaggerCharacter] = issuer
+        self.__duration: int = row[9]
+        self.__escrow: typing.Optional[float] = row[10]
+
+    @property
+    def order_id(self) -> int:
+        return self.__order_id
+
+    @property
+    def type_id(self) -> int:
+        return self.__type_id
+
+    @property
+    def type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__type
+
+    @property
+    def location_id(self) -> int:
+        return self.__location_id
+
+    @property
+    def location(self) -> typing.Optional[QSwaggerStation]:
+        return self.__location
+
+    @property
+    def is_buy_order(self) -> bool:
+        return self.__is_buy_order
+
+    @property
+    def price(self) -> float:
+        return self.__price
+
+    @property
+    def volume_total(self) -> int:
+        return self.__volume_total
+
+    @property
+    def volume_remain(self) -> int:
+        return self.__volume_remain
+
+    @property
+    def issued(self) -> datetime.datetime:
+        return self.__issued
+
+    @property
+    def issuer_id(self) -> int:
+        return self.__issuer_id
+
+    @property
+    def issuer(self) -> typing.Optional[QSwaggerCharacter]:
+        return self.__issuer
+
+    @property
+    def duration(self) -> int:
+        return self.__duration
+
+    @property
+    def escrow(self) -> typing.Optional[float]:
+        return self.__escrow
+
+
 class QSwaggerCorporation:
     def __init__(self, corporation_id: int, corporation_name: str):
         # идентификаторы
@@ -882,6 +960,7 @@ class QSwaggerCorporation:
         self.blueprints: typing.Dict[int, QSwaggerCorporationBlueprint] = {}
         self.industry_jobs_active: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
         self.industry_jobs_completed: typing.Dict[int, QSwaggerCorporationIndustryJob] = {}
+        self.orders: typing.Dict[int, QSwaggerCorporationOrder] = {}
         # идентификаторы корпоративных контейнеров
         self.container_ids: typing.List[int] = []
 
@@ -889,6 +968,7 @@ class QSwaggerCorporation:
         # идентификаторы корпоративных контейнеров
         del self.container_ids
         # наборы данных (взаимосвязаны друг с другом, ВАЖЕН ПОРЯДОК уничтожения!)
+        del self.orders
         del self.industry_jobs_completed
         del self.industry_jobs_active
         del self.blueprints

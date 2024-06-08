@@ -1,5 +1,6 @@
 ﻿/* see https://www.eveonline.com/news/view/industry-ui */
 .icn12 { width:12px; height:12px; }
+.icn20 { width:20px; height:20px; }
 .icn_industry { width:12px; height:12px; margin-bottom:1px; }
 
 table.qind-blueprints-tbl > tbody > tr > td { padding: 4px; border-top: none; }
@@ -83,8 +84,6 @@ table.tbl-lifetime tbody tr td left { color: #ffa600; }
 .label-not-enough { color: #fff; background-color: #f0ad4e; }
 .label-impossible { color: #fff; background-color: #d9534f; }
 .label-impossible-ntier { color: #fff; background-color: #e89694; }
-.label-overstock { color: # eee; background-color: #131313; }
-.label-invent-overstocked { color: # eee; background-color: #131313; }
 .label-not-available { color: #fff; background-color: #b7b7b7; }
 .text-material-industry-ntier { color: #aaa; }
 .text-material-buy-ntier { color: #a67877; }
@@ -129,6 +128,7 @@ table.tbl-summary tbody tr.lost-jobs,
 table.tbl-summary tbody tr.lost-blueprints,
 table.tbl-summary tbody tr.lost-assets { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
+table.tbl-summary tbody tr.row-overstock,
 table.tbl-summary tbody tr.row-multiple,
 table.tbl-summary tbody tr.row-possible,
 table.tbl-summary tbody tr.row-optional,
@@ -198,3 +198,17 @@ me_tag { color: #3372b6; font-weight: bold; padding: .1em .1em .1em; border: 1px
 /* поведение кнопки копирования около названия декриптора */
 qdecr { color: #8dc169; }
 .qind-copy-btn:hover + * + qdecr { color: #ec5c5c; }
+/* поведение метки перепроизводства */
+.label-overstock { background-color: #000; color: #ffa600; }
+@keyframes overstock-pulsate{50%{color:#ffa600;text-shadow:0 -1px rgba(0,0,0,.3),0 0 5px #f09000,0 0 8px #ff0048;}}
+.qind-copy-btn:hover + * ~ div .label-overstock {
+ color: #ff0048;
+ -webkit-animation: overstock-pulsate 1.2s linear infinite;
+ animation: overstock-pulsate 1.2s linear infinite;
+}
+/* поведение кнопки info около продукта инвента */
+div.industry-products a.qind-info-btn { color: #808080; }
+div.industry-products a.qind-info-btn:hover,
+div.industry-products a.qind-info-btn:active,
+div.industry-products a.qind-info-btn:focus { color: #aaa; }
+#modalIndustryProduct * span.quantity { color: #ffa600; }

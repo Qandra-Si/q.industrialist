@@ -348,6 +348,21 @@ function getMaterialText(choose, q, na, nm) {
  else
   return nm+' <b>x'+q+'</b> (нет '+na+')';
 }
+function replaceAssetItemHtml(elem) {
+ let tid = elem.attr('tid');
+ if (!(tid === undefined)) {
+  let icn = elem.attr('icn');
+  let cl = elem.attr('cl');
+  var nm = getSdeItemName(tid);
+  if (nm === null) nm = tid;
+  if (icn === undefined) icn = 24;
+  if (cl === undefined) cl = ''; else cl = ' '+cl;
+  s = getMaterialImg(tid, icn)+' '+nm+'&nbsp;<a' +
+      ' data-target="#" role="button" data-tid="'+tid+'" class="qind-copy-btn'+cl+'" data-toggle="tooltip"' +
+      ' data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>';
+  elem.replaceWith(s);
+ }
+}
 function initMaterialNames() {
  $('table.tbl-stock tbody tr td qnm').each(function() {
   var data_tid = $(this).data('tid');
@@ -363,20 +378,9 @@ function initMaterialNames() {
    $(this).replaceWith(getMaterialImg(data_tid, 24));
   }
  });
- $('table.tbl-stock tbody tr td qmaterial').each(function() {
-  var tid = $(this).attr('tid');
-  var icn = $(this).attr('icn');
-  var cl = $(this).attr('cl');
-  if (!(tid === undefined)) {
-   var nm = getSdeItemName(tid);
-   if (nm === null) nm = tid;
-   if (icn === undefined) icn = 24;
-   if (cl === undefined) cl = ''; else cl = ' '+cl;
-   s = getMaterialImg(tid, icn)+' '+nm+'&nbsp;<a' +
-       ' data-target="#" role="button" data-tid="'+tid+'" class="qind-copy-btn'+cl+'" data-toggle="tooltip"' +
-       ' data-original-title="" title=""><span class="glyphicon glyphicon-copy" aria-hidden="true"></span></a>';
-   $(this).replaceWith(s);
-  }
+ $('table.tbl-stock tbody tr td qmaterial,'+
+   'table.tbl-summary tbody tr td qproduct').each(function() {
+   replaceAssetItemHtml($(this));
  });
 }
 function initMaterialsOfBlueprints(used_materials, not_available) {
@@ -435,6 +439,7 @@ function rebuildConveyorTable() {
  var show_possible = (getOption('option', 'run-possible') == 1) ? 1 : 0;
  var show_impossible = (getOption('option', 'run-impossible') == 1) ? 1 : 0;
  var show_lost = (getOption('option', 'lost-items') == 1) ? 1 : 0;
+ var show_overstock = (getOption('option', 'overstock-product') == 1) ? 1 : 0;
  var show_phantom = (getOption('option', 'phantom-blueprints') == 1) ? 1 : 0;
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
  var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
@@ -443,41 +448,30 @@ function rebuildConveyorTable() {
  var rows = $('table.tbl-summary tbody').children('tr');
  for (var i=0,cnt=rows.length;i<cnt;++i) {
   var tr = rows.eq(i);
+  var multiple = false;
   if (tr.hasClass('row-conveyor')) {
    var tag = conveyorTagToStr(tr);
    hide_conveyor = (getOption('conveyor', tag) == 1) ? 0 : 1;
   }
-  else if (tr.hasClass('row-multiple')) {
-   changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
-   tr.find('td div').each(function() {
-    if ($(this).hasClass('run-possible'))
-     changeElemVisibility($(this), hide_conveyor * show_possible);
-    else if ($(this).hasClass('run-impossible'))
-     changeElemVisibility($(this), hide_conveyor * show_impossible);
-    else if ($(this).hasClass('run-optional'))
-     changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
-   });
+  else if (tr.hasClass('row-impossible')) {
+   changeElemVisibility(tr, hide_conveyor * show_impossible);
+   multiple = true;
+  }
+  else if (tr.hasClass('row-overstock')) { // row-overstock встречается со всеми остальными row-классами
+   changeElemVisibility(tr, hide_conveyor * show_overstock);
+   multiple = true;
   }
   else if (tr.hasClass('row-possible')) {
    changeElemVisibility(tr, hide_conveyor * show_possible);
-   tr.find('td div').each(function() {
-    if ($(this).hasClass('run-possible'))
-     changeElemVisibility($(this), hide_conveyor * show_possible);
-   });
-  }
-  else if (tr.hasClass('row-impossible')) {
-   changeElemVisibility(tr, hide_conveyor * show_impossible);
-   tr.find('td div').each(function() {
-    if ($(this).hasClass('run-impossible'))
-     changeElemVisibility($(this), hide_conveyor * show_impossible);
-   });
+   multiple = true;
   }
   else if (tr.hasClass('row-optional')) {
    changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
-   tr.find('td div').each(function() {
-    if ($(this).hasClass('run-optional'))
-     changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
-   });
+   multiple = true;
+  }
+  else if (tr.hasClass('row-multiple')) {
+   changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
+   multiple = true;
   }
   else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets') || tr.hasClass('lost-jobs'))
    changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
@@ -487,7 +481,21 @@ function rebuildConveyorTable() {
    changeElemVisibility(tr, hide_conveyor * show_active);
   else if (tr.hasClass('job-completed'))
    changeElemVisibility(tr, hide_conveyor * show_completed);
+  if (multiple) {
+   tr.find('td div').each(function() {
+    if ($(this).hasClass('run-possible'))
+     changeElemVisibility($(this), hide_conveyor * show_possible);
+    else if ($(this).hasClass('run-impossible'))
+     changeElemVisibility($(this), hide_conveyor * show_impossible);
+    else if ($(this).hasClass('run-optional'))
+     changeElemVisibility($(this), hide_conveyor * (show_possible + show_impossible));
+   });
+  }
  }
+
+ $('div.overstock-product').each(function() {
+  changeElemVisibility($(this), hide_conveyor * show_overstock);
+ });
 
  var used_materials = (getOption('option', 'used-materials') == 1) ? 1 : 0;
  var not_available = (getOption('option', 'not-available') == 1) ? 1 : 0;
@@ -567,6 +575,24 @@ function recalcLifetimeTimestamps() {
    }
   }
  });
+}
+//---
+function showIndustryProductModal(elem) {
+ let data_product = elem.data('product');
+ if (data_product === undefined) return;
+ if (!(data_product.p === undefined)) {
+  $('#modalIndustryProductLabel icon').html(getMaterialImg(data_product.p));
+  $('#product-name').html(getSdeItemName(data_product.p));
+ }
+ var txt;
+ const nodata = '0'; // '<mute>-</mute>';
+ if (!(data_product.a === undefined) && (data_product.a > 0)) txt = data_product.a; else txt = nodata;
+ $('#product-in-assets').html(txt);
+ if (!(data_product.j === undefined) && (data_product.j > 0)) txt = data_product.j; else txt = nodata;
+ $('#product-in-jobs').html(txt);
+ if (!(data_product.s === undefined) && (data_product.s > 0)) txt = data_product.s; else txt = nodata;
+ $('#product-in-sale').html(txt);
+ $('#modalIndustryProduct').modal('show');
 }
 //-----------
 // работа с пунктами меню
@@ -696,6 +722,9 @@ $(document).ready(function(){
    rebuildOptionsMenu();
    sortConveyor();
    rebuildConveyorTable();
+  });
+  $('div.industry-products a.qind-info-btn').on('click', function () {
+   showIndustryProductModal($(this));
   });
   // Working with clipboard
   $('a.qind-copy-btn').each(function() {

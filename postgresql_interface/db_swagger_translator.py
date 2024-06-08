@@ -654,7 +654,7 @@ WHERE
                     continue
             # определяем продукт производства, например Photon Microprocessor
             if prev_product_type_id != product_type_id:
-                product_type_id = product_type_id
+                prev_product_type_id = product_type_id
                 cached_product_type = None
                 # стараемся найти тип продукта в наборе данных, ассоциированных с типом чертежа
                 if cached_blueprint_type:
@@ -796,5 +796,103 @@ WHERE
             corporation_assets,
             corporation_blueprints,
             load_unknown_type_blueprints=load_unknown_type_blueprints)
+        del rows
+        return data
+
+    # -------------------------------------------------------------------------
+    # corporations/{corporation_id}/orders/
+    # -------------------------------------------------------------------------
+    def get_internal_corporation_orders(
+            self,
+            rows: typing.Any,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            characters: typing.Dict[int, QSwaggerCharacter],
+            stations: typing.Dict[int, QSwaggerStation]) -> typing.Dict[int, QSwaggerCorporationOrder]:
+        # получаем список пилотов, которые разместили ордера
+        unique_issuer_ids: typing.List[int] = list(set([r[8] for r in rows]))
+        if unique_issuer_ids:
+            unknown_issuer_ids: typing.List[int] = [c_id for c_id in unique_issuer_ids if not characters.get(c_id)]
+            if unknown_issuer_ids:
+                unknown_order_issuers: typing.Dict[int, QSwaggerCharacter] = self.get_characters(unknown_issuer_ids)
+                for (character_id, cached_character) in unknown_order_issuers.items():
+                    characters[character_id] = cached_character
+                del unknown_order_issuers
+            del unknown_issuer_ids
+        del unique_issuer_ids
+        # получаем список рынков, на которых размещены ордера
+        unique_location_ids: typing.List[int] = list(set([r[2] for r in rows]))
+        if unique_location_ids:
+            unknown_location_ids: typing.List[int] = [c_id for c_id in unique_location_ids if not stations.get(c_id)]
+            if unknown_location_ids:
+                unknown_order_locations: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_location_ids, type_ids)
+                for (location_id, cached_location) in unknown_order_locations.items():
+                    stations[location_id] = cached_location
+                del unknown_order_locations
+            del unknown_location_ids
+        del unique_location_ids
+        # обработка данных по корпоративным ордерам и связывание их с другими кешированными объектами
+        data = {}
+        prev_issued_by: int = -1
+        cached_issuer: typing.Optional[QSwaggerCharacter] = None
+        prev_type_id: int = -1
+        cached_type: typing.Optional[QSwaggerTypeId] = None
+        prev_location_id: int = -1
+        cached_location: typing.Optional[QSwaggerStation] = None
+        for row in rows:
+            order_id: int = row[0]
+            type_id: int = row[1]
+            location_id: int = row[2]
+            issued_by: int = row[8]
+            # определяем предмет, выставленный в ордере, например Keepstar
+            if prev_type_id != type_id:
+                prev_type_id = type_id
+                cached_type = type_ids.get(type_id)
+            # определяем пилота (обычно известен) т.к. добавляется в БД синхронно ордеру (если не удалён вручную)
+            if prev_issued_by != issued_by:
+                prev_issued_by = issued_by
+                cached_issuer = characters[issued_by]
+            # определяем рынок (обычно езвестен) т.к. добавляется в БД синхронно ордеру (и не удаляется), но к
+            # маркету может пропасть доступ и q_universe_preload.py не сможет получить информацию о нём
+            if prev_location_id != location_id:
+                prev_location_id = location_id
+                cached_location = stations.get(location_id)
+            # добавляем новую корпоративную работку
+            data[order_id] = QSwaggerCorporationOrder(
+                cached_type,  # неизвестен, если в БД нет данных об этом типе предмета (пока не обновится esi)
+                cached_issuer,  # обычно известен, т.к. добавляется в БД синхронно работе (если не удалён вручную)
+                cached_location,  # меркеты обычно известны, если не пропал доступ (и БД неотсинхронизирована)
+                row)
+        return data
+
+    def get_corporation_orders_active(
+            self,
+            corporation_id: int,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            characters: typing.Dict[int, QSwaggerCharacter],
+            stations: typing.Dict[int, QSwaggerStation]) -> typing.Dict[int, QSwaggerCorporationOrder]:
+        rows = self.db.select_all_rows(  # около 1000 одновременных активных ордеров, или больше...
+            "SELECT"
+            " ecor_order_id,"
+            " ecor_type_id,"
+            " ecor_location_id,"
+            " ecor_is_buy_order,"
+            " ecor_price,"
+            " ecor_volume_total,"
+            " ecor_volume_remain,"
+            " ecor_issued,"
+            " ecor_issued_by,"
+            " ecor_duration,"
+            " ecor_escrow "
+            "FROM esi_corporation_orders "
+            "WHERE not ecor_history AND ecor_corporation_id=%(id)s;",
+            {'id': corporation_id}
+        )
+        if rows is None:
+            return {}
+        data = self.get_internal_corporation_orders(
+            rows,
+            type_ids,
+            characters,
+            stations)
         del rows
         return data
