@@ -95,23 +95,25 @@ EOD;
   $blueprints_data = pg_fetch_all($blueprints_data_cursor);
 
   echo 'g_blueprints_data=[';
-  foreach ($blueprints_data as &$t)
-  {
-    echo '['.
-            $t['bp'].','. //0
-            $t['act'].','. //1
-            $t['prod']. //2
-         "],\n";
-  }
+  if ($blueprints_data)
+    foreach ($blueprints_data as &$t)
+    {
+      echo '['.
+              $t['bp'].','. //0
+              $t['act'].','. //1
+              $t['prod']. //2
+           "],\n";
+    }
   echo "null];\n";
 }
 
 function get_product_type_ids(&$blueprints_data, &$product_type_ids)
 {
-  foreach ($blueprints_data as ["prod" => $prod])
-  {
-    $product_type_ids[] = intval($prod);
-  }
+  if ($blueprints_data)
+    foreach ($blueprints_data as ["prod" => $prod])
+    {
+      $product_type_ids[] = intval($prod);
+    }
   $product_type_ids = array_unique($product_type_ids, SORT_NUMERIC);
 }
 
@@ -689,15 +691,16 @@ foreach (range(0,$IDs_len/2-1) as $idx)
   $cnt = $IDs[2*$idx+1];
   $t_key = get_main_data_tkey($main_data, $id);
   __dump_praisal_table_row($id, $cnt, is_null($t_key) ? null : $main_data[$t_key], $market_hubs, $sale_orders);
-  foreach ($blueprints_data as ["bp" => $bp, "act" => $act, "prod" => $prod])
-  {
-    $_bp = intval($bp);
-    if ($_bp!=$id) continue;
-    if ($_bp>$id) break;
-    $_prod = intval($prod);
-    $t_key = get_main_data_tkey($main_data, $prod);
-    __dump_praisal_table_row($prod, null, is_null($t_key) ? null : $main_data[$t_key], $market_hubs, $sale_orders);
-  }
+  if ($blueprints_data)
+    foreach ($blueprints_data as ["bp" => $bp, "act" => $act, "prod" => $prod])
+    {
+      $_bp = intval($bp);
+      if ($_bp!=$id) continue;
+      if ($_bp>$id) break;
+      $_prod = intval($prod);
+      $t_key = get_main_data_tkey($main_data, $prod);
+      __dump_praisal_table_row($prod, null, is_null($t_key) ? null : $main_data[$t_key], $market_hubs, $sale_orders);
+    }
 }
 __dump_praisal_table_footer($market_hubs);
 __dump_clipboard_waiter(false);
