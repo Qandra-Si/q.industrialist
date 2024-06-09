@@ -100,6 +100,8 @@ def sec_to_timestr(time: int, trim_to_10min: bool = True) -> str:
 
 
 def format_time_to_time(min_num: int, max_num: int, mute_min: bool = True) -> str:
+    if not min_num:
+        return 'нет данных'
     # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
     res: str = sec_to_timestr(min_num)
     if min_num == max_num:
@@ -1386,7 +1388,8 @@ def dump_corp_conveyors(
                 for _a in settings.activities:
                     a: db.QSwaggerActivityCode = _a
                     # проверка, что в коробку research не попали копии
-                    if b.is_copy and a in (db.QSwaggerActivityCode.RESEARCH_TIME,
+                    if b.is_copy and a in (db.QSwaggerActivityCode.COPYING,
+                                           db.QSwaggerActivityCode.RESEARCH_TIME,
                                            db.QSwaggerActivityCode.RESEARCH_MATERIAL):
                         lost, possible = True, False
                         break
