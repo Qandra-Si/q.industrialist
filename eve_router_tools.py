@@ -1205,8 +1205,16 @@ class ConveyorManufacturingAnalysis:
                     ConveyorOrderPlace.SELL
                 ])
         self.product_tier1_num_in_sell: int = sum([_.volume_remain for _ in self.product_tier1_in_sell])
+        # если не задан лимит, то оверстока нет
+        self.product_tier1_limit: typing.Optional[int] = None
+        self.product_tier1_overstock: bool = False
         # проверка избыточного количества продукта
-        self.product_tier1_overstock: bool = self.num_ready >= 1000
+        conveyor_limits: typing.Optional[typing.List[db.QSwaggerConveyorLimit]] = \
+            qid.get_conveyor_limits(self.product_tier1.product_id)
+        if conveyor_limits:
+            self.product_tier1_limit = sum([_.approximate for _ in conveyor_limits])
+            self.product_tier1_overstock = self.num_ready >= self.product_tier1_limit
+
 
     @property
     def num_ready(self) -> int:
@@ -1300,6 +1308,14 @@ class ConveyorInventAnalysis:
     def product_tier2_num_in_sell(self) -> int:
         if not self.__analysis_tier2.product: return 0
         return self.__analysis_tier2.product.product_tier1_num_in_sell
+
+    """
+    ограничение производства предмета (не должно производиться больше, чем выставлено на продажу)
+    """
+    @property
+    def product_tier2_limit(self) -> typing.Optional[int]:
+        if not self.__analysis_tier2.product: return None
+        return self.__analysis_tier2.product.product_tier1_limit
 
     """
     признак того, что продукта уже избыточное количество

@@ -72,20 +72,8 @@ def main():
         qid.load_corporation_industry_jobs_completed(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_orders_active(corporation)
         qid.load_corporation_stations(corporation)
-        """
-        # отладка
-        for job in corporation.industry_jobs.values():
-            if not job.installer.character_name or not job.blueprint_type or not job.product_type or \
-               not job.facility or not job.blueprint_location or not job.output_location:
-                print("{}\t{}\t{}\t{}\t{}\t{}\t{}".format(
-                    job.job_id,
-                    job.installer.character_name if job.installer else '?',
-                    job.blueprint_type.blueprint_type.name if job.blueprint_type else '?',
-                    job.product_type.name if job.product_type else '?',
-                    job.blueprint_location.name if job.blueprint_location else '?',
-                    job.output_location.name if job.output_location else '?',
-                    job.facility.station_name if job.facility else '?'))
-        """
+    # загрузка настроек работы конвейера (редактируются online через php_interface)
+    qid.load_conveyor_limits()
     # загрузка информации об обновлении сведений в БД для загруженных корпораций
     qid.load_lifetime(list(qid.corporations.keys()))
     # загружаем сведения о станциях, которые есть в настройках маршрутизатора

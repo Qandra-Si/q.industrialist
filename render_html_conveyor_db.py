@@ -741,7 +741,8 @@ def dump_invent_product_dialog(glf) -> None:
     glf.write("""<p>
 Хранится в ассетах: <span id="product-in-assets" class="quantity"></span><br>
 Производится: <span id="product-in-jobs" class="quantity"></span><br>
-Выставлено на продажу: <span id="product-in-sale" class="quantity"></span>
+Выставлено на продажу: <span id="product-in-sale" class="quantity"></span><hr>
+Порог производства: <span id="product-limit" class="quantity"></span>
 </p>""")
     # закрываем footer модального диалога
     render_html.__dump_any_into_modal_footer(glf)
@@ -1210,6 +1211,7 @@ def dump_list_of_possible_blueprints(
                                 f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>'
                     if num_ready > 0:
                         info = {'p': ia.product_tier2.product_id,
+                                'l': ia.product_tier2_limit,
                                 'a': ia.product_tier2_num_in_assets,
                                 'j': ia.product_tier2_num_in_jobs,
                                 's': ia.product_tier2_num_in_sell}
@@ -1231,6 +1233,7 @@ def dump_list_of_possible_blueprints(
                             f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>'
                 if num_ready > 0:
                     info = {'p': ma.product_tier1.product_id,
+                            'l': ma.product_tier1_limit,
                             'a': ma.product_tier1_num_in_assets,
                             'j': ma.product_tier1_num_in_jobs,
                             's': ma.product_tier1_num_in_sell}

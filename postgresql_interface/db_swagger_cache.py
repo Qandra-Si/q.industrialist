@@ -981,3 +981,46 @@ class QSwaggerCorporation:
     @property
     def corporation_name(self) -> str:
         return self.__corporation_name
+
+
+class QSwaggerConveyorLimit:
+    def __init__(self,
+                 item_type: typing.Optional[QSwaggerTypeId],
+                 trade_hub: typing.Optional[QSwaggerStation],
+                 trade_corp: typing.Optional[QSwaggerCorporation],
+                 row):
+        self.__type_id: int = row[0]
+        self.__type: typing.Optional[QSwaggerTypeId] = item_type
+        self.__trade_hub_id: int = row[1]
+        self.__trade_hub: typing.Optional[QSwaggerStation] = trade_hub
+        self.__trade_corp_id: int = row[2]
+        self.__trade_corp: typing.Optional[QSwaggerCorporation] = trade_corp
+        self.__approximate: int = row[3]
+
+    @property
+    def type_id(self) -> int:
+        return self.__type_id
+
+    @property
+    def type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__type
+
+    @property
+    def trade_hub_id(self) -> int:
+        return self.__trade_hub_id
+
+    @property
+    def trade_hub(self) -> typing.Optional[QSwaggerStation]:
+        return self.__trade_hub
+
+    @property
+    def trade_corp_id(self) -> int:
+        return self.__trade_corp_id
+
+    @property
+    def trade_corp(self) -> typing.Optional[QSwaggerCorporation]:
+        return self.__trade_corp
+
+    @property
+    def approximate(self) -> int:
+        return self.__approximate

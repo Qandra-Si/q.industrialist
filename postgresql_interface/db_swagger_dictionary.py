@@ -13,6 +13,7 @@ class QSwaggerDictionary:
         # справочники
         self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
         self.sde_lifetime: typing.Dict[typing.Tuple[str, int], datetime.datetime] = {}  # what:corporation_id
+        self.conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]] = {}
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
         self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
@@ -38,6 +39,7 @@ class QSwaggerDictionary:
         del self.sde_groups
         del self.sde_categories
         del self.sde_market_groups
+        del self.conveyor_limits
         del self.sde_lifetime
 
     def disconnect_from_translator(self):
@@ -397,3 +399,20 @@ class QSwaggerDictionary:
                 return market_group
             market_group_id = market_group.parent_id
         return None
+
+    def get_conveyor_limits(self, type_id: int) -> typing.Optional[typing.List[QSwaggerConveyorLimit]]:
+        cached_conveyor_limits: typing.Optional[typing.List[QSwaggerConveyorLimit]] = self.conveyor_limits.get(type_id)
+        return cached_conveyor_limits
+
+    def load_conveyor_limits(self) -> typing.Dict[int, typing.List[QSwaggerConveyorLimit]]:
+        if self.conveyor_limits:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load conveyor limits twice")
+        if not self.sde_type_ids or not self.corporations or not self.stations:  # загружайте и корпорации и станции
+            raise Exception("You should load type ids, corporations and stations first")
+        self.conveyor_limits = self.__qit.get_conveyor_limits(
+            # справочники
+            self.sde_type_ids,
+            self.corporations,
+            self.stations)
+        return self.conveyor_limits

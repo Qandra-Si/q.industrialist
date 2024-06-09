@@ -802,6 +802,7 @@ WHERE
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/orders/
     # -------------------------------------------------------------------------
+
     def get_internal_corporation_orders(
             self,
             rows: typing.Any,
@@ -895,4 +896,62 @@ WHERE
             characters,
             stations)
         del rows
+        return data
+
+    # -------------------------------------------------------------------------
+    # conveyor
+    # -------------------------------------------------------------------------
+
+    def get_conveyor_limits(self,
+                            type_ids: typing.Dict[int, QSwaggerTypeId],
+                            corporations: typing.Dict[int, QSwaggerCorporation],
+                            stations: typing.Dict[int, QSwaggerStation]) -> \
+            typing.Dict[int, typing.List[QSwaggerConveyorLimit]]:
+        rows = self.db.select_all_rows(  # около 1000 одновременных активных ордеров, или больше...
+            "SELECT"
+            " cl_type_id,"
+            " cl_trade_hub,"
+            " cl_trader_corp,"
+            " cl_approximate "
+            "FROM conveyor_limits "
+            "WHERE cl_trader_corp in (select * from unnest(%(ids)s));",
+            {'ids': list(corporations.keys())}
+        )
+        if rows is None:
+            return {}
+        # получаем список рынков, на которых размещены ордера и настроены лимиты
+        unique_trade_hub_ids: typing.List[int] = list(set([r[1] for r in rows]))
+        if unique_trade_hub_ids:
+            unknown_trade_hub_ids: typing.List[int] = [c_id for c_id in unique_trade_hub_ids if not stations.get(c_id)]
+            if unknown_trade_hub_ids:
+                unknown_limit_trade_hubs: typing.Dict[int, QSwaggerStation] = self.get_stations(unknown_trade_hub_ids,
+                                                                                                type_ids)
+                for (trade_hub_id, cached_trade_hub) in unknown_limit_trade_hubs.items():
+                    stations[trade_hub_id] = cached_trade_hub
+                del unknown_limit_trade_hubs
+            del unknown_trade_hub_ids
+        del unique_trade_hub_ids
+        # обработка данных по лимитам конвейера и связывание их с другими кешированными объектами
+        data = {}
+        for row in rows:
+            # получаем информацию о предмете
+            type_id: int = row[0]
+            cached_item_type: QSwaggerTypeId = type_ids.get(type_id)
+            # получаем информацию о торговом хабе
+            trade_hub_id: int = row[1]
+            cached_trade_hub: QSwaggerStation = stations.get(trade_hub_id)
+            # получаем информацию о торговой корпорации
+            corporation_id: int = row[2]
+            cached_corporation: QSwaggerCorporation = corporations.get(corporation_id)
+            # добавляем лимит
+            limit: QSwaggerConveyorLimit = QSwaggerConveyorLimit(
+                cached_item_type,
+                cached_trade_hub,
+                cached_corporation,
+                row)
+            limits: typing.List[QSwaggerConveyorLimit] = data.get(type_id)
+            if not limits:
+                data[type_id] = [limit]
+            else:
+                limits.append(limit)
         return data

@@ -592,6 +592,8 @@ function showIndustryProductModal(elem) {
  $('#product-in-jobs').html(txt);
  if (!(data_product.s === undefined) && (data_product.s > 0)) txt = data_product.s; else txt = nodata;
  $('#product-in-sale').html(txt);
+ if (!(data_product.l === undefined) && (data_product.l > 0)) txt = data_product.l; else txt = 'порог не задан';
+ $('#product-limit').html(txt);
  $('#modalIndustryProduct').modal('show');
 }
 //-----------
