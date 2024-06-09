@@ -751,7 +751,7 @@ class QSwaggerCorporationBlueprint:
         # A range of numbers with a minimum of -2 and no maximum value where -1 is an original and -2 is a copy.
         # It can be a positive integer if it is a stack of blueprint originals fresh from the market (e.g. no
         # activities performed on them yet).
-        return self.__quantity == -1
+        return self.__quantity == -1 or self.__quantity > 0
 
 
 class QSwaggerCorporationIndustryJob:
