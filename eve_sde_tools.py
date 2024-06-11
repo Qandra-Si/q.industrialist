@@ -73,7 +73,7 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
                 dicts_to_stay.append(i2s)
     f_name_yaml = __get_source_name(subname, name)
     f_name_json = __get_converted_name(ws_dir, name)
-    # файлы от CCP-шников действительно сохранены в utf-8 кодировке, т.к. например в groupIDs.yaml
+    # файлы от CCP-шников действительно сохранены в utf-8 кодировке, т.к. например в groups.yaml
     # содержится группа 1764 с Unicode Character 'BLACK DIAMOND SUIT' (U+2666) см. подробнее тут
     # https://www.fileformat.info/info/unicode/char/2666/index.htm и в файле содержится
     # последовательность из октет 0xE2 0x99 0xA6, что соответствует utf-8
@@ -795,9 +795,9 @@ where
 order by x.cnt;
     """
 
-    sde_type_ids = read_converted(ws_dir, "typeIDs")
+    sde_type_ids = read_converted(ws_dir, "types")
     sde_bp_materials = read_converted(ws_dir, "blueprints")
-    sde_group_ids = read_converted(ws_dir, "groupIDs")
+    sde_group_ids = read_converted(ws_dir, "groups")
 
     manufacturing_products = set()
     manufacturing_materials = {}
@@ -892,9 +892,9 @@ def main():  # rebuild .yaml files
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "metaGroups", ["iconID", {"nameID": ["en"]}])
 
-    print("Rebuilding typeIDs.yaml file...")
+    print("Rebuilding types.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "typeIDs", ["basePrice", "capacity", "iconID", "groupID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
+    __rebuild(workspace_cache_files_dir, "fsd", "types", ["basePrice", "capacity", "iconID", "groupID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
 
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
@@ -932,19 +932,19 @@ def main():  # rebuild .yaml files
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities", "maxProductionLimit"])
 
-    print("Rebuilding categoryIDs.yaml file...")
+    print("Rebuilding categories.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "categoryIDs", ["iconID", {"name": ["en"]}, "published"])
+    __rebuild(workspace_cache_files_dir, "fsd", "categories", ["iconID", {"name": ["en"]}, "published"])
 
-    print("Rebuilding groupIDs.yaml file...")
+    print("Rebuilding groups.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "groupIDs", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
+    __rebuild(workspace_cache_files_dir, "fsd", "groups", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
 
     __generate_long_term_industry(workspace_cache_files_dir, "longTermIndustry")
 
 
 def test():
-    data = __get_yaml("static_data_interface", 'fsd/typeIDs.yaml', "32859:")
+    data = __get_yaml("static_data_interface", 'fsd/types.yaml', "32859:")
     # for d in data:
     #     print("{}".format(d))
     print("{}".format(data["name"]["en"]))  # Small Standard Container Blueprint
