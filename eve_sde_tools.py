@@ -62,7 +62,7 @@ def read_converted(ws_dir, name):
         return json_data
 
 
-def __rebuild(ws_dir, subname, name, items_to_stay=None):
+def __rebuild(ws_dir, subname, name_from, name_to, items_to_stay=None):
     keys_to_stay = []
     dicts_to_stay = []
     if not (items_to_stay is None):
@@ -71,8 +71,8 @@ def __rebuild(ws_dir, subname, name, items_to_stay=None):
                 keys_to_stay.append(i2s)
             elif isinstance(i2s, dict):
                 dicts_to_stay.append(i2s)
-    f_name_yaml = __get_source_name(subname, name)
-    f_name_json = __get_converted_name(ws_dir, name)
+    f_name_yaml = __get_source_name(subname, name_from)
+    f_name_json = __get_converted_name(ws_dir, name_to)
     # файлы от CCP-шников действительно сохранены в utf-8 кодировке, т.к. например в groups.yaml
     # содержится группа 1764 с Unicode Character 'BLACK DIAMOND SUIT' (U+2666) см. подробнее тут
     # https://www.fileformat.info/info/unicode/char/2666/index.htm и в файле содержится
@@ -795,9 +795,9 @@ where
 order by x.cnt;
     """
 
-    sde_type_ids = read_converted(ws_dir, "types")
+    sde_type_ids = read_converted(ws_dir, "typeIDs")
     sde_bp_materials = read_converted(ws_dir, "blueprints")
-    sde_group_ids = read_converted(ws_dir, "groups")
+    sde_group_ids = read_converted(ws_dir, "groupIDs")
 
     manufacturing_products = set()
     manufacturing_materials = {}
@@ -890,15 +890,15 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding metaGroups.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "metaGroups", ["iconID", {"nameID": ["en"]}])
+    __rebuild(workspace_cache_files_dir, "fsd", "metaGroups", "metaGroups", ["iconID", {"nameID": ["en"]}])
 
     print("Rebuilding types.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "types", ["basePrice", "capacity", "iconID", "groupID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
+    __rebuild(workspace_cache_files_dir, "fsd", "types", "typeIDs", ["basePrice", "capacity", "iconID", "groupID", "marketGroupID", "metaGroupID", {"name": ["en"]}, "published", "volume"])
 
     print("Rebuilding invPositions.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "bsd", "invPositions", ["itemID", "x", "y", "z"])
+    __rebuild(workspace_cache_files_dir, "bsd", "invPositions", "invPositions", ["itemID", "x", "y", "z"])
     __clean_positions(workspace_cache_files_dir, "invPositions")
     print("Reindexing .converted_invPositions.json file...")
     sys.stdout.flush()
@@ -906,39 +906,39 @@ def main():  # rebuild .yaml files
 
     print("Rebuilding marketGroups.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
+    __rebuild(workspace_cache_files_dir, "fsd", "marketGroups", "marketGroups", ["iconID", {"nameID": ["en"]}, "parentGroupID"])
     
     print("Rebuilding iconIDs.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "iconIDs", ["iconFile"])
+    __rebuild(workspace_cache_files_dir, "fsd", "iconIDs", "iconIDs", ["iconFile"])
     print("Reindexing .converted_iconIDs.json file...")
     __rebuild_icons(workspace_cache_files_dir, "iconIDs")
     
     print("Rebuilding invNames.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "bsd", "invNames", ["itemID", "itemName"])
+    __rebuild(workspace_cache_files_dir, "bsd", "invNames", "invNames", ["itemID", "itemName"])
     print("Reindexing .converted_invNames.json file...")
     sys.stdout.flush()
     __rebuild_list2dict_by_key(workspace_cache_files_dir, "invNames", "itemID", "itemName")
     
     print("Rebuilding invItems.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "bsd", "invItems", ["itemID", "locationID", "typeID"])
+    __rebuild(workspace_cache_files_dir, "bsd", "invItems", "invItems", ["itemID", "locationID", "typeID"])
     print("Reindexing .converted_invItems.json file...")
     sys.stdout.flush()
     __rebuild_list2dict_by_key(workspace_cache_files_dir, "invItems", "itemID")
 
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "blueprints", ["activities", "maxProductionLimit"])
+    __rebuild(workspace_cache_files_dir, "fsd", "blueprints", "blueprints", ["activities", "maxProductionLimit"])
 
     print("Rebuilding categories.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "categories", ["iconID", {"name": ["en"]}, "published"])
+    __rebuild(workspace_cache_files_dir, "fsd", "categories", "categoryIDs", ["iconID", {"name": ["en"]}, "published"])
 
     print("Rebuilding groups.yaml file...")
     sys.stdout.flush()
-    __rebuild(workspace_cache_files_dir, "fsd", "groups", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
+    __rebuild(workspace_cache_files_dir, "fsd", "groups", "groupIDs", ["categoryID", "iconID", {"name": ["en"]}, "published", "useBasePrice"])
 
     __generate_long_term_industry(workspace_cache_files_dir, "longTermIndustry")
 
