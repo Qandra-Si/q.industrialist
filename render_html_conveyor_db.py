@@ -21,9 +21,11 @@ const g_sde_type_len={len(sorted_type_id_keys)};
 const g_sde_type_ids=[""")
     for (idx, type_id) in enumerate(sorted_type_id_keys):
         # экранируем " (двойные кавычки), т.к. они встречаются реже, чем ' (одинарные кавычки)
+        item_type: typing.Optional[db.QSwaggerTypeId] = dictionary.qid.get_type_id(type_id)
+        type_name = item_type.name if item_type is not None else str(type_id)
         glf.write('{end}[{id},"{nm}"]'.format(
             id=type_id,
-            nm=dictionary.qid.get_type_id(type_id).name.replace('"', '\\\"'),
+            nm=type_name.replace('"', '\\\"'),
             end=',' if idx else "\n"))
     glf.write("""
 ];
@@ -798,26 +800,40 @@ def dump_list_of_jobs(
             group_by_product=True,
             group_by_activity=True)
     # сортируем уже сгруппированные работы
-    grouped_and_sorted: typing.List[typing.Tuple[str, int, int, typing.List[db.QSwaggerCorporationIndustryJob]]] = []
+    grouped_and_sorted: typing.List[typing.Tuple[
+        str,
+        str,
+        typing.Optional[int],
+        typing.Optional[int],
+        typing.List[db.QSwaggerCorporationIndustryJob]]] = []
     for key in grouped.keys():
         group: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
         j0: db.QSwaggerCorporationIndustryJob = group[0]
-        sum_runs: int = sum([j.runs for j in group])
-        sum_products: int = sum_runs * tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
+        if j0.blueprint_type is not None:  # новый тип чертежа, которого ещё нет в БД
+            sum_runs: int = sum([j.runs for j in group])
+            sum_products: int = sum_runs * tools.get_product_quantity(j0.activity_id, j0.product_type_id, j0.blueprint_type)
+            blueprint_type_name: str = j0.blueprint_type.blueprint_type.name
+        else:
+            sum_runs: typing.Optional[int] = None
+            sum_products: typing.Optional[int] = None
+            blueprint_type_name: str = str(j0.blueprint_type_id)
+        if j0.product_type is not None:
+            product_type_name: str = j0.product_type.name
+        else:
+            product_type_name: str = str(j0.product_type_id)
         grouped_and_sorted.append((
-            j0.product_type.name,
+            blueprint_type_name,
+            product_type_name,
             sum_runs,
             sum_products,
             group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # выводим в отчёт
     global g_nav_menu_defaults
-    for _, sum_runs, sum_products, group in grouped_and_sorted:
+    for blueprint_type_name, product_type_name, sum_runs, sum_products, group in grouped_and_sorted:
         j0: db.QSwaggerCorporationIndustryJob = group[0]
         blueprint_type_id: int = j0.blueprint_type_id
-        blueprint_type_name: str = j0.blueprint_type.blueprint_type.name
         product_type_id: int = j0.product_type_id
-        product_type_name: str = j0.product_type.name
         # --- --- ---
         installer: str = ''
         installers_count: int = len(set([_.installer_id for _ in group]))
@@ -867,7 +883,9 @@ def dump_list_of_jobs(
                     container_prefix + \
                     container_prefix.join(nms) + \
                     f"<!--\njob_ids: {[_.job_id for _ in lost_outputs]}-->"
-                if j0.product_type.group and j0.product_type.group.category_id == 9:  # 9 = Blueprints
+                if j0.product_type is None:
+                    lost_label = f" <label class='label label-lost-assets'>{declension_of_lost_assets(lost_outputs_count)}</label>"
+                elif j0.product_type.group and j0.product_type.group.category_id == 9:  # 9 = Blueprints
                     lost_label = f" <label class='label label-lost-jobs'>{declension_of_lost_blueprints(lost_outputs_count)}</label>"
                 else:
                     lost_label = f" <label class='label label-lost-assets'>{declension_of_lost_assets(lost_outputs_count)}</label>"
@@ -887,7 +905,7 @@ def dump_list_of_jobs(
 <td>{activity_icon}&nbsp;<qname>{blueprint_type_name}</qname>&nbsp;<a
 data-target="#" role="button" data-tid="{blueprint_type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>
 {active_label}<br>
-<mute>Число прогонов - </mute>{sum_runs}
+<mute>Число прогонов - </mute>{sum_runs if sum_runs is not None else 'нет сведений'}
 </td>
 <td>{len(group)}</td>
 <td></td>
@@ -897,7 +915,7 @@ data-target="#" role="button" data-tid="{product_type_id}" class="qind-copy-btn 
 <small>{installer} {output}</small>
 {lost_output}
 </td>
-<td>{sum_products}</td>
+<td>{sum_products if sum_products is not None else 'нет сведений'}</td>
 </tr>""")
     # освобождаем память
     del grouped_and_sorted
@@ -942,16 +960,18 @@ def dump_list_of_lost_blueprints(
     grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationBlueprint]]] = []
     for key in grouped.keys():
         group: typing.List[db.QSwaggerCorporationBlueprint] = grouped.get(key)
-        grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
+        if group[0].blueprint_type and group[0].blueprint_type.blueprint_type:
+            grouped_and_sorted.append((group[0].blueprint_type.blueprint_type.name, group))
+        else:
+            grouped_and_sorted.append((str(group[0].type_id), group))
     grouped_and_sorted.sort(key=lambda x: x[0])
     # локальные переменные
     container_prefix: str = '<br><mute>Контейнер - </mute>'
     # выводим в отчёт
     global g_nav_menu_defaults
-    for _, group in grouped_and_sorted:
+    for type_name, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
-        type_name: str = b0.blueprint_type.blueprint_type.name
         sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
         # ---
         containers: typing.Set[str] = set()
@@ -1394,6 +1414,10 @@ def dump_corp_conveyors(
                         lost, possible = True, False
                         break
                     if b.is_original and a == db.QSwaggerActivityCode.INVENTION:
+                        lost, possible = True, False
+                        break
+                    # проверка, что в БД есть сведения о чертеже
+                    if b.blueprint_type is None:
                         lost, possible = True, False
                         break
                     # проверка, что чертёж можно запускать в работу с выбранной activity

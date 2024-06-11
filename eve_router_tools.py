@@ -407,8 +407,10 @@ def get_jobs_grouped_by(
 def get_product_quantity(
         activity_id: int,
         product_type_id: int,
-        blueprint: db.QSwaggerBlueprint) -> int:
+        blueprint: db.QSwaggerBlueprint) -> typing.Optional[int]:
     activity = blueprint.get_activity(activity_id=activity_id)
+    if activity is None:  # новый тип чертежа, которого ещё нет в БД
+        return None
     if db.QSwaggerActivityCode.MANUFACTURING.to_int() == activity_id:
         manufacturing: db.QSwaggerBlueprintManufacturing = activity
         return manufacturing.quantity
