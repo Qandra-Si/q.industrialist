@@ -268,6 +268,7 @@ function submitProductLimit() {
  var hubs = [];
  var corps = [];
  var limits = [];
+ var common_lim = Number(0);
  for (const h of g_market_hubs) {
   if (h === null) break;
   if (h[7]==1) continue; //archive
@@ -276,7 +277,7 @@ function submitProductLimit() {
   var ed=$('#navOverstocks div.row[hub='+h[0]+'][corp='+h[1]+'] div input');
   if (ed === undefined) return;
   var lim=ed.val();
-  if (!lim) lim=null;
+  if (!lim || isNaN(Number(lim)) || (lim <= 0)) lim=null;
   var td = tr.find('td[hub='+h[0]+']');
   var lv = td.find('limit-volume');
   if (!(lv === undefined) && !(lv.html() === undefined)) {
@@ -292,8 +293,12 @@ function submitProductLimit() {
   }
   hubs.push(h[0]);
   corps.push(h[1]);
-  if (!lim) limits.push(0); else limits.push(lim);
+  if (!lim) limits.push(0); else { limits.push(lim); common_lim += Number(lim); }
  }
+ if (common_lim)
+  tr.find('td:eq(2)').html(numLikeEve(common_lim));
+ else
+  tr.find('td:eq(2)').html('');
  //- сохранение настроек в форму
  //var frm = $("#frmSetupLimits");
  //см.выше:frm.find("input[name='tid']").val(type_id);
