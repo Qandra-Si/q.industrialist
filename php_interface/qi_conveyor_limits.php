@@ -43,6 +43,28 @@ function get_product_type_ids(&$conveyor_limits, &$product_type_ids) {
   $product_type_ids = array_unique($product_type_ids, SORT_NUMERIC);
 }
 
+function __dump_unlimited_products(&$conn, &$unlimited_type_ids) {
+  $query = <<<EOD
+select distinct ecor_type_id as id, sdet_type_name as nm
+from esi_corporation_orders o
+ left outer join qi.eve_sde_type_ids t on (sdet_type_id=ecor_type_id)
+where
+ not ecor_history and
+ not ecor_is_buy_order and
+ ecor_type_id not in (select distinct cl_type_id from conveyor_limits)
+order by sdet_type_name;
+EOD;
+  $unlimited_cursor = pg_query($conn, $query)
+          or die('pg_query err: '.pg_last_error());
+  $unlimited = pg_fetch_all($unlimited_cursor);
+
+  if ($unlimited)
+    foreach ($unlimited as ["id" => $prod])
+    {
+      $unlimited_type_ids[] = intval($prod);
+    }
+}
+
 function __dump_limits_menu_bar(&$market_hubs) {
   $active_market_hub_ids = array();
   $active_trader_corp_ids = array();
@@ -359,20 +381,22 @@ $conveyor_limits = array();
 __dump_conveyor_limits($conn, $conveyor_limits);
 $product_type_ids = array();
 get_product_type_ids($conveyor_limits, $product_type_ids);
-//echo var_export($product_type_ids);
+$unlimited_type_ids = array();
+__dump_unlimited_products($conn, $unlimited_type_ids);
+$merged_type_ids = array_merge($unlimited_type_ids, $product_type_ids);
 $main_data = array();
-__dump_main_data($conn, $product_type_ids, $main_data);
+__dump_main_data($conn, $merged_type_ids, $main_data);
 $market_hubs = array();
 __dump_market_hubs_data($conn, $market_hubs);
 //$sale_orders = array();
-//__dump_market_orders_data($conn, $market_hubs, $product_type_ids, $sale_orders);
+//__dump_market_orders_data($conn, $market_hubs, $merged_type_ids, $sale_orders);
 $sale_remain = array();
 __dump_market_orders_remain($conn, $market_hubs, $sale_remain);
 ?></script><?php
 
 __dump_limits_menu_bar($market_hubs);
 __dump_limits_table_header($market_hubs);
-foreach ($product_type_ids as $num => $id)
+foreach ($merged_type_ids as $num => $id)
 {
   $t_key = get_main_data_tkey($main_data, $id);
   __dump_limits_table_row($id, is_null($t_key) ? null : $main_data[$t_key], $conveyor_limits, $market_hubs, $sale_remain);
