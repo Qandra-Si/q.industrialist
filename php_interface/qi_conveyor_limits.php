@@ -12,7 +12,9 @@ select
  cl_trade_hub hub,
  cl_trader_corp co,
  cl_approximate lim
-from conveyor_limits;
+from conveyor_limits cl
+ left outer join qi.eve_sde_type_ids t on (sdet_type_id=cl_type_id)
+order by sdet_type_name;
 EOD;
   $conveyor_limits_cursor = pg_query($conn, $query)
           or die('pg_query err: '.pg_last_error());
