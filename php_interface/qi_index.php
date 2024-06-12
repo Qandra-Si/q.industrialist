@@ -23,6 +23,11 @@ pg_exec($conn, "SET search_path TO qi");
  <br><a class="btn btn-warning" href="/qi_regroup.php" role="button">Regroup Settings</a>
  </p>
 
+ <p>
+ Настройка конвейера, списки продуктов для производства и ограничения на их количество во избежание овестока.
+ <br><a class="btn btn-warning" href="/qi_conveyor_limits.php" role="button">Conveyor Limits</a>
+ </p>
+
 <h2>Мониторинг состояния закрытого раздела</h2>
  <p>
  Полный список тех материалов, которые производились или инвентились нашими корпорациями. Расчёт стоимости работ и уплаченных налогов на запуск.

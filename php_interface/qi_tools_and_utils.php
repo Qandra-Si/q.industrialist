@@ -19,4 +19,10 @@ function get_numeric_array($val) {
     foreach ($arr as &$num) $num = get_numeric($num);
     return $arr;
 }
+// --------------------------------------------------------------------------------------------------------------
+// sys_numbers
+// user_numbers
+// --------------------------------------------------------------------------------------------------------------
+function sys_numbers($var) { return $var <= 2147483647; }
+function user_numbers($var) { return $var > 2147483647; }
 ?>

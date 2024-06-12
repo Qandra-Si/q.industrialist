@@ -476,3 +476,4 @@ composer.lock
 # Q.Industrialist (Digger)
 /phpinfo.php
 /.settings.php
+render_stylesheet_dark.css

@@ -81,9 +81,6 @@ table.qind-table-jobsstat > tbody > tr > td:nth-child(5)
 { text-align: left; }
 </style><?php
 
-function sys_numbers($var) { return $var <= 2147483647; }
-function user_numbers($var) { return $var > 2147483647; }
-
 function __dump_type_ids(&$conn, &$ids) {
     $sys_ids = array_filter($ids, "sys_numbers");
     $query = <<<EOD

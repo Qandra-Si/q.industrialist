@@ -21,11 +21,11 @@ function displayOptionInMenu(opt, img, inverse=false) {
 function resetOptionsMenuToDefault() {
  resetOptionToDefault('Selected Market Hub', 60003760); // Jita hub
  resetOptionToDefault('Selected Trader Corp', 98553333); // R Strike
- resetOptionToDefault('Show Jita Price', 1);
- resetOptionToDefault('Show Amarr Price', 1);
- resetOptionToDefault('Show Universe Price', 1);
- resetOptionToDefault('Show Market Volume', 1);
- resetOptionToDefault('Show Best Offer', 1);
+ resetOptionToDefault('Show Jita Price', 0);
+ resetOptionToDefault('Show Amarr Price', 0);
+ resetOptionToDefault('Show Universe Price', 0);
+ resetOptionToDefault('Show Market Volume', 0);
+ resetOptionToDefault('Show Percent Volume', 0);
  resetOptionToDefault('Show Only Our Orders', 0);
 }
 function rebuildOptionsMenu() {
@@ -33,12 +33,12 @@ function rebuildOptionsMenu() {
  displayOptionInMenu('Show Amarr Price', $('#imgShowAmarrPrice'));
  displayOptionInMenu('Show Universe Price', $('#imgShowUniversePrice'));
  displayOptionInMenu('Show Market Volume', $('#imgShowMarketVolume'));
- displayOptionInMenu('Show Best Offer', $('#imgShowBestOffer'));
+ displayOptionInMenu('Show Percent Volume', $('#imgShowPercentVolume'));
  var show = ls.getItem('Show Market Volume');
  if (show==1)
-  $('#btnToggleBestOffer').parent().removeClass('disabled');
+  $('#btnTogglePercentVolume').parent().removeClass('disabled');
  else
-  $('#btnToggleBestOffer').parent().addClass('disabled');
+  $('#btnTogglePercentVolume').parent().addClass('disabled');
  displayOptionInMenu('Show Only Our Orders', $('#imgShowOurOrdersOnly'), true);
  displayOptionInMenu('Show Only Our Orders', $('#imgShowTheirOrdersOnly'));
 
@@ -180,10 +180,11 @@ function rebuildBody() {
   applyOptionVal(show, '#tbl tbody tr td:nth-child('+idx+')');
  }
  var show = ls.getItem('Show Market Volume');
- applyOptionVal(show, 'market-volume');
+ applyOptionVal(show, 'remain-volume');
  if (show) {
-  /*var*/ show = ls.getItem('Show Best Offer');
-  applyOptionVal(show, 'best-offer');
+  let percent = ls.getItem('Show Percent Volume');
+  applyOptionVal((percent==1)?1:0, 'percent-volume');
+  applyOptionVal((percent==1)?0:1, 'numeric-volume');
  }
  /*var*/ show = ls.getItem('Show Only Our Orders');
  if (show==0)
@@ -227,12 +228,107 @@ function toggleMenuOption(name, inverse=false) {
  rebuildBody();
 }
 
+function editProductLimit(elem) {
+ var tid = getProductMainData(elem);
+ if (tid === null) return;
+ let type_id = tid[0];
+ //- сохранение идентификатора продукта в форму
+ var frm = $("#frmSetupLimits");
+ frm.find("input[name='tid']").val(type_id);
+ //- формирование содержимого диалогового окна
+ var tr = elem.closest('tr');
+ var modal = $("#modalLimits");
+ $('#modalLimitsLabel').html('<span class="text-primary">'+tid[1]+'</span> настройки производства');
+ for (const h of g_market_hubs) {
+  if (h === null) break;
+  if (h[7]==1) continue; //archive
+  if (h[8]==1) continue; //forbidden
+  var ed=$('#navOverstocks div.row[hub='+h[0]+'][corp='+h[1]+'] div input');
+  if (ed === undefined) return;
+  var td = tr.find('td[hub='+h[0]+']');
+  var lv = td.find('limit-volume');
+  var found=null;
+  if (!(lv === undefined)) {
+   let lim = lv.attr('lim');
+   if (!(lim === undefined)) found = lim;
+  }
+  if (found)
+   ed.val(found);
+  else
+   ed.val('');
+ }
+ modal.modal('show');
+}
+
+function submitProductLimit() {
+ var frm = $("#frmSetupLimits");
+ let type_id = frm.find("input[name='tid']").val(); // см. editProductLimit
+ var tr = $('#tbl tbody tr[type_id='+type_id+']');
+ if (tr === undefined) return;
+ var hubs = [];
+ var corps = [];
+ var limits = [];
+ for (const h of g_market_hubs) {
+  if (h === null) break;
+  if (h[7]==1) continue; //archive
+  if (h[8]==1) continue; //forbidden
+  var found=null;
+  var ed=$('#navOverstocks div.row[hub='+h[0]+'][corp='+h[1]+'] div input');
+  if (ed === undefined) return;
+  var lim=ed.val();
+  if (!lim) lim=null;
+  var td = tr.find('td[hub='+h[0]+']');
+  var lv = td.find('limit-volume');
+  if (!(lv === undefined) && !(lv.html() === undefined)) {
+   if (lim) {
+    lv.attr('lim', lim);
+    lv.html(numLikeEve(lim));
+   } else {
+    lv.removeAttr('lim');
+    lv.html('');
+   }
+  } else if (lim) {
+   td.html('<limit-volume lim="'+lim+'">'+numLikeEve(lim)+'</limit-volume>');
+  }
+  hubs.push(h[0]);
+  corps.push(h[1]);
+  if (!lim) limits.push(0); else limits.push(lim);
+ }
+ //- сохранение настроек в форму
+ //var frm = $("#frmSetupLimits");
+ //см.выше:frm.find("input[name='tid']").val(type_id);
+ frm.find("input[name='hub']").val(hubs.join(',')); // мб. список
+ frm.find("input[name='corp']").val(corps.join(',')); // мб. список
+ frm.find("input[name='limit']").val(limits.join(',')); // мб. список
+ frm.submit();
+}
+
+$("#frmSetupLimits").on("submit", function(e){
+ e.preventDefault();
+ $.ajax({
+  url: '/tools/cl.php',
+  method: 'post',
+  dataType: 'json',
+  data: $(this).serialize(),
+  success: function(data){},
+  error: function (jqXHR, exception) {
+   if (jqXHR.status === 0) alert('Not connect. Verify Network.');
+   else if (jqXHR.status == 404) alert('Requested page not found (404).');
+   else if (jqXHR.status == 500) alert('Internal Server Error (500).');
+   else if (exception === 'parsererror') alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   else if (exception === 'timeout') alert('Time out error.'); // сервер завис?
+   else if (exception === 'abort') alert('Ajax request aborted.');
+   else alert('Uncaught Error. ' + jqXHR.responseText);
+  }
+ });
+});
+
 $(document).ready(function(){
  $('#btnToggleJitaPrice').on('click', function () { toggleMenuOption('Show Jita Price'); });
  $('#btnToggleAmarrPrice').on('click', function () { toggleMenuOption('Show Amarr Price'); });
  $('#btnToggleUniversePrice').on('click', function () { toggleMenuOption('Show Universe Price'); });
  $('#btnToggleMarketVolume').on('click', function () { toggleMenuOption('Show Market Volume'); });
- $('#btnToggleBestOffer').on('click', function () { toggleMenuOption('Show Best Offer'); });
+ $('#btnTogglePercentVolume').on('click', function () { toggleMenuOption('Show Percent Volume'); });
  $('#btnToggleOurOrdersOnly').on('click', function () { toggleMenuOption('Show Only Our Orders'); });
  $('#btnToggleTheirOrdersOnly').on('click', function () { toggleMenuOption('Show Only Our Orders'); });
  $('#btnResetOptions').on('click', function () {
@@ -300,4 +396,7 @@ $(document).ready(function(){
 
  // щелчок по кнопке (i)
  $('a.qind-info-btn').bind('click', function() { showProductInfoDialog($(this)); });
+ // щелчок по кнопке (edit)
+ $('a.qind-edit-btn').bind('click', function() { editProductLimit($(this)); });
+ $('#limSubmit').bind('click', function() { submitProductLimit(); });
 });
