@@ -727,7 +727,7 @@ class ConveyorMaterialRequirements:
                 group_by_type_id=True,
                 group_by_station=True,
                 group_by_me=True,
-                group_by_te=False,
+                group_by_te=True,
                 group_by_runs=True)
         # сортируем уже сгруппированные чертежи
         self.__grouped_and_sorted: typing.List[ConveyorMaterialRequirements.StackOfBlueprints] = []

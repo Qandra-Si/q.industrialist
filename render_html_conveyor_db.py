@@ -1213,9 +1213,17 @@ def dump_list_of_possible_blueprints(
                 min_duration, max_duration = tt
             else:
                 min_duration, max_duration = min(min_duration, tt[0]), max(max_duration, tt[1])
+            me_te_tag: str = ''
+            if db.QSwaggerActivityCode.RESEARCH_TIME in settings.activities or \
+               db.QSwaggerActivityCode.RESEARCH_MATERIAL in settings.activities:
+                me_te_tag = f"<me_tag>{b0.material_efficiency}% <mute>/</mute> {b0.time_efficiency}%</me_tag>"
+            elif db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
+                me_te_tag = f"<me_tag>{b0.material_efficiency}% <mute>/ {b0.time_efficiency}%</mute></me_tag>"
+            elif db.QSwaggerActivityCode.INVENTION in settings.activities:
+                pass  # для инвента me_te_tag нет смысла показывать
             details += f"{tr_div_class('div', stack, True)}" \
                        f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
-                       f"<me_tag>{b0.material_efficiency}%</me_tag>" \
+                       f"{me_te_tag}" \
                        f"<qmaterials {format_json_data('arr', js)}></qmaterials>" \
                        f"{tr_div_class('div', None, False)}"
             quantities += f"{tr_div_class('div', stack, True)}" \
@@ -1257,7 +1265,8 @@ def dump_list_of_possible_blueprints(
                 ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
                 num_ready: int = ma.num_ready
                 # формирование отчёта со сведениями о производстве
-                variants += f'<div class="industry-product">' \
+                variants_class: str = "industry-product" + g_nav_menu_defaults.css('industry-product')
+                variants += f'<div class="{variants_class}">' \
                             f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
                             '</div>'
                 info = {'p': ma.product_tier1.product_id,
@@ -1421,9 +1430,16 @@ def dump_corp_conveyors(
                                            db.QSwaggerActivityCode.RESEARCH_MATERIAL):
                         lost, possible = True, False
                         break
+                    # проверка, что в коробку invent не попали оригиналы
                     if b.is_original and a == db.QSwaggerActivityCode.INVENTION:
                         lost, possible = True, False
                         break
+                    # проверка, что чертёж имеет смысл исследовать
+                    if a in (db.QSwaggerActivityCode.RESEARCH_TIME,
+                             db.QSwaggerActivityCode.RESEARCH_MATERIAL):
+                        if b.time_efficiency == 20 and b.material_efficiency == 10:
+                            lost, possible = True, False
+                            break
                     # проверка, что в БД есть сведения о чертеже
                     if b.blueprint_type is None:
                         lost, possible = True, False
