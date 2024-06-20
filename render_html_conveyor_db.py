@@ -162,28 +162,27 @@ class NavMenuDefaults:
             raise Exception("Unsupported label to get nav menu defaults")
 
     def css(self, label: str, prefix: bool = True) -> str:
-        opt: bool = False
         if label == 'row-multiple' or \
            label == 'run-possible' or label == 'row-possible' or \
            label == 'run-optional' or label == 'row-optional':
-            opt = self.run_possible
+            opt: bool = self.run_possible
         elif label == 'run-impossible' or label == 'row-impossible':
-            opt = self.run_impossible
+            opt: bool = self.run_impossible
         elif label == 'overstock-product' or label == 'row-overstock':
-            opt = self.overstock_products
+            opt: bool = self.overstock_products
         elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
-            opt = self.lost_items
+            opt: bool = self.lost_items
         elif label == 'phantom-blueprints':
-            opt = self.phantom_blueprints
+            opt: bool = self.phantom_blueprints
         elif label == 'job-active':
-            opt = self.job_active
+            opt: bool = self.job_active
         elif label == 'job-completed':
-            opt = self.job_completed
+            opt: bool = self.job_completed
         # ---
         elif label == 'used-materials':
-            opt = self.used_materials
+            opt: bool = self.used_materials
         elif label == 'not-available':
-            opt = self.not_available
+            opt: bool = self.not_available
         else:
             raise Exception("Unsupported label to get nav menu defaults")
         return '' if opt else (' hidden' if prefix else 'hidden')
@@ -1152,11 +1151,11 @@ def dump_list_of_possible_blueprints(
                 if x1 or x2:
                     tr_class = ''
                     break
-            if not tr_class:
-                tr_class = 'row-multiple'
-                tr_class += g_nav_menu_defaults.css(tr_class)
-            if industry_analysis.is_all_variants_overstock(type_id, settings):
-                tr_class += ' row-overstock'
+        if not tr_class:
+            tr_class = 'row-multiple'
+            tr_class += g_nav_menu_defaults.css(tr_class)
+        if industry_analysis.is_all_variants_overstock(type_id, settings):
+            tr_class += ' row-overstock'
 
         def tr_div_class(which: str,
                          __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
