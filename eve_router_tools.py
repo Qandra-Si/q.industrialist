@@ -836,10 +836,47 @@ def get_router_details(
     return station, corporation, containers_stocks, containers_output
 
 
+class ConveyorRouterInputMaterials:
+    def __init__(self):
+        self.input_materials: typing.Dict[int, db.QSwaggerTypeId] = {}  # type_id:material
+
+    def calc(self,
+             # данные (справочники)
+             qid: db.QSwaggerDictionary,
+             # настройки генерации отчёта
+             router_settings: RouterSettings):
+        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+        for product_type_id in router_settings.output:
+            activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
+            if not activities: continue
+            for a in activities:
+                mats: db.QSwaggerActivityMaterials = a.materials
+                for m in mats.materials:
+                    if m.material_id not in self.input_materials:
+                        self.input_materials[m.material_id] = m.material_type
+
+
+def calc_router_materials(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
+        router_settings: typing.List[RouterSettings]) \
+        -> typing.Dict[RouterSettings, ConveyorRouterInputMaterials]:
+    if not router_settings:
+        return {}
+    # считаем требуемые матариалы для указанных настроек роутера
+    router_materials: typing.Dict[RouterSettings, ConveyorRouterInputMaterials] = {}
+    for rs in router_settings:
+        m: ConveyorRouterInputMaterials = ConveyorRouterInputMaterials()
+        m.calc(qid, rs)
+        router_materials[rs] = m
+    return router_materials
+
+
 class ConveyorCorporationOutputProducts:
     def __init__(self, index: int):
         self.index: int = index
-        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:material
+        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:product
         self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}  # type_id:list(assets)
         self.corporation: typing.Optional[db.QSwaggerCorporation] = None
         self.station: typing.Optional[db.QSwaggerStation] = None

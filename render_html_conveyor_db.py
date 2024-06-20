@@ -341,7 +341,9 @@ def dump_nav_menu_router_dialog(
         global_dictionary: tools.ConveyorDictionary,
         # настройки генерации отчёта
         router_settings: typing.List[tools.RouterSettings],
-        conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
+        conveyor_settings: typing.List[tools.ConveyorSettings],
+        # справочник задействованных материалов
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
@@ -407,13 +409,7 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
         products: typing.Set[int] = set()
         if s.output:
             # если список output сконфигурирован, то имеет место быть станция из настроек router-а
-            for product_type_id in s.output:
-                activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
-                if not activities: continue
-                for a in activities:
-                    mats: db.QSwaggerActivityMaterials = a.materials
-                    for m in mats.materials:
-                        materials.add(m.material_id)
+            materials = set(router_materials[s].input_materials.keys())
             products = set(s.output)
         else:
             # если список output пустой, то имеет место быть default-ная производственная база,
@@ -739,7 +735,7 @@ var g_server_time={int(server_time.timestamp())};
     render_html.__dump_any_into_modal_footer(glf)
 
 
-def dump_invent_product_dialog(glf) -> None:
+def dump_industry_product_dialog(glf) -> None:
     # создаём заголовок модального окна, где будем показывать список имеющихся материалов в контейнере "..stock ALL"
     render_html.__dump_any_into_modal_header_wo_button(
         glf,
@@ -1590,14 +1586,32 @@ def dump_corp_conveyors(
 """)
 
 
-def dump_list_of_ready_products(glf, products_ready: typing.List[db.QSwaggerMaterial]) -> None:
+def dump_list_of_ready_products(
+        glf,
+        # список произведённых продуктов
+        products_ready: typing.List[db.QSwaggerMaterial],
+        # текущие сведения роутинга на станции
+        current_router_settings: tools.RouterSettings,
+        # справочник задействованных материалов
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     for p in products_ready:
         type_id: int = p.material_type.type_id
+        next_factory: str = ''
+        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+        for router_settings, materials in router_materials.items():
+            if type_id in materials.input_materials:
+                next_factory = router_settings.station
+                break
+        # если список output пустой, то имеет место быть default-ная производственная база,
+        # перемещаем на неё весь сток "неприкаянных" материалов с этой фабрики
+        if not next_factory and current_router_settings.output:
+            next_factory = next((rs.station for rs in router_materials.keys() if not rs.output), '')
         glf.write(f"""<tr class="hidden">
 <td>{get_tbl_router_row_num()}</td>
 <td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
 <td>{p.material_type.name}&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a></td>
+<td>{next_factory}</td>
 <td>{p.quantity:,d}</td>
 <td>{int(p.quantity * p.material_type.packaged_volume + 0.9):,d}</td>
 </tr>""")
@@ -1606,7 +1620,12 @@ data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sig
 def dump_list_of_lost_products(
         glf,
         corporation: db.QSwaggerCorporation,
-        products_lost: typing.List[db.QSwaggerCorporationAssetsItem]) -> None:
+        # список потерянных продуктов
+        products_lost: typing.List[db.QSwaggerCorporationAssetsItem],
+        # текущие сведения роутинга на станции
+        current_router_settings: tools.RouterSettings,
+        # справочник задействованных материалов
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     # группируем ассеты по типу, чтобы получить уникальные сочетания с количествами
     grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = \
         tools.get_asset_items_grouped_by(
@@ -1627,6 +1646,16 @@ def dump_list_of_lost_products(
         type_id: int = a0.type_id
         type_name: str = a0.item_type.name
         quantity: int = sum([_.quantity for _ in group])
+        next_factory: str = ''
+        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+        for router_settings, materials in router_materials.items():
+            if type_id in materials.input_materials:
+                next_factory = router_settings.station
+                break
+        # если список output пустой, то имеет место быть default-ная производственная база,
+        # перемещаем на неё весь сток "неприкаянных" материалов с этой фабрики
+        if not next_factory and current_router_settings.output:
+            next_factory = next((rs.station for rs in router_materials.keys() if not rs.output), '')
         # ---
         containers: typing.Set[str] = set()
         for a in group:
@@ -1643,6 +1672,7 @@ def dump_list_of_lost_products(
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
 <label class='label label-lost-assets'>{declension_of_lost_assets(quantity)}</label>{container_prefix}{containers}<!--
 item_ids: {[_.item_id for _ in group]}--></td>
+<td>{next_factory}</td>
 <td>{quantity:,d}</td>
 <td>{warn_sign} {int(quantity * a0.item_type.packaged_volume + 0.9):,d}</td>
 </tr>""")
@@ -1653,7 +1683,9 @@ def dump_corp_router(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
-        ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts]) -> None:
+        ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts],
+        # справочник задействованных материалов
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     # проверка, пусты ли настройки конвейера?
     if not ready_products: return
     # получаем ссылку на единственную корпорацию
@@ -1667,8 +1699,9 @@ def dump_corp_router(
   <th></th><!--1-->
   <th></th><!--2-->
   <th>Продукция</th><!--3-->
-  <th>Кол-во</th><!--4-->
-  <th>Объём</th><!--5-->
+  <th>След.фабрика</th><!--4-->
+  <th>Кол-во</th><!--5-->
+  <th>Объём</th><!--6-->
  </tr>
 </thead>
 <tbody>
@@ -1697,7 +1730,7 @@ def dump_corp_router(
             warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
 
         glf.write(f"""<tr class="row-station" {format_json_data('tag', tag)}>
-<td colspan="4">{station.station_name}
+<td colspan="5">{station.station_name}
 <mute>({station.station_type_name}, {router_settings.desc})</mute>
 <a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a></td>
 <td>{warn_sign}{sum_volume:,d} m<sup>3</sup></td>
@@ -1706,10 +1739,10 @@ def dump_corp_router(
 
         if products_ready:
             products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
-            dump_list_of_ready_products(glf, products_ready)
+            dump_list_of_ready_products(glf, products_ready, router_settings, router_materials)
         if products_lost:
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
-            dump_list_of_lost_products(glf, products.corporation, products_lost)
+            dump_list_of_lost_products(glf, products.corporation, products_lost, router_settings, router_materials)
 
         del products_ready
         del products_lost
@@ -1749,6 +1782,9 @@ def dump_router2_into_report(
         ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts] = \
             tools.calc_ready_products(qid, router_settings, conveyor_settings)
         global_dictionary.load_ready_products(ready_products)
+        # инициализация списка материалов, требуемых всоответствии с настройками роутера
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials] = \
+            tools.calc_router_materials(qid, router_settings)
         # компоновка высшего уровня конвейера
         dump_corp_conveyors(
             glf,
@@ -1761,12 +1797,23 @@ def dump_router2_into_report(
         dump_corp_router(
             glf,
             qid,
-            ready_products)
-        # сохраняем содержимое диалоговых окон
-        dump_nav_menu_router_dialog(glf, qid, global_dictionary, router_settings, conveyor_settings)
+            ready_products,
+            router_materials)
+        # сохраняем содержимое диалоговых окон [Станции]
+        dump_nav_menu_router_dialog(
+            glf,
+            qid,
+            global_dictionary,
+            router_settings,
+            conveyor_settings,
+            router_materials)
+        # сохраняем содержимое диалоговых окон [Конвейер]
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
+        # сохраняем содержимое диалоговых окон [Время]
         dump_nav_menu_lifetime_dialog(glf, qid)
-        dump_invent_product_dialog(glf)
+        # сохраняем содержимое диалоговых окон [Время]
+        dump_industry_product_dialog(glf)
+        # сохраняем справочник названий, используемых на странице конвейера
         dump_materials_to_js(glf, global_dictionary)
         glf.write(f' <script src="{render_html.__get_file_src("render_html_conveyor.js")}"></script>\n')
         render_html.__dump_footer(glf)

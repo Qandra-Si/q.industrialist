@@ -164,12 +164,13 @@ table.tbl-router thead tr th { padding: 4px; border-bottom: 1px solid #1d3231; v
 table.tbl-router tbody tr td { padding: 0px; padding-left: 4px; padding-right: 4px; border-top: none; vertical-align: top; }
 table.tbl-router tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
 table.tbl-router tbody tr td { border-left: 1px solid #1d3231; }
-table.tbl-router tbody tr td:nth-child(3) { border-left: none; }
-table.tbl-router thead tr th:nth-child(4),
-table.tbl-router tbody tr td:nth-child(4),
+table.tbl-router tbody tr td:nth-child(3) { border-left: none; white-space: nowrap; }
+table.tbl-router thead tr th:nth-child(4) { color: #999; }
+table.tbl-router tbody tr td:nth-child(4) { color: #777; }
 table.tbl-router thead tr th:nth-child(5),
-table.tbl-router tbody tr td:nth-child(5) { text-align: right; }
-table.tbl-router tbody tr td:nth-child(3) { white-space: nowrap; }
+table.tbl-router tbody tr td:nth-child(5),
+table.tbl-router thead tr th:nth-child(6),
+table.tbl-router tbody tr td:nth-child(6) { text-align: right; }
 
 table.tbl-router tbody tr.row-station td { font-size: medium; text-align: left; background: #111b1b; border-bottom: 1px solid #111b1b; }
 table.tbl-router tbody tr.row-station td:nth-child(2) { font-size: 110%; text-align: right; vertical-align: bottom; white-space: nowrap; }
