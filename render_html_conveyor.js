@@ -500,6 +500,9 @@ function rebuildConveyorTable() {
  var used_materials = (getOption('option', 'used-materials') == 1) ? 1 : 0;
  var not_available = (getOption('option', 'not-available') == 1) ? 1 : 0;
  initMaterialsOfBlueprints(used_materials, not_available);
+
+ var industry_product = (getOption('option', 'industry-product') == 1) ? 1 : 0;
+ $('div.industry-product').each(function() { changeElemVisibility($(this), industry_product); });
 }
 function rebuildRouterTable() {
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;
@@ -725,7 +728,7 @@ $(document).ready(function(){
    sortConveyor();
    rebuildConveyorTable();
   });
-  $('div.industry-products a.qind-info-btn').on('click', function () {
+  $('a.qind-info-btn').on('click', function () {
    showIndustryProductModal($(this));
   });
   // Working with clipboard

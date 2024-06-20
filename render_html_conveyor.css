@@ -206,9 +206,14 @@ qdecr { color: #8dc169; }
  -webkit-animation: overstock-pulsate 1.2s linear infinite;
  animation: overstock-pulsate 1.2s linear infinite;
 }
+.qind-copy-btn:hover + * ~ .label-overstock {
+ color: #ff0048;
+ -webkit-animation: overstock-pulsate 1.2s linear infinite;
+ animation: overstock-pulsate 1.2s linear infinite;
+}
 /* поведение кнопки info около продукта инвента */
-div.industry-products a.qind-info-btn { color: #808080; }
-div.industry-products a.qind-info-btn:hover,
-div.industry-products a.qind-info-btn:active,
-div.industry-products a.qind-info-btn:focus { color: #aaa; }
+a.qind-info-btn { color: #808080; }
+a.qind-info-btn:hover,
+a.qind-info-btn:active,
+a.qind-info-btn:focus { color: #aaa; }
 #modalIndustryProduct * span.quantity { color: #ffa600; }

@@ -137,6 +137,7 @@ class NavMenuDefaults:
         # ---
         self.used_materials: bool = False
         self.not_available: bool = False
+        self.industry_product: bool = False
 
     def get(self, label: str) -> bool:
         if label == 'row-multiple' or \
@@ -158,6 +159,8 @@ class NavMenuDefaults:
             return self.used_materials
         elif label == 'not-available':
             return self.not_available
+        elif label == 'industry-product':
+            return self.industry_product
         else:
             raise Exception("Unsupported label to get nav menu defaults")
 
@@ -183,6 +186,8 @@ class NavMenuDefaults:
             opt: bool = self.used_materials
         elif label == 'not-available':
             opt: bool = self.not_available
+        elif label == 'industry-product':
+            opt: bool = self.industry_product
         else:
             raise Exception("Unsupported label to get nav menu defaults")
         return '' if opt else (' hidden' if prefix else 'hidden')
@@ -204,6 +209,7 @@ def dump_nav_menu(glf) -> None:
         None,
         (g_nav_menu_defaults.used_materials,     'used-materials',     'Используемые материалы', True),
         (g_nav_menu_defaults.not_available,      'not-available',      'Недоступные материалы', True),
+        (g_nav_menu_defaults.industry_product,   'industry-product',   'Продукты производства', True),
         None,
         (True, 'end-level-manuf', "Производство последнего уровня", False),  # btnToggleEndLevelManuf
         (False, 'entry-level-purchasing', "Список для закупки", False),  # btnToggleEntryLevelPurchasing
@@ -1220,6 +1226,8 @@ def dump_list_of_possible_blueprints(
                      f"{tr_div_class('div', None, False)}"
 
         variants: str = ''
+        product_info_btn: str = ''
+        product_details_note: str = ''
         if db.QSwaggerActivityCode.INVENTION in settings.activities:
             invent_analysis: typing.Optional[tools.ConveyorInventProductsAnalysis] = \
                 industry_analysis.invent_analysis.get(type_id)
@@ -1228,20 +1236,19 @@ def dump_list_of_possible_blueprints(
                     if ia.product_tier2 is None: continue
                     num_ready: int = ia.num_ready
                     # формирование отчёта со сведениями об инвенте
-                    variants += f'<div class="industry-products">' \
+                    variants += f'<div class="invent-products">' \
                                 f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>'
-                    if num_ready > 0:
-                        info = {'p': ia.product_tier2.product_id,
-                                'l': ia.product_tier2_limit,
-                                'a': ia.product_tier2_num_in_assets,
-                                'j': ia.product_tier2_num_in_jobs,
-                                's': ia.product_tier2_num_in_sell}
-                        variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
-                                    f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
-                                    f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
-                        # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                        if ia.product_tier2_overstock:
-                            variants += ' <label class="label label-overstock">перепроизводство</label>'
+                    info = {'p': ia.product_tier2.product_id,
+                            'l': ia.product_tier2_limit,
+                            'a': ia.product_tier2_num_in_assets,
+                            'j': ia.product_tier2_num_in_jobs,
+                            's': ia.product_tier2_num_in_sell}
+                    variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
+                                f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
+                                f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                    # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                    if num_ready > 0 and ia.product_tier2_overstock:
+                        variants += ' <label class="label label-overstock">перепроизводство</label>'
                     variants += '</div>'
         if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
             manufacturing_analysis: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = \
@@ -1250,21 +1257,24 @@ def dump_list_of_possible_blueprints(
                 ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
                 num_ready: int = ma.num_ready
                 # формирование отчёта со сведениями о производстве
-                variants += f'<div class="industry-products">' \
-                            f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>'
-                if num_ready > 0:
-                    info = {'p': ma.product_tier1.product_id,
-                            'l': ma.product_tier1_limit,
-                            'a': ma.product_tier1_num_in_assets,
-                            'j': ma.product_tier1_num_in_jobs,
-                            's': ma.product_tier1_num_in_sell}
-                    variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
-                                f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
-                                f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
-                    # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                    if ma.product_tier1_overstock:
-                        variants += ' <label class="label label-overstock">перепроизводство</label>'
-                variants += '</div>'
+                variants += f'<div class="industry-product">' \
+                            f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                            '</div>'
+                info = {'p': ma.product_tier1.product_id,
+                        'l': ma.product_tier1_limit,
+                        'a': ma.product_tier1_num_in_assets,
+                        'j': ma.product_tier1_num_in_jobs,
+                        's': ma.product_tier1_num_in_sell}
+                product_info_btn = '&nbsp;' \
+                                   '<a data-target="#" role="button" class="qind-info-btn"' \
+                                   f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
+                product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                if num_ready > 0 and ma.product_tier1_overstock:
+                    product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+
+        blueprint_copy_btn: str = f'&nbsp;<a data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn"' \
+                                  f' data-toggle="tooltip">{glyphicon("copy")}</a>'
 
         sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=(min_duration, max_duration))
         activity_icons: str = get_industry_icons(settings.activities)
@@ -1272,9 +1282,8 @@ def dump_list_of_possible_blueprints(
         glf.write(f"""<tr{tr_div_class('tr')} {format_json_data('sort', sort)}>
 <td>{get_tbl_summary_row_num()}</td>
 <td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{activity_icons}&nbsp;<qname>{type_name}</qname>&nbsp;<a
-data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn" data-toggle="tooltip">{glyphicon("copy")}</a>{decryptor}
-{details}{variants}</td>
+<td>{activity_icons}&nbsp;<qname>{type_name}</qname>{product_info_btn}{blueprint_copy_btn}{decryptor}
+{product_details_note}{details}{variants}</td>
 <td>{quantities}</td>
 <td>{times}</td>
 <td></td><td></td><td></td>
