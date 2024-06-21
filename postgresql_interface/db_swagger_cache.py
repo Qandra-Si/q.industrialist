@@ -311,14 +311,22 @@ def get_activities_by_nums(codes: typing.List[int]) -> typing.List[QSwaggerActiv
     return res
 
 
+class QSwaggerBlueprint: pass  # forward declaration
+
+
 class QSwaggerActivity:
-    def __init__(self, time: int, code: QSwaggerActivityCode):
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int, code: QSwaggerActivityCode):
+        self.__blueprint: QSwaggerBlueprint = blueprint
         self.__code: QSwaggerActivityCode = code
         self.__time: int = time
         self.__materials = QSwaggerActivityMaterials()
 
     def __del__(self):
         del self.__materials
+
+    @property
+    def blueprint(self) -> QSwaggerBlueprint:
+        return self.__blueprint
 
     @property
     def code(self) -> QSwaggerActivityCode:
@@ -334,8 +342,8 @@ class QSwaggerActivity:
 
 
 class QSwaggerBlueprintManufacturing(QSwaggerActivity):
-    def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time, QSwaggerActivityCode.MANUFACTURING)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int, product_type: QSwaggerTypeId, quantity: int):
+        super().__init__(blueprint, time, QSwaggerActivityCode.MANUFACTURING)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
 
     def __del__(self):
@@ -363,8 +371,8 @@ class QSwaggerBlueprintManufacturing(QSwaggerActivity):
 
 
 class QSwaggerBlueprintInvention(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time, QSwaggerActivityCode.INVENTION)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int):
+        super().__init__(blueprint, time, QSwaggerActivityCode.INVENTION)
         self.__products: typing.List[QSwaggerInventionProduct] = []
 
     def __del__(self):
@@ -388,8 +396,8 @@ class QSwaggerBlueprintInvention(QSwaggerActivity):
 
 
 class QSwaggerBlueprintCopying(QSwaggerActivity):
-    def __init__(self, time: int, product_type: QSwaggerTypeId):
-        super().__init__(time, QSwaggerActivityCode.COPYING)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int, product_type: QSwaggerTypeId):
+        super().__init__(blueprint, time, QSwaggerActivityCode.COPYING)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, 1)
 
     def __del__(self):
@@ -413,8 +421,8 @@ class QSwaggerBlueprintCopying(QSwaggerActivity):
 
 
 class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time, QSwaggerActivityCode.RESEARCH_MATERIAL)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int):
+        super().__init__(blueprint, time, QSwaggerActivityCode.RESEARCH_MATERIAL)
 
     def __del__(self):
         pass
@@ -425,8 +433,8 @@ class QSwaggerBlueprintResearchMaterial(QSwaggerActivity):
 
 
 class QSwaggerBlueprintResearchTime(QSwaggerActivity):
-    def __init__(self, time: int):
-        super().__init__(time, QSwaggerActivityCode.RESEARCH_TIME)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int):
+        super().__init__(blueprint, time, QSwaggerActivityCode.RESEARCH_TIME)
 
     def __del__(self):
         pass
@@ -437,8 +445,8 @@ class QSwaggerBlueprintResearchTime(QSwaggerActivity):
 
 
 class QSwaggerBlueprintReaction(QSwaggerActivity):
-    def __init__(self, time: int, product_type: QSwaggerTypeId, quantity: int):
-        super().__init__(time, QSwaggerActivityCode.REACTION)
+    def __init__(self, blueprint: QSwaggerBlueprint, time: int, product_type: QSwaggerTypeId, quantity: int):
+        super().__init__(blueprint, time, QSwaggerActivityCode.REACTION)
         self.__product: QSwaggerProduct = QSwaggerProduct(product_type, quantity)
 
     def __del__(self):
@@ -494,21 +502,21 @@ class QSwaggerBlueprint:
         time: int = row[2]
         if activity_id == 1:
             quantity: int = row[4]
-            self.__manufacturing = QSwaggerBlueprintManufacturing(time, product_type, quantity)
+            self.__manufacturing = QSwaggerBlueprintManufacturing(self, time, product_type, quantity)
         elif activity_id == 9:
             quantity: int = row[4]
-            self.__reaction = QSwaggerBlueprintReaction(time, product_type, quantity)
+            self.__reaction = QSwaggerBlueprintReaction(self, time, product_type, quantity)
         elif activity_id == 5:
             # продукт не всегда того же типа: копирка чертежа 33082 производит чертёж 33081
-            self.__copying = QSwaggerBlueprintCopying(time, product_type)
+            self.__copying = QSwaggerBlueprintCopying(self, time, product_type)
 
     def add_activity_without_product(self, activity_id: int, time: int) -> None:
         if activity_id == 8:
-            self.__invention = QSwaggerBlueprintInvention(time)  # продукты добавляются отдельным методом
+            self.__invention = QSwaggerBlueprintInvention(self, time)  # продукты добавляются отдельным методом
         elif activity_id == 4:
-            self.__research_material = QSwaggerBlueprintResearchMaterial(time)  # ...также не имеет продукта
+            self.__research_material = QSwaggerBlueprintResearchMaterial(self, time)  # ...также не имеет продукта
         elif activity_id == 3:
-            self.__research_time = QSwaggerBlueprintResearchTime(time)  # ...также не имеет продукта
+            self.__research_time = QSwaggerBlueprintResearchTime(self, time)  # ...также не имеет продукта
 
     @property
     def type_id(self) -> int:

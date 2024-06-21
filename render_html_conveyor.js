@@ -747,15 +747,28 @@ $(document).ready(function(){
    clearInterval(lifetime_timer);
   });
   $('a.qind-copy-btn').bind('copied', function(event, message) {
-    $(this).attr('title', message)
-      .tooltip('fixTitle')
-      .tooltip('show')
-      .attr('title', "Copy to clipboard")
-      .tooltip('fixTitle');
+   $(this).attr('title', message)
+    .tooltip('fixTitle')
+    .tooltip('show')
+    .attr('title', "Copy to clipboard")
+    .tooltip('fixTitle');
   });
   if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
-    // какой-то код ...
-    $('a.qind-copy-btn').each(function() { changeElemVisibility($(this), 0); });
+   // какой-то код ...
+   $('a.qind-copy-btn').each(function() { changeElemVisibility($(this), 0); });
+  } else {
+   $('table.tbl-router tbody tr.last-factory td:nth-child(4) num').each(function() { $(this).tooltip(); });
+   $('table.tbl-router tbody tr.last-factory td:nth-child(4) num').bind('click', function () {
+    var data_copy = $(this).html();
+    data_copy = data_copy.replace(/\s/g, '').replace(/<\/?[^>]+(>|$)/g, "").toLowerCase();
+    copyToClipboard($(this), data_copy);
+   });
+   $('table.tbl-router tbody tr.last-factory td:nth-child(4) num').bind('copied', function(event, message) {
+    var t = $(this).attr('title', message)
+     .tooltip('fixTitle')
+     .tooltip('show');
+    setTimeout(function() { t.tooltip('destroy'); }, 1500);
+   });
   }
   // Delayed and low priority operations
   initMaterialNames();

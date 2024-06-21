@@ -165,17 +165,23 @@ table.tbl-router tbody tr td { padding: 0px; padding-left: 4px; padding-right: 4
 table.tbl-router tfoot tr td { padding: 4px; border-top: 1px solid #1d3231; }
 table.tbl-router tbody tr td { border-left: 1px solid #1d3231; }
 table.tbl-router tbody tr td:nth-child(3) { border-left: none; white-space: nowrap; }
-table.tbl-router thead tr th:nth-child(4) { color: #999; }
-table.tbl-router tbody tr td:nth-child(4) { color: #777; }
 table.tbl-router thead tr th:nth-child(5),
 table.tbl-router tbody tr td:nth-child(5),
 table.tbl-router thead tr th:nth-child(6),
 table.tbl-router tbody tr td:nth-child(6) { text-align: right; }
-
+/* зесериваем и выравниваем названия станций промежуточной транспортировки */
+table.tbl-router tbody tr.last-factory td:nth-child(4) { text-align: right; }
+table.tbl-router thead tr th:nth-child(4) { color: #999; }
+table.tbl-router tbody tr.interim-factory td:nth-child(4),
+table.tbl-router tbody tr.last-factory td:nth-child(4) { color: #777; }
+table.tbl-router tbody tr.last-factory td:nth-child(4) hub { color: #3371b6; }
+table.tbl-router tbody tr.last-factory td:nth-child(4) num { color: #c5c8c9; }
+table.tbl-router tbody tr.last-factory td:nth-child(4) num:hover { color: #c5c8c9; text-shadow: 0 0 0.2vw #c5c8c9b2, 0 0 8vw #c5c8c9; cursor: default; }
+/* заголовок с названием станции */
 table.tbl-router tbody tr.row-station td { font-size: medium; text-align: left; background: #111b1b; border-bottom: 1px solid #111b1b; }
 table.tbl-router tbody tr.row-station td:nth-child(2) { font-size: 110%; text-align: right; vertical-align: bottom; white-space: nowrap; }
 table.tbl-router tbody tr.row-station:hover td { border-bottom: 1px solid #6db09e; }
-
+/* сжимаю последние колонки */
 table.tbl-router tbody tr td { width: auto; }
 table.tbl-router tbody tr td:nth-child(4),
 table.tbl-router tbody tr td:nth-child(5),

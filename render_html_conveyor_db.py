@@ -125,6 +125,30 @@ def get_industry_icons(activities: typing.List[db.QSwaggerActivityCode], delimit
     return activity_icons
 
 
+def format_product_tier2_info_btn(ia: tools.ConveyorInventAnalysis) -> str:
+    info = {'p': ia.product_tier2.product_id,
+            'l': ia.product_tier2_limit,
+            'a': ia.product_tier2_num_in_assets,
+            'j': ia.product_tier2_num_in_jobs,
+            's': ia.product_tier2_num_in_sell}
+    product_info_btn: str = \
+        '<a data-target="#" role="button" class="qind-info-btn"' \
+        f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
+    return product_info_btn
+
+
+def format_product_tier1_info_btn(ma: tools.ConveyorManufacturingAnalysis) -> str:
+    info = {'p': ma.product_tier1.product_id,
+            'l': ma.product_tier1_limit,
+            'a': ma.product_tier1_num_in_assets,
+            'j': ma.product_tier1_num_in_jobs,
+            's': ma.product_tier1_num_in_sell}
+    product_info_btn: str = \
+        '<a data-target="#" role="button" class="qind-info-btn"' \
+        f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
+    return product_info_btn
+
+
 class NavMenuDefaults:
     def __init__(self):
         self.run_possible: bool = True
@@ -1240,16 +1264,11 @@ def dump_list_of_possible_blueprints(
                     if ia.product_tier2 is None: continue
                     num_ready: int = ia.num_ready
                     # формирование отчёта со сведениями об инвенте
-                    variants += f'<div class="invent-products">' \
-                                f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>'
-                    info = {'p': ia.product_tier2.product_id,
-                            'l': ia.product_tier2_limit,
-                            'a': ia.product_tier2_num_in_assets,
-                            'j': ia.product_tier2_num_in_jobs,
-                            's': ia.product_tier2_num_in_sell}
-                    variants += ' <a data-target="#" role="button" class="qind-info-btn"' \
-                                f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>' \
-                                f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                    variants += \
+                        f'<div class="invent-products">' \
+                        f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                        ' ' + format_product_tier2_info_btn(ia) + \
+                        f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
                     # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                     if num_ready > 0 and ia.product_tier2_overstock:
                         variants += ' <label class="label label-overstock">перепроизводство</label>'
@@ -1262,17 +1281,11 @@ def dump_list_of_possible_blueprints(
                 num_ready: int = ma.num_ready
                 # формирование отчёта со сведениями о производстве
                 variants_class: str = "industry-product" + g_nav_menu_defaults.css('industry-product')
-                variants += f'<div class="{variants_class}">' \
-                            f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
-                            '</div>'
-                info = {'p': ma.product_tier1.product_id,
-                        'l': ma.product_tier1_limit,
-                        'a': ma.product_tier1_num_in_assets,
-                        'j': ma.product_tier1_num_in_jobs,
-                        's': ma.product_tier1_num_in_sell}
-                product_info_btn = '&nbsp;' \
-                                   '<a data-target="#" role="button" class="qind-info-btn"' \
-                                   f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
+                variants += \
+                    f'<div class="{variants_class}">' \
+                    f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                    '</div>'
+                product_info_btn = '&nbsp;' + format_product_tier1_info_btn(ma)
                 product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
                 # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                 if num_ready > 0 and ma.product_tier1_overstock:
@@ -1586,17 +1599,65 @@ def dump_corp_conveyors(
 """)
 
 
-def dump_list_of_ready_products(
+def dump_list_of_products(
         glf,
-        # список произведённых продуктов
-        products_ready: typing.List[db.QSwaggerMaterial],
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        corporation: db.QSwaggerCorporation,
         # текущие сведения роутинга на станции
         current_router_settings: tools.RouterSettings,
+        # ищем производственный конвейер корпорации
+        manufacturing_conveyor: tools.ConveyorSettings,
         # справочник задействованных материалов
-        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
-    for p in products_ready:
-        type_id: int = p.material_type.type_id
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials],
+        # список произведённых продуктов
+        products_ready: typing.Optional[typing.List[db.QSwaggerMaterial]] = None,
+        # список потерянных продуктов
+        products_lost: typing.Optional[typing.List[db.QSwaggerCorporationAssetsItem]] = None) -> None:
+    # локальные переменные
+    container_prefix: str = '<br><mute>Контейнер - </mute>'
+    # список продуктов, сконвентированный для хранения разных сущностей
+    products: typing.List[typing.Tuple[
+        int,  # код: 0 - ready, 1 - lost
+        int,  # type_id
+        int,  # количество
+        db.QSwaggerTypeId,  # тип продукта
+        typing.Optional[typing.List[str]]  # только для lost: названия контейнеров, где обнаружены "потеряшки"
+    ]] = []
+
+    if products_ready is not None:
+        products = [(0, _.material_id, _.quantity, _.material_type, None) for _ in products_ready]
+
+    if products_lost is not None:
+        # группируем ассеты по типу, чтобы получить уникальные сочетания с количествами
+        grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = \
+            tools.get_asset_items_grouped_by(
+                products_lost,
+                group_by_type_id=True,
+                group_by_station=False)
+        # сортируем уже сгруппированные чертежи
+        grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationAssetsItem]]] = []
+        for key in grouped.keys():
+            group: typing.List[db.QSwaggerCorporationAssetsItem] = grouped.get(key)
+            grouped_and_sorted.append((group[0].item_type.name, group))
+        grouped_and_sorted.sort(key=lambda x: x[0])
+        # готовим сгруппированный набор данных
+        for _, group in grouped_and_sorted:
+            a0: db.QSwaggerCorporationAssetsItem = group[0]
+            type_id: int = a0.type_id
+            quantity: int = sum([_.quantity for _ in group])
+            containers: typing.Set[str] = set()
+            for a in group:
+                c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(a.location_id)
+                containers.add(c.name if c and c.name else str(a.location_id))
+            containers: typing.List[str] = sorted(containers)
+            # ---
+            products.append((1, type_id, quantity, a0.item_type, containers))
+
+    for code, type_id, quantity, product_type, containers in products:
         next_factory: str = ''
+        product_info_btn: str = ''
+        row_class: str = 'interim-factory'
         # если список output сконфигурирован, то имеет место быть станция из настроек router-а
         for router_settings, materials in router_materials.items():
             if type_id in materials.input_materials:
@@ -1604,78 +1665,133 @@ def dump_list_of_ready_products(
                 break
         # если список output пустой, то имеет место быть default-ная производственная база,
         # перемещаем на неё весь сток "неприкаянных" материалов с этой фабрики
-        if not next_factory and current_router_settings.output:
-            next_factory = next((rs.station for rs in router_materials.keys() if not rs.output), '')
-        glf.write(f"""<tr class="hidden">
+        if not next_factory:
+            if current_router_settings.output:
+                next_factory = next((rs.station for rs in router_materials.keys() if not rs.output), '')
+            else:
+                row_class: str = 'last-factory'
+                # анализируем состояние производства продукта (добываем информацию где он уже имеется? продаётся?)
+                ma: tools.ConveyorManufacturingProductAnalysis = tools.ConveyorManufacturingProductAnalysis()
+                ma.analyse_product(
+                    qid,
+                    product_type,
+                    manufacturing_conveyor)
+                pma: tools.ConveyorManufacturingAnalysis = ma.product
+                # генерируем кнопку для получения информации о наличии предметов (а также их производстве)
+                product_info_btn = ' ' + format_product_tier1_info_btn(pma)
+                # формируем список направлений для транспортировки товара
+                num_in_assets: int = pma.product_tier1_num_in_assets  # stock, output, sale_stock
+
+                def format_trade_hub(num: int, solar_system: str, is_hub: bool) -> str:
+                    # форматируем строку с информацией о транспортировке товаров
+                    if num == 0:
+                        res: str = '0 '
+                    else:
+                        res: str = f'<num>{num:,d}</num> '
+                    if is_hub:
+                        res += f'<hub>{solar_system}</hub>'
+                    else:
+                        res += f'{solar_system}'
+                    return res
+
+                # пытаемся распределить продукты по торговым хабам
+                trade_hubs: typing.List[str] = []
+                rest_in_assets: int = num_in_assets
+                if pma.product_tier1_limits:
+                    for l in pma.product_tier1_limits:
+                        hub_id: int = l.trade_hub_id
+                        # считаем сколько товара выставлено на продажу в этом хабе
+                        hub_remain: int = sum([_.volume_remain for _ in pma.product_tier1_in_sell if _.location_id == hub_id])
+                        # если на продажу в хабе выставлено больше заданного лимита - пропускаем перевозку
+                        if hub_remain > l.approximate:
+                            # форматируем строку с информацией о транспортировке товаров
+                            trade_hubs.append(format_trade_hub(0, l.trade_hub.solar_system_name, True))
+                            continue
+                        # учитываем кол-во нераспределённого товара и кол-во которое надо доставить в хаб
+                        num_to_hub: int = min(rest_in_assets, l.approximate - hub_remain)
+                        # форматируем строку с информацией о транспортировке товаров
+                        trade_hubs.append(format_trade_hub(num_to_hub, l.trade_hub.solar_system_name, True))
+                        # уменьшаем кол-во нераспределённого товара
+                        rest_in_assets -= num_to_hub
+                        if rest_in_assets == 0: break
+                # если полностью распределить товары не удалось, то выводим оставшееся нераспределённого количество
+                if rest_in_assets:
+                    # форматируем строку с информацией о транспортировке товаров
+                    trade_hubs.append(format_trade_hub(rest_in_assets, 'др', False))
+                next_factory = ', '.join(trade_hubs)
+
+                # разделяем вывод на два типа: с выводом информацией о контейнерах и без
+        if code == 0:
+            glf.write(f"""<tr class="{row_class} hidden">
 <td>{get_tbl_router_row_num()}</td>
 <td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{p.material_type.name}&nbsp;<a
+<td>{product_type.name}{product_info_btn}&nbsp;<a
 data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a></td>
 <td>{next_factory}</td>
-<td>{p.quantity:,d}</td>
-<td>{int(p.quantity * p.material_type.packaged_volume + 0.9):,d}</td>
+<td>{quantity:,d}</td>
+<td>{int(quantity * product_type.packaged_volume + 0.9):,d}</td>
 </tr>""")
+        elif code == 1:
+            warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign'])
+            container_names: str = container_prefix.join(containers)
+            glf.write(f"""<tr class="{row_class} hidden lost-assets">
+<td>{get_tbl_router_row_num()}</td>
+<td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{warn_sign} {product_type.name}{product_info_btn}&nbsp;<a
+data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
+<label class='label label-lost-assets'>{declension_of_lost_assets(quantity)}</label>{container_prefix}{container_names}</td>
+<td>{next_factory}</td>
+<td>{quantity:,d}</td>
+<td>{warn_sign} {int(quantity * product_type.packaged_volume + 0.9):,d}</td>
+</tr>""")
+
+
+def dump_list_of_ready_products(
+        glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        corporation: db.QSwaggerCorporation,
+        # список произведённых продуктов
+        products_ready: typing.List[db.QSwaggerMaterial],
+        # текущие сведения роутинга на станции
+        current_router_settings: tools.RouterSettings,
+        # ищем производственный конвейер корпорации
+        manufacturing_conveyor: tools.ConveyorSettings,
+        # справочник задействованных материалов
+        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
+    # следующий метод вызывается независимо для products_ready, но можно его вызов не разделять
+    dump_list_of_products(
+        glf,
+        qid,
+        corporation,
+        current_router_settings,
+        manufacturing_conveyor,
+        router_materials,
+        products_ready=products_ready)
 
 
 def dump_list_of_lost_products(
         glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
         corporation: db.QSwaggerCorporation,
         # список потерянных продуктов
         products_lost: typing.List[db.QSwaggerCorporationAssetsItem],
         # текущие сведения роутинга на станции
         current_router_settings: tools.RouterSettings,
+        # ищем производственный конвейер корпорации
+        manufacturing_conveyor: tools.ConveyorSettings,
         # справочник задействованных материалов
         router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
-    # группируем ассеты по типу, чтобы получить уникальные сочетания с количествами
-    grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationAssetsItem]] = \
-        tools.get_asset_items_grouped_by(
-            products_lost,
-            group_by_type_id=True,
-            group_by_station=False)
-    # сортируем уже сгруппированные чертежи
-    grouped_and_sorted: typing.List[typing.Tuple[str, typing.List[db.QSwaggerCorporationAssetsItem]]] = []
-    for key in grouped.keys():
-        group: typing.List[db.QSwaggerCorporationAssetsItem] = grouped.get(key)
-        grouped_and_sorted.append((group[0].item_type.name, group))
-    grouped_and_sorted.sort(key=lambda x: x[0])
-    # локальные переменные
-    container_prefix: str = '<br><mute>Контейнер - </mute>'
-    # выводим в отчёт
-    for _, group in grouped_and_sorted:
-        a0: db.QSwaggerCorporationAssetsItem = group[0]
-        type_id: int = a0.type_id
-        type_name: str = a0.item_type.name
-        quantity: int = sum([_.quantity for _ in group])
-        next_factory: str = ''
-        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
-        for router_settings, materials in router_materials.items():
-            if type_id in materials.input_materials:
-                next_factory = router_settings.station
-                break
-        # если список output пустой, то имеет место быть default-ная производственная база,
-        # перемещаем на неё весь сток "неприкаянных" материалов с этой фабрики
-        if not next_factory and current_router_settings.output:
-            next_factory = next((rs.station for rs in router_materials.keys() if not rs.output), '')
-        # ---
-        containers: typing.Set[str] = set()
-        for a in group:
-            c: db.QSwaggerCorporationAssetsItem = corporation.assets.get(a.location_id)
-            containers.add(c.name if c and c.name else str(a.location_id))
-        containers: typing.List[str] = sorted(containers)
-        containers: str = container_prefix.join(containers)
-        # ---
-        warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign'])
-        glf.write(f"""<tr class="hidden lost-assets">
-<td>{get_tbl_router_row_num()}</td>
-<td><img class="icn16" src="{render_html.__get_img_src(type_id, 32)}"></td>
-<td>{warn_sign} {type_name}&nbsp;<a
-data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn qind-sign" data-toggle="tooltip">{glyphicon("copy")}</a>
-<label class='label label-lost-assets'>{declension_of_lost_assets(quantity)}</label>{container_prefix}{containers}<!--
-item_ids: {[_.item_id for _ in group]}--></td>
-<td>{next_factory}</td>
-<td>{quantity:,d}</td>
-<td>{warn_sign} {int(quantity * a0.item_type.packaged_volume + 0.9):,d}</td>
-</tr>""")
+    # следующий метод вызывается независимо для products_lost, но можно его вызов не разделять
+    dump_list_of_products(
+        glf,
+        qid,
+        corporation,
+        current_router_settings,
+        manufacturing_conveyor,
+        router_materials,
+        products_lost=products_lost)
 
 
 def dump_corp_router(
@@ -1683,13 +1799,29 @@ def dump_corp_router(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # настройки генерации отчёта
+        conveyor_settings: typing.List[tools.ConveyorSettings],
+        # список готовых продуктов в стоках конвейера
         ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts],
         # справочник задействованных материалов
         router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     # проверка, пусты ли настройки конвейера?
     if not ready_products: return
+
     # получаем ссылку на единственную корпорацию
     corporation: db.QSwaggerCorporation = next(iter(ready_products.values())).corporation
+
+    # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
+    # если нет, то... надо добавить здесь какой-то сворачиваемый список?
+    corporations: typing.Set[int] = set([s.corporation.corporation_id for s in conveyor_settings])
+    if not len(corporations) == 1:
+        raise Exception("Unsupported mode: multiple corporations in a single conveyor")
+    # получаем ссылку на единственную корпорацию
+    if not corporation.corporation_id == conveyor_settings[0].corporation.corporation_id:
+        raise Exception("Unsupported mode: multiple corporations in conveyor and router settings")
+    # ищем производственный конвейер корпорации
+    manufacturing_conveyor: tools.ConveyorSettings = next(
+        (s for s in conveyor_settings if db.QSwaggerActivityCode.MANUFACTURING in s.activities), None)
+
     glf.write(f"""
 <hr>
 <h3>Маршрутизатор {corporation.corporation_name}</h3>
@@ -1739,10 +1871,25 @@ def dump_corp_router(
 
         if products_ready:
             products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
-            dump_list_of_ready_products(glf, products_ready, router_settings, router_materials)
+            dump_list_of_ready_products(
+                glf,
+                qid,
+                products.corporation,
+                products_ready,
+                router_settings,
+                manufacturing_conveyor,
+                router_materials)
+
         if products_lost:
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
-            dump_list_of_lost_products(glf, products.corporation, products_lost, router_settings, router_materials)
+            dump_list_of_lost_products(
+                glf,
+                qid,
+                products.corporation,
+                products_lost,
+                router_settings,
+                manufacturing_conveyor,
+                router_materials)
 
         del products_ready
         del products_lost
@@ -1797,6 +1944,7 @@ def dump_router2_into_report(
         dump_corp_router(
             glf,
             qid,
+            conveyor_settings,
             ready_products,
             router_materials)
         # сохраняем содержимое диалоговых окон [Станции]

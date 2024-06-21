@@ -1194,26 +1194,47 @@ def get_single_run_output_quantity(
     return single_run_output
 
 
+def get_activity_by_product(
+        qid: db.QSwaggerDictionary,
+        product_id: int,
+        conveyor_settings: ConveyorSettings) -> typing.Optional[db.QSwaggerActivity]:
+    variants: typing.Optional[typing.List[db.QSwaggerActivity]] = qid.get_activities_by_product(product_id)
+    for activity in variants:
+        if activity.code in conveyor_settings.activities:
+            return activity
+        elif conveyor_settings.conveyor_with_reactions and activity.code == db.QSwaggerActivityCode.REACTION:
+            return activity
+    return None
+
+
 class ConveyorManufacturingAnalysis:
     def __init__(self,
                  qid: db.QSwaggerDictionary,
-                 blueprint_tier1: typing.Optional[db.QSwaggerBlueprint],
-                 activity_tier1: typing.Optional[db.QSwaggerBlueprintManufacturing],
-                 manufacturing_conveyor: ConveyorSettings):
+                 manufacturing_conveyor: ConveyorSettings,
+                 blueprint_tier1: typing.Optional[db.QSwaggerBlueprint] = None,
+                 activity_tier1: typing.Optional[db.QSwaggerBlueprintManufacturing] = None,
+                 product_tier1: typing.Optional[db.QSwaggerTypeId] = None):
         # T2/T3-чертёж полученный в результате invent-а (продукт invent-а)
         self.blueprint_tier1: typing.Optional[db.QSwaggerBlueprint] = None
         # параметры T2/T3-производства по чертежу полученному invent-ом
         self.activity_tier1: typing.Optional[db.QSwaggerBlueprintManufacturing] = None
         # продукт T2/T3-производства
         self.product_tier1: typing.Optional[db.QSwaggerProduct] = None
-        if blueprint_tier1:
-            self.blueprint_tier1 = blueprint_tier1
-            self.activity_tier1 = blueprint_tier1.manufacturing
-        elif activity_tier1:
-            self.activity_tier1 = activity_tier1
-            self.blueprint_tier1 = qid.get_activities_by_product(self.product_tier1.product_id)
-        if self.activity_tier1 is None or self.blueprint_tier1 is None: return
-        self.product_tier1: db.QSwaggerProduct = self.activity_tier1.product
+        # различные варианты конструирования объекта
+        if blueprint_tier1 or activity_tier1:
+            if blueprint_tier1:
+                self.blueprint_tier1 = blueprint_tier1
+                self.activity_tier1 = blueprint_tier1.manufacturing
+            elif activity_tier1:
+                self.activity_tier1 = activity_tier1
+                self.blueprint_tier1 = activity_tier1.blueprint
+            if self.activity_tier1 is None or self.blueprint_tier1 is None: return
+            self.product_tier1: db.QSwaggerProduct = self.activity_tier1.product
+        elif product_tier1:
+            self.product_tier1: db.QSwaggerProduct = db.QSwaggerProduct(product_tier1, 0)
+            self.activity_tier1 = get_activity_by_product(qid, self.product_tier1.product_id, manufacturing_conveyor)
+            if self.activity_tier1:
+                self.blueprint_tier1 = self.activity_tier1.blueprint
 
         # подсчёт кол-ва предметов в ассетах
         self.product_tier1_in_assets: typing.List[db.QSwaggerCorporationAssetsItem] = \
@@ -1248,12 +1269,28 @@ class ConveyorManufacturingAnalysis:
         self.product_tier1_limit: typing.Optional[int] = None
         self.product_tier1_overstock: bool = False
         # проверка избыточного количества продукта
-        conveyor_limits: typing.Optional[typing.List[db.QSwaggerConveyorLimit]] = \
+        self.product_tier1_limits: typing.Optional[typing.List[db.QSwaggerConveyorLimit]] = \
             qid.get_conveyor_limits(self.product_tier1.product_id)
-        if conveyor_limits:
-            self.product_tier1_limit = sum([_.approximate for _ in conveyor_limits])
+        if self.product_tier1_limits:
+            self.product_tier1_limit = sum([_.approximate for _ in self.product_tier1_limits])
             self.product_tier1_overstock = self.num_ready >= self.product_tier1_limit
 
+    @classmethod
+    def from_blueprint_tier1(
+            cls,
+            qid: db.QSwaggerDictionary,
+            manufacturing_conveyor: ConveyorSettings,
+            blueprint_tier1: typing.Optional[db.QSwaggerBlueprint],
+            activity_tier1: typing.Optional[db.QSwaggerBlueprintManufacturing]):
+        return cls(qid, manufacturing_conveyor, blueprint_tier1=blueprint_tier1, activity_tier1=activity_tier1)
+
+    @classmethod
+    def from_product_tier1(
+            cls,
+            qid: db.QSwaggerDictionary,
+            manufacturing_conveyor: ConveyorSettings,
+            product_tier1: db.QSwaggerTypeId):
+        return cls(qid, manufacturing_conveyor, product_tier1=product_tier1)
 
     @property
     def num_ready(self) -> int:
@@ -1274,7 +1311,17 @@ class ConveyorManufacturingProductAnalysis:
         if manufacturing_conveyor is None: return
         if activity and not isinstance(activity, db.QSwaggerBlueprintManufacturing): return
         if db.QSwaggerActivityCode.MANUFACTURING not in manufacturing_conveyor.activities: return
-        self.product = ConveyorManufacturingAnalysis(qid, blueprint, activity, manufacturing_conveyor)
+        self.product = ConveyorManufacturingAnalysis.from_blueprint_tier1 (
+            qid, manufacturing_conveyor, blueprint, activity)
+
+    def analyse_product(self,
+                        qid: db.QSwaggerDictionary,
+                        product_type: db.QSwaggerTypeId,
+                        manufacturing_conveyor: ConveyorSettings):
+        self.product = None
+        if manufacturing_conveyor is None: return
+        self.product = ConveyorManufacturingAnalysis.from_product_tier1(
+            qid, manufacturing_conveyor, product_type)
 
 
 class ConveyorInventAnalysis:
