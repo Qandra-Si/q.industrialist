@@ -250,47 +250,174 @@ function __dump_limits_table_footer(&$market_hubs, $active_market_hubs_num) { ?>
 </table>
 <?php }
 
-function __dump_limits_table_tree_recursion($id, &$market_groups_tree, $level) {
-  //static $prev_ids = array();
+function get_market_groups_tree_recursion($id, &$market_groups_tree, &$hierarhy, &$unfolding_ids) {
+  if (is_null($id)) return;
   foreach ($market_groups_tree as ["id" => $_id, "parent" => $parent, "name" => $name, "depth" => $depth])
   {
     if ($id != $_id) continue;
-    if (!is_null($parent)) {
-      __dump_limits_table_tree_recursion($parent, $market_groups_tree, $level + 1);
-    }
-    $name_formatted = $name;
-    if ($level == 0) {
-      $name_formatted = '<current>'.$name_formatted.'</current>';
-    }
-    else {
-      $name_formatted = '<previous>'.$name_formatted.'</previous>';
-    }
-    ?><mute><?=str_repeat('» ', $depth)?></mute><?=$name_formatted?><sup> <?=$id?></sup><br><?php
-    break;
+    get_market_groups_tree_recursion($parent, $market_groups_tree, $hierarhy, $unfolding_ids);
+    $hierarhy[] = ["id" => $id, "name" => $name, "depth" => $depth];
+    $unfolding_ids[] = $id;
   }
 }
 
-function __dump_limits_table_tree_hierarhy($rnum, &$market_groups_tree, $active_market_hubs_num) {
-  foreach ($market_groups_tree as ["id" => $id, "parent" => $parent, "name" => $name, "depth" => $depth, "rnum" => $_rnum])
+/*
+ $stop_unfolding_id - идентификатор группы, для которой не должен выводиться заголовок с иерархическим деревом
+ Возможная ситуация:
+  » Ships 4
+  » » Battleships 1376
+  » » » Advanced Battleships 1377
+  » » » » Marauders 1080
+  » » » » » Caldari 1082
+            Golem (28710)
+  » Ships 4
+  » » Battleships 1376
+  » » » Advanced Battleships 1377
+  » » » » Marauders 1080
+  » » » » » Gallente 1083
+            Kronos (28661)
+  » Ships 4
+  » » Battleships 1376
+  » » » Advanced Battleships 1377
+  » » » » Marauders 1080
+  » » » » » Minmatar 1084
+            Vargur (28665)
+ Должно быть свёрнуто в дерево:
+  » Ships 4
+  » » Battleships 1376
+  » » » Advanced Battleships 1377
+  » » » » Marauders 1080
+            Golem (28710)
+            Kronos (28661)
+            Vargur (28665)
+*/
+function __dump_limits_table_tree_hierarhy($stop_unfolding_id, $rnum, &$market_groups_tree, $active_market_hubs_num) {
+  static $g_folding_market_groups = array(
+    // Ammunition & Charges (11)
+    2297, // Command Burst Charges
+    593, // Mining Crystals
+    114, // Missiles
+    // Drones (157)
+    2410, // Carrier-based Fighters
+    // Manufacture & Research (475)
+    1035, // Components
+    1332, // Planetary Materials
+    1034, // Reaction Materials
+    // Ship and Module Modifications (955)
+    956, // Armor Rigs
+    957, // Astronautic Rigs
+    958, // Drone Rigs
+    960, // Electronics Superiority Rigs
+    962, // Energy Weapon Rigs
+    961, // Engineering Rigs
+    963, // Hybrid Weapon Rigs
+    964, // Missile Launcher Rigs
+    979, // Projectile Weapon Rigs
+    1779, // Resource Processing Rigs
+    1780, // Scanning Rigs
+    965, // Shield Rigs
+    1610, // Amarr Subsystems
+    1625, // Caldari Subsystems
+    1627, // Gallente Subsystems
+    1626, // Minmatar Subsystems
+    // Ship Equipment (9)
+    141, //
+    657, // Electronic Warfare
+    656, // Electronics and Sensor Upgrades
+    655, // Engineering Equipment
+    779, // Fleet Assistance Modules
+    1713, // Harvest Equipment
+    541, //
+    535, // Armor Hardeners
+    133, // Armor Plates
+    134, // Armor Repairers
+    540, // Armor Resistance Coatings
+    538, // Hull Repairers
+    135, // Hull Upgrades
+    537, // Remote Armor Repairers
+    128, // Remote Shield Boosters
+    552, // Shield Boosters
+    551, // Shield Extenders
+    553, // Shield Hardeners
+    550, // Shield Resistance Amplifiers
+    88, // Energy Turrets
+    86, // Hybrid Turrets
+    140, // Missile Launchers
+    87, // Projectile Turrets
+    912, // Superweapons
+    143, // Weapon Upgrades
+    // Structure Equipment (2202)
+    2206, // Electronic Warfare
+    2208, // Engineering Equipment
+    2210, // Service Modules
+    2209, // Structure Weapons
+    2204, // Structure Resource Processing Rigs
+    // Structures (477)
+    2199, // Citadels
+    // Ships (4)
+    822, // Command Ships
+    1075, // Black Ops
+    1080, // Marauders
+    448, // Heavy Assault Cruisers
+    1070, // Heavy Interdiction Cruisers
+    437, // Logistics
+    824, // Recon Ships
+    2125, // Command Destroyers
+    823, // Interdictors
+    1951, // Tactical Destroyers
+    464, // Standard Destroyers
+    432, // Assault Frigates
+    420, // Covert Ops
+    1065, // Electronic Attack Frigates
+    399, // Interceptors
+    2146, // Logistics Frigates
+    1362, // Faction Frigates
+    629, // Transport Ships
+    8, // Standard Haulers
+    1384, // Mining Barges
+    1612, // Special Edition Ships
+  );
+  
+  foreach ($market_groups_tree as ["id" => $id , /*"parent" => $parent, "name" => $name, "depth" => $depth,*/ "rnum" => $_rnum])
   {
     if ($rnum != $_rnum) continue;
+    //id уникален при каждом rnum:if ($id == $stop_unfolding_id) return $stop_unfolding_id;
+
+    $hierarhy = array();
+    $unfolding_ids = array();
+    get_market_groups_tree_recursion($id, $market_groups_tree, $hierarhy, $unfolding_ids);
+    if (in_array($stop_unfolding_id, $unfolding_ids)) return $stop_unfolding_id;
+    
     ?><tr class="row-tree"><td colspan="<?=3+$active_market_hubs_num+3?>"><?php
-    __dump_limits_table_tree_recursion($id, $market_groups_tree, 0);
-    /* ?><tr class="row-tree"><td colspan="<?=3+$active_market_hubs_num+3?>"><?=$name?></td></tr><?php */
+    //var_export($hierarhy);
+    //var_export($unfolding_ids);
+    foreach ($hierarhy as $level => ["id" => $_id, "name" => $_name, "depth" => $_depth])
+    {
+      $name_formatted = $_name;
+      $last_group = in_array($_id, $g_folding_market_groups);
+      if ($last_group || $level == (count($hierarhy)-1))
+        $name_formatted = '<current>'.$name_formatted.'</current>';
+      else
+        $name_formatted = '<previous>'.$name_formatted.'</previous>';
+      ?><mute><?=str_repeat('» ', $_depth)?></mute><?=$name_formatted?><sup> <?=$_id?></sup><br><?php
+      if ($last_group) return $_id;
+    }
     ?></td></tr><?php
-    break;
+    return $id;
   }
+  return -1;
 }
 
 function __dump_limits_table_tree($type_id, &$involved_products, &$market_groups_tree, $active_market_hubs_num) {
   static $prev_type_id = -1;
   static $prev_rnum = -1;
+  static $folding_id = -1;
   if ($prev_type_id == $type_id) return;
   foreach ($involved_products as ["rnum" => $rnum, "id" => $_type_id])
   {
     if ($type_id != $_type_id) continue;
     if ($prev_rnum == $rnum) return;
-    __dump_limits_table_tree_hierarhy($rnum, $market_groups_tree, $active_market_hubs_num);
+    $folding_id = __dump_limits_table_tree_hierarhy($folding_id, $rnum, $market_groups_tree, $active_market_hubs_num);
     $prev_type_id = $type_id;
     $prev_rnum = $rnum;
     break;
