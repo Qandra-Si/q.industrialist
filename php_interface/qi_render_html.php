@@ -294,4 +294,75 @@ $(document).ready(function(){
  }
 });
 </script><?php }
+
+// --------------------------------------------------------------------------------------------------------------
+// __dump_clipboard_waiter
+// --------------------------------------------------------------------------------------------------------------
+function __dump_clipboard_waiter($notice) { ?>
+<noscript>Вам необходимо включить JavaScript для использования этой программы.</noscript>
+<?php if ($notice) { ?>
+<center>
+<h2>Вставьте содержимое буфера обмена...</h2>
+<div class="row">
+ <div class="col-md-2"></div>
+ <div class="col-md-8">
+ <p>В окне контейнера выберите <mark>Режим просмотра (Список)</mark>, затем выделите нужную позицию, щёлкните <kbd>Right-click</kbd> на выбранных строках и выберите "Скопировать". Также можно использовать копирование с помощью кнопок клавиатуры <kbd>Cmd</kbd>&nbsp;|&nbsp;<kbd>Ctrl</kbd>&nbsp;+&nbsp;<kbd>A</kbd>, затем <kbd>Cmd</kbd>&nbsp;|&nbsp;<kbd>Ctrl</kbd>&nbsp;+&nbsp;<kbd>C</kbd>. после чего вернитесь на эту страницу и нажмите <kbd>Cmd</kbd>&nbsp;|&nbsp;<kbd>Ctrl</kbd>&nbsp;+&nbsp;<kbd>V</kbd> для получения отчёта по скопированным предметам.</p>
+ </div>
+ <div class="col-md-2"></div>
+</div> <!--row-->
+</center>
+<?php } ?>
+<script src="/tools/tids.php"></script>
+<script>
+document.addEventListener('paste', async (e) => {
+ e.preventDefault();
+ const paste = (e.clipboardData || window.clipboardData).getData('text');
+ const lines = paste.split('\n');
+ var uri = '';
+ for (const line of lines) {
+<?php
+/* == Форматы копируемой информации ==
+Имущество (режим просмотра, список):
+10MN Afterburner II	45	Propulsion Module			225 м^3	109 222 217,10 ISK
+10MN Afterburner II<t><right>45<t>Propulsion Module<t><t><t><right>225 м^3<t><right>109 222 217,10 ISK
+Имущество (режим просмотра, информация):
+10MN Afterburner II	45	Propulsion Module			225 м^3	109 222 217,10 ISK
+10MN Afterburner II<t><right>45<t>Propulsion Module<t><t><t><right>225 м^3<t><right>109 222 217,10 ISK
+Имущество (режим просмотра, пиктограммы):
+10MN Afterburner II	45
+Мои ордера:
+10MN Afterburner II	5/5	2 546 000,00 ISK	B2J-5N - Shukhov (R)	Malpais	89д 23ч 48мин 12с
+10MN Afterburner II<t><right>5/5<t><right><color='0xFFFFFFFF'>2 546 000,00 ISK</color></right><t>B2J-5N - Shukhov (R)<t>Malpais<t>89д 23ч 41мин 47с
+Корпоративные ордера:
+10MN Afterburner II	5/5	2 546 000,00 ISK	B2J-5N - Shukhov (R)	Malpais	89д 23ч 41мин 20с	Qandra Si	Главный счет 
+10MN Afterburner II<t><right>5/5<t><right><color='0xFFFFFFFF'>2 546 000,00 ISK</color></right><t>B2J-5N - Shukhov (R)<t>Malpais<t>89д 23ч 42мин 46с<t>Qandra Si<t>Главный счет 
+История заказов:
+Отменён	2023.09.24 16:33:00	Warp Disruptor II	10 / 10	1 757 000,00 ISK	B2J-5N - Shukhov (R)	Malpais
+Отменён<t>2023.09.24 16:33:00<t>Warp Disruptor II<t>10 / 10<t><right>1 757 000,00 ISK</right><t>B2J-5N - Shukhov (R)<t>Malpais
+Название предмета:
+10MN Afterburner II
+*/
 ?>
+  const words = line.split('\t');
+  const len = words.length;
+  if (len == 0) continue;
+  var t = words[0];
+  var tid = getSdeItemId(t);
+  if (tid) {
+   var cnt = 1;
+   if (len >= 2) {
+    cnt = words[1];
+    if (cnt.includes('/')) cnt = cnt.split('/')[0];
+    cnt = cnt.replace(/\s/g, '');
+    if (!cnt) cnt = 1;
+   }
+   if (uri) uri += ',';
+   uri += tid+','+cnt;
+  }
+ }
+ if (uri) location.assign("<?=strtok($_SERVER['REQUEST_URI'],'?')?>?id="+uri);
+});
+</script>
+<?php }
+?>
+

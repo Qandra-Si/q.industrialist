@@ -1,9 +1,66 @@
-<?php
+﻿<?php
 include 'qi_render_html.php';
 include 'qi_tools_and_utils.php';
 include 'qi_render_products_and_orders.php';
 include 'qi_render_trade_hubs.php';
 include_once '.settings.php';
+
+function __dump_involved_products(&$conn, &$specified_type_ids, &$involved_products, &$market_groups_tree) {
+  if (is_null($specified_type_ids) || count($specified_type_ids) == 0) {
+    $query = <<<EOD
+select
+ t.rnum rnum,
+ x.type_id id
+from (
+  select tid.*, sdet_market_group_id as market_group_id
+  from (
+   -- лимиты заданы
+   select distinct cl_type_id as type_id
+   from conveyor_limits
+    union
+   -- ордера на продажу выставлены, но лимиты не заданы
+   select distinct ecor_type_id
+   from esi_corporation_orders o
+   where
+    not ecor_history and
+    not ecor_is_buy_order and
+    ecor_type_id not in (select distinct cl_type_id from conveyor_limits)
+  ) tid, eve_sde_type_ids
+  where tid.type_id=sdet_type_id
+ ) as x
+ left outer join qi.eve_sde_market_groups_tree_sorted t on (x.market_group_id=t.id)
+order by t.rnum;
+EOD;
+    $involved_products_cursor = pg_query($conn, $query)
+            or die('pg_query err: '.pg_last_error());
+    $involved_products = pg_fetch_all($involved_products_cursor);
+  } else {
+    $query = <<<EOD
+select
+ t.rnum rnum,
+ x.type_id id
+from (
+  select sdet_type_id as type_id, sdet_market_group_id as market_group_id
+  from eve_sde_type_ids
+  where sdet_type_id=any($1)
+ ) as x
+ left outer join qi.eve_sde_market_groups_tree_sorted t on (x.market_group_id=t.id)
+order by t.rnum;
+EOD;
+    $params = array('{'.implode(',',$specified_type_ids).'}');
+    $involved_products_cursor = pg_query_params($conn, $query, $params)
+            or die('pg_query err: '.pg_last_error());
+    $involved_products = pg_fetch_all($involved_products_cursor);
+  }
+
+  $query = <<<EOD
+select *
+from eve_sde_market_groups_tree_sorted;
+EOD;
+  $market_groups_tree_cursor = pg_query($conn, $query)
+          or die('pg_query err: '.pg_last_error());
+  $market_groups_tree = pg_fetch_all($market_groups_tree_cursor);
+}
 
 function __dump_conveyor_limits(&$conn, &$conveyor_limits) {
   $query = <<<EOD
@@ -41,28 +98,6 @@ function get_product_type_ids(&$conveyor_limits, &$product_type_ids) {
       $product_type_ids[] = intval($prod);
     }
   $product_type_ids = array_unique($product_type_ids, SORT_NUMERIC);
-}
-
-function __dump_unlimited_products(&$conn, &$unlimited_type_ids) {
-  $query = <<<EOD
-select distinct ecor_type_id as id, sdet_type_name as nm
-from esi_corporation_orders o
- left outer join qi.eve_sde_type_ids t on (sdet_type_id=ecor_type_id)
-where
- not ecor_history and
- not ecor_is_buy_order and
- ecor_type_id not in (select distinct cl_type_id from conveyor_limits)
-order by sdet_type_name;
-EOD;
-  $unlimited_cursor = pg_query($conn, $query)
-          or die('pg_query err: '.pg_last_error());
-  $unlimited = pg_fetch_all($unlimited_cursor);
-
-  if ($unlimited)
-    foreach ($unlimited as ["id" => $prod])
-    {
-      $unlimited_type_ids[] = intval($prod);
-    }
 }
 
 function __dump_limits_menu_bar(&$market_hubs) {
@@ -171,13 +206,19 @@ percent-volume { }
 .remain-bright:hover { color: #c5c8c9; text-shadow: 0 0 0.2vw #c5c8c9b2, 0 0 8vw #c5c8c9; cursor: default; }
 .remain-normal { color: #808080; }
 .remain-normal:hover { color: #808080; text-shadow: 0 0 0.2vw #808080b2, 0 0 8vw #808080; cursor: default; }
+
+mute { color: #777; }
+tr.row-tree { font-size: medium; text-align: left; background: #111b1b; padding: 0px; }
+tr.row-tree sup { font-size: 66%; color: #777; }
+tr.row-tree previous { font-size: 75%; color: #777; }
+tr.row-tree current { font-weight: 700; color: #3371b6; }
 </style>
 <table class="table table-condensed table-hover table-gallente" id="tbl">
 <thead>
  <tr>
   <th></th><!--0-->
   <th>Названия предметов</th><!--1-->
-  <th>Общ.лимит</th><!--2-->
+  <th>Общий<br>лимит</th><!--2-->
 <?php foreach ($active_market_hub_ids as $hub) { ?>
   <th id="tbl-hub<?=$hub?>">
 <?php
@@ -199,19 +240,62 @@ percent-volume { }
 <tbody>
 <?php }
 
-function __dump_limits_table_footer(&$market_hubs) {
-  $active_market_hub_ids = array();
-  $active_trader_corp_ids = array();
-  get_active_market_hub_ids($market_hubs, $active_market_hub_ids, $active_trader_corp_ids);
-?>
+function __dump_limits_table_footer(&$market_hubs, $active_market_hubs_num) { ?>
 </tbody>
 <tfoot>
 <tr>
- <td colspan="<?=3+count($active_market_hub_ids)+3?>>"></td>
+ <td colspan="<?=3+$active_market_hubs_num+3?>"></td>
 </tr>
 </tfoot>
 </table>
 <?php }
+
+function __dump_limits_table_tree_recursion($id, &$market_groups_tree, $level) {
+  //static $prev_ids = array();
+  foreach ($market_groups_tree as ["id" => $_id, "parent" => $parent, "name" => $name, "depth" => $depth])
+  {
+    if ($id != $_id) continue;
+    if (!is_null($parent)) {
+      __dump_limits_table_tree_recursion($parent, $market_groups_tree, $level + 1);
+    }
+    $name_formatted = $name;
+    if ($level == 0) {
+      $name_formatted = '<current>'.$name_formatted.'</current>';
+    }
+    else {
+      $name_formatted = '<previous>'.$name_formatted.'</previous>';
+    }
+    ?><mute><?=str_repeat('» ', $depth)?></mute><?=$name_formatted?><sup> <?=$id?></sup><br><?php
+    break;
+  }
+}
+
+function __dump_limits_table_tree_hierarhy($rnum, &$market_groups_tree, $active_market_hubs_num) {
+  foreach ($market_groups_tree as ["id" => $id, "parent" => $parent, "name" => $name, "depth" => $depth, "rnum" => $_rnum])
+  {
+    if ($rnum != $_rnum) continue;
+    ?><tr class="row-tree"><td colspan="<?=3+$active_market_hubs_num+3?>"><?php
+    __dump_limits_table_tree_recursion($id, $market_groups_tree, 0);
+    /* ?><tr class="row-tree"><td colspan="<?=3+$active_market_hubs_num+3?>"><?=$name?></td></tr><?php */
+    ?></td></tr><?php
+    break;
+  }
+}
+
+function __dump_limits_table_tree($type_id, &$involved_products, &$market_groups_tree, $active_market_hubs_num) {
+  static $prev_type_id = -1;
+  static $prev_rnum = -1;
+  if ($prev_type_id == $type_id) return;
+  foreach ($involved_products as ["rnum" => $rnum, "id" => $_type_id])
+  {
+    if ($type_id != $_type_id) continue;
+    if ($prev_rnum == $rnum) return;
+    __dump_limits_table_tree_hierarhy($rnum, $market_groups_tree, $active_market_hubs_num);
+    $prev_type_id = $type_id;
+    $prev_rnum = $rnum;
+    break;
+  }
+}
 
 function __dump_limits_table_row($type_id, $t, &$conveyor_limits, &$market_hubs, &$sale_remain) {
   $active_market_hub_ids = array();
@@ -230,7 +314,8 @@ function __dump_limits_table_row($type_id, $t, &$conveyor_limits, &$market_hubs,
 ?>
 <tr <?=!is_null($t)?'type_id="'.$type_id.'"':''?>>
 <td><img class="icn32" src="<?=__get_img_src($type_id,32,FS_RESOURCES)?>" width="32px" height="32px"></td>
-      <td><?=$t?('<tid>'.$type_name.get_clipboard_copy_button($type_name)).get_glyph_icon_button('info-sign','class="qind-info-btn"').get_glyph_icon_button('stats','class="qind-edit-btn"').'</tid>':''?></td>
+      <td><?=$t?('<tid>'.$type_name.get_clipboard_copy_button($type_name)).get_glyph_icon_button('info-sign','class="qind-info-btn"').get_glyph_icon_button('stats','class="qind-edit-btn"').'</tid>':''?>
+<br><mute><?=$type_id?></mute></td>
 <td><?=is_null($cnt)?'':number_format($cnt,0,'.',',')?></td>
 <?php foreach ($active_market_hub_ids as $hub) { ?>
 <td hub="<?=$hub?>">
@@ -323,7 +408,7 @@ function __dump_edit_limit_dialog(&$market_hubs) { ?>
    <div class="modal-body">
 <!-- -->
 <ul class="nav nav-tabs">
-  <li role="presentation" class="active"><a href="#navOverstocks" aria-controls="navOverstocks" role="tab" data-toggle="tab">Ограничения</a></li>
+  <li role="presentation" class="active"><a href="#navOverstocks" aria-controls="navOverstocks" role="tab" data-toggle="tab">Сток в маркете</a></li>
 </ul>
 <div class="tab-content">
   <!-- -->
@@ -365,6 +450,40 @@ function __dump_edit_limit_dialog(&$market_hubs) { ?>
 __dump_header("Conveyor Limits", FS_RESOURCES, "", true);
 
 // ---------------------------
+// IDs
+// ---------------------------
+$IDs = null;
+if (isset($_GET['id'])) {
+  $_get_id = htmlentities($_GET['id']);
+  if (is_numeric($_get_id)) $IDs = array(get_numeric($_get_id));
+  else if (is_numeric_array($_get_id)) $IDs = get_numeric_array($_get_id);
+}
+
+$IDs_len = is_null($IDs) ? 0 : count($IDs);
+if ($IDs_len == 1)
+{
+  $IDs[] = 1;
+  $IDs_len = 2;
+}
+
+if (($IDs_len > 2) && (($IDs_len%2) != 0))
+{
+  /*?><script>location.assign("<?=strtok($_SERVER['REQUEST_URI'],'?')?>");</script><?php*/
+  __dump_clipboard_waiter(true);
+  __dump_footer();
+  return;
+}
+
+$specified_type_ids = array();
+if ($IDs_len > 0)
+{
+  $type_ids = array();
+  foreach (range(0,$IDs_len/2-1) as $idx) $type_ids[] = $IDs[2*$idx];
+  $type_ids = array_unique($type_ids, SORT_NUMERIC);
+  $specified_type_ids = array_filter($type_ids, "sys_numbers");
+}
+
+// ---------------------------
 // DATABASE
 // ---------------------------
 if (!extension_loaded('pgsql'))
@@ -377,32 +496,39 @@ $conn = pg_connect("host=".DB_HOST." port=".DB_PORT." dbname=".DB_DATABASE." use
 pg_exec($conn, "SET search_path TO qi");
 
 ?><script><?php
+$involved_products = array();
+$market_groups_tree = array();
+__dump_involved_products($conn, $specified_type_ids, $involved_products, $market_groups_tree);
 $conveyor_limits = array();
 __dump_conveyor_limits($conn, $conveyor_limits);
 $product_type_ids = array();
-get_product_type_ids($conveyor_limits, $product_type_ids);
-$unlimited_type_ids = array();
-__dump_unlimited_products($conn, $unlimited_type_ids);
-$merged_type_ids = array_merge($unlimited_type_ids, $product_type_ids);
+get_product_type_ids($involved_products, $product_type_ids);
+//$merged_type_ids = array_merge($specified_type_ids, $product_type_ids);
 $main_data = array();
-__dump_main_data($conn, $merged_type_ids, $main_data);
+__dump_main_data($conn, $product_type_ids, $main_data);
 $market_hubs = array();
 __dump_market_hubs_data($conn, $market_hubs);
 //$sale_orders = array();
-//__dump_market_orders_data($conn, $market_hubs, $merged_type_ids, $sale_orders);
+//__dump_market_orders_data($conn, $market_hubs, $product_type_ids, $sale_orders);
 $sale_remain = array();
 __dump_market_orders_remain($conn, $market_hubs, $sale_remain);
 ?></script><?php
 
+$active_market_hub_ids = array();
+$active_trader_corp_ids = array();
+get_active_market_hub_ids($market_hubs, $active_market_hub_ids, $active_trader_corp_ids);
+$active_market_hubs_num = count($active_market_hub_ids);
+
 __dump_limits_menu_bar($market_hubs);
 __dump_limits_table_header($market_hubs);
-foreach ($merged_type_ids as $num => $id)
+foreach ($product_type_ids as $num => $id)
 {
   $t_key = get_main_data_tkey($main_data, $id);
+  __dump_limits_table_tree($id, $involved_products, $market_groups_tree, $active_market_hubs_num);
   __dump_limits_table_row($id, is_null($t_key) ? null : $main_data[$t_key], $conveyor_limits, $market_hubs, $sale_remain);
 }
-__dump_limits_table_footer($market_hubs);
-//__dump_clipboard_waiter(false);
+__dump_limits_table_footer($market_hubs, count($active_market_hub_ids));
+__dump_clipboard_waiter(false);
 pg_close($conn);
 __dump_market_hubs_dialog($market_hubs);
 __dump_products_and_orders_dialog($market_hubs);
