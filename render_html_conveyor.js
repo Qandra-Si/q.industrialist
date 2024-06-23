@@ -503,6 +503,7 @@ function rebuildConveyorTable() {
 
  var industry_product = (getOption('option', 'industry-product') == 1) ? 1 : 0;
  $('div.industry-product').each(function() { changeElemVisibility($(this), industry_product); });
+ $('div.invent-product').each(function() { changeElemVisibility($(this), industry_product); }); // когда продукт один
 }
 function rebuildRouterTable() {
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;

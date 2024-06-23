@@ -183,7 +183,7 @@ class NavMenuDefaults:
             return self.used_materials
         elif label == 'not-available':
             return self.not_available
-        elif label == 'industry-product':
+        elif label == 'industry-product' or label == 'invent-product':
             return self.industry_product
         else:
             raise Exception("Unsupported label to get nav menu defaults")
@@ -210,7 +210,7 @@ class NavMenuDefaults:
             opt: bool = self.used_materials
         elif label == 'not-available':
             opt: bool = self.not_available
-        elif label == 'industry-product':
+        elif label == 'industry-product' or label == 'invent-product':
             opt: bool = self.industry_product
         else:
             raise Exception("Unsupported label to get nav menu defaults")
@@ -1259,20 +1259,36 @@ def dump_list_of_possible_blueprints(
         if db.QSwaggerActivityCode.INVENTION in settings.activities:
             invent_analysis: typing.Optional[tools.ConveyorInventProductsAnalysis] = \
                 industry_analysis.invent_analysis.get(type_id)
-            if invent_analysis and invent_analysis.products:
-                for ia in invent_analysis.products:
-                    if ia.product_tier2 is None: continue
-                    num_ready: int = ia.num_ready
-                    # формирование отчёта со сведениями об инвенте
-                    variants += \
-                        f'<div class="invent-products">' \
-                        f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
-                        ' ' + format_product_tier2_info_btn(ia) + \
-                        f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
-                    # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                    if num_ready > 0 and ia.product_tier2_overstock:
-                        variants += ' <label class="label label-overstock">перепроизводство</label>'
-                    variants += '</div>'
+            if invent_analysis:
+                if len(invent_analysis.products) == 1:
+                    ia: tools.ConveyorInventAnalysis = invent_analysis.products[0]
+                    if ia.product_tier2 is not None:
+                        num_ready: int = ia.num_ready
+                        # формирование отчёта со сведениями об инвенте
+                        variants_class: str = "invent-product" + g_nav_menu_defaults.css('invent-product')
+                        variants += \
+                            f'<div class="{variants_class}">' \
+                            f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                            '</div>'
+                        product_info_btn = '&nbsp;' + format_product_tier2_info_btn(ia)
+                        product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                        # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                        if num_ready > 0 and ia.product_tier2_overstock:
+                            product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+                else:
+                    for ia in invent_analysis.products:
+                        if ia.product_tier2 is None: continue
+                        num_ready: int = ia.num_ready
+                        # формирование отчёта со сведениями об инвенте
+                        variants += \
+                            f'<div class="invent-products">' \
+                            f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                            ' ' + format_product_tier2_info_btn(ia) + \
+                            f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                        # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+                        if num_ready > 0 and ia.product_tier2_overstock:
+                            variants += ' <label class="label label-overstock">перепроизводство</label>'
+                        variants += '</div>'
         if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
             manufacturing_analysis: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = \
                 industry_analysis.manufacturing_analysis.get(type_id)
