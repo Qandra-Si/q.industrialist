@@ -1246,9 +1246,26 @@ class ConveyorManufacturingAnalysis:
                 ])
         self.product_tier1_num_in_assets: int = sum([_.quantity for _ in self.product_tier1_in_assets])
         # подсчёт кол-ва чертежей для производства этого типа предмета
-        # if in_blueprints:
-        #     num += product_tier1.quantity * sum([_.runs for _ in in_blueprints if _.is_copy])
-        pass
+        if self.blueprint_tier1:
+            blueprint_ids: typing.List[db.QSwaggerCorporationAssetsItem] = \
+                manufacturing_conveyor.assets.get_with_unique_items(
+                    self.blueprint_tier1.type_id, [
+                        ConveyorPlace.CONVEYOR,
+                    ])
+            blueprint_ids: typing.Set[int] = set([_.item_id for _ in blueprint_ids])
+            self.product_tier1_in_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                [_[1] for _ in manufacturing_conveyor.corporation.blueprints.items() if _[0] in blueprint_ids]
+            # TODO: здесь нет фильтрации уже запущенных в работу чертежей
+            # self.product_tier1_in_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+            #     manufacturing_conveyor.blueprints.get_with_unique_items(
+            #         self.blueprint_tier1.type_id, [
+            #             ConveyorPlace.CONVEYOR,
+            #         ])
+        else:
+            self.product_tier1_in_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+        self.product_tier1_num_in_blueprints: int = sum([1 if _.is_copy else max(_.quantity, 1)
+                                                         for _ in self.product_tier1_in_blueprints])
+        self.product_tier1_num_in_blueprint_runs: int = sum([_.runs for _ in self.product_tier1_in_blueprints])
         # подсчёт количества производимых сейчас предметов
         self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
             manufacturing_conveyor.industry_jobs.get_with_unique_items(
@@ -1296,6 +1313,11 @@ class ConveyorManufacturingAnalysis:
     def num_ready(self) -> int:
         # подсчёт кол-ва предметов в ассетах, в производстве и продаже
         return self.product_tier1_num_in_assets + self.product_tier1_num_in_jobs + self.product_tier1_num_in_sell
+
+    @property
+    def num_prepared(self) -> int:
+        # подсчёт кол-ва готовых чертежей для производства этого продукта (в кол-ве ранов)
+        return self.product_tier1_num_in_blueprint_runs
 
 
 class ConveyorManufacturingProductAnalysis:
@@ -1370,6 +1392,24 @@ class ConveyorInventAnalysis:
         return self.__analysis_tier2.product.product_tier1_num_in_assets
 
     """
+    корп.чертежи типа продукта T2/T3-производства (в коробках конвейера)
+    """
+    @property
+    def product_tier2_in_blueprints(self) -> typing.Optional[typing.List[db.QSwaggerCorporationBlueprint]]:
+        if not self.__analysis_tier2.product: return None
+        return self.__analysis_tier2.product.product_tier1_in_blueprints
+
+    @property
+    def product_tier2_num_in_blueprints(self) -> int:
+        if not self.__analysis_tier2.product: return 0
+        return self.__analysis_tier2.product.product_tier1_num_in_blueprints
+
+    @property
+    def product_tier2_num_in_blueprint_runs(self) -> int:
+        if not self.__analysis_tier2.product: return 0
+        return self.__analysis_tier2.product.product_tier1_num_in_blueprint_runs
+
+    """
     работки типа T2/T3-производства (запущенные из коробок конвейера, или с выходом в output-конвейера)
     """
     @property
@@ -1409,7 +1449,10 @@ class ConveyorInventAnalysis:
     @property
     def product_tier2_overstock(self) -> typing.Optional[bool]:
         if not self.__analysis_tier2.product: return None
-        return self.__analysis_tier2.product.product_tier1_overstock
+        if self.product_tier2_limit:
+            return (self.num_ready + self.num_prepared) >= self.product_tier2_limit
+        else:
+            return None
 
     """
     подсчёт кол-ва предметов в ассетах, в производстве и продаже
@@ -1418,6 +1461,11 @@ class ConveyorInventAnalysis:
     def num_ready(self) -> int:
         if not self.__analysis_tier2.product: return 0
         return self.__analysis_tier2.product.num_ready
+
+    @property
+    def num_prepared(self) -> int:
+        if not self.__analysis_tier2.product: return 0
+        return self.__analysis_tier2.product.num_prepared
 
 
 class ConveyorInventProductsAnalysis:

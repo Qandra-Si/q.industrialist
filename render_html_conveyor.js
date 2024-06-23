@@ -596,6 +596,11 @@ function showIndustryProductModal(elem) {
  $('#product-in-jobs').html(txt);
  if (!(data_product.s === undefined) && (data_product.s > 0)) txt = data_product.s; else txt = nodata;
  $('#product-in-sale').html(txt);
+ if (!(data_product.b === undefined) && (data_product.b > 0)) txt = data_product.b; else txt = nodata;
+ $('#product-in-blueprints').html(txt);
+ if (!(data_product.r === undefined) && (data_product.r > 0)) txt = data_product.r; else txt = nodata;
+ $('#product-in-blueprint-runs').html(txt);
+ //
  if (!(data_product.l === undefined) && (data_product.l > 0)) txt = data_product.l; else txt = 'порог не задан';
  $('#product-limit').html(txt);
  $('#modalIndustryProduct').modal('show');

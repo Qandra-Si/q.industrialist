@@ -130,7 +130,9 @@ def format_product_tier2_info_btn(ia: tools.ConveyorInventAnalysis) -> str:
             'l': ia.product_tier2_limit,
             'a': ia.product_tier2_num_in_assets,
             'j': ia.product_tier2_num_in_jobs,
-            's': ia.product_tier2_num_in_sell}
+            's': ia.product_tier2_num_in_sell,
+            'b': ia.product_tier2_num_in_blueprints,
+            'r': ia.product_tier2_num_in_blueprint_runs}
     product_info_btn: str = \
         '<a data-target="#" role="button" class="qind-info-btn"' \
         f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
@@ -142,7 +144,9 @@ def format_product_tier1_info_btn(ma: tools.ConveyorManufacturingAnalysis) -> st
             'l': ma.product_tier1_limit,
             'a': ma.product_tier1_num_in_assets,
             'j': ma.product_tier1_num_in_jobs,
-            's': ma.product_tier1_num_in_sell}
+            's': ma.product_tier1_num_in_sell,
+            'b': ma.product_tier1_num_in_blueprints,
+            'r': ma.product_tier1_num_in_blueprint_runs}
     product_info_btn: str = \
         '<a data-target="#" role="button" class="qind-info-btn"' \
         f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
@@ -770,7 +774,9 @@ def dump_industry_product_dialog(glf) -> None:
     glf.write("""<p>
 Хранится в ассетах: <span id="product-in-assets" class="quantity"></span><br>
 Производится: <span id="product-in-jobs" class="quantity"></span><br>
-Выставлено на продажу: <span id="product-in-sale" class="quantity"></span><hr>
+Выставлено на продажу: <span id="product-in-sale" class="quantity"></span><br>
+Подготовлено чертежей: <span id="product-in-blueprints" class="quantity"></span><br>
+Прогоны чертежей: <span id="product-in-blueprint-runs" class="quantity"></span><hr>
 Порог производства: <span id="product-limit" class="quantity"></span>
 </p>""")
     # закрываем footer модального диалога
@@ -1263,7 +1269,7 @@ def dump_list_of_possible_blueprints(
                 if len(invent_analysis.products) == 1:
                     ia: tools.ConveyorInventAnalysis = invent_analysis.products[0]
                     if ia.product_tier2 is not None:
-                        num_ready: int = ia.num_ready
+                        num_prepared: int = ia.num_ready + ia.num_prepared
                         # формирование отчёта со сведениями об инвенте
                         variants_class: str = "invent-product" + g_nav_menu_defaults.css('invent-product')
                         variants += \
@@ -1271,22 +1277,22 @@ def dump_list_of_possible_blueprints(
                             f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
                             '</div>'
                         product_info_btn = '&nbsp;' + format_product_tier2_info_btn(ia)
-                        product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                        product_details_note = f' <mute> - имеется</mute> {num_prepared} <mute>шт</mute>'
                         # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                        if num_ready > 0 and ia.product_tier2_overstock:
+                        if num_prepared > 0 and ia.product_tier2_overstock:
                             product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
                 else:
                     for ia in invent_analysis.products:
                         if ia.product_tier2 is None: continue
-                        num_ready: int = ia.num_ready
+                        num_prepared: int = ia.num_ready + ia.num_prepared
                         # формирование отчёта со сведениями об инвенте
                         variants += \
                             f'<div class="invent-products">' \
                             f'<qproduct tid="{ia.product_tier2.product_id}" icn="20" cl="qind-sign"></qproduct>' \
                             ' ' + format_product_tier2_info_btn(ia) + \
-                            f'<mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+                            f'<mute> - имеется</mute> {num_prepared} <mute>шт</mute>'
                         # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                        if num_ready > 0 and ia.product_tier2_overstock:
+                        if num_prepared > 0 and ia.product_tier2_overstock:
                             variants += ' <label class="label label-overstock">перепроизводство</label>'
                         variants += '</div>'
         if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
