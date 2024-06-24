@@ -836,152 +836,30 @@ def get_router_details(
     return station, corporation, containers_stocks, containers_output
 
 
-class ConveyorRouterInputMaterials:
+class ConveyorRouterAssets:
     def __init__(self):
-        self.input_materials: typing.Dict[int, db.QSwaggerTypeId] = {}  # type_id:material
-
-    def calc(self,
-             # данные (справочники)
-             qid: db.QSwaggerDictionary,
-             # настройки генерации отчёта
-             router_settings: RouterSettings):
-        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
-        for product_type_id in router_settings.output:
-            activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
-            if not activities: continue
-            for a in activities:
-                mats: db.QSwaggerActivityMaterials = a.materials
-                for m in mats.materials:
-                    if m.material_id not in self.input_materials:
-                        self.input_materials[m.material_id] = m.material_type
-
-
-def calc_router_materials(
-        # данные (справочники)
-        qid: db.QSwaggerDictionary,
-        # настройки генерации отчёта
-        router_settings: typing.List[RouterSettings]) \
-        -> typing.Dict[RouterSettings, ConveyorRouterInputMaterials]:
-    if not router_settings:
-        return {}
-    # считаем требуемые матариалы для указанных настроек роутера
-    router_materials: typing.Dict[RouterSettings, ConveyorRouterInputMaterials] = {}
-    for rs in router_settings:
-        m: ConveyorRouterInputMaterials = ConveyorRouterInputMaterials()
-        m.calc(qid, rs)
-        router_materials[rs] = m
-    return router_materials
-
-
-class ConveyorCorporationOutputProducts:
-    def __init__(self, index: int):
-        self.index: int = index
-        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:product
-        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}  # type_id:list(assets)
         self.corporation: typing.Optional[db.QSwaggerCorporation] = None
         self.station: typing.Optional[db.QSwaggerStation] = None
         self.router_settings: typing.Optional[RouterSettings] = None
         self.conveyor_settings: typing.List[ConveyorSettings] = []
         self.activities: typing.Set[db.QSwaggerActivityCode] = set()
 
-    def calc(self,
-             # данные (справочники)
-             qid: db.QSwaggerDictionary,
-             # данные корпорации для подсчёта кол-ва материалов
-             corporation: db.QSwaggerCorporation,
-             # настройки генерации отчёта
-             conveyor_settings: typing.List[ConveyorSettings],
-             router_settings: RouterSettings,
-             # список активностей, которые выполняются для получения продуктов роутера
-             activities: typing.Set[db.QSwaggerActivityCode]) \
-            -> typing.Dict[int, db.QSwaggerMaterial]:
-        del self.activities
-        del self.conveyor_settings
-        del self.lost_products
-        del self.output_products
-        # ---
-        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}
-        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}
-        self.corporation: db.QSwaggerCorporation = corporation
-        self.station: db.QSwaggerStation = None
-        self.router_settings: RouterSettings = router_settings
-        self.conveyor_settings: typing.List[ConveyorSettings] = conveyor_settings[:]
-        self.activities: typing.Set[db.QSwaggerActivityCode] = activities
-        # ---
-        # проверка правильности входных данных
-        if next((_ for _ in self.conveyor_settings if not _.corporation.corporation_id == self.corporation.corporation_id), None) is not None:
-            raise Exception("Incompatible conveyor settings and corporation data")
-        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
-        router_details: typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]] = get_router_details(
-            qid,
-            router_settings,
-            conveyor_settings
-        )
-        self.station: db.QSwaggerStation = router_details[0]
-        if corporation.corporation_id != router_details[1].corporation_id:
-            raise Exception("Something wrong: incompatible corporations for conveyor/router settings")
-        # containers_stocks: typing.Set[int] = router_details[2]
-        containers_output: typing.Set[int] = router_details[3]
-        containers_exclude: typing.Set[int] = set([_.container_id for x in conveyor_settings for _ in x.containers_exclude])
-        # перебираем ассеты, ищем материалы
-        if containers_output:
-            station_id: int = self.station.station_id
-            for a in corporation.assets.values():
-                if not a.station_id == station_id: continue
-                if a.location_id in containers_exclude: continue
-                # проверям "заблудился" ли продукт, или лежит на своём месте?
-                type_id: int = a.type_id
-                # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что
-                # сконфигурированы на других станциях)
-                correct_container: bool = a.location_id in containers_output
-                correct_product: bool = True
-                if router_settings.output:
-                    if type_id not in router_settings.output:
-                        correct_product = False
-                elif not correct_container:
-                    continue
-                # ---
-                if not correct_container and not correct_product:
-                    continue
-                elif correct_container and correct_product:
-                    p = self.output_products.get(a.type_id)
-                    if p:
-                        p.increment_quantity(a.quantity)
-                    else:
-                        self.output_products[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
-                else:
-                    p = self.lost_products.get(a.type_id)
-                    if p:
-                        p.append(a)
-                    else:
-                        self.lost_products[a.type_id] = [a]
-        return self.output_products
-
-
-def calc_ready_products(
-        # данные (справочники)
-        qid: db.QSwaggerDictionary,
-        # настройки генерации отчёта
-        router_settings: typing.List[RouterSettings],
-        conveyor_settings: typing.List[ConveyorSettings]) \
-        -> typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]:
-    if not conveyor_settings or not router_settings:
-        return {}
-    # проверям, что конвейер - поддерживается только одна производственная корпорация
-    corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
-    if next((_ for _ in conveyor_settings if not _.corporation.corporation_id == corporation.corporation_id), None) is not None:
-        raise Exception("Unsupported multi-corporation conveyor")
-    # считаем количество готовых продуктов на выбранных станциях
-    ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts] = {}
-    for index, rs in enumerate(router_settings):
+    @staticmethod
+    def prepare_calc0(
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            # настройки генерации отчёта
+            router_settings: RouterSettings,
+            conveyor_settings: typing.List[ConveyorSettings]) \
+            -> typing.Tuple[typing.Set[db.QSwaggerActivityCode], typing.List[ConveyorSettings]]:
         # надо определиться, является ли конвейер manufacturing или reaction
         activities: typing.Set[db.QSwaggerActivityCode] = set()
-        if rs.output:
+        if router_settings.output:
             # если список производства задан, то это "внешняя станция" со своими настройками производства
             for b in qid.sde_blueprints.values():
-                if b.manufacturing and b.manufacturing.product_id in rs.output:
+                if b.manufacturing and b.manufacturing.product_id in router_settings.output:
                     activities.add(db.QSwaggerActivityCode.MANUFACTURING)
-                if b.reaction and b.reaction.product_id in rs.output:
+                if b.reaction and b.reaction.product_id in router_settings.output:
                     activities.add(db.QSwaggerActivityCode.REACTION)
         else:
             # если список производства не задан, то это основная станция на которой производится всё, кроме
@@ -1005,7 +883,231 @@ def calc_ready_products(
                     continue
         if not local_conveyor_settings:
             raise Exception("There is router settings not complementary with conveyor settings")
+        return activities, local_conveyor_settings
+
+    def prepare_calc1(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            # данные корпорации для подсчёта кол-ва материалов
+            corporation: db.QSwaggerCorporation,
+            # настройки генерации отчёта
+            _conveyor_settings: typing.List[ConveyorSettings],
+            _router_settings: RouterSettings,
+            # список активностей, которые выполняются для получения продуктов роутера
+            _activities: typing.Set[db.QSwaggerActivityCode]) \
+            -> typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]]:
+        del self.activities
+        del self.conveyor_settings
+        # ---
+        self.corporation: db.QSwaggerCorporation = corporation
+        self.station: db.QSwaggerStation = None
+        self.router_settings: RouterSettings = _router_settings
+        self.conveyor_settings: typing.List[ConveyorSettings] = _conveyor_settings[:]
+        self.activities: typing.Set[db.QSwaggerActivityCode] = _activities
+        # ---
+        # проверка правильности входных данных
+        if next((_ for _ in self.conveyor_settings
+                 if not _.corporation.corporation_id == self.corporation.corporation_id), None) is not None:
+            raise Exception("Incompatible conveyor settings and corporation data")
+        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
+        router_details: typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]] = \
+            get_router_details(qid, self.router_settings, self.conveyor_settings)
+        return router_details
+
+    @staticmethod
+    def calc2(
+            a: db.QSwaggerCorporationAssetsItem,
+            router_settings: RouterSettings,
+            station_id: int,
+            containers_exclude: typing.Set[int],
+            # настраиваемое поведение калькулятора, который компонует список предметов, сортируя их на "в нужной ли он
+            # коробке" или "в неправильной"?
+            valid_containers: typing.Set[int],
+            valid_items: typing.Dict[int, db.QSwaggerTypeId],
+            ready_items: typing.Dict[int, db.QSwaggerMaterial],
+            lost_items: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]]):
+        if not a.station_id == station_id: return
+        if a.location_id in containers_exclude: return
+        # проверям "заблудился" ли материал/продукт, или лежит на своём месте?
+        type_id: int = a.type_id
+        correct_container: bool = a.location_id in valid_containers
+        correct_item: bool = True
+        # если output не сконфигурирован, то на станции производится вся возможная продукция (кроме тех, что
+        # сконфигурированы на других станциях)
+        if router_settings.output:
+            if type_id not in valid_items:
+                correct_item = False
+        elif not correct_container:
+            return
+        # ---
+        if not correct_container and not correct_item:
+            return
+        elif correct_container and correct_item:
+            p = ready_items.get(a.type_id)
+            if p:
+                p.increment_quantity(a.quantity)
+            else:
+                ready_items[a.type_id] = db.QSwaggerMaterial(a.item_type, a.quantity)
+        else:
+            p = lost_items.get(a.type_id)
+            if p:
+                p.append(a)
+            else:
+                lost_items[a.type_id] = [a]
+
+
+class ConveyorRouterInputMaterials(ConveyorRouterAssets):
+    def __init__(self, index: int):
+        super().__init__()
+        self.index: int = index
+        self.valid_materials: typing.Dict[int, db.QSwaggerTypeId] = {}  # type_id:material
+        self.input_materials: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:material
+        self.lost_materials: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}  # type_id:list(assets)
+
+    def calc(self,
+             # данные (справочники)
+             qid: db.QSwaggerDictionary,
+             # данные корпорации для подсчёта кол-ва материалов
+             corporation: db.QSwaggerCorporation,
+             # настройки генерации отчёта
+             conveyor_settings: typing.List[ConveyorSettings],
+             router_settings: RouterSettings,
+             # список активностей, которые выполняются для получения продуктов роутера
+             activities: typing.Set[db.QSwaggerActivityCode]) -> None:
+        self.valid_materials: typing.Dict[int, db.QSwaggerTypeId] = {}
+        self.input_materials: typing.Dict[int, db.QSwaggerMaterial] = {}
+        self.lost_materials: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}
+        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
+        router_details: typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]] = \
+            self.prepare_calc1(qid, corporation, conveyor_settings, router_settings, activities)
+        self.station: db.QSwaggerStation = router_details[0]
+        if corporation.corporation_id != router_details[1].corporation_id:
+            raise Exception("Something wrong: incompatible corporations for conveyor/router settings")
+        containers_stocks: typing.Set[int] = router_details[2]
+        # containers_output: typing.Set[int] = router_details[3]
+        containers_exclude: typing.Set[int] = set([_.container_id for x in conveyor_settings for _ in x.containers_exclude])
+        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+        for product_type_id in router_settings.output:
+            product_activities: typing.List[db.QSwaggerActivity] = qid.get_activities_by_product(product_type_id)
+            if not product_activities: continue
+            for a in product_activities:
+                if a.code in activities:
+                    mats: db.QSwaggerActivityMaterials = a.materials
+                    for m in mats.materials:
+                        if m.material_id not in self.valid_materials:
+                            self.valid_materials[m.material_id] = m.material_type
+        # перебираем ассеты, ищем вход производства (сток материалов)
+        if containers_stocks:
+            station_id: int = self.station.station_id
+            for a in corporation.assets.values():
+                # проверям "заблудился" ли материал, или лежит на своём месте?
+                ConveyorRouterAssets.calc2(
+                    a,
+                    router_settings,
+                    station_id,
+                    containers_exclude,
+                    containers_stocks,
+                    self.valid_materials,
+                    self.input_materials,
+                    self.lost_materials)
+
+
+def calc_router_materials(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
+        router_settings: typing.List[RouterSettings],
+        conveyor_settings: typing.List[ConveyorSettings]) \
+        -> typing.Dict[RouterSettings, ConveyorRouterInputMaterials]:
+    if not conveyor_settings or not router_settings:
+        return {}
+    # проверям, что конвейер - поддерживается только одна производственная корпорация
+    corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
+    if next((_ for _ in conveyor_settings if not _.corporation.corporation_id == corporation.corporation_id), None) is not None:
+        raise Exception("Unsupported multi-corporation conveyor")
+    # считаем количество готовых материалов на выбранных станциях
+    ready_materials: typing.Dict[RouterSettings, ConveyorRouterInputMaterials] = {}
+    for index, rs in enumerate(router_settings):
+        # получаем настройки для рассчёта
+        activities, local_conveyor_settings = ConveyorRouterAssets.prepare_calc0(qid, rs, conveyor_settings)
         if not local_conveyor_settings: continue
+        # выполняем расчёт
+        m: ConveyorRouterInputMaterials = ConveyorRouterInputMaterials(index)
+        m.calc(qid, corporation, local_conveyor_settings, rs, activities)
+        ready_materials[rs] = m
+    return ready_materials
+
+
+class ConveyorCorporationOutputProducts(ConveyorRouterAssets):
+    def __init__(self, index: int):
+        super().__init__()
+        self.index: int = index
+        self.valid_products: typing.Dict[int, db.QSwaggerTypeId] = {}  # type_id:product
+        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}  # type_id:product
+        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}  # type_id:list(assets)
+
+    def calc(self,
+             # данные (справочники)
+             qid: db.QSwaggerDictionary,
+             # данные корпорации для подсчёта кол-ва материалов
+             corporation: db.QSwaggerCorporation,
+             # настройки генерации отчёта
+             conveyor_settings: typing.List[ConveyorSettings],
+             router_settings: RouterSettings,
+             # список активностей, которые выполняются для получения продуктов роутера
+             activities: typing.Set[db.QSwaggerActivityCode]) -> None:
+        self.valid_products: typing.Dict[int, db.QSwaggerTypeId] = {}
+        self.output_products: typing.Dict[int, db.QSwaggerMaterial] = {}
+        self.lost_products: typing.Dict[int, typing.List[db.QSwaggerCorporationAssetsItem]] = {}
+        # определяем станцию, корпорацию и стоки конвейера соответствующего роутеру
+        router_details: typing.Tuple[db.QSwaggerStation, db.QSwaggerCorporation, typing.Set[int], typing.Set[int]] = \
+            self.prepare_calc1(qid, corporation, conveyor_settings, router_settings, activities)
+        self.station: db.QSwaggerStation = router_details[0]
+        if corporation.corporation_id != router_details[1].corporation_id:
+            raise Exception("Something wrong: incompatible corporations for conveyor/router settings")
+        # containers_stocks: typing.Set[int] = router_details[2]
+        containers_output: typing.Set[int] = router_details[3]
+        containers_exclude: typing.Set[int] = set([_.container_id for x in conveyor_settings for _ in x.containers_exclude])
+        # если список output сконфигурирован, то имеет место быть станция из настроек router-а
+        for product_type_id in router_settings.output:
+            self.valid_products[product_type_id] = qid.get_type_id(product_type_id)
+        # перебираем ассеты, ищем продукты производства
+        if containers_output:
+            station_id: int = self.station.station_id
+            for a in corporation.assets.values():
+                # проверям "заблудился" ли продукт, или лежит на своём месте?
+                ConveyorRouterAssets.calc2(
+                    a,
+                    router_settings,
+                    station_id,
+                    containers_exclude,
+                    containers_output,
+                    self.valid_products,
+                    self.output_products,
+                    self.lost_products)
+
+
+def calc_router_products(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
+        router_settings: typing.List[RouterSettings],
+        conveyor_settings: typing.List[ConveyorSettings]) \
+        -> typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]:
+    if not conveyor_settings or not router_settings:
+        return {}
+    # проверям, что конвейер - поддерживается только одна производственная корпорация
+    corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
+    if next((_ for _ in conveyor_settings if not _.corporation.corporation_id == corporation.corporation_id), None) is not None:
+        raise Exception("Unsupported multi-corporation conveyor")
+    # считаем количество готовых продуктов на выбранных станциях
+    ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts] = {}
+    for index, rs in enumerate(router_settings):
+        # получаем настройки для рассчёта
+        activities, local_conveyor_settings = ConveyorRouterAssets.prepare_calc0(qid, rs, conveyor_settings)
+        if not local_conveyor_settings: continue
+        # выполняем расчёт
         a: ConveyorCorporationOutputProducts = ConveyorCorporationOutputProducts(index)
         a.calc(qid, corporation, local_conveyor_settings, rs, activities)
         ready_products[rs] = a

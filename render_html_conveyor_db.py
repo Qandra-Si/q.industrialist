@@ -437,7 +437,7 @@ g_tbl_stock_img_src="{render_html.__get_img_src("{tid}", 32)}";
         products: typing.Set[int] = set()
         if s.output:
             # если список output сконфигурирован, то имеет место быть станция из настроек router-а
-            materials = set(router_materials[s].input_materials.keys())
+            materials = set(router_materials[s].valid_materials.keys())
             products = set(s.output)
         else:
             # если список output пустой, то имеет место быть default-ная производственная база,
@@ -1682,7 +1682,7 @@ def dump_list_of_products(
         row_class: str = 'interim-factory'
         # если список output сконфигурирован, то имеет место быть станция из настроек router-а
         for router_settings, materials in router_materials.items():
-            if type_id in materials.input_materials:
+            if type_id in materials.valid_materials:
                 next_factory = router_settings.station
                 break
         # если список output пустой, то имеет место быть default-ная производственная база,
@@ -1825,12 +1825,14 @@ def dump_corp_router(
         # список готовых продуктов в стоках конвейера
         ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts],
         # справочник задействованных материалов
-        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
+        ready_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials]) -> None:
     # проверка, пусты ли настройки конвейера?
     if not ready_products: return
 
-    # получаем ссылку на единственную корпорацию
+    # получаем ссылку на единственную корпорацию (странная операция...)
     corporation: db.QSwaggerCorporation = next(iter(ready_products.values())).corporation
+    if not corporation:
+        corporation: db.QSwaggerCorporation = next(iter(ready_materials.values())).corporation
 
     # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
     # если нет, то... надо добавить здесь какой-то сворачиваемый список?
@@ -1866,19 +1868,34 @@ def dump_corp_router(
     for products in router_products:
         # определяем станцию, корпорацию и выход конвейера соответствующего роутеру
         router_settings: tools.RouterSettings = products.router_settings
+        materials: tools.ConveyorRouterInputMaterials = ready_materials.get(router_settings)
         station: db.QSwaggerStation = products.station
-        # containers_stocks: typing.Set[int] = router_details[2]
-        # containers_output: typing.Set[int] = router_details[3]
         station_id: int = station.station_id
         sum_volume: int = int(sum([_.quantity * _.material_type.packaged_volume for _ in products.output_products.values()]) + 0.9)
         tag = {"r": station_id}
         warn_sign: str = ''
 
+        # TODO: неуместно здесь корректировать списки, они должны изначально компоноваться правильно!
+        #  (придётся объединить калькуляцию материалов и продуктов)
         products_ready: typing.List[db.QSwaggerMaterial] = list(products.output_products.values())
+
+        # возможна ситуация, когда алгоритм среагирует на некорректное расположение asset-ов, которые и не материалы, и
+        # не продукты, поэтому чтобы списки не дублировались - прореживаю уже невалидными элементами
+        # также возможная ситуация, когда скажем Axosomatic Neurolink Enhancer является в конвейере и продуктом и
+        # материалом, когда он точно лежит на своём месте
+        products_lost: typing.List[db.QSwaggerCorporationAssetsItem] = \
+            [_ for x in products.lost_products.values() for _ in x
+             if _.type_id not in products.valid_products.keys()]
+        products_lost_ids: typing.Set[int] = set([_.item_id for _ in products_lost])
+        materials_lost: typing.List[db.QSwaggerCorporationAssetsItem] = \
+            [_ for x in materials.lost_materials.values() for _ in x
+             if _.type_id not in products.valid_products.keys() and _.item_id not in products_lost_ids]
+        products_lost.extend(materials_lost)
+        del materials_lost
+
         if products_ready:
             products_ready.sort(key=lambda p: (p.material_type.group_id, p.material_type.name))
 
-        products_lost: typing.List[db.QSwaggerCorporationAssetsItem] = [_ for x in products.lost_products.values() for _ in x]
         if products_lost:
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
             warn_sign: str = glyphicon_ex('warning-sign', ['lost-sign']) + ' '
@@ -1900,7 +1917,7 @@ def dump_corp_router(
                 products_ready,
                 router_settings,
                 manufacturing_conveyor,
-                router_materials)
+                ready_materials)
 
         if products_lost:
             products_lost.sort(key=lambda p: (p.item_type.group_id, p.item_type.name))
@@ -1911,7 +1928,7 @@ def dump_corp_router(
                 products_lost,
                 router_settings,
                 manufacturing_conveyor,
-                router_materials)
+                ready_materials)
 
         del products_ready
         del products_lost
@@ -1949,11 +1966,11 @@ def dump_router2_into_report(
         global_dictionary.load_available_materials(available_materials)
         # инициализация списка продуктов, уже произведённых на станциях (и требующих перевозки)
         ready_products: typing.Dict[tools.RouterSettings, tools.ConveyorCorporationOutputProducts] = \
-            tools.calc_ready_products(qid, router_settings, conveyor_settings)
+            tools.calc_router_products(qid, router_settings, conveyor_settings)
         global_dictionary.load_ready_products(ready_products)
         # инициализация списка материалов, требуемых всоответствии с настройками роутера
-        router_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials] = \
-            tools.calc_router_materials(qid, router_settings)
+        ready_materials: typing.Dict[tools.RouterSettings, tools.ConveyorRouterInputMaterials] = \
+            tools.calc_router_materials(qid, router_settings, conveyor_settings)
         # компоновка высшего уровня конвейера
         dump_corp_conveyors(
             glf,
@@ -1968,7 +1985,7 @@ def dump_router2_into_report(
             qid,
             conveyor_settings,
             ready_products,
-            router_materials)
+            ready_materials)
         # сохраняем содержимое диалоговых окон [Станции]
         dump_nav_menu_router_dialog(
             glf,
@@ -1976,7 +1993,7 @@ def dump_router2_into_report(
             global_dictionary,
             router_settings,
             conveyor_settings,
-            router_materials)
+            ready_materials)
         # сохраняем содержимое диалоговых окон [Конвейер]
         dump_nav_menu_conveyor_dialog(glf, qid, conveyor_settings)
         # сохраняем содержимое диалоговых окон [Время]
