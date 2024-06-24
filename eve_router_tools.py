@@ -1199,11 +1199,12 @@ def get_activity_by_product(
         product_id: int,
         conveyor_settings: ConveyorSettings) -> typing.Optional[db.QSwaggerActivity]:
     variants: typing.Optional[typing.List[db.QSwaggerActivity]] = qid.get_activities_by_product(product_id)
-    for activity in variants:
-        if activity.code in conveyor_settings.activities:
-            return activity
-        elif conveyor_settings.conveyor_with_reactions and activity.code == db.QSwaggerActivityCode.REACTION:
-            return activity
+    if variants is not None:
+        for activity in variants:
+            if activity.code in conveyor_settings.activities:
+                return activity
+            elif conveyor_settings.conveyor_with_reactions and activity.code == db.QSwaggerActivityCode.REACTION:
+                return activity
     return None
 
 
@@ -1267,13 +1268,16 @@ class ConveyorManufacturingAnalysis:
                                                          for _ in self.product_tier1_in_blueprints])
         self.product_tier1_num_in_blueprint_runs: int = sum([_.runs for _ in self.product_tier1_in_blueprints])
         # подсчёт количества производимых сейчас предметов
-        self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
-            manufacturing_conveyor.industry_jobs.get_with_unique_items(
-                self.blueprint_tier1.type_id,
-                self.product_tier1.product_id, [
-                    ConveyorJobPlace.BLUEPRINT,
-                    ConveyorJobPlace.OUTPUT,
-                ])
+        if self.blueprint_tier1:
+            self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                manufacturing_conveyor.industry_jobs.get_with_unique_items(
+                    self.blueprint_tier1.type_id,
+                    self.product_tier1.product_id, [
+                        ConveyorJobPlace.BLUEPRINT,
+                        ConveyorJobPlace.OUTPUT,
+                    ])
+        else:
+            self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
         self.product_tier1_num_in_jobs: int = self.product_tier1.quantity * sum([_.runs for _ in self.product_tier1_in_jobs])
         # подсчёт количества продаваемых сейчас предметов
         self.product_tier1_in_sell: typing.List[db.QSwaggerCorporationOrder] = \
