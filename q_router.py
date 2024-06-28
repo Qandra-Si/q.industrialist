@@ -154,6 +154,10 @@ def main():
                     container_hangar: str = container.location_flag
                     if container_hangar[:-1] != 'CorpSAG':
                         continue
+                    # проверяем, что принадлежность контейнера станции выяснить можно (из ассетов пропадают офисы)
+                    if not container.station_id:
+                        container = container
+                        continue
                     # определяем признаки категорий, к которым принадлежала коробка
                     source_box: bool = False
                     stock_box: bool = False

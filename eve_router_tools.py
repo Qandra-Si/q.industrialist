@@ -831,6 +831,8 @@ def get_router_details(
                     raise Exception(
                         f"There are multiple routes for multiple corporations {corporation.corporation_name} and {c.corporation.corporation_name}")
                 corporation = c.corporation
+    if not corporation and conveyor_settings:
+        corporation = conveyor_settings[0].corporation  # TODO: костыль (иногда из ассетов пропадают офисы, как быть?)
     if not corporation:
         raise Exception("Invalid router settings without corporation' conveyor settings")
     return station, corporation, containers_stocks, containers_output
