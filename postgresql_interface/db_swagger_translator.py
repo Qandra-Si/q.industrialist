@@ -955,3 +955,57 @@ WHERE
             else:
                 limits.append(limit)
         return data
+
+    def get_conveyor_requirements(
+            self,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]]) -> \
+            typing.Dict[int, QSwaggerConveyorRequirement]:
+        rows = self.db.select_all_rows("""
+select
+ l.type_id,
+ --t.sdet_type_name as type_name,
+ l.limit,
+ o.remain,
+ --case when o.remain is null then l.limit else l.limit - o.remain end required,
+ case when o.remain is null then 0.0
+      else o.remain::double precision / l.limit
+ end rest
+from (
+ select cl_type_id as type_id, sum(cl_approximate) as limit
+ from conveyor_limits
+ group by 1
+) as l left outer join (
+ select o.ecor_type_id as type_id, sum(o.ecor_volume_remain) as remain
+ from (
+  select ecor_type_id, ecor_corporation_id, ecor_location_id, ecor_volume_remain 
+  from esi_corporation_orders
+  where
+   not ecor_history and
+   not ecor_is_buy_order and
+   (ecor_type_id, ecor_location_id, ecor_corporation_id) in (select cl_type_id, cl_trade_hub, cl_trader_corp from conveyor_limits)
+ ) o
+ group by 1 
+) as o on (o.type_id=l.type_id)
+ left outer join eve_sde_type_ids as t on (t.sdet_type_id=l.type_id)
+where
+ l.type_id in (select sdebp_product_id from eve_sde_blueprint_products)
+ --and (o.remain is null or (l.limit > o.remain))
+--order by rest;
+""")
+        if rows is None:
+            return {}
+        # обработка данных по лимитам конвейера и связывание их с другими кешированными объектами
+        data: typing.Dict[int, QSwaggerConveyorRequirement] = {}
+        for row in rows:
+            # получаем информацию о предмете
+            type_id: int = row[0]
+            cached_item_type: QSwaggerTypeId = type_ids.get(type_id)
+            cached_conveyor_limit: typing.Optional[typing.List[QSwaggerConveyorLimit]] = conveyor_limits.get(type_id)
+            # добавляем потребность
+            requirement: QSwaggerConveyorRequirement = QSwaggerConveyorRequirement(
+                cached_item_type,
+                cached_conveyor_limit,
+                row)
+            data[type_id] = requirement
+        return data

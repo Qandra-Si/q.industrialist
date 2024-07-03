@@ -379,7 +379,8 @@ function initMaterialNames() {
   }
  });
  $('table.tbl-stock tbody tr td qmaterial,'+
-   'table.tbl-summary tbody tr td qproduct').each(function() {
+   'table.tbl-summary tbody tr td qproduct,'+
+   'table.tbl-requirements tbody tr td qmaterial').each(function() {
    replaceAssetItemHtml($(this));
  });
 }

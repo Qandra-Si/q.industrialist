@@ -2,6 +2,8 @@
 """
 import typing
 from enum import Enum
+import datetime
+import itertools
 
 import eve_efficiency
 import postgresql_interface as db
@@ -17,6 +19,7 @@ class RouterSettings:
 
 
 class ConveyorSettings: pass  # forward declaration
+class ConveyorDictionary: pass  # forward declaration
 
 
 class ConveyorSettingsContainer:
@@ -144,6 +147,7 @@ class ConveyorJobPlaces:
             blueprint_type_id: typing.Optional[int],
             product_type_id: typing.Optional[int],
             places: typing.List[ConveyorJobPlace],
+            activity: typing.Optional[db.QSwaggerActivityCode] = None,
             facility_id: typing.Optional[int] = None) -> typing.List[db.QSwaggerCorporationIndustryJob]:
         res: typing.List[db.QSwaggerCorporationIndustryJob] = []
         ids: typing.Set[int] = set()
@@ -159,10 +163,12 @@ class ConveyorJobPlaces:
             if blueprint_type_id is not None:
                 for _ in x.get(blueprint_type_id, []):
                     if facility_id is not None and _.facility_id != facility_id: continue
+                    if activity is not None and _.activity != activity: continue
                     push(_)
             if product_type_id is not None:
                 for _ in y.get(product_type_id, []):
                     if facility_id is not None and _.facility_id != facility_id: continue
+                    if activity is not None and _.activity != activity: continue
                     push(_)
 
         if ConveyorJobPlace.BLUEPRINT in places:
@@ -230,6 +236,9 @@ class ConveyorSettings:
         # параметры поведения конвейера (связь с торговой деятельностью, влияние её поведения на работу производства)
         self.trade_corporations: typing.List[db.QSwaggerCorporation] = []
         self.containers_sale_stocks: typing.List[ConveyorSettingsSaleContainer] = []  # station:container:trade_corporation
+        # параметры поведения конвейера (расчёт копирки)
+        self.calculate_requirements: bool = False
+        self.requirements_sold_threshold: float = 0.2
         # идентификаторы контейнеров с чертежами, со стоком, с формулами, исключённых из поиска и т.п.
         self.sources_locations: typing.Set[int] = set()
         self.stocks_locations: typing.Set[int] = set()
@@ -394,7 +403,7 @@ def get_jobs_grouped_by(
     grouped: typing.Dict[typing.Tuple[int, int], typing.List[db.QSwaggerCorporationIndustryJob]] = {}
     for j in jobs:
         product_type_id: int = j.product_type_id if group_by_product else 0
-        activity: int = j.activity_id if group_by_activity else 0
+        activity: int = j.activity.to_int() if group_by_activity else 0
         key: typing.Tuple[int, int] = product_type_id, activity
         g0: typing.List[db.QSwaggerCorporationIndustryJob] = grouped.get(key)
         if not g0:
@@ -1193,74 +1202,6 @@ def get_min_max_time(
     return min_time, max_time
 
 
-# ConveyorDictionary - долговременный справочник материалов конвейера, хранится долго и накапливает информацию из
-# экземпляров QSwaggerTypeId
-class ConveyorDictionary:
-    def __init__(self, qid: db.QSwaggerDictionary):
-        # сохраняем ссылку на ПОЛНЫЙ справочник загруженный из БД
-        self.qid: db.QSwaggerDictionary = qid
-        # подготовка списка-справочника, который будет хранить идентификаторы всех продуктов, используемых конвейером
-        self.materials: typing.Set[int] = set()
-        # подготовка списка-справочника, который будет хранить используемые материалы в различных activity (скопом)
-        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {}
-        self._fill_involved_materials()
-
-    def __del__(self):
-        # уничтожаем свой список-справочник, остальные (не наши) не трогаем
-        del self.materials
-
-    def _fill_involved_materials(self):
-        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {
-            db.QSwaggerActivityCode.MANUFACTURING: set(),
-            db.QSwaggerActivityCode.INVENTION: set(),
-            db.QSwaggerActivityCode.COPYING: set(),
-            db.QSwaggerActivityCode.RESEARCH_MATERIAL: set(),
-            db.QSwaggerActivityCode.RESEARCH_TIME: set(),
-            db.QSwaggerActivityCode.REACTION: set()
-        }
-        for by_products in self.qid.sde_activities.values():
-            for activity in by_products:
-                ids: typing.Set[int] = set([_.material_id for _ in activity.materials.materials])
-                if isinstance(activity, db.QSwaggerBlueprintManufacturing):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.MANUFACTURING
-                elif isinstance(activity, db.QSwaggerBlueprintInvention):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.INVENTION
-                elif isinstance(activity, db.QSwaggerBlueprintCopying):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.COPYING
-                elif isinstance(activity, db.QSwaggerBlueprintResearchMaterial):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_MATERIAL
-                elif isinstance(activity, db.QSwaggerBlueprintResearchTime):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_TIME
-                elif isinstance(activity, db.QSwaggerBlueprintReaction):
-                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.REACTION
-                else:
-                    raise Exception("Unknown type of activity")
-                involved: typing.Set[int] = self.involved_materials.get(a)
-                involved.update(ids)
-
-    def load_router_settings(self, router_settings: typing.List[RouterSettings]) -> None:
-        for r in router_settings:
-            self.materials = self.materials | set(r.output)
-
-    def load_type_ids(self, type_ids: typing.Set[int]):
-        self.materials = self.materials | set(type_ids)
-
-    def load_available_materials(self, available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]):
-        for stocks in available_materials.values():
-            for materials in stocks.stock_materials.values():
-                self.load_type_ids(materials.keys())
-
-    def load_ready_products(self, ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]):
-        for products in ready_products.values():
-            self.load_type_ids(products.output_products.keys())
-            self.load_type_ids(products.lost_products.keys())
-
-    def load_requirements(self, requirements: typing.List[ConveyorMaterialRequirements.StackOfBlueprints]):
-        for stack in requirements:
-            for materials in stack.required_materials_for_single.values():
-                self.load_type_ids(set([_.material_id for _ in materials]))
-
-
 def get_conveyor_table_sort_data(
         priority: int,
         activities: typing.List[db.QSwaggerActivityCode],
@@ -1376,10 +1317,9 @@ class ConveyorManufacturingAnalysis:
             self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
                 manufacturing_conveyor.industry_jobs.get_with_unique_items(
                     self.blueprint_tier1.type_id,
-                    self.product_tier1.product_id, [
-                        ConveyorJobPlace.BLUEPRINT,
-                        ConveyorJobPlace.OUTPUT,
-                    ])
+                    self.product_tier1.product_id,
+                    places=[ConveyorJobPlace.BLUEPRINT, ConveyorJobPlace.OUTPUT],
+                    activity=db.QSwaggerActivityCode.MANUFACTURING)
         else:
             self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
         self.product_tier1_num_in_jobs: int = self.product_tier1.quantity * sum([_.runs for _ in self.product_tier1_in_jobs])
@@ -1441,7 +1381,7 @@ class ConveyorManufacturingProductAnalysis:
         if manufacturing_conveyor is None: return
         if activity and not isinstance(activity, db.QSwaggerBlueprintManufacturing): return
         if db.QSwaggerActivityCode.MANUFACTURING not in manufacturing_conveyor.activities: return
-        self.product = ConveyorManufacturingAnalysis.from_blueprint_tier1 (
+        self.product = ConveyorManufacturingAnalysis.from_blueprint_tier1(
             qid, manufacturing_conveyor, blueprint, activity)
 
     def analyse_product(self,
@@ -1469,6 +1409,10 @@ class ConveyorInventAnalysis:
         # анализ следующего уровня производства
         self.__analysis_tier2: ConveyorManufacturingProductAnalysis = ConveyorManufacturingProductAnalysis()
         self.__analysis_tier2.analyse_manufacturing(qid, self.blueprint_tier1, None, manufacturing_conveyor)
+
+    @property
+    def analysis_tier2(self) -> ConveyorManufacturingProductAnalysis:
+        return self.__analysis_tier2
 
     @property
     def activity_tier2(self) -> typing.Optional[db.QSwaggerBlueprintManufacturing]:
@@ -1611,62 +1555,353 @@ class ConveyorInventProductsAnalysis:
         return overstock
 
 
+class ConveyorCopyingAnalysis:
+    def __init__(self,
+                 qid: db.QSwaggerDictionary,
+                 invention_conveyor: ConveyorSettings,
+                 manufacturing_conveyor: ConveyorSettings,
+                 blueprint_tier1: typing.Optional[db.QSwaggerBlueprint] = None,
+                 activity_tier1: typing.Optional[db.QSwaggerBlueprintCopying] = None,
+                 product_tier1: typing.Optional[db.QSwaggerBlueprint] = None):
+        # копия T1-чертёжа полученная в результате копирки (продукт copying-а)
+        self.blueprint_tier1: typing.Optional[db.QSwaggerBlueprint] = None
+        # параметры T1-копирки чертежа
+        self.activity_tier1: typing.Optional[db.QSwaggerBlueprintCopying] = None
+        # продукт T1-копирки (должен быть тот же самый чертёж, если это не Taipan Blueprint)
+        self.product_tier1: typing.Optional[db.QSwaggerBlueprint] = None
+        # различные варианты конструирования объекта
+        if blueprint_tier1 or activity_tier1:
+            if blueprint_tier1:
+                self.blueprint_tier1 = blueprint_tier1
+                self.activity_tier1 = blueprint_tier1.copying
+            elif activity_tier1:
+                self.activity_tier1 = activity_tier1
+                self.blueprint_tier1 = activity_tier1.blueprint
+            if self.activity_tier1 is None or self.blueprint_tier1 is None: return
+            self.product_tier1: db.QSwaggerBlueprint = self.activity_tier1.blueprint  # здесь должен был быть продукт
+        elif product_tier1:
+            self.product_tier1: db.QSwaggerBlueprint = product_tier1
+            self.activity_tier1 = self.product_tier1.copying
+            if self.activity_tier1:
+                self.blueprint_tier1 = self.activity_tier1.blueprint
+        # подсчёт кол-ва копий в ассетах
+        self.product_tier1_in_copies: typing.List[db.QSwaggerCorporationBlueprint] = \
+            invention_conveyor.blueprints.get_with_unique_items(
+                self.product_tier1.type_id,
+                places=[ConveyorPlace.CONVEYOR])
+        self.product_tier1_in_copies = [_ for _ in self.product_tier1_in_copies if _.is_copy]
+        self.product_tier1_num_in_copies: int = sum([1 for _ in self.product_tier1_in_copies])
+        self.product_tier1_num_in_copy_runs: int = sum([_.runs for _ in self.product_tier1_in_copies])
+        # подсчёт кол-ва оригиналов в ассетах
+        self.product_tier1_in_originals: typing.List[db.QSwaggerCorporationBlueprint] = \
+            manufacturing_conveyor.blueprints.get_with_unique_items(
+                self.product_tier1.type_id,
+                places=[ConveyorPlace.ADDITIONAL_BLUEPRINTS])
+        self.product_tier1_in_originals = [_ for _ in self.product_tier1_in_originals if _.is_original]
+        self.product_tier1_num_in_originals: int = \
+            sum([1 if _.quantity < 0 else _.quantity for _ in self.product_tier1_in_originals])
+        # подсчёт количества производимых сейчас предметов
+        self.product_tier1_in_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
+        if self.blueprint_tier1:
+            self.product_tier1_in_jobs = invention_conveyor.industry_jobs.get_with_unique_items(
+                self.blueprint_tier1.type_id,
+                self.product_tier1.type_id,
+                places=[ConveyorJobPlace.BLUEPRINT],
+                activity=db.QSwaggerActivityCode.COPYING)
+        self.product_tier1_num_in_jobs: int = sum([1 for _ in self.product_tier1_in_jobs])
+        self.product_tier1_num_in_job_runs: int = sum([_.runs for _ in self.product_tier1_in_jobs])
+
+        # анализ следующего уровня производства
+        self.__analysis_tier2: typing.Optional[ConveyorInventProductsAnalysis] = None
+        # проверяем, что копия инвентится
+        if self.product_tier1.invention:
+            self.__analysis_tier2 = ConveyorInventProductsAnalysis()
+            self.__analysis_tier2.analyse_invent(
+                qid,
+                invention_conveyor,
+                [manufacturing_conveyor],
+                self.product_tier1.invention)
+
+    def analysis_tier3(self, type_id: int) -> typing.Optional[ConveyorManufacturingProductAnalysis]:
+        for p in self.__analysis_tier2.products:
+            if type_id == p.product_tier1.product_id:
+                return p.analysis_tier2
+        return None
+
+    @property
+    def analysis_tier2(self) -> ConveyorInventProductsAnalysis:
+        return self.__analysis_tier2
+
+    #
+    # === следующие поля известны только при product_tier2 not None ===
+    #
+
+    """
+    подсчёт кол-ва предметов в ассетах, в производстве и продаже
+    """
+    """
+    @property
+    def num_ready(self) -> int:
+        if not self.__analysis_tier2.product: return 0
+        return self.__analysis_tier2.product.num_ready
+
+    @property
+    def num_prepared(self) -> int:
+        if not self.__analysis_tier2.product: return 0
+        return self.__analysis_tier2.product.num_prepared
+    """
+
+    @classmethod
+    def from_blueprint_tier1(
+            cls,
+            qid: db.QSwaggerDictionary,
+            invention_conveyor: ConveyorSettings,
+            manufacturing_conveyor: ConveyorSettings,
+            blueprint_tier1: typing.Optional[db.QSwaggerBlueprint],
+            activity_tier1: typing.Optional[db.QSwaggerBlueprintCopying]):
+        return cls(
+            qid,
+            invention_conveyor,
+            manufacturing_conveyor,
+            blueprint_tier1=blueprint_tier1,
+            activity_tier1=activity_tier1)
+
+    @classmethod
+    def from_product_tier1(
+            cls,
+            qid: db.QSwaggerDictionary,
+            invention_conveyor: ConveyorSettings,
+            manufacturing_conveyor: ConveyorSettings,
+            product_tier1: db.QSwaggerBlueprint):
+        return cls(
+            qid,
+            invention_conveyor,
+            manufacturing_conveyor,
+            product_tier1=product_tier1)
+
+
+class ConveyorCopyingProductsAnalysis:
+    def __init__(self):
+        self.product: typing.Optional[ConveyorCopyingAnalysis] = None
+
+    def analyse_copying(self,
+                        qid: db.QSwaggerDictionary,
+                        blueprint: typing.Optional[db.QSwaggerBlueprint],
+                        activity: typing.Optional[db.QSwaggerActivity],
+                        invention_conveyor: ConveyorSettings,
+                        manufacturing_conveyor: ConveyorSettings) -> None:
+        self.product = None
+        if invention_conveyor is None or manufacturing_conveyor is None: return
+        if activity and not isinstance(activity, db.QSwaggerBlueprintCopying): return
+        if db.QSwaggerActivityCode.INVENTION not in invention_conveyor.activities: return
+        if db.QSwaggerActivityCode.MANUFACTURING not in manufacturing_conveyor.activities: return
+        self.product = ConveyorCopyingAnalysis.from_blueprint_tier1(
+            qid,
+            invention_conveyor,
+            manufacturing_conveyor,
+            blueprint,
+            activity)
+
+    def analyse_product(self,
+                        qid: db.QSwaggerDictionary,
+                        product_type: db.QSwaggerBlueprint,
+                        invention_conveyor: ConveyorSettings,
+                        manufacturing_conveyor: ConveyorSettings):
+        self.product = None
+        if invention_conveyor is None: return
+        self.product = ConveyorCopyingAnalysis.from_product_tier1(
+            qid,
+            invention_conveyor,
+            manufacturing_conveyor,
+            product_type)
+
+
 class ConveyorIndustryAnalysis:
     def __init__(self):
+        # индексируется значениями типа [33082] для tier1-чертежа типа 'Taipan Blueprint'
+        # хранит значения типа [33082] для tier1-чертежей типа 'Taipan Blueprint' (а в SDE ошибка! там указан 33081)
+        self.copying_analysis: typing.Dict[int, ConveyorCopyingProductsAnalysis] = {}
+        # индексируется значениями типа 691 для чертежей типа 'Rifter Blueprint'
+        #  хранит список чертежей типа [11372,11401] для tier1-чертежей типа ['Wolf Blueprint','Jaguar Blueprint']
+        #  а также список продуктов типа [11371,11400] для tier2-продуктов типа ['Wolf','Jaguar']
         self.invent_analysis: typing.Dict[int, ConveyorInventProductsAnalysis] = {}
+        # индексируется значениями типа 42891 для tier1-чертежей типа 'Capital Industrial Core II Blueprint'
+        # хранит значения типа 42890 для tier1-продуктов типа 'Capital Industrial Core II'
         self.manufacturing_analysis: typing.Dict[int, ConveyorManufacturingProductAnalysis] = {}
 
-    def analyse_industry(self,
-                         # данные (справочники)
-                         qid: db.QSwaggerDictionary,
-                         global_dictionary: ConveyorDictionary,
-                         # настройки генерации отчёта
-                         all_possible_conveyors: typing.List[ConveyorSettings],
-                         # настройки текущего конвейера и список чертежей для анализа
-                         settings: ConveyorSettings,
-                         possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint]):
-        self.invent_analysis.clear()
-        self.manufacturing_analysis.clear()
+    def push_into_copying(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки текущего конвейера и список чертежей для анализа
+            invention_conveyor: ConveyorSettings,
+            manufacturing_conveyor: ConveyorSettings,
+            # производственная активность для расчёта
+            activity_tier1: db.QSwaggerBlueprintCopying) -> typing.Optional[ConveyorCopyingProductsAnalysis]:
+        if not activity_tier1: return None
+        copying_analysis: ConveyorCopyingProductsAnalysis = self.copying_analysis.get(activity_tier1.blueprint.type_id)
+        if copying_analysis: return copying_analysis
+        copying_analysis: ConveyorCopyingProductsAnalysis = ConveyorCopyingProductsAnalysis()
+        copying_analysis.analyse_copying(
+            qid,
+            activity_tier1.blueprint,
+            activity_tier1,
+            invention_conveyor,
+            manufacturing_conveyor)
+        if not copying_analysis.product:
+            del copying_analysis
+            return None
+        else:
+            # сохраняем результаты анализа для повторного использования
+            self.__push_into_copying_stage(
+                global_dictionary,
+                activity_tier1.blueprint.type_id,
+                copying_analysis)
+            return copying_analysis
+
+    def __push_into_copying_stage(
+            self,
+            global_dictionary: ConveyorDictionary,
+            type_id: int,
+            copying_analysis: ConveyorCopyingProductsAnalysis) -> None:
+        # сохраняем результаты анализа для повторного использования
+        if not self.copying_analysis.get(type_id):
+            self.copying_analysis[type_id] = copying_analysis
+            if copying_analysis.product.product_tier1:
+                # сохраняем в глобальный справочник идентификатор продукта копирки
+                global_dictionary.load_type_ids({copying_analysis.product.product_tier1.type_id})
+                # пополняем справочник инвентом (через связь уже готового анализа)
+                invent_analysis: ConveyorInventProductsAnalysis = copying_analysis.product.analysis_tier2
+                self.__push_into_invent_stage2(
+                    global_dictionary,
+                    copying_analysis.product.product_tier1.type_id,
+                    invent_analysis)
+
+    def push_into_invent(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки генерации отчёта
+            all_possible_conveyors: typing.List[ConveyorSettings],
+            # настройки текущего конвейера и список чертежей для анализа
+            settings: ConveyorSettings,
+            # производственная активность для расчёта
+            activity_tier1: db.QSwaggerBlueprintInvention) -> typing.Optional[ConveyorInventProductsAnalysis]:
+        if not activity_tier1: return None
+        invent_analysis: ConveyorInventProductsAnalysis = self.invent_analysis.get(activity_tier1.blueprint.type_id)
+        if invent_analysis: return invent_analysis
+        invent_analysis: ConveyorInventProductsAnalysis = ConveyorInventProductsAnalysis()
+        invent_analysis.analyse_invent(
+            qid,
+            settings,
+            all_possible_conveyors,
+            activity_tier1)
+        if not invent_analysis.products:
+            del invent_analysis
+            return None
+        else:
+            # сохраняем результаты анализа для повторного использования
+            self.__push_into_invent_stage2(
+                global_dictionary,
+                activity_tier1.blueprint.type_id,
+                invent_analysis)
+            return invent_analysis
+
+    def __push_into_invent_stage2(
+            self,
+            global_dictionary: ConveyorDictionary,
+            type_id: int,
+            invent_analysis: ConveyorInventProductsAnalysis) -> None:
+        # сохраняем результаты анализа для повторного использования
+        if not self.invent_analysis.get(type_id):
+            self.invent_analysis[type_id] = invent_analysis
+            for ia in invent_analysis.products:
+                if ia.product_tier2 is None: continue
+                # сохраняем в глобальный справочник идентификаторы продуктов инвента
+                global_dictionary.load_type_ids({ia.product_tier2.product_id})
+                # пополняем справочник перепроизводства продуктом инвента (через связь уже готового анализа)
+                manufacturing_analysis: ConveyorManufacturingProductAnalysis = ia.analysis_tier2
+                self.__push_into_manufacturing_stage2(
+                    global_dictionary,
+                    manufacturing_analysis.product.blueprint_tier1.type_id,
+                    manufacturing_analysis)
+
+    def push_into_manufacturing(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки текущего конвейера и список чертежей для анализа
+            settings: ConveyorSettings,
+            # производственная активность для расчёта
+            activity_tier1: db.QSwaggerBlueprintManufacturing) -> typing.Optional[ConveyorManufacturingProductAnalysis]:
+        if not activity_tier1: return None
+        manufacturing_analysis: ConveyorManufacturingProductAnalysis = \
+            self.manufacturing_analysis.get(activity_tier1.blueprint.type_id)
+        if manufacturing_analysis: return manufacturing_analysis
+        manufacturing_analysis: ConveyorManufacturingProductAnalysis = ConveyorManufacturingProductAnalysis()
+        manufacturing_analysis.analyse_manufacturing(
+            qid,
+            activity_tier1.blueprint,
+            activity_tier1,  # можно передать None
+            settings)
+        if not manufacturing_analysis.product:
+            del manufacturing_analysis
+            return None
+        else:
+            # сохраняем разультаты анализа для повторного использования
+            self.__push_into_manufacturing_stage2(
+                global_dictionary,
+                activity_tier1.blueprint.type_id,
+                manufacturing_analysis)
+            return manufacturing_analysis
+
+    def __push_into_manufacturing_stage2(
+            self,
+            global_dictionary: ConveyorDictionary,
+            type_id: int,
+            manufacturing_analysis: ConveyorManufacturingProductAnalysis) -> None:
+        # сохраняем разультаты анализа для повторного использования
+        if not self.manufacturing_analysis.get(type_id):
+            self.manufacturing_analysis[type_id] = manufacturing_analysis
+            if manufacturing_analysis.product.product_tier1:
+                # сохраняем в глобальный справочник идентификаторы продуктов инвента
+                global_dictionary.load_type_ids({manufacturing_analysis.product.product_tier1.product_id})
+
+    def analyse_industry(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки генерации отчёта
+            all_possible_conveyors: typing.List[ConveyorSettings],
+            # настройки текущего конвейера и список чертежей для анализа
+            settings: ConveyorSettings,
+            possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint]):
+        # self.copying_analysis.clear()
+        # self.invent_analysis.clear()
+        # self.manufacturing_analysis.clear()
         if db.QSwaggerActivityCode.INVENTION in settings.activities:
             for b in possible_blueprints:
                 if not b.blueprint_type.invention: continue
-                invent_analysis: ConveyorInventProductsAnalysis = self.invent_analysis.get(b.type_id)
-                if invent_analysis: continue
                 activity_tier1: db.QSwaggerBlueprintInvention = b.blueprint_type.invention
-                invent_analysis: ConveyorInventProductsAnalysis = ConveyorInventProductsAnalysis()
-                invent_analysis.analyse_invent(
+                self.push_into_invent(
                     qid,
-                    settings,
+                    global_dictionary,
                     all_possible_conveyors,
+                    settings,
                     activity_tier1)
-                if not invent_analysis.products:
-                    del invent_analysis
-                else:
-                    # сохраняем разультаты анализа для повторного использования
-                    self.invent_analysis[b.type_id] = invent_analysis
-                    for ia in invent_analysis.products:
-                        if ia.product_tier2 is None: continue
-                        # сохраняем в глобальный справочник идентификаторы продуктов инвента
-                        global_dictionary.load_type_ids({ia.product_tier2.product_id})
         if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
             for b in possible_blueprints:
                 if not b.blueprint_type.manufacturing: continue
-                manufacturing_analysis: ConveyorManufacturingProductAnalysis = self.manufacturing_analysis.get(b.type_id)
-                if manufacturing_analysis: continue
-                manufacturing_analysis: ConveyorManufacturingProductAnalysis = ConveyorManufacturingProductAnalysis()
-                manufacturing_analysis.analyse_manufacturing(
+                activity_tier1: db.QSwaggerBlueprintManufacturing = b.blueprint_type.manufacturing
+                self.push_into_manufacturing(
                     qid,
-                    b.blueprint_type,
-                    b.blueprint_type.manufacturing,  # можно передать None
-                    settings)
-                if not manufacturing_analysis.product:
-                    del manufacturing_analysis
-                else:
-                    # сохраняем разультаты анализа для повторного использования
-                    self.manufacturing_analysis[b.type_id] = manufacturing_analysis
-                    if manufacturing_analysis.product.product_tier1:
-                        # сохраняем в глобальный справочник идентификаторы продуктов инвента
-                        global_dictionary.load_type_ids({manufacturing_analysis.product.product_tier1.product_id})
+                    global_dictionary,
+                    settings,
+                    activity_tier1)
 
     def is_all_variants_overstock(self, type_id: int, settings: ConveyorSettings) -> typing.Optional[bool]:
         all_variants_overstock: typing.Optional[bool] = None
@@ -1683,3 +1918,536 @@ class ConveyorIndustryAnalysis:
                    manufacturing_analysis.product.product_tier1:
                     all_variants_overstock = manufacturing_analysis.product.product_tier1_overstock
         return all_variants_overstock
+
+
+class ConveyorDemands:
+    class Corrected:
+        def __init__(self, requirement: db.QSwaggerConveyorRequirement):
+            self.requirement = db.QSwaggerConveyorRequirement = requirement
+            self.analysis_tier1: typing.Optional[ConveyorManufacturingAnalysis] = None
+            self.analysis_tier2: typing.Optional[ConveyorInventAnalysis] = None
+            self.analysis_tier3: typing.Optional[ConveyorCopyingAnalysis] = None
+
+    def __init__(self,
+                 # данные (справочники)
+                 qid: db.QSwaggerDictionary,
+                 global_dictionary: ConveyorDictionary,
+                 # настройки генерации отчёта
+                 all_possible_conveyors: typing.List[ConveyorSettings],
+                 # анализ чертежей на предмет перепроизводства
+                 industry_analysis: ConveyorIndustryAnalysis,
+                 # настройки генерации отчёта
+                 manufacturing_conveyor: ConveyorSettings,
+                 invention_conveyor: ConveyorSettings):  # rest_threshold: typing.Optional[float] = None
+        self.conveyor_requirements: typing.List[ConveyorDemands.Corrected] = \
+            [ConveyorDemands.Corrected(_) for _ in qid.conveyor_requirements.values()]
+        # пересчёт потребностей конвейера с учётом данных об анализе перепроизводства
+        self.recalc(
+            qid,
+            global_dictionary,
+            all_possible_conveyors,
+            industry_analysis,
+            manufacturing_conveyor,
+            invention_conveyor)
+        # ---
+        self.ordered_demand: typing.List[ConveyorDemands.Corrected] = \
+            [_ for _ in self.conveyor_requirements if _.requirement.rest_percent < 1.0]
+        self.ordered_overstock: typing.List[ConveyorDemands.Corrected] = \
+            [_ for _ in self.conveyor_requirements if _.requirement.rest_percent >= 1.0]
+        self.ordered_demand.sort(key=lambda x: x.requirement.rest_percent)
+        self.ordered_overstock.sort(key=lambda x: x.requirement.rest_percent, reverse=True)
+
+    def recalc(self,
+               # данные (справочники)
+               qid: db.QSwaggerDictionary,
+               global_dictionary: ConveyorDictionary,
+               # настройки генерации отчёта
+               all_possible_conveyors: typing.List[ConveyorSettings],
+               # анализ чертежей на предмет перепроизводства
+               industry_analysis: ConveyorIndustryAnalysis,
+               # настройки генерации отчёта
+               manufacturing_conveyor: ConveyorSettings,
+               invention_conveyor: ConveyorSettings) -> None:
+        for r in self.conveyor_requirements:
+            methods_1tier: typing.Optional[typing.List[db.QSwaggerActivity]] = \
+                qid.get_activities_by_product(r.requirement.type_id)
+            if not methods_1tier: continue
+            # проверка, можно ли произвести данный вид продукции?
+            manufacturing_activity_1tier: typing.Optional[db.QSwaggerBlueprintManufacturing] = \
+                next((_ for _ in methods_1tier if _.code == db.QSwaggerActivityCode.MANUFACTURING), None)
+            if not manufacturing_activity_1tier: continue
+            # проверка, надо ли инвентить этот чертёж?
+            if invention_conveyor:
+                methods_2tier: typing.Optional[typing.List[db.QSwaggerActivity]] = \
+                    qid.get_activities_by_product(manufacturing_activity_1tier.blueprint.type_id)
+                if methods_2tier:
+                    invent_activity_2tier: typing.Optional[db.QSwaggerBlueprintInvention] = \
+                        next((_ for _ in methods_2tier if _.code == db.QSwaggerActivityCode.INVENTION), None)
+                    if invent_activity_2tier:
+                        # проверка, можно ли копировать этот чертёж?
+                        # TODO: проверить, что у нас имеются оригиналы этого типа чертежа?
+                        methods_3tier: typing.Optional[typing.List[db.QSwaggerActivity]] = \
+                            qid.get_activities_by_product(invent_activity_2tier.blueprint.type_id)
+                        if methods_3tier:
+                            copying_activity_3tier: typing.Optional[db.QSwaggerBlueprintCopying] = \
+                                next((_ for _ in methods_3tier if _.code == db.QSwaggerActivityCode.COPYING), None)
+                            if copying_activity_3tier:
+                                r.analysis_tier3 = self.produce_analysis_tier3(
+                                    qid,
+                                    global_dictionary,
+                                    manufacturing_conveyor,
+                                    invention_conveyor,
+                                    industry_analysis,
+                                    copying_activity_3tier)
+                        r.analysis_tier2 = self.produce_analysis_tier2(
+                            qid,
+                            global_dictionary,
+                            all_possible_conveyors,
+                            invention_conveyor,
+                            industry_analysis,
+                            r.requirement.type_id,
+                            invent_activity_2tier)
+            if not r.analysis_tier2:
+                r.analysis_tier1 = self.produce_analysis_tier1(
+                    qid,
+                    global_dictionary,
+                    manufacturing_conveyor,
+                    industry_analysis,
+                    manufacturing_activity_1tier)
+
+            if r.analysis_tier2:
+                r.requirement.recalc_rest_percent(r.analysis_tier2.num_ready, r.analysis_tier2.num_prepared)
+            elif r.analysis_tier1:
+                r.requirement.recalc_rest_percent(r.analysis_tier1.num_ready)
+
+    @staticmethod
+    def produce_analysis_tier3(
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки генерации отчёта
+            manufacturing_conveyor: ConveyorSettings,
+            invention_conveyor: ConveyorSettings,
+            # анализ чертежей на предмет перепроизводства
+            industry_analysis: ConveyorIndustryAnalysis,
+            # данные для расчёта
+            copying_activity_3tier: db.QSwaggerBlueprintCopying) -> \
+            typing.Optional[ConveyorCopyingAnalysis]:
+        # поиск готового расчёта
+        ca: typing.Optional[ConveyorCopyingProductsAnalysis] = \
+            industry_analysis.copying_analysis.get(copying_activity_3tier.blueprint.type_id)
+        # проверка, что расчёт корректен
+        if ca and ca.product and ca.product.product_tier1:
+            return ca.product
+        else:
+            # анализируем чертежи на предмет перепроизводства
+            ca: typing.Optional[ConveyorCopyingProductsAnalysis] = \
+                industry_analysis.push_into_copying(
+                    qid,
+                    global_dictionary,
+                    invention_conveyor,
+                    manufacturing_conveyor,
+                    copying_activity_3tier)
+            if ca and ca.product and ca.product.product_tier1:
+                return ca.product
+        return None
+
+    @staticmethod
+    def produce_analysis_tier2(
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки генерации отчёта
+            all_possible_conveyors: typing.List[ConveyorSettings],
+            invention_conveyor: ConveyorSettings,
+            # анализ чертежей на предмет перепроизводства
+            industry_analysis: ConveyorIndustryAnalysis,
+            # данные для расчёта
+            product_type_id: int,
+            invent_activity_2tier: db.QSwaggerBlueprintInvention) -> \
+            typing.Optional[ConveyorInventAnalysis]:
+        # поиск готового расчёта
+        ia: typing.Optional[ConveyorInventProductsAnalysis] = \
+            industry_analysis.invent_analysis.get(invent_activity_2tier.blueprint.type_id)
+        if ia:
+            if len(ia.products) == 1:
+                return ia.products[0]
+            else:
+                for iaN in ia.products:
+                    if iaN.product_tier2 is None: continue
+                    if iaN.product_tier2.product_id != product_type_id: continue
+                    return iaN
+        else:
+            # анализируем чертежи на предмет перепроизводства
+            ia: typing.Optional[ConveyorInventProductsAnalysis] = \
+                industry_analysis.push_into_invent(
+                    qid,
+                    global_dictionary,
+                    all_possible_conveyors,
+                    invention_conveyor,
+                    invent_activity_2tier)
+            if ia:
+                if len(ia.products) == 1:
+                    return ia.products[0]
+                else:
+                    for iaN in ia.products:
+                        if iaN.product_tier2 is None: continue
+                        if iaN.product_tier2.product_id != product_type_id: continue
+                        return iaN
+        return None
+
+    @staticmethod
+    def produce_analysis_tier1(
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # настройки генерации отчёта
+            manufacturing_conveyor: ConveyorSettings,
+            # анализ чертежей на предмет перепроизводства
+            industry_analysis: ConveyorIndustryAnalysis,
+            # данные для рассчёта
+            manufacturing_activity_1tier: db.QSwaggerBlueprintManufacturing) -> \
+            typing.Optional[ConveyorManufacturingAnalysis]:
+        # поиск готового расчёта
+        ma: typing.Optional[ConveyorManufacturingProductAnalysis] = \
+            industry_analysis.manufacturing_analysis.get(manufacturing_activity_1tier.blueprint.type_id)
+        # проверка, что расчёт корректен
+        if ma and ma.product and ma.product.product_tier1:
+            return ma.product
+        else:
+            # анализируем чертежи на предмет перепроизводства
+            ma: typing.Optional[ConveyorManufacturingProductAnalysis] = \
+                industry_analysis.push_into_manufacturing(
+                    qid,
+                    global_dictionary,
+                    manufacturing_conveyor,
+                    manufacturing_activity_1tier)
+            if ma and ma.product and ma.product.product_tier1:
+                return ma.product
+        return None
+
+
+class ConveyorCalculations:
+    class NthPriority:
+        def __init__(self, corporation: db.QSwaggerCorporation):
+            self.corporation: db.QSwaggerCorporation = corporation
+            self.corp_containers: typing.List[ConveyorSettingsPriorityContainer] = []
+            # список контейнеров с чертежами для производства
+            self.containers: typing.List[ConveyorSettingsPriorityContainer] = []
+            self.container_ids: typing.Set[int] = set()
+            # список чертежей, находящихся в этих контейнерах
+            self.blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            # текущие работы (запущенные из этих контейнеров)
+            self.active_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
+            # отсев чертежей находящихся в завершённых работах
+            self.completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
+            # список тех чертежей, запуск которых невозможен
+            self.active_blueprint_ids: typing.Set[int] = set()
+            # чертежи, которые не подходят к текущей activity конвейера
+            self.possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            self.lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
+            # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
+            # чертежа тоже нет, ...вот такие фантомные чертежи мешаются в процессе расчётов (фильтрую чертежи более
+            # актуальными ассетами)
+            self.phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            self.phantom_blueprint_ids: typing.Set[int] = set()
+            # список потенциально-задействованных в текущем конвейере материалов (по типу производства)
+            self.involved_materials: typing.Set[int] = set()
+            #  список "залётных" предметов (материалов и продуктов), которые упали не в ту коробку
+            self.lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
+            #
+            # следующие поля валидны и рассчитаны для чертежей из списка [possible_blueprints]
+            #
+            # материалы, и потребности конвейера (для чертежей, запуск которых возможен)
+            self.stock_materials: typing.Optional[ConveyorCorporationStockMaterials] = None
+            self.requirements: typing.Optional[typing.List[ConveyorMaterialRequirements.StackOfBlueprints]] = None
+
+        def calc_stage1(
+                self,
+                # данные (справочники)
+                qid: db.QSwaggerDictionary,
+                global_dictionary: ConveyorDictionary,
+                # анализ чертежей на предмет перепроизводства
+                industry_analysis: ConveyorIndustryAnalysis,
+                # настройки генерации отчёта
+                settings: ConveyorSettings,
+                router_settings: typing.List[RouterSettings],
+                all_possible_conveyors: typing.List[ConveyorSettings],
+                # список доступных материалов в стоках конвейеров
+                available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]):
+            # инициализируем интервал отсеивания фантомных чертежей из списка corporation blueprints
+            phantom_timedelta = datetime.timedelta(hours=3)
+
+            # получаем список контейнеров с чертежами для производства
+            self.container_ids: typing.Set[int] = set([_.container_id for _ in self.corp_containers])
+            # получаем список чертежей, находящихся в этих контейнерах
+            self.blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                [b for b in self.corporation.blueprints.values() if b.location_id in self.container_ids]
+            # проверяем текущие работы (запущенные из этих контейнеров),
+            # если чертёж находится в активных работах, то им пользоваться нельзя
+            self.active_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [j for j in self.corporation.industry_jobs_active.values()
+                 if j.blueprint_location_id in self.container_ids]
+            # также, если чертёж находится в завершённых работах, то им тоже пользоваться нельзя
+            self.completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = \
+                [j for j in self.corporation.industry_jobs_completed.values() if
+                 j.blueprint_location_id in self.container_ids]
+            # составляем новый (уменьшенный) список тех чертежей, запуск которых невозможен
+            self.active_blueprint_ids: typing.Set[int] = \
+                set([j.blueprint_id for j in self.active_jobs])
+            # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
+            global_dictionary.load_type_ids(set([_.type_id for _ in self.blueprints]))
+            global_dictionary.load_type_ids(set([_.blueprint_type_id for _ in self.active_jobs]))
+            global_dictionary.load_type_ids(set([_.product_type_id for _ in self.active_jobs]))
+            global_dictionary.load_type_ids(set([_.blueprint_type_id for _ in self.completed_jobs]))
+            global_dictionary.load_type_ids(set([_.product_type_id for _ in self.completed_jobs]))
+            # отсеиваем те чертежи, которые не подходят к текущей activity конвейера
+            self.possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            self.lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            for b in self.blueprints:
+                possible: bool = False
+                lost: bool = False
+                for _a in settings.activities:
+                    a: db.QSwaggerActivityCode = _a
+                    # проверка, что в коробку research не попали копии
+                    if b.is_copy and a in (db.QSwaggerActivityCode.COPYING,
+                                           db.QSwaggerActivityCode.RESEARCH_TIME,
+                                           db.QSwaggerActivityCode.RESEARCH_MATERIAL):
+                        lost, possible = True, False
+                        break
+                    # проверка, что в коробку invent не попали оригиналы
+                    if b.is_original and a == db.QSwaggerActivityCode.INVENTION:
+                        lost, possible = True, False
+                        break
+                    # проверка, что чертёж имеет смысл исследовать
+                    if a in (db.QSwaggerActivityCode.RESEARCH_TIME,
+                             db.QSwaggerActivityCode.RESEARCH_MATERIAL):
+                        if b.time_efficiency == 20 and b.material_efficiency == 10:
+                            lost, possible = True, False
+                            break
+                    # проверка, что в БД есть сведения о чертеже
+                    if b.blueprint_type is None:
+                        lost, possible = True, False
+                        break
+                    # проверка, что чертёж можно запускать в работу с выбранной activity
+                    activity = b.blueprint_type.get_activity(activity_id=a.to_int())
+                    if activity:
+                        if b.item_id not in self.active_blueprint_ids:
+                            possible = True
+                    else:
+                        lost = True
+                if possible:
+                    self.possible_blueprints.append(b)
+                elif lost:
+                    self.lost_blueprints.append(b)
+            # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
+            # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
+            # чертежа тоже нет, ...вот такие фантомные чертежи мешаются в процессе расчётов (фильтрую чертежи более
+            # актуальными ассетами)
+            self.phantom_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            if self.possible_blueprints:
+                # внимание! для поиска фантомных чертежей ассеты должны загружаться вместе с чертежами, т.е.
+                # при загрузке ассетов надо использовать флаг load_asseted_blueprints=True
+                self.phantom_blueprint_ids: typing.Set[int] = set()
+                for p in self.possible_blueprints:
+                    a: db.QSwaggerCorporationAssetsItem = self.corporation.assets.get(p.item_id)
+                    if a is not None: continue
+                    # если в ассетах чертежа нет, то это плохой признак
+                    # надо решать дилемму: чертежа уже нет, или всё ещё нет?
+                    b: db.QSwaggerCorporationBlueprint = self.corporation.blueprints.get(p.item_id)
+                    if (b.updated_at + phantom_timedelta) < qid.eve_now:
+                        self.phantom_blueprint_ids.add(b.item_id)
+                        self.phantom_blueprints.append(b)
+                # корректируем список возможных к постройке чертежей (вычитаем фантомные)
+                if self.phantom_blueprint_ids:
+                    self.possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                        [b for b in self.possible_blueprints if b.item_id not in self.phantom_blueprint_ids]
+            # составляем список "залётных" чертежей, которые упали не в ту коробку
+            if self.lost_blueprints:
+                self.lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = \
+                    [b for b in self.lost_blueprints if b.item_id not in self.active_blueprint_ids]
+            # составляем список потенциально-задействованных в текущем конвейере материалов (по типу производства)
+            self.involved_materials = set(
+                itertools.chain.from_iterable([global_dictionary.involved_materials[_] for _ in settings.activities]))
+            # надо придумать как от избавиться от костыля (в коробке с инвентом хранятся ассеты для копирки)
+            if db.QSwaggerActivityCode.INVENTION in settings.activities:
+                self.involved_materials |= global_dictionary.involved_materials[db.QSwaggerActivityCode.COPYING]
+            # составляем список "залётных" предметов (материалов и продуктов), которые упали не в ту коробку
+            self.lost_asset_items: typing.List[db.QSwaggerCorporationAssetsItem] = []
+            for _a in self.corporation.assets.values():
+                a: db.QSwaggerCorporationAssetsItem = _a
+                if a.location_id not in self.container_ids: continue
+                # проверка справочника категорий/групп, к которым относятся чертежи
+                if a.item_type.group and a.item_type.group.category_id == 9: continue  # 9 = Blueprints
+                # не всякий чертёж есть в blueprints (м.б. только в assets), т.ч. проверяем цепочку market_groups
+                if settings.same_stock_container:
+                    # в случае, если коробка является стоком, то в ней разрешено держать все возможные предметы,
+                    # соответствующие текущей activity
+                    if a.type_id in self.involved_materials:
+                        continue
+                    elif db.QSwaggerActivityCode.INVENTION in settings.activities:
+                        if a.item_type.group_id == 1304:  # 1304 = Generic Decryptor
+                            continue
+                # если коробка не является стоком, то в ней ничего не должно валяться, кроме чертежей
+                # (конвейер не свалка, д.б. порядок)
+                self.lost_asset_items.append(a)
+            # расчёт кол-ва материалов, и потребностей конвейера (для чертежей, запуск которых возможен)
+            if self.possible_blueprints:
+                # анализируем чертежи на предмет перепроизводства (список possible чертежей не сокращаем)
+                industry_analysis.analyse_industry(
+                    qid,
+                    global_dictionary,
+                    all_possible_conveyors,
+                    settings,
+                    self.possible_blueprints)
+                # получаем количество материалов в стоке выбранного конвейера
+                self.stock_materials: ConveyorCorporationStockMaterials = available_materials.get(settings)
+                # считаем потребности конвейера
+                self.requirements: typing.List[ConveyorMaterialRequirements.StackOfBlueprints] = \
+                    calc_corp_conveyor(
+                        # данные (справочники)
+                        qid,
+                        # настройки генерации отчёта
+                        router_settings,
+                        settings,
+                        # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
+                        self.stock_materials,
+                        # список чертежей, которые необходимо обработать
+                        self.possible_blueprints)
+                # сохраняем в глобальный справочник идентификаторы предметов для работы с ними динамическим образом
+                global_dictionary.load_requirements(self.requirements)
+
+    class Prioritized:
+        def __init__(self, corporation: db.QSwaggerCorporation, conveyor_settings: ConveyorSettings):
+            self.conveyor_settings: ConveyorSettings = conveyor_settings
+            self.data: ConveyorCalculations.NthPriority = ConveyorCalculations.NthPriority(corporation)
+
+    def __init__(self):
+        # инициализируем основные дескрипторы для расчётов
+        self.corporation: typing.Optional[db.QSwaggerCorporation] = None
+        # контейнеры, сгруппированные по приоритетам
+        self.prioritized: typing.Dict[int, typing.Dict[ConveyorSettings, ConveyorCalculations.Prioritized]] = {}
+
+    def calc_corp_conveyors(
+            self,
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            global_dictionary: ConveyorDictionary,
+            # анализ чертежей на предмет перепроизводства
+            industry_analysis: ConveyorIndustryAnalysis,
+            # настройки генерации отчёта
+            router_settings: typing.List[RouterSettings],
+            conveyor_settings: typing.List[ConveyorSettings],
+            # список доступных материалов в стоках конвейеров
+            available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]) -> None:
+        # проверка, пусты ли настройки конвейера?
+        if len(conveyor_settings) == 0: return
+
+        # проверка, принадлежат ли настройки конвейера лишь одной корпорации?
+        # если нет, то... надо добавить здесь какой-то сворачиваемый список?
+        corporations: typing.Set[int] = set([s.corporation.corporation_id for s in conveyor_settings])
+        if not len(corporations) == 1:
+            raise Exception("Unsupported mode: multiple corporations in a single conveyor")
+        # получаем ссылку на единственную корпорацию
+        self.corporation: db.QSwaggerCorporation = conveyor_settings[0].corporation
+
+        # группируем контейнеры по приоритетам
+        self.prioritized: typing.Dict[int, typing.Dict[ConveyorSettings, ConveyorCalculations.Prioritized]] = {}
+        for s in conveyor_settings:
+            for container in s.containers_sources:
+                p0: typing.Optional[typing.Dict[ConveyorSettings, ConveyorCalculations.Prioritized]] = \
+                    self.prioritized.get(container.priority)
+                if not p0:
+                    self.prioritized[container.priority] = {}
+                    p0: typing.Optional[typing.Dict[ConveyorSettings, ConveyorCalculations.Prioritized]] = \
+                        self.prioritized.get(container.priority)
+                p1: typing.Optional[ConveyorCalculations.Prioritized] = p0.get(s)
+                if not p1:
+                    p1: ConveyorCalculations.Prioritized = ConveyorCalculations.Prioritized(self.corporation, s)
+                    p0[s] = p1
+                p1.data.corp_containers.append(container)
+
+        # перебираем сгруппированные преоритизированные группы
+        for priority in sorted(self.prioritized.keys()):
+            p0 = self.prioritized.get(priority)
+            for p1 in p0.values():
+                p1.data.calc_stage1(
+                    qid,
+                    global_dictionary,
+                    industry_analysis,
+                    p1.conveyor_settings,
+                    router_settings,
+                    conveyor_settings,
+                    available_materials)
+
+
+# ConveyorDictionary - долговременный справочник материалов конвейера, хранится долго и накапливает информацию из
+# экземпляров QSwaggerTypeId
+class ConveyorDictionary:
+    def __init__(self, qid: db.QSwaggerDictionary):
+        # сохраняем ссылку на ПОЛНЫЙ справочник загруженный из БД
+        self.qid: db.QSwaggerDictionary = qid
+        # подготовка списка-справочника, который будет хранить идентификаторы всех продуктов, используемых конвейером
+        self.materials: typing.Set[int] = set()
+        # подготовка списка-справочника, который будет хранить используемые материалы в различных activity (скопом)
+        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {}
+        self._fill_involved_materials()
+
+    def __del__(self):
+        # уничтожаем свой список-справочник, остальные (не наши) не трогаем
+        del self.materials
+
+    def _fill_involved_materials(self):
+        self.involved_materials: typing.Dict[db.QSwaggerActivityCode, typing.Set[int]] = {
+            db.QSwaggerActivityCode.MANUFACTURING: set(),
+            db.QSwaggerActivityCode.INVENTION: set(),
+            db.QSwaggerActivityCode.COPYING: set(),
+            db.QSwaggerActivityCode.RESEARCH_MATERIAL: set(),
+            db.QSwaggerActivityCode.RESEARCH_TIME: set(),
+            db.QSwaggerActivityCode.REACTION: set()
+        }
+        for by_products in self.qid.sde_activities.values():
+            for activity in by_products:
+                ids: typing.Set[int] = set([_.material_id for _ in activity.materials.materials])
+                if isinstance(activity, db.QSwaggerBlueprintManufacturing):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.MANUFACTURING
+                elif isinstance(activity, db.QSwaggerBlueprintInvention):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.INVENTION
+                elif isinstance(activity, db.QSwaggerBlueprintCopying):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.COPYING
+                elif isinstance(activity, db.QSwaggerBlueprintResearchMaterial):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_MATERIAL
+                elif isinstance(activity, db.QSwaggerBlueprintResearchTime):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.RESEARCH_TIME
+                elif isinstance(activity, db.QSwaggerBlueprintReaction):
+                    a: db.QSwaggerActivityCode = db.QSwaggerActivityCode.REACTION
+                else:
+                    raise Exception("Unknown type of activity")
+                involved: typing.Set[int] = self.involved_materials.get(a)
+                involved.update(ids)
+
+    def load_router_settings(self, router_settings: typing.List[RouterSettings]) -> None:
+        for r in router_settings:
+            self.materials = self.materials | set(r.output)
+
+    def load_type_ids(self, type_ids: typing.Set[int]):
+        self.materials = self.materials | set(type_ids)
+
+    def load_available_materials(self, available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]):
+        for stocks in available_materials.values():
+            for materials in stocks.stock_materials.values():
+                self.load_type_ids(materials.keys())
+
+    def load_ready_products(self, ready_products: typing.Dict[RouterSettings, ConveyorCorporationOutputProducts]):
+        for products in ready_products.values():
+            self.load_type_ids(products.output_products.keys())
+            self.load_type_ids(products.lost_products.keys())
+
+    def load_requirements(self, requirements: typing.List[ConveyorMaterialRequirements.StackOfBlueprints]):
+        for stack in requirements:
+            for materials in stack.required_materials_for_single.values():
+                self.load_type_ids(set([_.material_id for _ in materials]))
+
+    def load_demands(self, demands: ConveyorDemands):
+        self.load_type_ids(set([_.requirement.type_id for _ in demands.conveyor_requirements]))

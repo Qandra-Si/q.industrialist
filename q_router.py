@@ -74,6 +74,7 @@ def main():
         qid.load_corporation_stations(corporation)
     # загрузка настроек работы конвейера (редактируются online через php_interface)
     qid.load_conveyor_limits()
+    qid.load_conveyor_requirements()
     # загрузка информации об обновлении сведений в БД для загруженных корпораций
     qid.load_lifetime(list(qid.corporations.keys()))
     # загружаем сведения о станциях, которые есть в настройках маршрутизатора
@@ -228,9 +229,7 @@ def main():
                     behavior_market = conveyor['behavior'].get('market')
                     if behavior_market:
                         # пропускаем некорректные настройки (просто правильность синтаксиса настроек)
-                        trade_corporation_names: typing.List[str] = behavior_market.get('corporations')
-                        if not trade_corporation_names:
-                            continue
+                        trade_corporation_names: typing.List[str] = behavior_market.get('corporations', [])
                         # поиск корпорации, которая торгует (видимо в Jita? но это не обязательно)
                         for trade_corporation_name in trade_corporation_names:
                             trade_corporation: db.QSwaggerCorporation = qid.get_corporation_by_name(trade_corporation_name)
@@ -250,6 +249,11 @@ def main():
                                 if 1 == next((1 for tmplt in behavior_market['exclude_overstock'] if re.search(tmplt, container_name)), None):
                                     cssc = tools.ConveyorSettingsSaleContainer(settings, trade_corporation, container)
                                     settings.containers_sale_stocks.append(cssc)
+                    # параметры поведения конвейера (расчёт копирки)
+                    behavior_requirements = conveyor['behavior'].get('requirements')
+                    if behavior_requirements:
+                        settings.calculate_requirements = behavior_requirements.get('calculate', False)
+                        settings.requirements_sold_threshold = behavior_requirements.get('sold_threshold', 0.2)
                 # сохраняем полученные настройки, обрабатывать будем потом
                 settings_of_conveyors.append(settings)
 

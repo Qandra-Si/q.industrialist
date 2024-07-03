@@ -14,6 +14,7 @@ class QSwaggerDictionary:
         self.eve_now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
         self.sde_lifetime: typing.Dict[typing.Tuple[str, int], datetime.datetime] = {}  # what:corporation_id
         self.conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]] = {}
+        self.conveyor_requirements: typing.Dict[int, QSwaggerConveyorRequirement] = {}
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
         self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
@@ -39,6 +40,7 @@ class QSwaggerDictionary:
         del self.sde_groups
         del self.sde_categories
         del self.sde_market_groups
+        del self.conveyor_requirements
         del self.conveyor_limits
         del self.sde_lifetime
 
@@ -416,3 +418,15 @@ class QSwaggerDictionary:
             self.corporations,
             self.stations)
         return self.conveyor_limits
+
+    def load_conveyor_requirements(self) -> typing.Dict[int, QSwaggerConveyorRequirement]:
+        if self.conveyor_requirements:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load conveyor requirements twice")
+        if not self.sde_type_ids:  # загружайте предметы
+            raise Exception("You should load type ids and conveyor limits first")
+        self.conveyor_requirements = self.__qit.get_conveyor_requirements(
+            # справочники
+            self.sde_type_ids,
+            self.conveyor_limits)
+        return self.conveyor_requirements

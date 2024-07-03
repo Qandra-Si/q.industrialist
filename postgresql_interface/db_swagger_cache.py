@@ -290,6 +290,22 @@ class QSwaggerActivityCode(Enum):
         else:
             raise Exception('Unknown activity label')
 
+    @staticmethod
+    def from_code(code: int):
+        if code == 1:
+            return QSwaggerActivityCode.MANUFACTURING
+        elif code == 8:
+            return QSwaggerActivityCode.INVENTION
+        elif code == 5:
+            return QSwaggerActivityCode.COPYING
+        elif code == 4:
+            return QSwaggerActivityCode.RESEARCH_MATERIAL
+        elif code == 3:
+            return QSwaggerActivityCode.RESEARCH_TIME
+        elif code == 9:
+            return QSwaggerActivityCode.REACTION
+        else:
+            raise Exception('Unknown activity code')
 
 def get_activities_by_nums(codes: typing.List[int]) -> typing.List[QSwaggerActivityCode]:
     res: typing.List[QSwaggerActivityCode] = list()
@@ -778,7 +794,7 @@ class QSwaggerCorporationIndustryJob:
         self.__facility_id: int = row[2]
         self.__facility: typing.Optional[QSwaggerStation] = facility
         # self.__location_id: int = row[?] # бесполезно, аналогично facility_id
-        self.__activity_id: int = row[3]
+        self.__activity: QSwaggerActivityCode = QSwaggerActivityCode.from_code(row[3])
         self.__blueprint_id: int = row[4]
         self.__blueprint: typing.Optional[QSwaggerCorporationBlueprint] = blueprint
         self.__blueprint_type_id: int = row[5]
@@ -816,8 +832,8 @@ class QSwaggerCorporationIndustryJob:
         return self.__facility
 
     @property
-    def activity_id(self) -> int:
-        return self.__activity_id
+    def activity(self) -> QSwaggerActivityCode:
+        return self.__activity
 
     @property
     def blueprint_id(self) -> int:
@@ -1032,3 +1048,61 @@ class QSwaggerConveyorLimit:
     @property
     def approximate(self) -> int:
         return self.__approximate
+
+
+class QSwaggerConveyorRequirement:
+    def __init__(self,
+                 item_type: typing.Optional[QSwaggerTypeId],
+                 conveyor_limit: typing.List[QSwaggerConveyorLimit],
+                 row):
+        self.__type_id: int = row[0]
+        self.__type: typing.Optional[QSwaggerTypeId] = item_type
+        self.__conveyor_limit: typing.Optional[typing.List[QSwaggerConveyorLimit]] = conveyor_limit
+        self.__limit: int = row[1]
+        self.__trade_remain: int = row[2] if row[2] else 0
+        self.__required: int = self.__limit - self.__trade_remain
+        self.__rest_percent: float = row[3]
+        self.__num_ready: int = 0
+        self.__num_prepared: int = 0
+        # self.recalc_rest_percent()
+
+    def recalc_rest_percent(self, num_ready: int, num_prepared: int = 0):
+        self.__num_ready: int = num_ready
+        self.__num_prepared: int = num_prepared
+        self.__rest_percent: float = (self.__num_ready + self.num_prepared) / self.__limit
+
+    @property
+    def type_id(self) -> int:
+        return self.__type_id
+
+    @property
+    def type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__type
+
+    @property
+    def conveyor_limit(self) -> typing.Optional[typing.List[QSwaggerConveyorLimit]]:
+        return self.__conveyor_limit
+
+    @property
+    def limit(self) -> int:
+        return self.__limit
+
+    @property
+    def trade_remain(self) -> int:
+        return self.__trade_remain
+
+    @property
+    def required(self) -> int:
+        return self.__required
+
+    @property
+    def num_ready(self) -> int:
+        return self.__num_ready
+
+    @property
+    def num_prepared(self) -> int:
+        return self.__num_prepared
+
+    @property
+    def rest_percent(self) -> float:
+        return self.__rest_percent
