@@ -867,13 +867,38 @@ def dump_nav_menu_demand_dialog(
                     copying: typing.Optional[db.QSwaggerBlueprintCopying] = product.analysis_tier3.activity_tier1
                     invention: typing.Optional[db.QSwaggerBlueprintInvention] = product.analysis_tier2.activity_tier1
                     if copied_bpc and copying and invention:
-                        invented_bpc: typing.Optional[db.QSwaggerInventionProduct] = next((_ for _ in invention.products
+                        invented_product: typing.Optional[db.QSwaggerInventionProduct] = next((_ for _ in invention.products
                             if _.product_id==product.analysis_tier2.analysis_tier2.product.blueprint_tier1.type_id), None)
-                        if invented_bpc:
+                        invented_bpc = product.analysis_tier2.activity_tier2.blueprint
+                        if invented_product and invented_bpc:
+                            decryptor_probability: float = 0.0
+                            decryptor_runs: int = 0
+                            decryptor_time: float = 0.0
+
+                            market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
+                                invented_bpc.blueprint_type,
+                                {204, 943, 1909})
+                            if market_group:
+                                if market_group.group_id == 204:  # Ships
+                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34201)  # Accelerant Decryptor
+                                    decryptor_probability: float = 0.2  # +20% вероятность успеха
+                                    decryptor_runs: int = 1  # +1 число прогонов проекта
+                                    decryptor_time: float = 0.1  # TODO: доделать +8% экономия времени производства
+                                elif market_group.group_id == 943:  # Ship Modifications
+                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34206)  # Symmetry Decryptor
+                                    decryptor_probability: float = 0.0  # вероятность успеха не меняется
+                                    decryptor_runs: int = 2  # +2 число прогонов проекта
+                                    decryptor_time: float = 0.08  # TODO: доделать +8% экономия времени производства
+                                elif market_group.group_id == 1909:  # Ancient Relics
+                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34204)  # Parity Decryptor
+                                    decryptor_probability: float = 0.5  # +50% вероятность успеха
+                                    decryptor_runs: int = 3  # +3 число прогонов проекта
+                                    decryptor_time: float = -0.02  # TODO: доделать -2% экономия времени производства
+
                             # считаем длительность инвента одной копии с одним прогоном
                             # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
                             single_invent_copy_run: float = ((invention.time * (1-0.3)) * (1-0.15))
-                            # считаем кол-во прогонов копий чертежй, которые необходимо выбрать при копирке
+                            # считаем кол-во прогонов копий чертежей, которые необходимо выбрать при копирке
                             # (относительно 2х суток)
                             num_copies_runs: int = math.ceil(172800 / single_invent_copy_run)
                             # считаем длительность копирки одной копии с N прогонами
@@ -882,7 +907,9 @@ def dump_nav_menu_demand_dialog(
                             # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
                             # T2-продукции, которая может быть получена из копий с N прогонами:
                             # 30% навыки и импланты
-                            probable_t2_products: float = (num_copies_runs * invented_bpc.quantity * (1-invented_bpc.probability)) * (1-0.3)
+                            # если используются декрипторы, то учитываем их как дополнительные файлы данных
+                            probable_t2_products: float = \
+                                ((num_copies_runs * (invented_product.quantity + decryptor_runs) * (1.0-invented_product.probability)) * (1.0-decryptor_probability)) * (1.0-0.3)
                             # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
                             # на производство), то считаем количество копий чртежей/штук по N прогонов
                             num_copies_by_n_runs: int = math.ceil(product.requirement.limit / probable_t2_products)
