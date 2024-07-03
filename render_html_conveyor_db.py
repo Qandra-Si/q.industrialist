@@ -857,35 +857,39 @@ def dump_nav_menu_demand_dialog(
 
                 invent_plan: str = ''
 
-                if product.analysis_tier2 and product.analysis_tier3:
-                    if not num_prepared and \
-                       not product.analysis_tier3.product_tier1_num_in_copy_runs and \
-                       not product.analysis_tier3.product_tier1_num_in_jobs:
-                        copied_bpc: db.QSwaggerBlueprint = product.analysis_tier3.product_tier1
-                        copying: typing.Optional[db.QSwaggerBlueprintCopying] = product.analysis_tier3.activity_tier1
-                        invention: typing.Optional[db.QSwaggerBlueprintInvention] = product.analysis_tier2.activity_tier1
-                        if copied_bpc and copying and invention:
-                            invented_bpc: typing.Optional[db.QSwaggerInventionProduct] = next((_ for _ in invention.products
-                                if _.product_id==product.analysis_tier2.analysis_tier2.product.blueprint_tier1.type_id), None)
-                            if invented_bpc:
-                                # считаем длительность инвента одной копии с одним прогоном
-                                # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
-                                single_invent_copy_run: float = ((invention.time * (1-0.3)) * (1-0.15))
-                                # считаем кол-во прогонов копий чертежй, которые необходимо выбрать при копирке
-                                # (относительно 2х суток)
-                                num_copies_runs: int = math.ceil(172800 / single_invent_copy_run)
-                                # считаем длительность копирки одной копии с N прогонами
-                                # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
-                                n_run_copy_duration: float = (num_copies_runs * copying.time * (1-0.3)) * (1-0.363)
-                                # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
-                                # T2-продукции, которая может быть получена из копий с N прогонами:
-                                # 30% навыки и импланты
-                                probable_t2_products: float = (num_copies_runs * invented_bpc.quantity * (1-invented_bpc.probability)) * (1-0.3)
-                                # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
-                                # на производство), то считаем количество копий чртежей/штук по N прогонов
-                                num_copies_by_n_runs: int = math.ceil(product.requirement.limit / probable_t2_products)
-                                # ---
-                                invent_plan = f'<br><mute>{copied_bpc.blueprint_type.name}: {num_copies_by_n_runs} копий x {num_copies_runs} прогонов</mute>'
+                if product.requirement.rest_percent <= s.requirements_sold_threshold and \
+                   product.analysis_tier2 and \
+                   product.analysis_tier3 and \
+                   not num_prepared and \
+                   not product.analysis_tier3.product_tier1_num_in_copy_runs and \
+                   not product.analysis_tier3.product_tier1_num_in_jobs:
+                    copied_bpc: db.QSwaggerBlueprint = product.analysis_tier3.product_tier1
+                    copying: typing.Optional[db.QSwaggerBlueprintCopying] = product.analysis_tier3.activity_tier1
+                    invention: typing.Optional[db.QSwaggerBlueprintInvention] = product.analysis_tier2.activity_tier1
+                    if copied_bpc and copying and invention:
+                        invented_bpc: typing.Optional[db.QSwaggerInventionProduct] = next((_ for _ in invention.products
+                            if _.product_id==product.analysis_tier2.analysis_tier2.product.blueprint_tier1.type_id), None)
+                        if invented_bpc:
+                            # считаем длительность инвента одной копии с одним прогоном
+                            # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
+                            single_invent_copy_run: float = ((invention.time * (1-0.3)) * (1-0.15))
+                            # считаем кол-во прогонов копий чертежй, которые необходимо выбрать при копирке
+                            # (относительно 2х суток)
+                            num_copies_runs: int = math.ceil(172800 / single_invent_copy_run)
+                            # считаем длительность копирки одной копии с N прогонами
+                            # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
+                            n_run_copy_duration: float = (num_copies_runs * copying.time * (1-0.3)) * (1-0.363)
+                            # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
+                            # T2-продукции, которая может быть получена из копий с N прогонами:
+                            # 30% навыки и импланты
+                            probable_t2_products: float = (num_copies_runs * invented_bpc.quantity * (1-invented_bpc.probability)) * (1-0.3)
+                            # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
+                            # на производство), то считаем количество копий чртежей/штук по N прогонов
+                            num_copies_by_n_runs: int = math.ceil(product.requirement.limit / probable_t2_products)
+                            # ---
+                            invent_plan = f'<br><span style="color: #3371b6">{copied_bpc.blueprint_type.name}</span><mute>: ' \
+                                          f'Число копий</mute> {num_copies_by_n_runs} ' \
+                                          f'<mute>x Прогонов за копию</mute> {num_copies_runs}'
 
                 glf.write(f"""<tr{tr_class}>
 <td scope="row">{row_num}</td>
