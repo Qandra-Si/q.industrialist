@@ -1606,7 +1606,7 @@ class ConveyorCopyingAnalysis:
             self.product_tier1_in_jobs = invention_conveyor.industry_jobs.get_with_unique_items(
                 self.blueprint_tier1.type_id,
                 self.product_tier1.type_id,
-                places=[ConveyorJobPlace.BLUEPRINT],
+                places=[ConveyorJobPlace.BLUEPRINT, ConveyorJobPlace.OTHER],  # TODO: костыль, тут надо проверять выходную коробку у работок
                 activity=db.QSwaggerActivityCode.COPYING)
         self.product_tier1_num_in_jobs: int = sum([1 for _ in self.product_tier1_in_jobs])
         self.product_tier1_num_in_job_runs: int = sum([_.runs for _ in self.product_tier1_in_jobs])
