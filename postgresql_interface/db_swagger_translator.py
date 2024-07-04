@@ -835,7 +835,9 @@ from (
    ) and
    j.ecj_activity_id in (5,8)
   )
-where j.ecj_corporation_id is not null;""",
+where
+ j.ecj_corporation_id is not null and
+ (j.ecj_end_date-a.updated_at) <= '01:05:00';""",
             {'id': corporation_id}
         )
         if rows is None:
