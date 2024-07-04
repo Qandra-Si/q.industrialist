@@ -9,6 +9,13 @@ import eve_efficiency
 import postgresql_interface as db
 
 
+def coalesce(*arg):
+  for el in arg:
+    if el is not None:
+      return el
+  return None
+
+
 class RouterSettings:
     def __init__(self):
         # параметры работы конвейера

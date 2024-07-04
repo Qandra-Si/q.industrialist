@@ -876,47 +876,83 @@ def dump_nav_menu_demand_dialog(
                             decryptor_time: float = 0.0
 
                             market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
-                                invented_bpc.blueprint_type,
+                                tools.coalesce(invented_bpc.blueprint_type, copied_bpc.blueprint_type),
                                 {204, 943, 1909})
                             if market_group:
                                 if market_group.group_id == 204:  # Ships
                                     # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34201)  # Accelerant Decryptor
                                     decryptor_probability: float = 0.2  # +20% вероятность успеха
                                     decryptor_runs: int = 1  # +1 число прогонов проекта
-                                    decryptor_time: float = 0.1  # TODO: доделать +8% экономия времени производства
+                                    # decryptor_time: float = 0.1  # не используется: +8% экономия времени производства
                                 elif market_group.group_id == 943:  # Ship Modifications
                                     # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34206)  # Symmetry Decryptor
                                     decryptor_probability: float = 0.0  # вероятность успеха не меняется
                                     decryptor_runs: int = 2  # +2 число прогонов проекта
-                                    decryptor_time: float = 0.08  # TODO: доделать +8% экономия времени производства
+                                    # decryptor_time: float = 0.08  # не используется: +8% экономия времени производства
                                 elif market_group.group_id == 1909:  # Ancient Relics
                                     # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34204)  # Parity Decryptor
                                     decryptor_probability: float = 0.5  # +50% вероятность успеха
                                     decryptor_runs: int = 3  # +3 число прогонов проекта
-                                    decryptor_time: float = -0.02  # TODO: доделать -2% экономия времени производства
+                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени производства
 
                             # считаем длительность инвента одной копии с одним прогоном
                             # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
-                            single_invent_copy_run: float = ((invention.time * (1-0.3)) * (1-0.15))
+                            invent_1x1_run_time: float = ((invention.time * (1-0.3)) * (1-0.15))
                             # считаем кол-во прогонов копий чертежей, которые необходимо выбрать при копирке
                             # (относительно 2х суток)
-                            num_copies_runs: int = math.ceil(172800 / single_invent_copy_run)
+                            max_invent_runs_per_2days: int = math.floor(172800 / invent_1x1_run_time)
+                            max_invent_runs_per_2days = max(1, max_invent_runs_per_2days)
                             # считаем длительность копирки одной копии с N прогонами
                             # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
-                            n_run_copy_duration: float = (num_copies_runs * copying.time * (1-0.3)) * (1-0.363)
+                            n_run_copy_duration: float = (max_invent_runs_per_2days * copying.time * (1-0.3)) * (1-0.363)
+                            """
+                            * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
+                              30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
+                            * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
+                            * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
+                            ---
+                            рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
+                            ---
+                            Invention_Chance =
+                              Base_Chance *
+                              (1 + ((Encryption_Skill_Level / 40) +
+                                    ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
+                                   )
+                              ) * Decryptor_Modifier
+                            """
+                            invent_1xN_probability: float = \
+                                invented_product.probability * \
+                                1.275 * \
+                                (1.0 + decryptor_probability)
+                            """
+                            limit                   N runs        + decryptor_runs
+                            ---------  -------------------  ----------------------
+                            200 need                    10                    10+1
+                            100%                 200/10=20            200/11=18.18
+                            43%        20/43%=46.14 copies  18.18/43%=34.95 copies
+                            ---------  -------------------  ----------------------
+                            2 need                       1                     1+1
+                            100%                     2/1=2                   2/2=1
+                            43%          2/43%=4.65 copies       1/43%=2.33 copies
+                            ---------  -------------------  ----------------------
+                            5 need                       1                     1+1
+                            100%                     5/1=5                 5/2=2.5
+                            43%         5/43%=11.63 copies     2.5/43%=5.81 copies
+                            ---------  -------------------  ----------------------
+                            """
                             # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
-                            # T2-продукции, которая может быть получена из копий с N прогонами:
-                            # 30% навыки и импланты
-                            # если используются декрипторы, то учитываем их как дополнительные файлы данных
-                            probable_t2_products: float = \
-                                ((num_copies_runs * (invented_product.quantity + decryptor_runs) * (1.0-invented_product.probability)) * (1.0-decryptor_probability)) * (1.0-0.3)
+                            # T2-продукции, которая может быть получена из C копий с 1 прогонами:
+                            invent_Cx1_runs: float = \
+                                (math.ceil(product.requirement.limit / (invented_product.quantity + decryptor_runs))) / \
+                                invent_1xN_probability
                             # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
-                            # на производство), то считаем количество копий чртежей/штук по N прогонов
-                            num_copies_by_n_runs: int = math.ceil(product.requirement.limit / probable_t2_products)
+                            # на производство), то считаем количество копий чертежей/штук по N прогонов
+                            copy_CxN_runs: int = math.floor(invent_Cx1_runs / max_invent_runs_per_2days)
+                            copy_CxN_runs = max(1, copy_CxN_runs)
                             # ---
                             invent_plan = f'<br><span style="color: #3371b6">{copied_bpc.blueprint_type.name}</span><mute>: ' \
-                                          f'Число копий</mute> {num_copies_by_n_runs} ' \
-                                          f'<mute>x Прогонов за копию</mute> {num_copies_runs}'
+                                          f'Число копий</mute> {copy_CxN_runs} ' \
+                                          f'<mute>x Прогонов за копию</mute> {max_invent_runs_per_2days}'
 
                 glf.write(f"""<tr{tr_class}>
 <td scope="row">{row_num}</td>
