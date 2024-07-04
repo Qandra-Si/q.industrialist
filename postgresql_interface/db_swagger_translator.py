@@ -799,6 +799,91 @@ WHERE
         del rows
         return data
 
+    def get_corporation_blueprints_undelivered(
+            self,
+            corporation_id: int,
+            blueprints: typing.Dict[int, QSwaggerBlueprint],
+            load_unknown_type_blueprints: bool = False) -> \
+            typing.Tuple[typing.Dict[int, QSwaggerCorporationBlueprint], typing.Dict[int, QSwaggerCorporationAssetsItem]]:
+        rows = self.db.select_all_rows("""
+select
+ a.corporation_id, --0
+ a.updated_at, --1
+ --j.ecj_updated_at,
+ --j.ecj_status,
+ j.ecj_facility_id, --2
+ j.ecj_activity_id, --3
+ j.ecj_blueprint_type_id, --4
+ j.ecj_blueprint_location_id, --5
+ j.ecj_output_location_id, --6
+ j.ecj_runs, --7
+ j.ecj_licensed_runs, --8
+ j.ecj_product_type_id, --9
+ j.ecj_end_date --10
+from (
+ select eca_corporation_id as corporation_id, max(eca_updated_at) as updated_at
+ from esi_corporation_assets
+ where eca_corporation_id=%(id)s
+ group by eca_corporation_id
+) a
+  left outer join esi_corporation_industry_jobs j on (
+   j.ecj_corporation_id=a.corporation_id and
+   (j.ecj_updated_at >= a.updated_at
+    --or ((j.ecj_end_date >= a.updated_at) and
+    --    ((j.ecj_end_date+interval '90 minute') < a.updated_at)
+    --   )
+   ) and
+   j.ecj_activity_id in (5,8)
+  )
+where j.ecj_corporation_id is not null;""",
+            {'id': corporation_id}
+        )
+        if rows is None:
+            return {}, {}
+        undelivered_blueprints = {}
+        undelivered_assets = {}
+        item_id: int = 0
+        for row in rows:
+            type_id: int = row[4]
+            cached_blueprint_type: QSwaggerBlueprint = blueprints.get(type_id)
+            if cached_blueprint_type is None and not load_unknown_type_blueprints:
+                continue
+            for i in range(row[7]):
+                item_id -= 1
+                bpc: QSwaggerCorporationBlueprint = QSwaggerCorporationBlueprint(
+                    cached_blueprint_type,
+                    row=(
+                        item_id,  # item_id: 0
+                        type_id,  # type_id: 1
+                        row[6],  # location_id: 2
+                        'Unlocked',  # location_flag: 3 (??? 'Undelivered')
+                        -2,  # quantity: 4 (copy)
+                        0,  # TODO: time_efficiency: 5
+                        0,  # TODO: material_efficiency: 6
+                        row[8],  # runs: 7
+                        row[10],  # updated_at: 8
+                        row[2]  # station_id: 9
+                    )
+                )
+                undelivered_blueprints[item_id] = bpc
+                undelivered_assets[item_id] = QSwaggerCorporationAssetsItem(
+                    cached_blueprint_type.blueprint_type,
+                    row=(
+                        bpc.item_id,  # item_id: 0
+                        bpc.type_id,  # type_id: 1
+                        1,  # quantity: 2
+                        bpc.location_id,  # location_id: 3
+                        'item', # location_type: 4
+                        bpc.location_flag,  # location_flag: 5
+                        True,  # is_singleton: 6
+                        None,  # name: 7
+                        row[10],  # updated_at: 8
+                        row[2]  # station_id: 9
+                    )
+                )
+        del rows
+        return undelivered_blueprints, undelivered_assets
+
     # -------------------------------------------------------------------------
     # corporations/{corporation_id}/orders/
     # -------------------------------------------------------------------------

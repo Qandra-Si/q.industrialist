@@ -67,6 +67,7 @@ def main():
         # загрузка корпоративных ассетов
         qid.load_corporation_assets(corporation, load_unknown_type_assets=True, load_asseted_blueprints=True)
         qid.load_corporation_blueprints(corporation, load_unknown_type_blueprints=True)
+        qid.load_corporation_blueprints_undelivered(corporation)
         qid.load_corporation_container_places(corporation)
         qid.load_corporation_industry_jobs_active(corporation, load_unknown_type_blueprints=True)
         qid.load_corporation_industry_jobs_completed(corporation, load_unknown_type_blueprints=True)

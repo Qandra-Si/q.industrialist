@@ -286,6 +286,28 @@ class QSwaggerDictionary:
             load_unknown_type_blueprints=load_unknown_type_blueprints)
         return corporation.blueprints
 
+    def load_corporation_blueprints_undelivered(
+            self,
+            corporation: QSwaggerCorporation,
+            load_unknown_type_blueprints=False) -> \
+            typing.Tuple[typing.Dict[int, QSwaggerCorporationBlueprint], typing.Dict[int, QSwaggerCorporationAssetsItem]]:
+        if not isinstance(corporation, QSwaggerCorporation):
+            raise Exception("Illegal corporation descriptor")
+        if not corporation.assets and not corporation.blueprints:  # загружайте и ассеты и чертежи
+            raise Exception("You should load assets and blueprints firstly")
+        undelivered_blueprints, undelivered_assets = self.__qit.get_corporation_blueprints_undelivered(
+            # идентификаторы
+            corporation.corporation_id,
+            # справочники
+            self.sde_blueprints,
+            # настройки
+            load_unknown_type_blueprints=load_unknown_type_blueprints)
+        for item_id, blueprint in undelivered_blueprints.items():
+            corporation.blueprints[item_id] = blueprint
+        for item_id, asset_item in undelivered_assets.items():
+            corporation.assets[item_id] = asset_item
+        return undelivered_blueprints, undelivered_assets
+
     def load_corporation_container_places(
             self,
             corporation: QSwaggerCorporation) -> None:

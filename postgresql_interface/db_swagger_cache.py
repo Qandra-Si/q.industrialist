@@ -652,7 +652,7 @@ class QSwaggerCorporationAssetsItem:
         self.__is_singleton: bool = row[6]
         self.__name: typing.Optional[str] = row[7]
         self.__updated_at: datetime.datetime = row[8].replace(tzinfo=pytz.UTC)
-        self.__station_id: typing.Optional[int] = None
+        self.__station_id: typing.Optional[int] = None if len(row) == 9 else row[9]
 
     @property
     def item_id(self) -> int:
@@ -714,7 +714,7 @@ class QSwaggerCorporationBlueprint:
         self.__material_efficiency: int = row[6]
         self.__runs: int = row[7]
         self.__updated_at: datetime.datetime = row[8].replace(tzinfo=pytz.UTC)
-        self.__station_id: typing.Optional[int] = None
+        self.__station_id: typing.Optional[int] = None if len(row) == 9 else row[9]
 
     @property
     def item_id(self) -> int:
