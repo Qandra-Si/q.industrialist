@@ -939,6 +939,10 @@ def dump_nav_menu_demand_dialog(
                             100%                     5/1=5                 5/2=2.5
                             43%         5/43%=11.63 copies     2.5/43%=5.81 copies
                             ---------  -------------------  ----------------------
+                            10 need                      1
+                            100%                   10/1=10
+                            48%        10/48%=20.83 copies
+                            ---------  -------------------  ----------------------
                             """
                             # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
                             # T2-продукции, которая может быть получена из C копий с 1 прогонами:
@@ -949,6 +953,8 @@ def dump_nav_menu_demand_dialog(
                             # на производство), то считаем количество копий чертежей/штук по N прогонов
                             copy_CxN_runs: int = math.floor(invent_Cx1_runs / max_invent_runs_per_2days)
                             copy_CxN_runs = max(1, copy_CxN_runs)
+                            if copy_CxN_runs == 1:
+                                max_invent_runs_per_2days: int = math.floor(invent_Cx1_runs)
                             # ---
                             invent_plan = f'<br><span style="color: #3371b6">{copied_bpc.blueprint_type.name}</span><mute>: ' \
                                           f'Число копий</mute> {copy_CxN_runs} ' \
