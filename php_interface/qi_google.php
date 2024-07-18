@@ -335,7 +335,7 @@ from esi_corporation_industry_jobs
  left outer join esi_corporation_assets cout on (cout.eca_item_id=ecj_output_location_id)
  left outer join eve_sde_type_ids prod on (prod.sdet_type_id=ecj_product_type_id) 
 where
- ecj_end_date > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '7 days') and
+ ecj_end_date > (CURRENT_TIMESTAMP AT TIME ZONE 'GMT' - INTERVAL '30 days') and
  (ecj_product_type_id=any($1) or
   ecj_blueprint_type_id=any($1) or
   ecj_blueprint_location_id=any($2) or
@@ -353,7 +353,7 @@ EOD;
             or die('pg_query err: '.pg_last_error());
     $jobs = pg_fetch_all($jobs_cursor);
     if (!$jobs) return;
-?><h2>Хронология производства предмета <small>за последнюю неделю</small></h2>
+?><h2>Хронология производства предмета <small>за последний месяц</small></h2>
 <table class="table table-condensed table-hover qind-table qind-table-jobs" style="padding:1px;font-size:smaller;">
 <thead>
  <tr>
