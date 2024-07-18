@@ -1813,8 +1813,8 @@ tr.qind-em th
     <li class="dropdown">
      <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Display Options <span class="caret"></span></a>
       <ul class="dropdown-menu">
-       <li><a id="btnToggleImpossible" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowImpossible"></span> Show impossible to produce</a></li>
-       <li><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
+       <li class="disabled"><a id="btnToggleImpossible" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowImpossible"></span> Show impossible to produce</a></li>
+       <li class="disabled"><a id="btnToggleActive" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowActive"></span> Show active blueprints</a></li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleUsedMaterials" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowUsedMaterials"></span> Show used materials</a></li>
        <li><a id="btnToggleNotAvailable" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowNotAvailable"></span> Show not available materials</a></li>
@@ -1874,7 +1874,7 @@ tr.qind-em th
     for corp_conveyors in conveyor_data:
         glf.write("""
 <!-- BEGIN: collapsable group (locations) -->
-<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+<div class="panel-group hidden" id="accordion" role="tablist" aria-multiselectable="true">
 """)
 
         for conveyor_entity in corp_conveyors["corp_conveyour_entities_by_priority"].get(priority):
