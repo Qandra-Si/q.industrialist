@@ -444,6 +444,31 @@ def get_product_quantity(
         return reaction.quantity
 
 
+def which_decryptor_applies_to_blueprint(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # чертежи для проверки
+        blueprint_type: db.QSwaggerTypeId) -> typing.Optional[db.QSwaggerTypeId]:
+    decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
+    market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
+        blueprint_type,
+        {204, 943, 1909, 209})
+    if market_group:
+        if market_group.group_id == 204:  # Ships
+            decryptor_type = qid.get_type_id(34201)  # Accelerant Decryptor
+        elif market_group.group_id == 943:  # Ship Modifications
+            decryptor_type = qid.get_type_id(34206)  # Symmetry Decryptor
+        elif market_group.group_id == 1909:  # Ancient Relics
+            decryptor_type = qid.get_type_id(34204)  # Parity Decryptor
+        elif market_group.group_id == 209:  # Ship Equipment
+            # капитальные модули (риги проверены выше)
+            if blueprint_type.name[:8] == 'Capital ':
+                decryptor_type = qid.get_type_id(34207)  # Optimized Attainment Decryptor
+        else:
+            raise Exception("This shouldn't have happened")
+    return decryptor_type
+
+
 # blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
 # метод возвращает список tuple: [{"id": 11399, "q": 11, "qmin": 11"}] с учётом ME
 # при is_blueprint_copy=True tuple={"r":?}, при False tuple={"r":?,"q":?}
@@ -514,18 +539,10 @@ def get_materials_list(
                 product_blueprint_id: int = invention.products[0].product_id
                 product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
                 if product_blueprint_type and product_blueprint_type.manufacturing:
-                    market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
-                        b.blueprint_type.blueprint_type,
-                        {204, 943, 1909})
-                    if market_group:
-                        if market_group.group_id == 204:  # Ships
-                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34201)  # Accelerant Decryptor
-                        elif market_group.group_id == 943:  # Ship Modifications
-                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34206)  # Symmetry Decryptor
-                        elif market_group.group_id == 1909:  # Ancient Relics
-                            decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34204)  # Parity Decryptor
-                        else:
-                            raise Exception("This shouldn't have happened")
+                    decryptor_type: typing.Optional[db.QSwaggerTypeId] = which_decryptor_applies_to_blueprint(
+                        qid,
+                        b.blueprint_type.blueprint_type)
+                    if decryptor_type:
                         # расчёт кол-ва декрипторов с учётом эффективности производства
                         industry_input = eve_efficiency.get_industry_material_efficiency(
                             str(a),

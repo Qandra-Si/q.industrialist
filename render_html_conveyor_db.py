@@ -875,25 +875,27 @@ def dump_nav_menu_demand_dialog(
                             decryptor_runs: int = 0
                             decryptor_time: float = 0.0
 
-                            market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
-                                tools.coalesce(invented_bpc.blueprint_type, copied_bpc.blueprint_type),
-                                {204, 943, 1909})
-                            if market_group:
-                                if market_group.group_id == 204:  # Ships
-                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34201)  # Accelerant Decryptor
+                            decryptor_type: typing.Optional[db.QSwaggerTypeId] = \
+                                tools.which_decryptor_applies_to_blueprint(
+                                    qid,
+                                    tools.coalesce(copied_bpc.blueprint_type, invented_bpc.blueprint_type))
+                            if decryptor_type:
+                                if decryptor_type.type_id == 34201:  # Accelerant Decryptor
                                     decryptor_probability: float = 0.2  # +20% вероятность успеха
                                     decryptor_runs: int = 1  # +1 число прогонов проекта
                                     # decryptor_time: float = 0.1  # не используется: +8% экономия времени производства
-                                elif market_group.group_id == 943:  # Ship Modifications
-                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34206)  # Symmetry Decryptor
+                                elif decryptor_type.type_id == 34206:  # Symmetry Decryptor
                                     decryptor_probability: float = 0.0  # вероятность успеха не меняется
                                     decryptor_runs: int = 2  # +2 число прогонов проекта
                                     # decryptor_time: float = 0.08  # не используется: +8% экономия времени производства
-                                elif market_group.group_id == 1909:  # Ancient Relics
-                                    # decryptor_type: db.QSwaggerTypeId = qid.get_type_id(34204)  # Parity Decryptor
+                                elif decryptor_type.type_id == 34204:  # Parity Decryptor
                                     decryptor_probability: float = 0.5  # +50% вероятность успеха
                                     decryptor_runs: int = 3  # +3 число прогонов проекта
-                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени производства
+                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени произв.
+                                elif decryptor_type.type_id == 34207:  # Optimized Attainment Decryptor
+                                    decryptor_probability: float = 0.9  # +90% вероятность успеха
+                                    decryptor_runs: int = 2  # +2 число прогонов проекта
+                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени произв.
 
                             # считаем длительность инвента одной копии с одним прогоном
                             # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
