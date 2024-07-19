@@ -897,16 +897,36 @@ def dump_nav_menu_demand_dialog(
                                     decryptor_runs: int = 2  # +2 число прогонов проекта
                                     # decryptor_time: float = -0.02  # не используется: -2% экономия времени произв.
 
+                            # выбираем максимальную длительность инвента для данного вида продукта:
+                            #  * все батлы и батлкрузеры инвентим не дольше, чем 4 суток
+                            #  * все остальные предметы не дольше 2х суток
+                            product_market_group: typing.Optional[db.QSwaggerMarketGroup] = \
+                                qid.there_is_market_group_in_chain(
+                                    invented_bpc.manufacturing.product.product_type,
+                                    {1374,  # Battlecruisers (копирка 1:29, инвент 1д 02:28 => 4 суток для 3х прогонов)
+                                     1376,  # Battleships (копирка 2:33, инвент 1д 07:44 => 4 суток для 3х прогонов)
+                                     1080,  # Marauders (копирка 1:47, инвент 1д 07:44 => 2 суток для 1х прогона)
+                                     })
+                            if product_market_group:
+                                if product_market_group.group_id == 1080:
+                                    # марадёры слишком дорогие в постройке, поэтому 1 сутки округлятся до минимальной
+                                    # длительности с тем, чтобы скрафтилось точное количество кораблей в производстве
+                                    num_days: int = 1
+                                else:
+                                    num_days: int = 4
+                            else:
+                                num_days: int = 2
+
                             # считаем длительность инвента одной копии с одним прогоном
                             # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
                             invent_1x1_run_time: float = ((invention.time * (1-0.3)) * (1-0.15))
                             # считаем кол-во прогонов копий чертежей, которые необходимо выбрать при копирке
                             # (относительно 2х суток)
-                            max_invent_runs_per_2days: int = math.floor(172800 / invent_1x1_run_time)
-                            max_invent_runs_per_2days = max(1, max_invent_runs_per_2days)
+                            max_invent_runs_per_days: int = math.floor((86400*num_days) / invent_1x1_run_time)
+                            max_invent_runs_per_days = max(1, max_invent_runs_per_days)
                             # считаем длительность копирки одной копии с N прогонами
                             # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
-                            n_run_copy_duration: float = (max_invent_runs_per_2days * copying.time * (1-0.3)) * (1-0.363)
+                            n_run_copy_duration: float = (max_invent_runs_per_days * copying.time * (1-0.3)) * (1-0.363)
                             """
                             * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
                               30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
@@ -960,14 +980,14 @@ def dump_nav_menu_demand_dialog(
                                 invent_1xN_probability
                             # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
                             # на производство), то считаем количество копий чертежей/штук по N прогонов
-                            copy_CxN_runs: int = math.floor(invent_Cx1_runs / max_invent_runs_per_2days)
+                            copy_CxN_runs: int = math.floor(invent_Cx1_runs / max_invent_runs_per_days)
                             copy_CxN_runs = max(1, copy_CxN_runs)
                             if copy_CxN_runs == 1:
-                                max_invent_runs_per_2days: int = math.floor(invent_Cx1_runs)
+                                max_invent_runs_per_days: int = math.floor(invent_Cx1_runs)
                             # ---
                             invent_plan = f'<br><span style="color: #3371b6">{copied_bpc.blueprint_type.name}</span><mute>: ' \
                                           f'Число копий</mute> {copy_CxN_runs} ' \
-                                          f'<mute>x Прогонов за копию</mute> {max_invent_runs_per_2days}'
+                                          f'<mute>x Прогонов за копию</mute> {max_invent_runs_per_days}'
 
                 glf.write(f"""<tr{tr_class}>
 <td scope="row">{row_num}</td>
