@@ -1,5 +1,6 @@
 ﻿# -*- encoding: utf-8 -*-
 import typing
+import math
 
 from .db_swagger_cache import *
 from .db_interface import QIndustrialistDatabase
@@ -819,7 +820,8 @@ select
  j.ecj_runs, --7
  j.ecj_licensed_runs, --8
  j.ecj_product_type_id, --9
- j.ecj_end_date --10
+ j.ecj_end_date, --10
+ j.ecj_probability -- 11
 from (
  select eca_corporation_id as corporation_id, max(eca_updated_at) as updated_at
  from esi_corporation_assets
@@ -846,11 +848,21 @@ where
         undelivered_assets = {}
         item_id: int = 0
         for row in rows:
-            type_id: int = row[4]
+            activity_id: int = row[3]
+            if activity_id == 5:
+                type_id: int = row[4]
+                num_of_copies: int = row[7]
+                runs: int = row[8]
+            elif activity_id == 8:
+                type_id: int = row[9]
+                num_of_copies: int = max(1, math.floor(row[7] * row[11]))
+                runs: int = 1  # здесь декриптор неизвестен
+            else:
+                raise Exception(f"Unsupported activity_id={activity_id}")
             cached_blueprint_type: QSwaggerBlueprint = blueprints.get(type_id)
             if cached_blueprint_type is None and not load_unknown_type_blueprints:
                 continue
-            for i in range(row[7]):
+            for i in range(num_of_copies):
                 item_id -= 1
                 bpc: QSwaggerCorporationBlueprint = QSwaggerCorporationBlueprint(
                     cached_blueprint_type,
@@ -862,7 +874,7 @@ where
                         -2,  # quantity: 4 (copy)
                         0,  # TODO: time_efficiency: 5
                         0,  # TODO: material_efficiency: 6
-                        row[8],  # runs: 7
+                        runs,  # runs: 7
                         row[10],  # updated_at: 8
                         row[2]  # station_id: 9
                     )
