@@ -2,6 +2,7 @@
 """
 import typing
 from enum import Enum
+import math
 import datetime
 import itertools
 
@@ -444,29 +445,146 @@ def get_product_quantity(
         return reaction.quantity
 
 
+class DecryptorCode(Enum):
+    ACCELERANT = 34201
+    ATTAINMENT = 34202
+    AUGMENTATION = 34203
+    OPTIMIZED_ATTAINMENT = 34207
+    OPTIMIZED_AUGMENTATION = 34208
+    PARITY = 34204
+    PROCESS = 34205
+    SYMMETRY = 34206
+
+    def to_int(self) -> int:
+        return int(self.value)
+
+    @staticmethod
+    def from_decryptor(decryptor_type: db.QSwaggerTypeId):
+        if decryptor_type.type_id == 34201:
+            return DecryptorCode.ACCELERANT
+        elif decryptor_type.type_id == 34202:
+            return DecryptorCode.ATTAINMENT
+        elif decryptor_type.type_id == 34203:
+            return DecryptorCode.AUGMENTATION
+        elif decryptor_type.type_id == 34207:
+            return DecryptorCode.OPTIMIZED_ATTAINMENT
+        elif decryptor_type.type_id == 34208:
+            return DecryptorCode.OPTIMIZED_AUGMENTATION
+        elif decryptor_type.type_id == 34204:
+            return DecryptorCode.PARITY
+        elif decryptor_type.type_id == 34205:
+            return DecryptorCode.PROCESS
+        elif decryptor_type.type_id == 34206:
+            return DecryptorCode.SYMMETRY
+        else:
+            raise Exception("Unknown decryptor")
+
+
+class DecryptorDetails:
+    def __init__(self, decryptor_type: db.QSwaggerTypeId):
+        self.__code: DecryptorCode = DecryptorCode.from_decryptor(decryptor_type)
+        self.__type: db.QSwaggerTypeId = decryptor_type
+        self.__probability: float = 0.0  # вероятность успеха
+        self.__runs: int = 0  # число прогонов проекта
+        self.__material: float = 0.0  # экономия материалов при производстве
+        self.__time: float = 0.0  # экономия времени производства
+
+        if self.__code == DecryptorCode.ACCELERANT:  # Accelerant Decryptor
+            self.__probability: float = +0.20  # +20%
+            self.__runs: int = +1  # +1 прогона
+            self.__material: float = -0.02  # +2%
+            self.__time: float = +0.10  # +10%
+        elif self.__code == DecryptorCode.ATTAINMENT:  # Attainment Decryptor
+            self.__probability: float = +0.80  # +80%
+            self.__runs: int = +4  # +4 прогона
+            self.__material: float = -0.01  # -1%
+            self.__time: float = +0.04  # +4%
+        elif self.__code == DecryptorCode.AUGMENTATION:  # Augmentation Decryptor
+            self.__probability: float = -0.40  # -40%
+            self.__runs: int = +9  # +9 прогона
+            self.__material: float = -0.02  # -2%
+            self.__time: float = +0.02  # +2%
+        elif self.__code == DecryptorCode.OPTIMIZED_ATTAINMENT:  # Optimized Attainment Decryptor
+            self.__probability: float = +0.90  # +90%
+            self.__runs: int = 2  # +2 прогона
+            self.__material: float = -0.01  # -1%
+            self.__time: float = -0.02  # -2%
+        elif self.__code == DecryptorCode.OPTIMIZED_AUGMENTATION:  # Optimized Augmentation Decryptor
+            self.__probability: float = -0.10  # -10%
+            self.__runs: int = 7  # +7 прогонов
+            self.__material: float = +0.02  # +2%
+            self.__time: float = 0.00  # 0%
+        elif self.__code == DecryptorCode.PARITY:  # Parity Decryptor
+            self.__probability: float = +0.50  # +50%
+            self.__runs: int = 3  # +3 прогона
+            self.__material: float = +0.01  # +1%
+            self.__time: float = -0.02  # -2%
+        elif self.__code == DecryptorCode.PROCESS:  # Process Decryptor
+            self.__probability: float = +0.10  # +10%
+            self.__runs: int = 0  # не меняется
+            self.__material: float = +0.03  # +3%
+            self.__time: float = +0.06  # +6%
+        elif self.__code == DecryptorCode.SYMMETRY:  # Symmetry Decryptor
+            self.__probability: float = 0.0  # не меняется
+            self.__runs: int = +2  # +2 прогона
+            self.__material: float = +0.01  # +1%
+            self.__time: float = +0.08  # +8%
+
+    @property
+    def code(self) -> DecryptorCode:
+        return self.__code
+
+    @property
+    def type(self) -> db.QSwaggerTypeId:
+        return self.__type
+
+    @property
+    def probability(self) -> float:
+        return self.__probability
+
+    @property
+    def runs(self) -> int:
+        return self.__runs
+
+    @property
+    def material_efficiency(self) -> float:
+        return self.__material
+
+    @property
+    def time_efficiency(self) -> float:
+        return self.__time
+
+
 def which_decryptor_applies_to_blueprint(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
-        # чертежи для проверки
-        blueprint_type: db.QSwaggerTypeId) -> typing.Optional[db.QSwaggerTypeId]:
+        # продукт для проверки (внимание! чертежи плохо каталогизированы, market-группы часто не заданы,
+        # или отсутствуют у T2-чертежей)
+        product_type: db.QSwaggerTypeId) -> typing.Optional[DecryptorDetails]:
     decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
     market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
-        blueprint_type,
-        {204, 943, 1909, 209})
+        product_type,
+        {4, 1111, 1112, 9})
     if market_group:
-        if market_group.group_id == 204:  # Ships
+        if market_group.group_id == 4:  # Ships (соответствует Ships=204 в чертежах)
             decryptor_type = qid.get_type_id(34201)  # Accelerant Decryptor
-        elif market_group.group_id == 943:  # Ship Modifications
+        elif market_group.group_id == 1111:  # Rigs (соответствует Ship Modifications=943 в чертежах)
             decryptor_type = qid.get_type_id(34206)  # Symmetry Decryptor
-        elif market_group.group_id == 1909:  # Ancient Relics
+        elif market_group.group_id == 1112:  # Subsystems (соответствует Ship Ancient Relics=1909 в чертежах)
             decryptor_type = qid.get_type_id(34204)  # Parity Decryptor
-        elif market_group.group_id == 209:  # Ship Equipment
-            # капитальные модули (риги проверены выше)
-            if blueprint_type.name[:8] == 'Capital ':
+        elif market_group.group_id == 9:  # Ship Equipment (соответствует Ship Equipment=209 в чертежах)
+            # тут только капитальные модули (риги проверены выше)
+            if product_type.name[:8] == 'Capital ':
                 decryptor_type = qid.get_type_id(34207)  # Optimized Attainment Decryptor
+            elif product_type.group:
+                if product_type.group.name == 'Capital' or product_type.group.name == 'Extra Large':
+                    decryptor_type = qid.get_type_id(34207)  # Optimized Attainment Decryptor
         else:
             raise Exception("This shouldn't have happened")
-    return decryptor_type
+    if decryptor_type:
+        return DecryptorDetails(decryptor_type)
+    else:
+        return None
 
 
 # blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
@@ -539,10 +657,13 @@ def get_materials_list(
                 product_blueprint_id: int = invention.products[0].product_id
                 product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
                 if product_blueprint_type and product_blueprint_type.manufacturing:
-                    decryptor_type: typing.Optional[db.QSwaggerTypeId] = which_decryptor_applies_to_blueprint(
-                        qid,
-                        b.blueprint_type.blueprint_type)
-                    if decryptor_type:
+                    decryptor_details: typing.Optional[DecryptorDetails] = None
+                    if b.blueprint_type.manufacturing:
+                        decryptor_details = which_decryptor_applies_to_blueprint(
+                            qid,
+                            # чертёж: b.blueprint_type.blueprint_type
+                            b.blueprint_type.manufacturing.product_type)
+                    if decryptor_details:
                         # расчёт кол-ва декрипторов с учётом эффективности производства
                         industry_input = eve_efficiency.get_industry_material_efficiency(
                             str(a),
@@ -552,7 +673,7 @@ def get_materials_list(
                         # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
                         industry_input *= quantity_of_blueprints
                         # сохранение информации в справочник материалов
-                        push_into(activity, db.QSwaggerMaterial(decryptor_type, 0), industry_input)
+                        push_into(activity, db.QSwaggerMaterial(decryptor_details.type, 0), industry_input)
     # ---
     result: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
     for activity in materials_list_with_efficiency.keys():
@@ -2149,6 +2270,239 @@ class ConveyorDemands:
             if ma and ma.product and ma.product.product_tier1:
                 return ma.product
         return None
+
+    class InventPlan:
+        def __init__(self,
+                     copied_bpc: db.QSwaggerBlueprint,
+                     copying: db.QSwaggerBlueprintCopying,
+                     invention: db.QSwaggerBlueprintInvention,
+                     invented_product: db.QSwaggerInventionProduct,
+                     invented_bpc: db.QSwaggerBlueprint,
+                     decryptor_details: typing.Optional[DecryptorDetails]):
+            self.copied_bpc: db.QSwaggerBlueprint = copied_bpc
+            self.copying: db.QSwaggerBlueprintCopying = copying
+            self.invention: db.QSwaggerBlueprintInvention = invention
+            self.invented_product: db.QSwaggerInventionProduct = invented_product
+            self.invented_bpc: db.QSwaggerBlueprint = invented_bpc
+            self.decryptor_details: typing.Optional[DecryptorDetails] = decryptor_details
+            self.invention_days_max: int = 0
+            self.invent_1x1_run_time: float = 0.0
+            self.max_invent_runs_per_days: int = 0
+            self.invent_1xN_probability: float = 0.0
+            self.invent_Cx1_runs: float = 0.0
+            self.copy_CxN_runs: int = 0
+
+    @staticmethod
+    def calculate_invent_plan(
+            # данные (справочники)
+            qid: db.QSwaggerDictionary,
+            # данные для расчёта
+            product: Corrected,
+            # настройки генерации отчёта
+            manufacturing_conveyor: ConveyorSettings) -> typing.Optional[InventPlan]:
+        # подсчёт имеющегося количества продукции
+        num_prepared: typing.Optional[int] = None
+        overstock: bool = False
+
+        if product.analysis_tier2:
+            num_ready: int = product.analysis_tier2.num_ready
+            num_prepared: int = product.analysis_tier2.num_prepared
+            # если произведено излишнее количество продукции, то invent не считаем
+            if (num_ready + num_prepared) > 0 and product.analysis_tier2.product_tier2_overstock:
+                overstock = True
+        elif product.analysis_tier1:
+            num_ready: int = product.analysis_tier1.num_ready
+            # если произведено излишнее количество продукции, то invent не считаем
+            if num_ready > 0 and product.analysis_tier1.product_tier1_overstock:
+                overstock = True
+
+        # если произошло перепроизводство - инвент не считаем
+        if overstock:
+            return None
+        if product.requirement.rest_percent > manufacturing_conveyor.requirements_sold_threshold:
+            return None
+        # если производство, наличие и торговля продуктом не рассчитаны, то пропускаем
+        if not product.analysis_tier2 or not product.analysis_tier3:
+            return None
+        # если копирка или инвент для этого продукта уже выполнялись, то пропускаем его
+        # следующий анализ будет производиться только когда ни научки, ни чертежей для этого продукта нет
+        if num_prepared:
+            return None
+        if product.analysis_tier3.product_tier1_num_in_copy_runs:
+            return None
+        if product.analysis_tier3.product_tier1_num_in_jobs:
+            return None
+
+        # получаем сведения о чертежах для копирки и для инвента
+        copied_bpc: db.QSwaggerBlueprint = product.analysis_tier3.product_tier1
+        copying: typing.Optional[db.QSwaggerBlueprintCopying] = product.analysis_tier3.activity_tier1
+        invention: typing.Optional[db.QSwaggerBlueprintInvention] = product.analysis_tier2.activity_tier1
+        if not copied_bpc or not copying or not invention:
+            return None
+
+        invented_product: typing.Optional[db.QSwaggerInventionProduct] = next((
+            _ for _ in invention.products
+            if _.product_id == product.analysis_tier2.analysis_tier2.product.blueprint_tier1.type_id),
+            None)
+        invented_bpc = product.analysis_tier2.activity_tier2.blueprint
+
+        # если чертежей для копирки и для инвента в реестре не имеется, то пропускаем расчёт инвента
+        if not invented_product or not invented_bpc:
+            return None
+
+        # ------------------------------------------------------
+        # выбор декриптора для инвента
+        # ------------------------------------------------------
+
+        decryptor_probability: float = 0.0
+        decryptor_runs: int = 0
+        decryptor_time: float = 0.0
+
+        # выбираем декриптор
+        decryptor_details: typing.Optional[DecryptorDetails] = which_decryptor_applies_to_blueprint(
+            qid,
+            # чертёж: coalesce(copied_bpc.blueprint_type, invented_bpc.blueprint_type)
+            invented_bpc.manufacturing.product_type)
+        # выполняем coalesce для параметров декриптора
+        if decryptor_details:
+            decryptor_probability: float = decryptor_details.probability  # +?% вероятность успеха
+            decryptor_runs: int = decryptor_details.runs  # +? число прогонов проекта
+            decryptor_time: float = decryptor_details.time_efficiency  # +?% экономия времени производства
+
+        # ------------------------------------------------------
+        # расчёт плана инвента
+        # ------------------------------------------------------
+
+        invent_plan: ConveyorDemands.InventPlan = ConveyorDemands.InventPlan(
+            copied_bpc,
+            copying,
+            invention,
+            invented_product,
+            invented_bpc,
+            decryptor_details)
+
+        # ------------------------------------------------------
+        # расчёт длительности инвента
+        # ------------------------------------------------------
+
+        # выбираем максимальную длительность инвента для данного вида продукта:
+        #  * все батлы и батлкрузеры инвентим не дольше, чем 4 суток
+        #  * все остальные предметы не дольше 2х суток
+        product_market_group: typing.Optional[db.QSwaggerMarketGroup] = \
+            qid.there_is_market_group_in_chain(
+                invented_bpc.manufacturing.product.product_type,
+                {1374,  # Battlecruisers (копирка 1:29, инвент 1д 02:28 => 4 суток для 3х прогонов)
+                 1376,  # Battleships (копирка 2:33, инвент 1д 07:44 => 4 суток для 3х прогонов)
+                 1080,  # Marauders (копирка 1:47, инвент 1д 07:44 => 2 суток для 1х прогона)
+                 })
+        if product_market_group:
+            if product_market_group.group_id == 1080:
+                # марадёры слишком дорогие в постройке, поэтому 1 сутки округлятся до минимальной
+                # длительности с тем, чтобы скрафтилось точное количество кораблей в производстве
+                invent_plan.invention_days_max = 1
+            else:
+                invent_plan.invention_days_max = 4
+        else:
+            invent_plan.invention_days_max = 2
+
+        # ------------------------------------------------------
+        # расчёт количество прогонов инвента
+        # ------------------------------------------------------
+
+        # считаем длительность инвента одной копии с одним прогоном
+        # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
+        invent_plan.invent_1x1_run_time = ((invention.time * (1 - 0.3)) * (1 - 0.15))
+        # считаем кол-во прогонов копий чертежей, которые необходимо выбрать при копирке
+        # (относительно 2х суток)
+        invent_plan.max_invent_runs_per_days = math.floor(
+            (86400 * invent_plan.invention_days_max) / invent_plan.invent_1x1_run_time)
+        invent_plan.max_invent_runs_per_days = max(1, invent_plan.max_invent_runs_per_days)
+
+        # ------------------------------------------------------
+        # расчёт длительности копирки одной копии с N прогонами
+        # ------------------------------------------------------
+
+        # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
+        n_run_copy_duration: float = (invent_plan.max_invent_runs_per_days * copying.time * (1 - 0.3)) * (1 - 0.363)
+
+        # ------------------------------------------------------
+        # определение вероятности успеха инвента
+        # ------------------------------------------------------
+
+        """
+        * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
+          30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
+        * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
+        * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
+        ---
+        рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
+        ---
+        Invention_Chance =
+          Base_Chance *
+          (1 + ((Encryption_Skill_Level / 40) +
+                ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
+               )
+          ) * Decryptor_Modifier
+        """
+        invent_plan.invent_1xN_probability = \
+            invented_product.probability * \
+            1.275 * \
+            (1.0 + decryptor_probability)
+        """
+        limit                   N runs        + decryptor_runs
+        ---------  -------------------  ----------------------
+        200 need                    10                    10+1
+        100%                 200/10=20            200/11=18.18
+        43%        20/43%=46.14 copies  18.18/43%=34.95 copies
+        ---------  -------------------  ----------------------
+        2 need                       1                     1+1
+        100%                     2/1=2                   2/2=1
+        43%          2/43%=4.65 copies       1/43%=2.33 copies
+        ---------  -------------------  ----------------------
+        5 need                       1                     1+1
+        100%                     5/1=5                 5/2=2.5
+        43%         5/43%=11.63 copies     2.5/43%=5.81 copies
+        ---------  -------------------  ----------------------
+        10 need                      1
+        100%                   10/1=10
+        48%        10/48%=20.83 copies
+        ---------  -------------------------------------------
+        140'000 need                                      10+0
+        100%                            140'000/(10*5'000)=2.8
+        48%               (140'000/(10*5'000))/43%=6.51 copies
+        ---------  -------------------------------------------
+        """
+
+        # -----------------------------------------------------
+        # расчёт ориентировочного кол-ва Т2-продукции из копий
+        # ------------------------------------------------------
+
+        # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
+        # T2-продукции, которая может быть получена из C копий с 1 прогонами:
+        invent_plan.invent_Cx1_runs = \
+            (math.ceil(
+                product.requirement.limit /
+                ((invented_product.quantity + decryptor_runs) * invented_bpc.manufacturing.quantity)
+            )) / \
+            invent_plan.invent_1xN_probability
+
+        # ------------------------------------------------------
+        # расчёт количества копий чертежей/штук по N прогонов
+        # ------------------------------------------------------
+
+        # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
+        # на производство), то считаем количество копий чертежей/штук по N прогонов
+        invent_plan.copy_CxN_runs = math.floor(invent_plan.invent_Cx1_runs / invent_plan.max_invent_runs_per_days)
+        invent_plan.copy_CxN_runs = max(1, invent_plan.copy_CxN_runs)
+
+        # ------------------------------------------------------
+        # учёт исключительной ситуации (1 копия с min прогонами)
+        # ------------------------------------------------------
+
+        if invent_plan.copy_CxN_runs == 1:
+            invent_plan.max_invent_runs_per_days = math.floor(invent_plan.invent_Cx1_runs)
+
+        return invent_plan
 
 
 class ConveyorCalculations:

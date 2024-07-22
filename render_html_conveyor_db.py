@@ -1,5 +1,4 @@
-﻿import math
-import json
+﻿import json
 import typing
 import datetime
 import itertools
@@ -855,143 +854,23 @@ def dump_nav_menu_demand_dialog(
                                     f' + {product.analysis_tier3.product_tier1_num_in_jobs}'\
                                     f' + {product.analysis_tier3.product_tier1_num_in_job_runs}'
 
-                invent_plan: str = ''
+                invent_plan: typing.Optional[tools.ConveyorDemands.InventPlan] = \
+                    tools.ConveyorDemands.calculate_invent_plan(
+                        qid,
+                        product,
+                        s)
 
-                if product.requirement.rest_percent <= s.requirements_sold_threshold and \
-                   product.analysis_tier2 and \
-                   product.analysis_tier3 and \
-                   not num_prepared and \
-                   not product.analysis_tier3.product_tier1_num_in_copy_runs and \
-                   not product.analysis_tier3.product_tier1_num_in_jobs:
-                    copied_bpc: db.QSwaggerBlueprint = product.analysis_tier3.product_tier1
-                    copying: typing.Optional[db.QSwaggerBlueprintCopying] = product.analysis_tier3.activity_tier1
-                    invention: typing.Optional[db.QSwaggerBlueprintInvention] = product.analysis_tier2.activity_tier1
-                    if copied_bpc and copying and invention:
-                        invented_product: typing.Optional[db.QSwaggerInventionProduct] = next((_ for _ in invention.products
-                            if _.product_id==product.analysis_tier2.analysis_tier2.product.blueprint_tier1.type_id), None)
-                        invented_bpc = product.analysis_tier2.activity_tier2.blueprint
-                        if invented_product and invented_bpc:
-                            decryptor_probability: float = 0.0
-                            decryptor_runs: int = 0
-                            decryptor_time: float = 0.0
+                invent_plan_str: str = ''
 
-                            decryptor_type: typing.Optional[db.QSwaggerTypeId] = \
-                                tools.which_decryptor_applies_to_blueprint(
-                                    qid,
-                                    tools.coalesce(copied_bpc.blueprint_type, invented_bpc.blueprint_type))
-                            if decryptor_type:
-                                if decryptor_type.type_id == 34201:  # Accelerant Decryptor
-                                    decryptor_probability: float = 0.2  # +20% вероятность успеха
-                                    decryptor_runs: int = 1  # +1 число прогонов проекта
-                                    # decryptor_time: float = 0.1  # не используется: +8% экономия времени производства
-                                elif decryptor_type.type_id == 34206:  # Symmetry Decryptor
-                                    decryptor_probability: float = 0.0  # вероятность успеха не меняется
-                                    decryptor_runs: int = 2  # +2 число прогонов проекта
-                                    # decryptor_time: float = 0.08  # не используется: +8% экономия времени производства
-                                elif decryptor_type.type_id == 34204:  # Parity Decryptor
-                                    decryptor_probability: float = 0.5  # +50% вероятность успеха
-                                    decryptor_runs: int = 3  # +3 число прогонов проекта
-                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени произв.
-                                elif decryptor_type.type_id == 34207:  # Optimized Attainment Decryptor
-                                    decryptor_probability: float = 0.9  # +90% вероятность успеха
-                                    decryptor_runs: int = 2  # +2 число прогонов проекта
-                                    # decryptor_time: float = -0.02  # не используется: -2% экономия времени произв.
-
-                            # выбираем максимальную длительность инвента для данного вида продукта:
-                            #  * все батлы и батлкрузеры инвентим не дольше, чем 4 суток
-                            #  * все остальные предметы не дольше 2х суток
-                            product_market_group: typing.Optional[db.QSwaggerMarketGroup] = \
-                                qid.there_is_market_group_in_chain(
-                                    invented_bpc.manufacturing.product.product_type,
-                                    {1374,  # Battlecruisers (копирка 1:29, инвент 1д 02:28 => 4 суток для 3х прогонов)
-                                     1376,  # Battleships (копирка 2:33, инвент 1д 07:44 => 4 суток для 3х прогонов)
-                                     1080,  # Marauders (копирка 1:47, инвент 1д 07:44 => 2 суток для 1х прогона)
-                                     })
-                            if product_market_group:
-                                if product_market_group.group_id == 1080:
-                                    # марадёры слишком дорогие в постройке, поэтому 1 сутки округлятся до минимальной
-                                    # длительности с тем, чтобы скрафтилось точное количество кораблей в производстве
-                                    num_days: int = 1
-                                else:
-                                    num_days: int = 4
-                            else:
-                                num_days: int = 2
-
-                            # считаем длительность инвента одной копии с одним прогоном
-                            # 30% бонус сооружения, 15% навыки и импланты (минимально необходимый уровень)
-                            invent_1x1_run_time: float = ((invention.time * (1-0.3)) * (1-0.15))
-                            # считаем кол-во прогонов копий чертежей, которые необходимо выбрать при копирке
-                            # (относительно 2х суток)
-                            max_invent_runs_per_days: int = math.floor((86400*num_days) / invent_1x1_run_time)
-                            max_invent_runs_per_days = max(1, max_invent_runs_per_days)
-                            # считаем длительность копирки одной копии с N прогонами
-                            # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
-                            n_run_copy_duration: float = (max_invent_runs_per_days * copying.time * (1-0.3)) * (1-0.363)
-                            """
-                            * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
-                              30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
-                            * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
-                            * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
-                            ---
-                            рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
-                            ---
-                            Invention_Chance =
-                              Base_Chance *
-                              (1 + ((Encryption_Skill_Level / 40) +
-                                    ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
-                                   )
-                              ) * Decryptor_Modifier
-                            """
-                            invent_1xN_probability: float = \
-                                invented_product.probability * \
-                                1.275 * \
-                                (1.0 + decryptor_probability)
-                            """
-                            limit                   N runs        + decryptor_runs
-                            ---------  -------------------  ----------------------
-                            200 need                    10                    10+1
-                            100%                 200/10=20            200/11=18.18
-                            43%        20/43%=46.14 copies  18.18/43%=34.95 copies
-                            ---------  -------------------  ----------------------
-                            2 need                       1                     1+1
-                            100%                     2/1=2                   2/2=1
-                            43%          2/43%=4.65 copies       1/43%=2.33 copies
-                            ---------  -------------------  ----------------------
-                            5 need                       1                     1+1
-                            100%                     5/1=5                 5/2=2.5
-                            43%         5/43%=11.63 copies     2.5/43%=5.81 copies
-                            ---------  -------------------  ----------------------
-                            10 need                      1
-                            100%                   10/1=10
-                            48%        10/48%=20.83 copies
-                            ---------  -------------------------------------------
-                            140'000 need                                      10+0
-                            100%                            140'000/(10*5'000)=2.8
-                            48%               (140'000/(10*5'000))/43%=6.51 copies
-                            ---------  -------------------------------------------
-                            """
-                            # учитываем вероятность успеха инвента T2 чертежей и считаем ориентировочное количество
-                            # T2-продукции, которая может быть получена из C копий с 1 прогонами:
-                            invent_Cx1_runs: float = \
-                                (math.ceil(
-                                    product.requirement.limit /
-                                    ((invented_product.quantity + decryptor_runs) * invented_bpc.manufacturing.quantity)
-                                )) / \
-                                invent_1xN_probability
-                            # поскольку нам необходимо произвести X единиц продукции (в соответствии с ограничениями
-                            # на производство), то считаем количество копий чертежей/штук по N прогонов
-                            copy_CxN_runs: int = math.floor(invent_Cx1_runs / max_invent_runs_per_days)
-                            copy_CxN_runs = max(1, copy_CxN_runs)
-                            if copy_CxN_runs == 1:
-                                max_invent_runs_per_days: int = math.floor(invent_Cx1_runs)
-                            # ---
-                            invent_plan = f'<br><span style="color: #3371b6">{copied_bpc.blueprint_type.name}</span><mute>: ' \
-                                          f'Число копий</mute> {copy_CxN_runs} ' \
-                                          f'<mute>x Прогонов за копию</mute> {max_invent_runs_per_days}'
+                if invent_plan:
+                    invent_plan_str = \
+                        f'<br><span style="color: #3371b6">{invent_plan.copied_bpc.blueprint_type.name}</span><mute>: '\
+                        f'Число копий</mute> {invent_plan.copy_CxN_runs} ' \
+                        f'<mute>x Прогонов за копию</mute> {invent_plan.max_invent_runs_per_days}'
 
                 glf.write(f"""<tr{tr_class}>
 <td scope="row">{row_num}</td>
-<td><qmaterial tid="{product.requirement.type_id}" cl="qind-sign"></qmaterial>{product_info_btn}{product_details_note}{invent_plan}</td>
+<td><qmaterial tid="{product.requirement.type_id}" cl="qind-sign"></qmaterial>{product_info_btn}{product_details_note}{invent_plan_str}</td>
 <td>{100.0 - product.requirement.rest_percent*100.0:,.1f}%</td>
 <td>{product.requirement.limit:,}</td>
 <td>{product.requirement.trade_remain:,}</td>
