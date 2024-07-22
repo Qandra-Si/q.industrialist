@@ -94,7 +94,7 @@ def format_num_of_num(possible: typing.Optional[int], total: int, mute_possible:
 
 
 def sec_to_timestr(time: int, trim_to_10min: bool = True) -> str:
-    if trim_to_10min:
+    if time >= 600 and trim_to_10min:
         time = (time // 600) * 600
     # округляем до 10мин, т.к. всё равно у всех навыки разные, а от обилия циферок рябит в глазах
     res: str = f'{time // 3600:d}:{(time // 60) % 60:02d}'
@@ -162,6 +162,7 @@ class NavMenuDefaults:
         self.phantom_blueprints: bool = False
         self.job_active: bool = False
         self.job_completed: bool = False
+        self.required_blueprints: bool = False
         # ---
         self.used_materials: bool = False
         self.not_available: bool = False
@@ -180,6 +181,8 @@ class NavMenuDefaults:
             return self.lost_items
         elif label == 'phantom-blueprints':
             return self.phantom_blueprints
+        elif label == 'required-blueprints':
+            return self.required_blueprints
         elif label == 'job-active':
             return self.job_active
         # ---
@@ -205,6 +208,8 @@ class NavMenuDefaults:
             opt: bool = self.lost_items
         elif label == 'phantom-blueprints':
             opt: bool = self.phantom_blueprints
+        elif label == 'required-blueprints':
+            opt: bool = self.required_blueprints
         elif label == 'job-active':
             opt: bool = self.job_active
         elif label == 'job-completed':
@@ -227,17 +232,18 @@ g_nav_menu_defaults: NavMenuDefaults = NavMenuDefaults()
 def dump_nav_menu(glf) -> None:
     global g_nav_menu_defaults
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str, bool]]] = [
-        (g_nav_menu_defaults.run_possible,       'run-possible',       'Доступные для запуска работы', True),
-        (g_nav_menu_defaults.run_impossible,     'run-impossible',     'Недоступные для запуска работы', True),
-        (g_nav_menu_defaults.overstock_products, 'overstock-product',  'Избыточные чертежи (перепроизводство)', True),
-        (g_nav_menu_defaults.lost_items,         'lost-items',         'Потерянные предметы (не на своём месте)', True),
-        (g_nav_menu_defaults.phantom_blueprints, 'phantom-blueprints', 'Фантомные чертежи (рассогласованные)', True),
-        (g_nav_menu_defaults.job_active,         'job-active',         'Ведущиеся проекты', True),
-        (g_nav_menu_defaults.job_completed,      'job-completed',      'Завершённые проекты', True),
+        (g_nav_menu_defaults.run_possible,        'run-possible',        'Доступные для запуска работы', True),
+        (g_nav_menu_defaults.run_impossible,      'run-impossible',      'Недоступные для запуска работы', True),
+        (g_nav_menu_defaults.overstock_products,  'overstock-product',   'Избыточные чертежи (перепроизводство)', True),
+        (g_nav_menu_defaults.lost_items,          'lost-items',          'Потерянные предметы (не на своём месте)', True),
+        (g_nav_menu_defaults.phantom_blueprints,  'phantom-blueprints',  'Фантомные чертежи (рассогласованные)', True),
+        (g_nav_menu_defaults.required_blueprints, 'required-blueprints', 'Спрос на продукцию', True),
+        (g_nav_menu_defaults.job_active,          'job-active',          'Ведущиеся проекты', True),
+        (g_nav_menu_defaults.job_completed,       'job-completed',       'Завершённые проекты', True),
         None,
-        (g_nav_menu_defaults.used_materials,     'used-materials',     'Используемые материалы', True),
-        (g_nav_menu_defaults.not_available,      'not-available',      'Недоступные материалы', True),
-        (g_nav_menu_defaults.industry_product,   'industry-product',   'Продукты производства', True),
+        (g_nav_menu_defaults.used_materials,      'used-materials',      'Используемые материалы', True),
+        (g_nav_menu_defaults.not_available,       'not-available',       'Недоступные материалы', True),
+        (g_nav_menu_defaults.industry_product,    'industry-product',    'Продукты производства', True),
         None,
         (True, 'end-level-manuf', "Производство последнего уровня", False),  # btnToggleEndLevelManuf
         (False, 'entry-level-purchasing', "Список для закупки", False),  # btnToggleEntryLevelPurchasing
@@ -759,15 +765,16 @@ def dump_nav_menu_demand_dialog(
 
     for s in conveyor_settings:
         if not demands: break
-        corporation: db.QSwaggerCorporation = s.corporation
-        if not s.calculate_requirements: continue
         # ищем производственный конвейер корпорации
         if db.QSwaggerActivityCode.MANUFACTURING not in s.activities: continue
+        if not s.calculate_requirements: continue
+
+        corporation: db.QSwaggerCorporation = s.corporation
 
         # инициализация списка потребностей (задача копирки), сортировка списка
         requirements: typing.List[tools.ConveyorDemands.Corrected] = [
             _ for _ in demands.ordered_demand
-            # if _.rest_percent <= s.requirements_sold_threshold
+            # if _.requirement.rest_percent <= s.requirements_sold_threshold
         ]
         overstock: typing.List[tools.ConveyorDemands.Corrected] = demands.ordered_overstock
 
@@ -814,35 +821,40 @@ def dump_nav_menu_demand_dialog(
 
                 num_ready: int = 0
                 num_prepared: typing.Optional[int] = None
-                product_info_btn: str = ''
                 product_details_note: str = ''
 
                 if product.analysis_tier2:
                     num_ready: int = product.analysis_tier2.num_ready
                     num_prepared: int = product.analysis_tier2.num_prepared
-                    # формирование отчёта со сведениями о производстве
-                    product_info_btn = '&nbsp;' + format_product_tier2_info_btn(product.analysis_tier2)
                     # не требуется: product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
                     # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                     if (num_ready+num_prepared) > 0 and product.analysis_tier2.product_tier2_overstock:
                         product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
                 elif product.analysis_tier1:
                     num_ready: int = product.analysis_tier1.num_ready
-                    # формирование отчёта со сведениями о производстве
-                    product_info_btn = '&nbsp;' + format_product_tier1_info_btn(product.analysis_tier1)
                     # не требуется: product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
                     # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                     if num_ready > 0 and product.analysis_tier1.product_tier1_overstock:
                         product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+
+                def format_num_with_sup(_prev840: str, _val840: int, _sup840: str) -> str:
+                    if not _prev840:
+                        if _val840 == 0:
+                            return f'<mute>{_val840:,}<sup>{_sup840}</sup></mute>'
+                        else:
+                            return f'{_val840:,}<mute><sup>{_sup840}</sup></mute>'
+                    else:
+                        if _val840 == 0:
+                            return f'{_prev840[:-7]} + {_val840:,}<sup>{_sup840}</sup></mute>'
+                        else:
+                            return f'{_prev840[:-7]} +</mute> {_val840:,}<mute><sup>{_sup840}</sup></mute>'
 
                 str_ready: str = f'{num_ready:,}'
                 if num_ready == product.requirement.trade_remain:
                     str_ready = '<mute>'+str_ready+'</mute>'
                 str_prepared: str = ''
                 if num_prepared is not None:
-                    str_prepared = f'{num_prepared:,}'
-                    if num_prepared == 0:
-                        str_prepared = '<mute>'+str_prepared+'</mute>'
+                    str_prepared = format_num_with_sup('', num_prepared, 'rdy')
 
                 num_originals: str = ''
 
@@ -850,9 +862,12 @@ def dump_nav_menu_demand_dialog(
                 if product.analysis_tier3:
                     if product.analysis_tier3.product_tier1_num_in_originals:
                         num_originals = str(product.analysis_tier3.product_tier1_num_in_originals)
-                    str_prepared += f' + {product.analysis_tier3.product_tier1_num_in_copy_runs}'\
-                                    f' + {product.analysis_tier3.product_tier1_num_in_jobs}'\
-                                    f' + {product.analysis_tier3.product_tier1_num_in_job_runs}'
+                    str_prepared = format_num_with_sup(
+                        str_prepared, product.analysis_tier3.product_tier1_num_in_copy_runs, 'copy')
+                    str_prepared = format_num_with_sup(
+                        str_prepared, product.analysis_tier3.product_tier1_num_in_jobs, 'job')
+                    str_prepared = format_num_with_sup(
+                        str_prepared, product.analysis_tier3.product_tier1_num_in_job_runs, 'run')
 
                 invent_plan: typing.Optional[tools.ConveyorDemands.InventPlan] = \
                     tools.ConveyorDemands.calculate_invent_plan(
@@ -870,7 +885,7 @@ def dump_nav_menu_demand_dialog(
 
                 glf.write(f"""<tr{tr_class}>
 <td scope="row">{row_num}</td>
-<td><qmaterial tid="{product.requirement.type_id}" cl="qind-sign"></qmaterial>{product_info_btn}{product_details_note}{invent_plan_str}</td>
+<td><qmaterial tid="{product.requirement.type_id}" cl="qind-sign"></qmaterial>{product_details_note}{invent_plan_str}</td>
 <td>{100.0 - product.requirement.rest_percent*100.0:,.1f}%</td>
 <td>{product.requirement.limit:,}</td>
 <td>{product.requirement.trade_remain:,}</td>
@@ -1508,6 +1523,105 @@ def dump_list_of_possible_blueprints(
 </tr>""")
 
 
+def dump_list_of_blueprint_requirements(
+        glf,
+        # данные для генератора тэга сортировки
+        priority: int,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # настройки генерации отчёта
+        settings: tools.ConveyorSettings,
+        # список потребностей (задача копирки)
+        requirements: typing.List[tools.ConveyorDemands.Corrected]) -> None:
+    for product in requirements:
+        if product.requirement.rest_percent > settings.requirements_sold_threshold:
+            continue
+
+        num_ready: int = 0
+        num_prepared: typing.Optional[int] = None
+        product_info_btn: str = ''
+        overstock: bool = False
+
+        if product.analysis_tier2:
+            num_ready: int = product.analysis_tier2.num_ready
+            num_prepared: int = product.analysis_tier2.num_prepared
+            # формирование отчёта со сведениями о производстве
+            product_info_btn = '&nbsp;' + format_product_tier2_info_btn(product.analysis_tier2)
+            # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+            if (num_ready + num_prepared) > 0 and product.analysis_tier2.product_tier2_overstock:
+                overstock = True
+        elif product.analysis_tier1:
+            num_ready: int = product.analysis_tier1.num_ready
+            # формирование отчёта со сведениями о производстве
+            product_info_btn = '&nbsp;' + format_product_tier1_info_btn(product.analysis_tier1)
+            # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+            if num_ready > 0 and product.analysis_tier1.product_tier1_overstock:
+                overstock = True
+
+        if overstock: continue
+
+        invent_plan: typing.Optional[tools.ConveyorDemands.InventPlan] = \
+            tools.ConveyorDemands.calculate_invent_plan(
+                qid,
+                product,
+                settings)
+
+        if not invent_plan: continue
+
+        str_ready: str = f'{num_ready:,}'
+        if num_ready == product.requirement.trade_remain:
+            str_ready = '<mute>' + str_ready + '</mute>'
+        str_prepared: str = ''
+        if num_prepared is not None:
+            str_prepared = f'{num_prepared:,}'
+            if num_prepared == 0:
+                str_prepared = '<mute>' + str_prepared + '</mute>'
+
+        num_originals: str = '-'
+
+        # TODO: костыль, удалить!
+        if product.analysis_tier3:
+            if product.analysis_tier3.product_tier1_num_in_originals:
+                num_originals = str(product.analysis_tier3.product_tier1_num_in_originals)
+            str_prepared += f' + {product.analysis_tier3.product_tier1_num_in_copy_runs}' \
+                            f' + {product.analysis_tier3.product_tier1_num_in_jobs}' \
+                            f' + {product.analysis_tier3.product_tier1_num_in_job_runs}'
+
+        invent_plan_str: str = f'<mute>Число копий</mute> <b>{invent_plan.copy_CxN_runs}</b> ' + \
+                               f'<mute>x Прогонов за копию</mute> <b>{invent_plan.max_invent_runs_per_days}</b>'
+
+        type_id: int = invent_plan.copied_bpc.blueprint_type.type_id
+        type_name: str = invent_plan.copied_bpc.blueprint_type.name
+        duration: int = int(invent_plan.copy_CxN_duration)
+        activities: typing.List[db.QSwaggerActivityCode] = [db.QSwaggerActivityCode.COPYING]
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=(duration, duration))
+        activity_icons: str = get_industry_icons(activities)
+
+        blueprint_copy_btn: str = \
+            f'&nbsp;<a data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn"' \
+            f' data-toggle="tooltip">{glyphicon("copy")}</a>'
+
+        product_details_note: str = \
+            f' <mute>- выставлено на продажу</mute> {product.requirement.trade_remain:,}' \
+            f'<mute>, потребность - </mute> {100.0 - product.requirement.rest_percent * 100.0:,.1f}%'
+
+        glf.write(f"""<tr
+ class="required-blueprints{g_nav_menu_defaults.css('required-blueprints')}"
+ {format_json_data('sort', sort)}>
+<td>{get_tbl_summary_row_num()}</td>
+<td><img class="icn32" src="{render_html.__get_img_src(type_id, 32)}"></td>
+<td>{activity_icons}&nbsp;<qname>{type_name}</qname>{product_info_btn}{blueprint_copy_btn}{product_details_note}<br>
+{invent_plan_str}</td>
+<td>{num_originals}</td>
+<td>{sec_to_timestr(duration)}</td>
+<td></td><td></td><td></td>
+</tr>\n""")
+
+
 def dump_conveyor_banner(
         glf,
         label: str,
@@ -1531,10 +1645,14 @@ def dump_conveyor_banner(
 
 def dump_corp_conveyors(
         glf,
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
         # результат анализа содержимого конвейерных коробок
         corp_conveyors_calcs: tools.ConveyorCalculations,
         # анализ чертежей на предмет перепроизводства
         industry_analysis: tools.ConveyorIndustryAnalysis,
+        # анализ требований на предмет копирки
+        demands: typing.Optional[tools.ConveyorDemands],
         # настройки генерации отчёта
         conveyor_settings: typing.List[tools.ConveyorSettings]) -> None:
     # проверка, пусты ли настройки конвейера?
@@ -1615,6 +1733,32 @@ def dump_corp_conveyors(
                     settings.activities,
                     corporation,
                     prioritized.lost_asset_items)
+
+    once: bool = True
+    for manufacturing_conveyor in conveyor_settings:
+        if not demands: break
+        # ищем производственный конвейер корпорации
+        if db.QSwaggerActivityCode.MANUFACTURING not in manufacturing_conveyor.activities: continue
+        if not manufacturing_conveyor.calculate_requirements: continue
+
+        priority: int = 0
+        activities: typing.List[db.QSwaggerActivityCode] = [db.QSwaggerActivityCode.COPYING]
+        if once:
+            once = False
+            dump_conveyor_banner(glf, '', None, activities, additional_class=['hidden'])
+            dump_conveyor_banner(glf, f'Приоритет {priority}', priority, activities)
+
+        # инициализация списка потребностей (задача копирки)
+        requirements: typing.List[tools.ConveyorDemands.Corrected] = [
+            _ for _ in demands.ordered_demand
+            if _.requirement.rest_percent <= manufacturing_conveyor.requirements_sold_threshold
+        ]
+        dump_list_of_blueprint_requirements(
+            glf,
+            priority,
+            qid,
+            manufacturing_conveyor,
+            requirements)
 
     glf.write("""
 </tbody>
@@ -2001,8 +2145,10 @@ def dump_router2_into_report(
         # компоновка высшего уровня конвейера
         dump_corp_conveyors(
             glf,
+            qid,
             corp_conveyors_calcs,
             industry_analysis,
+            demands,
             conveyor_settings)
         # компоновка маршрутизатора по факту наличия ассетов для перемещения
         dump_corp_router(

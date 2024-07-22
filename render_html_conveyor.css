@@ -151,6 +151,7 @@ table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) { 
 table.tbl-summary tbody tr.job-completed :is(td:nth-child(3),td:nth-child(4)) mute { color: #444; }
 table.tbl-summary tbody tr.lost-jobs,
 table.tbl-summary tbody tr.lost-blueprints,
+table.tbl-summary tbody tr.required-blueprints,
 table.tbl-summary tbody tr.lost-assets { }
 table.tbl-summary tbody tr.phantom-blueprints { opacity: 0.15; }
 table.tbl-summary tbody tr.row-overstock,

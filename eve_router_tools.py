@@ -2291,6 +2291,7 @@ class ConveyorDemands:
             self.invent_1xN_probability: float = 0.0
             self.invent_Cx1_runs: float = 0.0
             self.copy_CxN_runs: int = 0
+            self.copy_CxN_duration: float = 0.0
 
     @staticmethod
     def calculate_invent_plan(
@@ -2419,13 +2420,6 @@ class ConveyorDemands:
         invent_plan.max_invent_runs_per_days = max(1, invent_plan.max_invent_runs_per_days)
 
         # ------------------------------------------------------
-        # расчёт длительности копирки одной копии с N прогонами
-        # ------------------------------------------------------
-
-        # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
-        n_run_copy_duration: float = (invent_plan.max_invent_runs_per_days * copying.time * (1 - 0.3)) * (1 - 0.363)
-
-        # ------------------------------------------------------
         # определение вероятности успеха инвента
         # ------------------------------------------------------
 
@@ -2501,6 +2495,16 @@ class ConveyorDemands:
 
         if invent_plan.copy_CxN_runs == 1:
             invent_plan.max_invent_runs_per_days = math.floor(invent_plan.invent_Cx1_runs)
+
+        # ------------------------------------------------------
+        # расчёт длительности копирки одной копии с N прогонами
+        # ------------------------------------------------------
+
+        # 30% бонус сооружения, 36.3% навыки и импланты (минимально необходимый уровень)
+        invent_plan.copy_CxN_duration = (
+            (invent_plan.copy_CxN_runs * invent_plan.max_invent_runs_per_days * invent_plan.copying.time * (1 - 0.3)) *
+            (1 - 0.363)
+        )
 
         return invent_plan
 

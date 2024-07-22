@@ -442,6 +442,7 @@ function rebuildConveyorTable() {
  var show_lost = (getOption('option', 'lost-items') == 1) ? 1 : 0;
  var show_overstock = (getOption('option', 'overstock-product') == 1) ? 1 : 0;
  var show_phantom = (getOption('option', 'phantom-blueprints') == 1) ? 1 : 0;
+ var show_required = (getOption('option', 'required-blueprints') == 1) ? 1 : 0;
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
  var show_completed = (getOption('option', 'job-completed') == 1) ? 1 : 0;
 
@@ -478,6 +479,8 @@ function rebuildConveyorTable() {
    changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
   else if (tr.hasClass('phantom-blueprints'))
    changeElemVisibility(tr, hide_conveyor * show_phantom);
+  else if (tr.hasClass('required-blueprints'))
+   changeElemVisibility(tr, hide_conveyor * show_required);
   else if (tr.hasClass('job-active'))
    changeElemVisibility(tr, hide_conveyor * show_active);
   else if (tr.hasClass('job-completed'))
