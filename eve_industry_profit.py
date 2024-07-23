@@ -146,6 +146,7 @@ def generate_materials_tree(
                     products_per_single_run,
                     single_run_time)
                 q_material.set_industry(next_industry)
+                next_industry.set_me(10 if activity == 'manufacturing' else 0)  # TODO: эту манипуляцию надо сделать через чертежи!
                 # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
                 # для нового уровня вложенности
                 generate_materials_tree(
