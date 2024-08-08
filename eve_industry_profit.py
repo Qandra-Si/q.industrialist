@@ -8,7 +8,7 @@ import render_html
 import eve_sde_tools
 import eve_efficiency
 import console_app
-import profit.industry_plan
+import profit
 
 """
 Некоторые данные для отладки:
@@ -445,10 +445,8 @@ def copy_reused_industry_plan__internal(
     reused_activity: profit.QPlannedActivity = planned_material.obtaining_plan.activity_plan
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
-        profit.QPlannedBlueprint(),
-        reused_activity.planned_blueprints,
-        reused_activity.planned_runs,
-        reused_activity.planned_quantity)
+        reused_activity.planned_blueprint,
+        reused_activity.planned_blueprints)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -599,11 +597,25 @@ def generate_industry_plan__internal(
     assert planned_runs > 0
     assert planned_quantity > 0
 
+    # формируем чертёж
+    current_level_blueprint: profit.QPlannedBlueprint = profit.QPlannedBlueprint(
+        profit.QMaterial(industry.blueprint_type_id,
+                         1,
+                         industry.blueprint_name,
+                         0,
+                         "",
+                         0.01,
+                         0),
+        1.0,
+        planned_quantity,
+        planned_runs,
+        industry.me,
+        0)
+
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
-        planned_blueprints,
-        planned_runs,
-        planned_quantity)
+        current_level_blueprint,
+        planned_blueprints)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -752,7 +764,7 @@ def generate_industry_plan__internal(
             if not used_rest_materials and not not_enough_materials:
                 assert 0  # TODO: это случай с расчётом остатков в коробках
 
-                # если материал и не производится, и не берётся из остатков производства, то он берётся ли бо из
+                # если материал и не производится, и не берётся из остатков производства, то он берётся либо из
                 # ассетов (assets), либо находится в процессе производства (in_progress)
                 warehoused_material: profit.QPlannedMaterial = profit.QPlannedMaterial(
                     m,
@@ -806,8 +818,8 @@ def generate_industry_plan(
     # в настройках производства д.б. заранее задано кол-во запусков - учитываем параметр customized_runs
     base_activity: profit.QPlannedActivity = generate_industry_plan__internal(
         None,
-        customized_runs,
         1,
+        customized_runs,
         base_industry.products_per_single_run * customized_runs,
         1.0,
         base_industry,
@@ -1006,14 +1018,14 @@ def render_report(
                            '{:.1f}'.format(  # 1.prob
                                100.0*m1_industry.probability
                            ) if not industry_plan.customization or not industry_plan.customization.min_probability else
-                           '({:.1f}+{:.1f})'.format(
+                           '({:.1f}*{:.1f})'.format(
                                100.0*m1_industry.probability,
                                industry_plan.customization.min_probability
                            ),
                            m1_planned_blueprints * m1_planned_runs * m1_material.quantity * m1_industry.probability * (
                                1.0 if not industry_plan.customization or
                                       not industry_plan.customization.min_probability else
-                               1+industry_plan.customization.min_probability/100.0
+                               industry_plan.customization.min_probability/100.0
                            ) * 100.0  # 2.out
                        ) if m1_science else
                        '<small>'
@@ -1294,7 +1306,8 @@ def main():
     # однако это не относится к другим типам activity !!!
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
-        {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        {'bptid': 10632, 'qr': 11, 'me': 4, 'te': 14},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
@@ -1307,8 +1320,20 @@ def main():
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
     # см. также eve_conveyor_tools.py : setup_blueprint_details
     calc_customization = {
-        # 'reaction_runs': 15,
+        'reaction_runs': 15,
         # 'industry_time': 5 * 60 * 60 * 24,
+        # === min_probability ===
+        # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
+        #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
+        # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
+        # * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
+        # рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
+        # Invention_Chance =
+        #  Base_Chance *
+        #  (1 + ((Encryption_Skill_Level / 40) +
+        #        ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
+        #       )
+        #  ) * Decryptor_Modifier
         'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
     }
 
