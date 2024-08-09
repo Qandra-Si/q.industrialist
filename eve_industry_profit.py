@@ -233,35 +233,35 @@ def schedule_industry_job__invent(
     elif blueprint_me == (2+2) and blueprint_te == (4+10) and blueprint_runs == (blueprint_runs_per_single_copy+1):
         # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
         invent_materials.append({'typeID': 34201, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.2))
+        invent_industry.set_decryptor_probability(+0.2)
     elif blueprint_me == (2-1) and blueprint_te == (4+4) and blueprint_runs == (blueprint_runs_per_single_copy+4):
         # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
         invent_materials.append({'typeID': 34202, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.8))
+        invent_industry.set_decryptor_probability(+0.8)
     elif blueprint_me == (2-2) and blueprint_te == (4+2) and blueprint_runs == (blueprint_runs_per_single_copy+9):
         # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
         invent_materials.append({'typeID': 34203, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 - 0.4))
+        invent_industry.set_decryptor_probability(-0.4)
     elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+2):
         # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
         invent_materials.append({'typeID': 34207, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.9))
+        invent_industry.set_decryptor_probability(+0.9)
     elif blueprint_me == (2+2) and blueprint_te == (4+0) and blueprint_runs == (blueprint_runs_per_single_copy+7):
         # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
         invent_materials.append({'typeID': 34208, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 - 0.1))
+        invent_industry.set_decryptor_probability(-0.1)
     elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+3):
         # Parity Decryptor : probability +50%, runs +3, me +1, te -2
         invent_materials.append({'typeID': 34204, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.5))
+        invent_industry.set_decryptor_probability(+0.5)
     elif blueprint_me == (2+3) and blueprint_te == (4+6) and blueprint_runs == (blueprint_runs_per_single_copy+0):
         # Process Decryptor : probability +10%, runs +0, me +3, te +6
         invent_materials.append({'typeID': 34205, 'quantity': 1})
-        invent_industry.set_probability(invent_probability * (1.0 + 0.1))
+        invent_industry.set_decryptor_probability(+0.1)
     elif blueprint_me == (2+1) and blueprint_te == (4+8) and blueprint_runs == (blueprint_runs_per_single_copy+2):
         # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
         invent_materials.append({'typeID': 34206, 'quantity': 1})
-        # не меняется: invent_industry.set_probability(invent_probability * (1.0 + 0))
+        invent_industry.set_decryptor_probability(+0.0)
     else:
         assert 0
 
@@ -407,11 +407,15 @@ def calculate_industry_ratio(
         industry_plan: profit.QIndustryPlan) -> float:
     if industry.action and industry.action in [profit.QIndustryAction.copying, profit.QIndustryAction.invent]:
         # сохраняем пропорцию использования текущего материала для текущей работы
-        usage_ratio: float = \
-            float(materials_quantity) / industry_output * \
-            (1 / industry.probability)
+        invent_probability: float = industry.invent_probability
+        decryptor_probability: float = 1.0
+        if industry.decryptor_probability is not None:
+            decryptor_probability: float = 1.0 + industry.decryptor_probability  # сумма м.б. меньше 1.0
+        skill_probability: float = 1.0
         if industry_plan.customization and industry_plan.customization.min_probability:
-            usage_ratio /= ((100.0 + industry_plan.customization.min_probability) / 100.0)
+            skill_probability = (100.0 + industry_plan.customization.min_probability) / 100.0
+        probability: float = invent_probability * decryptor_probability * skill_probability
+        usage_ratio: float = float(materials_quantity) / industry_output * (1 / probability)
         # сохраняем сведения о пропорциях использования материалов
         produced_material.store_usage_ratio(usage_ratio)
         return usage_ratio
@@ -1015,17 +1019,27 @@ def render_report(
                            m1_planned_blueprints,  # 1.bp
                            m1_planned_runs,  # 1.run
                            m1_material.quantity,  # 1.qty
-                           '{:.1f}'.format(  # 1.prob
-                               100.0*m1_industry.probability
+                           '{:.1f}{}'.format(  # 1.prob
+                               100.0*m1_industry.invent_probability,
+                               '' if m1_industry.decryptor_probability is None else
+                               '×{:.1f}'.format(100.0*m1_industry.decryptor_probability)
                            ) if not industry_plan.customization or not industry_plan.customization.min_probability else
-                           '({:.1f}*{:.1f})'.format(
-                               100.0*m1_industry.probability,
+                           '({:.1f}{}×{:.1f})'.format(
+                               100.0*m1_industry.invent_probability,
+                               '' if m1_industry.decryptor_probability is None else
+                               '×{:.1f}'.format(100.0*m1_industry.decryptor_probability),
                                industry_plan.customization.min_probability
                            ),
-                           m1_planned_blueprints * m1_planned_runs * m1_material.quantity * m1_industry.probability * (
+                           m1_planned_blueprints * \
+                           m1_planned_runs * \
+                           m1_material.quantity * \
+                           m1_industry.invent_probability * (  # Purifier : 30x20x27.5 => 0.3*1.2*1.275 => 45.9%
+                               1.0 if m1_industry.decryptor_probability is None else
+                               (1.0+m1_industry.decryptor_probability)
+                           ) * (
                                1.0 if not industry_plan.customization or
                                       not industry_plan.customization.min_probability else
-                               industry_plan.customization.min_probability/100.0
+                               (100.0+industry_plan.customization.min_probability)/100.0
                            ) * 100.0  # 2.out
                        ) if m1_science else
                        '<small>'
@@ -1307,11 +1321,13 @@ def main():
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
         # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
-        {'bptid': 10632, 'qr': 11, 'me': 4, 'te': 14},  # Rocket Launcher II
+        {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
+        # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
+        # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
     ]
     #with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
     #    s = f.read()

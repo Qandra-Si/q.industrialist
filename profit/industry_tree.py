@@ -96,7 +96,8 @@ class QIndustryTree:
         # ассетах чертежей), данные параметры должны быть упомянуты в QPlannedActivity
         self.__me: int = 10 if action.value == QIndustryAction.manufacturing else 0
         self.__blueprint_runs_per_single_copy: typing.Optional[int] = None
-        self.__probability: typing.Optional[float] = None
+        self.__invent_probability: typing.Optional[float] = None
+        self.__decryptor_probability: typing.Optional[float] = None
 
     @property
     def blueprint_type_id(self) -> int:
@@ -148,8 +149,15 @@ class QIndustryTree:
         self.__blueprint_runs_per_single_copy = blueprint_runs_per_single_copy
 
     @property
-    def probability(self) -> typing.Optional[float]:
-        return self.__probability
+    def invent_probability(self) -> typing.Optional[float]:
+        return self.__invent_probability
 
-    def set_probability(self, probability: float):
-        self.__probability = probability
+    def set_probability(self, invent_probability: float):
+        self.__invent_probability = invent_probability
+
+    @property
+    def decryptor_probability(self) -> typing.Optional[float]:
+        return self.__decryptor_probability
+
+    def set_decryptor_probability(self, decryptor_probability: float):
+        self.__decryptor_probability = decryptor_probability
