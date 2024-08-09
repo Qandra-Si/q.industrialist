@@ -187,6 +187,55 @@ def schedule_industry_job__invent(
     blueprints_market_group: int = 2
     blueprints_group_name: str = sde_market_groups[str(blueprints_market_group)]['nameID']['en']
 
+    # пытаемся получить чертёж и параметры копирки (если она предполагается для этого чертежа)
+    copying_dict = eve_sde_tools.get_blueprint_copying_activity(
+        sde_bp_materials,
+        source_blueprint_type_id)
+    # если копирка данного чертежа возможен, то добавляем в дерево работ копирку и материалы
+    if copying_dict:
+        copying_run_time: int = copying_dict.get('time', 0)
+        _copying_materials = copying_dict.get('materials', [])
+
+        # пополняем список материалов T1 чертежом
+        copying_material: profit.QMaterial = profit.QMaterial(
+            source_blueprint_type_id,
+            1,
+            copied_blueprint_name,
+            blueprints_market_group,
+            blueprints_group_name,
+            0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
+            0.0)  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
+        curr_industry.append_material(copying_material)
+
+        # считаем копирку
+        copying_industry: profit.QIndustryTree = profit.QIndustryTree(
+            source_blueprint_type_id,
+            copied_blueprint_name,
+            source_blueprint_type_id,
+            copied_blueprint_name,
+            profit.QIndustryAction.copying,
+            1,
+            copying_run_time)
+        copying_industry.set_blueprint_runs_per_single_copy(1)
+        # copying_industry.set_probability(1.0)
+        copying_material.set_industry(copying_industry)
+
+        # в список материалов подкладываем чертёж, который должен скопироваться N раз
+        # invent_materials = _invent_materials[:]
+        copying_materials = []
+        copying_materials.append({'typeID': source_blueprint_type_id, 'quantity': 1})
+        copying_materials.extend(_copying_materials)
+
+        # считаем работу с материалами для этого типа копирки (копирка с материалами существует только для T2 BPO,
+        # есть и такие в Евке)
+        generate_materials_tree(
+            copying_materials,
+            copying_industry,
+            sde_type_ids,
+            sde_bp_materials,
+            sde_market_groups,
+            eve_market_prices_data)
+
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
         blueprint_type_id,
@@ -273,9 +322,6 @@ def schedule_industry_job__invent(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data)
-    # работу с материалами для этого типа копирки не считаем и не запускаем, потому как копирка с материалами существует
-    # только для T2 BPO (есть и такие в Евке), а для копирки обычных T1 материалы не нужны, только иски
-    # ...
 
 
 def generate_industry_tree(
@@ -405,7 +451,7 @@ def calculate_industry_ratio(
         industry: profit.QIndustryTree,
         # справочник текущего производства с настройками оптимизации процесса
         industry_plan: profit.QIndustryPlan) -> float:
-    if industry.action and industry.action in [profit.QIndustryAction.copying, profit.QIndustryAction.invent]:
+    if industry.action and industry.action in [profit.QIndustryAction.invent]:
         # сохраняем пропорцию использования текущего материала для текущей работы
         invent_probability: float = industry.invent_probability
         decryptor_probability: float = 1.0
@@ -606,9 +652,9 @@ def generate_industry_plan__internal(
         profit.QMaterial(industry.blueprint_type_id,
                          1,
                          industry.blueprint_name,
-                         0,
-                         "",
-                         0.01,
+                         2,
+                         "Blueprints & Reactions",  # sde_market_groups[str(blueprints_market_group)]['nameID']['en']
+                         0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
                          0),
         1.0,
         planned_quantity,
@@ -955,8 +1001,9 @@ def render_report(
             m1_tnm: str = m1_material.name
             m1_quantity: int = m1_material.quantity
 
-            m1_science: bool = m1_industry and m1_industry.action in [profit.QIndustryAction.copying, profit.QIndustryAction.invent]
-            if m1_science:
+            m1_copying: bool = m1_industry and m1_industry.action == profit.QIndustryAction.copying
+            m1_invention: bool = m1_industry and m1_industry.action == profit.QIndustryAction.invent
+            if m1_copying or m1_invention:
                 m1_planned_blueprints: int = 1
                 m1_planned_runs: int = 1
             else:
@@ -1041,7 +1088,18 @@ def render_report(
                                       not industry_plan.customization.min_probability else
                                (100.0+industry_plan.customization.min_probability)/100.0
                            ) * 100.0  # 2.out
-                       ) if m1_science else
+                       ) if m1_invention else
+                       '<small>'
+                       '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>qty</sup> => '
+                       '{:.1f}<sup>out</sup>'
+                       '</small>'.format(
+                           m1_planned_blueprints,  # 1.bp
+                           m1_planned_runs,  # 1.run
+                           m1_material.quantity,  # 1.qty
+                           m1_planned_blueprints * \
+                           m1_planned_runs * \
+                           m1_material.quantity  # 2.out
+                       ) if m1_copying else
                        '<small>'
                        '{}<sup>bp</sup>*{}<sup>run</sup>*{}<sup>qty</sup> => '
                        '{}<sup>me</sup> '

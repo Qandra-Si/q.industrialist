@@ -359,6 +359,10 @@ def get_blueprint_any_materials(blueprints, activity: str, type_id: int):
     return a['materials']
 
 
+def get_blueprint_copying_activity(sde_bp_materials, type_id: int):
+    return get_blueprint_any_activity(sde_bp_materials, 'copying', type_id)
+
+
 def get_blueprint_manufacturing_activity(blueprints, type_id: int):
     return get_blueprint_any_activity(blueprints, 'manufacturing', type_id)
 
