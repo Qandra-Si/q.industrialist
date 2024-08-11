@@ -1,6 +1,32 @@
-﻿import typing
+﻿""" Q.EVE Industry Profit (desktop/mobile)
+
+Prerequisites:
+    * Have a Python 3 environment available to you (possibly by using a
+      virtual environment: https://virtualenv.pypa.io/en/stable/).
+    * Run pip install -r requirements.txt with this directory as your root.
+
+    * Copy q_industrialist_settings.py.template into q_industrialist_settings.py and
+      mood for your needs.
+    * Create an SSO application at developers.eveonline.com with the scopes
+      from g_client_scope list declared in q_industrialist_settings.py and the
+      callback URL "https://localhost/callback/".
+      Note: never use localhost as a callback in released applications.
+
+To run this example, make sure you have completed the prerequisites and then
+run the following command from this directory as the root:
+
+$ chcp 65001 & @rem on Windows only!
+$ python eve_sde_tools.py --cache_dir=~/.q_industrialist
+$ python eve_industry_profit.py --pilot="Qandra Si" --online --cache_dir=~/.q_industrialist
+
+Requires application scopes:
+    * Public scopes
+"""
+import sys
+import typing
 import math
 import json
+import requests
 
 from memory_profiler import profile
 
@@ -9,6 +35,10 @@ import eve_sde_tools
 import eve_efficiency
 import console_app
 import profit
+import q_industrialist_settings
+
+import eve_esi_interface as esi
+from __init__ import __version__
 
 """
 Некоторые данные для отладки:
@@ -1363,10 +1393,59 @@ def main():
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
     argv_prms = console_app.get_argv_prms()
 
+    # настройка Eve Online ESI Swagger interface
+    auth = esi.EveESIAuth(
+        '{}/auth_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        debug=True)
+    client = esi.EveESIClient(
+        auth,
+        keep_alive=True,
+        debug=argv_prms["verbose_mode"],
+        logger=True,
+        user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+    interface = esi.EveOnlineInterface(
+        client,
+        q_industrialist_settings.g_client_scope,
+        cache_dir='{}/esi_cache'.format(argv_prms["workspace_cache_files_dir"]),
+        offline_mode=argv_prms["offline_mode"])
+
+    authz = interface.authenticate(argv_prms["character_names"][0])
+    character_id = authz["character_id"]
+    character_name = authz["character_name"]
+
+    # Public information about a character
+    character_data = interface.get_esi_data(
+        "characters/{}/".format(character_id),
+        fully_trust_cache=True)
+    # Public information about a corporation
+    corporation_data = interface.get_esi_data(
+        "corporations/{}/".format(character_data["corporation_id"]),
+        fully_trust_cache=True)
+
+    corporation_id = character_data["corporation_id"]
+    corporation_name = corporation_data["name"]
+    print("\n{} is from '{}' corporation".format(character_name, corporation_name))
+    sys.stdout.flush()
+
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
+
+    try:
+        # Public information about market prices
+        eve_market_prices_data = interface.get_esi_data("markets/prices/")
+        print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
+        sys.stdout.flush()
+    except requests.exceptions.HTTPError as err:
+        status_code = err.response.status_code
+        if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
+            eve_market_prices_data = []
+        else:
+            raise
+    except:
+        print(sys.exc_info())
+        raise
 
     # входные данные для расчёта: тип чертежа и сведения о его material efficiency
     # идентификатор industry-чертежа всегда уникально указывает на тип продукта:
@@ -1420,7 +1499,7 @@ def main():
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
-            [])
+            eve_market_prices_data)
 
         # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
         industry_plan: profit.QIndustryPlan = generate_industry_plan(
