@@ -36,6 +36,7 @@ import eve_efficiency
 import console_app
 import profit
 import q_industrialist_settings
+import q_router_settings
 
 import eve_esi_interface as esi
 from __init__ import __version__
@@ -132,6 +133,30 @@ def get_material_adjusted_price(type_id: int, sde_type_ids, eve_market_prices_da
     return price
 
 
+def get_industry_cost_index(
+        product_type_id: int,
+        action: str,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) \
+        -> typing.Tuple[profit.QIndustryCostIndices, float]:
+    # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+    system_indices: profit.QIndustryCostIndices = next((
+        _ for _ in industry_cost_indices
+        if product_type_id in _.product_ids), None)
+    if system_indices is None:
+        system_indices = next((
+            _ for _ in industry_cost_indices
+            if not _.product_ids), None)
+    assert system_indices is not None
+    # получаем производственный индекс в системе
+    cost_index: float = next((
+        float(_['cost_index']) for _ in system_indices.cost_indices
+        if _['activity'] == action), None)
+    assert cost_index is not None
+    # возвращаем tuple
+    return system_indices, cost_index
+
+
 # составляем дерево материалов, которые будут использоваться в производстве
 def generate_materials_tree(
         # входной список материалов, используемых в производстве
@@ -143,7 +168,9 @@ def generate_materials_tree(
         sde_bp_materials,
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
-        eve_market_prices_data):
+        eve_market_prices_data,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
     for m1 in enumerate(curr_materials, start=1):
         material_tid: int = int(m1[1]['typeID'])
         material_qty: int = int(m1[1]['quantity'])
@@ -181,6 +208,11 @@ def generate_materials_tree(
                 products_per_single_run: int = blueprint_dict['products'][0]['quantity']
                 single_run_time: int = blueprint_dict['time']
                 next_materials = blueprint_dict['materials']
+                # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+                system_indices, cost_index = get_industry_cost_index(
+                    material_tid,
+                    activity,
+                    industry_cost_indices)
                 # в этой точке понятно, что данный материал можно произвести, поэтому список материалов для него будет
                 # пополнен более сложным способом
                 next_industry: profit.QIndustryTree = profit.QIndustryTree(
@@ -190,7 +222,9 @@ def generate_materials_tree(
                     material_name,
                     material_produce_action,
                     products_per_single_run,
-                    single_run_time)
+                    single_run_time,
+                    system_indices,
+                    cost_index)
                 q_material.set_industry(next_industry)
                 # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
                 # для нового уровня вложенности
@@ -200,7 +234,8 @@ def generate_materials_tree(
                     sde_type_ids,
                     sde_bp_materials,
                     sde_market_groups,
-                    eve_market_prices_data)
+                    eve_market_prices_data,
+                    industry_cost_indices)
                 break
     # считаем EIV, который потребуется для вычисления стоимости job cost
     curr_industry.set_estimated_items_value(
@@ -222,7 +257,9 @@ def schedule_industry_job__invent(
         sde_bp_materials,
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
-        eve_market_prices_data):
+        eve_market_prices_data,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
     # пытаемся получить чертёж и параметры инвента (если он предполагается для этого чертежа)
     source_blueprint_type_id, invent_dict = eve_sde_tools.get_blueprint_type_id_by_invention_product_id(
         blueprint_type_id,
@@ -259,6 +296,12 @@ def schedule_industry_job__invent(
             0.0)
         curr_industry.append_material(copying_material)
 
+        # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+        system_indices, cost_index = get_industry_cost_index(
+            source_blueprint_type_id,
+            'copying',
+            industry_cost_indices)
+
         # считаем копирку
         copying_industry: profit.QIndustryTree = profit.QIndustryTree(
             source_blueprint_type_id,
@@ -267,7 +310,9 @@ def schedule_industry_job__invent(
             copied_blueprint_name,
             profit.QIndustryAction.copying,
             1,
-            copying_run_time)
+            copying_run_time,
+            system_indices,
+            cost_index)
         copying_industry.set_blueprint_runs_per_single_copy(1)
         # copying_industry.set_probability(1.0)
         copying_material.set_industry(copying_industry)
@@ -286,7 +331,8 @@ def schedule_industry_job__invent(
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
-            eve_market_prices_data)
+            eve_market_prices_data,
+            industry_cost_indices)
 
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
@@ -311,6 +357,12 @@ def schedule_industry_job__invent(
     _invent_materials = invent_dict['materials']
     invent_probability: float = invent_product_dict['probability']
 
+    # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+    system_indices, cost_index = get_industry_cost_index(
+        blueprint_type_id,
+        'invention',
+        industry_cost_indices)
+
     # инициализируем базовый объект-справочник со сведениями о производстве
     invent_industry: profit.QIndustryTree = profit.QIndustryTree(
         source_blueprint_type_id,
@@ -319,7 +371,9 @@ def schedule_industry_job__invent(
         invented_blueprint_name,
         profit.QIndustryAction.invent,
         1,
-        invent_run_time)
+        invent_run_time,
+        system_indices,
+        cost_index)
     invent_industry.set_blueprint_runs_per_single_copy(blueprint_runs_per_single_copy)
     invent_industry.set_probability(invent_probability)
     invented_material.set_industry(invent_industry)
@@ -374,7 +428,8 @@ def schedule_industry_job__invent(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        eve_market_prices_data)
+        eve_market_prices_data,
+        industry_cost_indices)
 
 
 def generate_industry_tree(
@@ -385,7 +440,9 @@ def generate_industry_tree(
         sde_bp_materials,
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
-        eve_market_prices_data) -> profit.QIndustryTree:
+        eve_market_prices_data,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> profit.QIndustryTree:
     blueprint_type_id = calc_input.get('bptid')
     assert blueprint_type_id is not None
 
@@ -401,6 +458,12 @@ def generate_industry_tree(
     base_materials = bp0_dict.get('materials')
     assert base_materials is not None
 
+    # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+    system_indices, cost_index = get_industry_cost_index(
+        product_type_id,
+        'manufacturing',
+        industry_cost_indices)
+
     # инициализируем базовый объект-справочник со сведениями о производстве
     base_industry: profit.QIndustryTree = profit.QIndustryTree(
         blueprint_type_id,
@@ -409,7 +472,9 @@ def generate_industry_tree(
         eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id),
         profit.QIndustryAction.manufacturing,
         single_run_quantity,
-        bp0_dict['time'])
+        bp0_dict['time'],
+        system_indices,
+        cost_index)
     base_industry.set_me(calc_input.get('me', 2))
 
     # планируем работу (инвент если потребуется)
@@ -422,7 +487,8 @@ def generate_industry_tree(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        eve_market_prices_data)
+        eve_market_prices_data,
+        industry_cost_indices)
 
     # составляем дерево материалов, которые будут использоваться в производстве
     generate_materials_tree(
@@ -431,7 +497,8 @@ def generate_industry_tree(
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
-        eve_market_prices_data)
+        eve_market_prices_data,
+        industry_cost_indices)
 
     return base_industry
 
@@ -1048,11 +1115,15 @@ def render_report(
             row0_prefix: str,
             row1_num: int,
             row0_levels,
-            __it338: profit.QIndustryTree):
+            __it338: profit.QIndustryTree,
+            planned_blueprints: int,
+            planned_runs: int):
         bp_tid = __it338.blueprint_type_id
         bp_nm = __it338.blueprint_name
-        bp_runs = __it338.blueprint_runs_per_single_copy
         bp_action = __it338.action
+        job_cost: typing.Optional[profit.QIndustryJobCost] = __it338.industry_job_cost
+        assert job_cost is not None
+
         fmt: str = \
             '<tr{tr_class}>\n' \
             + '<th scope="row"><span class="text-muted">{num_prfx}</span>{num}</th>\n' \
@@ -1060,7 +1131,7 @@ def render_report(
             + '<td></td>' \
             + '<td></td>' \
             + '<td></td>' \
-            + '<td></td>' \
+            + '<td>{qp}</td>' \
             + '<td></td>' \
             + '<td></td>' \
             + '<td></td>' \
@@ -1073,11 +1144,25 @@ def render_report(
                 prfx='<tt><span class="text-muted">{}</span></tt>'.format(
                     get_pseudographics_prefix(row0_levels, True, False)),
                 nm=bp_nm,
-                pstfx='{qm} {manuf}'.format(
-                    qm="<sup> <strong style='color:maroon;'>x{}</strong></sup>".format(bp_runs),
-                    manuf='<span class="text-muted">{}</span>'.format(str(bp_action).split('.')[-1]),
+                pstfx="<sup> <strong style='color:maroon;'>{bp}&#215;{run}</strong> "
+                      "<span class='text-muted'>{act}</span></sup>".format(
+                    bp=planned_blueprints,
+                    run=planned_runs,
+                    act=str(bp_action).split('.')[-1],
                 ),
                 src=render_html.__get_img_src(bp_tid, 32),
+                qp='<small>'
+                   '{}<sup>EIV</sup>*{}<sup>runs</sup>*{:.2f}%<sup>{}</sup>*{}%<sup>rig</sup>'
+                   '*{}%<sup>tax</sup> => {}<sup>job</sup>'
+                   '</small>'.format(
+                        job_cost.estimated_items_value,  # 1.EIV
+                        planned_blueprints * planned_runs,  # 1.runs
+                        job_cost.industry_cost_index * 100.0,  # 1.const_index
+                        job_cost.system_indices.solar_system,  # 1.solar_system
+                        job_cost.structure_bonus_rigs * 100.0,  # 1.rig
+                        job_cost.scc_surcharge * 100.0,  # 1.tax
+                        int(math.ceil(planned_blueprints * planned_runs * job_cost.total_job_cost))  # 2.out
+                   )
             )
         )
 
@@ -1272,7 +1357,8 @@ def render_report(
                 row2_prefix: str = "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num)
                 generate_industry_plan_item(
                     row2_prefix, 0, row2_levels,
-                    m1_industry)
+                    m1_industry,
+                    m1_planned_blueprints, m1_planned_runs)
                 generate_components_list(
                     with_current_industry_progress,
                     row2_prefix,
@@ -1303,7 +1389,8 @@ def render_report(
     # вывод информации о работе и чертеже
     generate_industry_plan_item(
         '', 0, [],
-        industry_plan.base_industry)
+        industry_plan.base_industry,
+        1, industry_plan.customized_runs)
     # вывод информации о чертежах
     generate_components_list(False, '', [], industry_plan.base_planned_activity)
 
@@ -1507,6 +1594,7 @@ def main():
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
+    sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
 
     try:
         # Public information about market prices
@@ -1517,6 +1605,21 @@ def main():
         status_code = err.response.status_code
         if status_code == 404:  # 2020.12.03 поломался доступ к ценам маркета (ССР-шники "внесли правки")
             eve_market_prices_data = []
+        else:
+            raise
+    except:
+        print(sys.exc_info())
+        raise
+
+    try:
+        # Public information about industry cost indices for solar systems
+        eve_industry_systems_data = interface.get_esi_data("industry/systems/")
+        print("\nEVE industry has {} systems".format(len(eve_industry_systems_data) if not (eve_industry_systems_data is None) else 0))
+        sys.stdout.flush()
+    except requests.exceptions.HTTPError as err:
+        status_code = err.response.status_code
+        if status_code == 404:  # по аналогии получению данных выше
+            eve_industry_systems_data = []
         else:
             raise
     except:
@@ -1537,15 +1640,34 @@ def main():
         # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
-        # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
+        # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 4},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
         {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
     ]
-    #with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
+
+    # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
     #    s = f.read()
     #    calc_inputs = (json.loads(s))
+
+    # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+    industry_cost_indices: typing.List[profit.QIndustryCostIndices] = []
+    for r in q_router_settings.g_routes:
+        solar_system: str = r['solar_system']
+        solar_system_id: typing.Optional[int] = next((int(_[0]) for _ in sde_inv_names.items()
+                                                      if _[1] == solar_system), None)
+        assert solar_system_id is not None
+        cost_indices = next((_['cost_indices'] for _ in eve_industry_systems_data
+                             if _['solar_system_id'] == solar_system_id), None)
+        assert cost_indices is not None
+        iic: profit.QIndustryCostIndices = profit.QIndustryCostIndices(
+            solar_system_id,
+            solar_system,
+            cost_indices,
+            set(r['output']))
+        industry_cost_indices.append(iic)
+    del eve_industry_systems_data
 
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
     # см. также eve_conveyor_tools.py : setup_blueprint_details
@@ -1576,7 +1698,8 @@ def main():
             sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
-            eve_market_prices_data)
+            eve_market_prices_data,
+            industry_cost_indices)
 
         # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
         industry_plan: profit.QIndustryPlan = generate_industry_plan(

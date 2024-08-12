@@ -2,7 +2,8 @@
 # содержит настройки работы с производственным конвейером:
 
 g_routes = [
-    {'station': "P-ZMZV - Mendeleev",
+    {'solar_system': 'P-ZMZV',  # система указывается вручную для non-database скриптов
+     'station': "P-ZMZV - Mendeleev",
      'desc': 'Татара, реакции',
      'output': [
         # Processed Moon Materials
@@ -95,7 +96,8 @@ g_routes = [
           28693,  # Pure Synth X-Instinct Booster
      ],
     },
-    {'station': "9CG6-H - Alice' Brewery",
+    {'solar_system': '9CG6-H',  # система указывается вручную для non-database скриптов
+     'station': "9CG6-H - Alice' Brewery",
      'desc': 'Атанор, реакции',
      'output': [
         # Advanced Moon Materials
@@ -118,7 +120,8 @@ g_routes = [
           16672,  # Tungsten Carbide
      ]
     },
-    {'station': "9CG6-H - King Glorden",
+    {'solar_system': '9CG6-H',  # система указывается вручную для non-database скриптов
+     'station': "9CG6-H - King Glorden",
      'desc': 'Азбель, производство',
      'output': [
         # Advanced Components (Amarr)
@@ -176,7 +179,8 @@ g_routes = [
           #52312,  # Zero-Point Field Manipulator
      ]
     },
-    {'station': "UYU-VV - DarkFman vs Photon UI",
+    {'solar_system': 'UYU-VV',  # система указывается вручную для non-database скриптов
+     'station': "UYU-VV - DarkFman vs Photon UI",
      'desc': 'Атанор, реакции',
      'output': [
         # Polymer Materials
@@ -191,7 +195,8 @@ g_routes = [
           30308,  # Scandium Metallofullerene
      ]
     },
-    {'station': "P-ZMZV - Shukhov",
+    {'solar_system': 'P-ZMZV',  # система указывается вручную для non-database скриптов
+     'station': "P-ZMZV - Shukhov",
      'desc': 'Сотия, производство',
     },
 ]
