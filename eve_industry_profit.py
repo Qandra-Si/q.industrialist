@@ -117,6 +117,21 @@ def get_material_price(type_id: int, sde_type_ids, eve_market_prices_data) -> ty
     return price
 
 
+def get_material_adjusted_price(type_id: int, sde_type_ids, eve_market_prices_data) -> typing.Optional[float]:
+    price: typing.Optional[float] = None
+    price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
+    if price_dict is not None:
+        if "adjusted_price" in price_dict:  # используется в расчётах стоимости запуска работы
+            price = float(price_dict["adjusted_price"])
+        elif "average_price" in price_dict:
+            price = float(price_dict["average_price"])
+    if not price:
+        type_dict = sde_type_ids[str(type_id)]
+        if "basePrice" in type_dict:
+            price = float(type_dict["basePrice"])
+    return price
+
+
 # составляем дерево материалов, которые будут использоваться в производстве
 def generate_materials_tree(
         # входной список материалов, используемых в производстве
@@ -137,6 +152,7 @@ def generate_materials_tree(
         material_group_name: str = sde_market_groups[str(material_market_group)]['nameID']['en']
         material_volume: float = sde_type_ids[str(material_tid)].get('volume', 0.0)
         material_price: typing.Optional[float] = get_material_price(material_tid, sde_type_ids, eve_market_prices_data)
+        material_adjusted_price: typing.Optional[float] = get_material_adjusted_price(material_tid, sde_type_ids, eve_market_prices_data)
         # пополняем список материалов
         q_material: profit.QMaterial = profit.QMaterial(
             material_tid,
@@ -145,7 +161,8 @@ def generate_materials_tree(
             material_market_group,
             material_group_name,
             material_volume,
-            material_price)
+            material_price,
+            material_adjusted_price)
         curr_industry.append_material(q_material)
         # или: проверяем, возможно ли получить данный материал с помощью его manufacturing-производства?
         # или: проверяем, возможно ли получить данный материал с помощью его reaction-производства?
@@ -185,6 +202,10 @@ def generate_materials_tree(
                     sde_market_groups,
                     eve_market_prices_data)
                 break
+    # считаем EIV, который потребуется для вычисления стоимости job cost
+    curr_industry.set_estimated_items_value(
+        math.ceil(sum([_.adjusted_price * _.quantity for _ in curr_industry.materials]))
+    )
 
 
 # генерация чертежа/чертежей (в результате запуска научки) для точного расчёта научки с учётом datacores и decryptors
@@ -234,7 +255,8 @@ def schedule_industry_job__invent(
             blueprints_market_group,
             blueprints_group_name,
             0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
-            0.0)  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
+            0.0,  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
+            0.0)
         curr_industry.append_material(copying_material)
 
         # считаем копирку
@@ -274,7 +296,8 @@ def schedule_industry_job__invent(
         blueprints_market_group,
         blueprints_group_name,
         0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
-        0.0)  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
+        0.0,  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
+        0.0)
     curr_industry.append_material(invented_material)
 
     # теперь к T2-чертежу подключаем инвент-работу
@@ -685,6 +708,7 @@ def generate_industry_plan__internal(
                          2,
                          "Blueprints & Reactions",  # sde_market_groups[str(blueprints_market_group)]['nameID']['en']
                          0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
+                         0,
                          0),
         1.0,
         planned_quantity,
@@ -1002,24 +1026,67 @@ def render_report(
                   '<th>Итог<br/>(рентаб.)</th>\n'
                   '</tr>\n')
 
-    def get_pseudographics_prefix(levels, is_last):
+    def get_pseudographics_prefix(levels, is_first, is_last):
         prfx: str = ''
         for lv in enumerate(levels):
             if lv[1]:
                 prfx += '&nbsp; '
             else:
-                prfx += '&#x2502; '  # |
-        if is_last:
-            prfx += '&#x2514;&#x2500;'  # └─
+                prfx += '&#x2502; '          # |
+        if is_first:
+            if not prfx:
+                prfx += '&#x2514;'           # └
+            else:
+                prfx += '&#x2502; &#x2514;'  # | └
+        elif is_last:
+            prfx += '&#x2514;&#x2500;'       # └─
         else:
-            prfx += '&#x251C;&#x2500;'  # ├─
+            prfx += '&#x251C;&#x2500;'       # ├─
         return prfx
+
+    def generate_industry_plan_item(
+            row0_prefix: str,
+            row1_num: int,
+            row0_levels,
+            __it338: profit.QIndustryTree):
+        bp_tid = __it338.blueprint_type_id
+        bp_nm = __it338.blueprint_name
+        bp_runs = __it338.blueprint_runs_per_single_copy
+        bp_action = __it338.action
+        fmt: str = \
+            '<tr{tr_class}>\n' \
+            + '<th scope="row"><span class="text-muted">{num_prfx}</span>{num}</th>\n' \
+            + '<td><img class="icn24" src="{src}"> {prfx} {nm}{pstfx}</td>\n' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            + '<td></td>' \
+            '</tr>'
+        glf.write(
+            fmt.format(
+                tr_class=' class="active"' if not row0_prefix else '',
+                num_prfx=row0_prefix, num=row1_num,
+                prfx='<tt><span class="text-muted">{}</span></tt>'.format(
+                    get_pseudographics_prefix(row0_levels, True, False)),
+                nm=bp_nm,
+                pstfx='{qm} {manuf}'.format(
+                    qm="<sup> <strong style='color:maroon;'>x{}</strong></sup>".format(bp_runs),
+                    manuf='<span class="text-muted">{}</span>'.format(str(bp_action).split('.')[-1]),
+                ),
+                src=render_html.__get_img_src(bp_tid, 32),
+            )
+        )
 
     def generate_components_list(
             with_current_industry_progress: bool,
             row0_prefix: str,
             row0_levels,
             __ap344: profit.QPlannedActivity):
+        # вывод информации о материалах
         for m1 in enumerate(__ap344.planned_materials, start=1):
             row1_num: int = int(m1[0])
             m1_planned_material: profit.QPlannedMaterial = m1[1]
@@ -1065,7 +1132,7 @@ def render_report(
                     tr_class=' class="active"' if not row0_prefix else '',
                     num_prfx=row0_prefix, num=row1_num,
                     prfx='<tt><span class="text-muted">{}</span></tt>'.format(
-                        get_pseudographics_prefix(row0_levels, row1_num == len(__ap344.planned_materials))),
+                        get_pseudographics_prefix(row0_levels, False, row1_num == len(__ap344.planned_materials))),
                     nm=m1_tnm,
                     pstfx='{qm}{bpq}'.format(
                         qm="<sup> <strong style='color:darkblue;'>x{}</strong></sup>".format(m1_quantity),
@@ -1202,9 +1269,13 @@ def render_report(
             if m1_obtaining_activity:
                 row2_levels = row0_levels[:]
                 row2_levels.append(row1_num == len(__ap344.planned_materials))
+                row2_prefix: str = "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num)
+                generate_industry_plan_item(
+                    row2_prefix, 0, row2_levels,
+                    m1_industry)
                 generate_components_list(
                     with_current_industry_progress,
-                    "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num),
+                    row2_prefix,
                     row2_levels,
                     m1_obtaining_activity)
 
@@ -1229,6 +1300,11 @@ def render_report(
 </thead>
 <tbody>""")
 
+    # вывод информации о работе и чертеже
+    generate_industry_plan_item(
+        '', 0, [],
+        industry_plan.base_industry)
+    # вывод информации о чертежах
     generate_components_list(False, '', [], industry_plan.base_planned_activity)
 
     glf.write("""
@@ -1458,13 +1534,14 @@ def main():
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
         # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
-        {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
+        # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
+        {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
     ]
     #with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
     #    s = f.read()
@@ -1512,8 +1589,7 @@ def main():
             '{}/industry_cost'.format(argv_prms["workspace_cache_files_dir"]),
             sde_bp_materials,
             sde_market_groups,
-            sde_icon_ids
-        )
+            sde_icon_ids)
 
 
 if __name__ == "__main__":

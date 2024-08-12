@@ -10,13 +10,15 @@ class QBaseMaterial:
                  group_id: int,
                  group_name: str,
                  volume: float,
-                 price: typing.Optional[float]):
+                 price: typing.Optional[float],
+                 adjusted_price: typing.Optional[float]):
         self.__type_id: int = type_id
         self.__name: str = name
         self.__group_id: int = group_id
         self.__group_name: str = group_name
         self.__volume: float = volume  # TODO: это не упакованный размер! актуальные данные скачиваются в БД
         self.__price: typing.Optional[float] = price
+        self.__adjusted_price: typing.Optional[float] = adjusted_price
 
     @property
     def type_id(self) -> int:
@@ -42,6 +44,10 @@ class QBaseMaterial:
     def price(self) -> typing.Optional[float]:
         return self.__price
 
+    @property
+    def adjusted_price(self) -> typing.Optional[float]:
+        return self.__adjusted_price
+
 
 class QMaterial(QBaseMaterial):
     def __init__(self,
@@ -51,8 +57,9 @@ class QMaterial(QBaseMaterial):
                  group_id: int,
                  group_name: str,
                  volume: float,
-                 price: typing.Optional[float]):
-        super().__init__(type_id, name, group_id, group_name, volume, price)
+                 price: typing.Optional[float],
+                 adjusted_price: typing.Optional[float]):
+        super().__init__(type_id, name, group_id, group_name, volume, price, adjusted_price)
         self.__quantity: int = quantity
         self.__industry: typing.Optional[QIndustryTree] = None
 
@@ -98,6 +105,8 @@ class QIndustryTree:
         self.__blueprint_runs_per_single_copy: typing.Optional[int] = None
         self.__invent_probability: typing.Optional[float] = None
         self.__decryptor_probability: typing.Optional[float] = None
+        # стоимость материалов для me=0 (используется для расчёта industry job cost)
+        self.__estimated_items_value: typing.Optional[float] = None
 
     @property
     def blueprint_type_id(self) -> int:
@@ -161,3 +170,10 @@ class QIndustryTree:
 
     def set_decryptor_probability(self, decryptor_probability: float):
         self.__decryptor_probability = decryptor_probability
+
+    @property
+    def estimated_items_value(self) -> typing.Optional[float]:
+        return self.__estimated_items_value
+
+    def set_estimated_items_value(self, estimated_items_value: float):
+        self.__estimated_items_value = estimated_items_value
