@@ -1125,8 +1125,10 @@ def render_report(
         bp_tid = __it338.blueprint_type_id
         bp_nm = __it338.blueprint_name
         bp_action = __it338.action
+
         job_cost: typing.Optional[profit.QPlannedJobCost] = __pa339.industry_job_cost
         assert job_cost is not None
+        __pa339.planned_blueprint.usage_chain
 
         fmt: str = \
             '<tr{tr_class}>\n' \
@@ -1137,7 +1139,7 @@ def render_report(
             + '<td></td>' \
             + '<td>{qp}</td>' \
             + '<td></td>' \
-            + '<td></td>' \
+            + '<td>{qu}</td>' \
             + '<td></td>' \
             + '<td></td>' \
             '</tr>'
@@ -1166,7 +1168,15 @@ def render_report(
                         job_cost.structure_bonus_rigs * 100.0,  # 1.rig
                         job_cost.scc_surcharge * 100.0,  # 1.tax
                         int(math.ceil(planned_blueprints * planned_runs * job_cost.total_job_cost))  # 2.out
-                   )
+                   ),
+                qu='<small>'
+                   '{:.8f}<sup>chain</sup>*{}<sup>pcs</sup> => '
+                   '{:.8f}<sup>ratio</sup>'
+                   '</small>'.format(
+                        m1_planned_material.usage_chain,
+                        m1_planned_material.quantity_with_efficiency,
+                        m1_planned_material.usage_chain * m1_planned_material.usage_ratio
+                    ),
             )
         )
 
@@ -1645,13 +1655,13 @@ def main():
         # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
-        # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
+        {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 4},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
         # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
-        {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
+        # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
