@@ -237,10 +237,6 @@ def generate_materials_tree(
                     eve_market_prices_data,
                     industry_cost_indices)
                 break
-    # считаем EIV, который потребуется для вычисления стоимости job cost
-    curr_industry.set_estimated_items_value(
-        math.ceil(sum([_.adjusted_price * _.quantity for _ in curr_industry.materials]))
-    )
 
 
 # генерация чертежа/чертежей (в результате запуска научки) для точного расчёта научки с учётом datacores и decryptors
@@ -616,7 +612,8 @@ def copy_reused_industry_plan__internal(
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
         reused_activity.planned_blueprint,
-        reused_activity.planned_blueprints)
+        reused_activity.planned_blueprints,
+        reused_activity.industry_job_cost)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -786,7 +783,13 @@ def generate_industry_plan__internal(
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
         current_level_blueprint,
-        planned_blueprints)
+        planned_blueprints,
+        None)
+
+    # считаем EIV, который потребуется для вычисления стоимости job cost
+    estimated_items_value: float = math.ceil(sum([_.adjusted_price * _.quantity for _ in industry.materials]))
+    # считаем стоимость работы
+    current_level_activity.calc_job_cost(estimated_items_value)
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -1116,12 +1119,13 @@ def render_report(
             row1_num: int,
             row0_levels,
             __it338: profit.QIndustryTree,
+            __pa339: profit.QPlannedActivity,
             planned_blueprints: int,
             planned_runs: int):
         bp_tid = __it338.blueprint_type_id
         bp_nm = __it338.blueprint_name
         bp_action = __it338.action
-        job_cost: typing.Optional[profit.QIndustryJobCost] = __it338.industry_job_cost
+        job_cost: typing.Optional[profit.QPlannedJobCost] = __pa339.industry_job_cost
         assert job_cost is not None
 
         fmt: str = \
@@ -1152,10 +1156,10 @@ def render_report(
                 ),
                 src=render_html.__get_img_src(bp_tid, 32),
                 qp='<small>'
-                   '{}<sup>EIV</sup>*{}<sup>runs</sup>*{:.2f}%<sup>{}</sup>*{}%<sup>rig</sup>'
+                   '{}<sup>eiv</sup>*{}<sup>runs</sup>*{:.2f}%<sup>{}</sup>*{}%<sup>rig</sup>'
                    '*{}%<sup>tax</sup> => {}<sup>job</sup>'
                    '</small>'.format(
-                        job_cost.estimated_items_value,  # 1.EIV
+                        job_cost.estimated_items_value,  # 1.eiv
                         planned_blueprints * planned_runs,  # 1.runs
                         job_cost.industry_cost_index * 100.0,  # 1.const_index
                         job_cost.system_indices.solar_system,  # 1.solar_system
@@ -1358,6 +1362,7 @@ def render_report(
                 generate_industry_plan_item(
                     row2_prefix, 0, row2_levels,
                     m1_industry,
+                    m1_obtaining_activity,
                     m1_planned_blueprints, m1_planned_runs)
                 generate_components_list(
                     with_current_industry_progress,
@@ -1390,6 +1395,7 @@ def render_report(
     generate_industry_plan_item(
         '', 0, [],
         industry_plan.base_industry,
+        industry_plan.base_planned_activity,
         1, industry_plan.customized_runs)
     # вывод информации о чертежах
     generate_components_list(False, '', [], industry_plan.base_planned_activity)
@@ -1644,7 +1650,8 @@ def main():
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
-        {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
+        # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
+        {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:

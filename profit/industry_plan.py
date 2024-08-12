@@ -3,6 +3,8 @@ import typing
 from .industry_tree import QBaseMaterial
 from .industry_tree import QMaterial
 from .industry_tree import QIndustryTree
+from .industry_tree import QIndustryAction
+from .industry_tree import QIndustryCostIndices
 
 
 class QIndustryObtainingPlan:
@@ -19,7 +21,7 @@ class QIndustryObtainingPlan:
         return self.__purchase_quantity
 
     @property
-    def activity_plan(self):
+    def activity_plan(self):  # -> typing.Optional[QPlannedActivity]
         return self.__activity_plan
 
     @property
@@ -163,15 +165,44 @@ class QPlannedBlueprint(QPlannedMaterial):
         return self.__te
 
 
+class QPlannedJobCost:
+    def __init__(self,
+                 action: QIndustryAction,
+                 estimated_items_value: float,
+                 system_indices: QIndustryCostIndices,
+                 industry_cost_index: float):
+        # входные данные для расчёта (стоимость материалов, производственный индекс в системе)
+        self.estimated_items_value: float = estimated_items_value  # ISK
+        # сведения о производственных индексах в системе
+        self.system_indices: QIndustryCostIndices = system_indices
+        self.industry_cost_index: float = industry_cost_index  # процент
+        # расчёт стоимости работы
+        if action in [QIndustryAction.manufacturing, QIndustryAction.reaction]:
+            self.__job_cost_base: float = self.estimated_items_value  # ISK
+        else:
+            self.__job_cost_base: float = self.estimated_items_value * 0.02  # ISK
+        self.system_cost: float = self.__job_cost_base * self.industry_cost_index  # ISK
+        self.structure_bonus_rigs: float = -0.05  # TODO: процент
+        self.structure_role_bonus: float = self.system_cost * self.structure_bonus_rigs  # ISK
+        self.total_job_gross_cost: float = self.system_cost + self.structure_role_bonus  # ISK
+        self.scc_surcharge: float = 0.04  # TODO: процент
+        self.tax_scc_surcharge: float = self.__job_cost_base * self.scc_surcharge  # ISK
+        self.total_taxes: float = self.tax_scc_surcharge  # ISK
+        self.total_job_cost: float = self.total_job_gross_cost + self.total_taxes  # ISK
+
+
 class QPlannedActivity:
     def __init__(self,
                  industry: QIndustryTree,
                  planned_blueprint: QPlannedBlueprint,
-                 planned_blueprints: int):
+                 planned_blueprints: int,
+                 industry_job_cost: typing.Optional[QPlannedJobCost]):
         self.__industry: QIndustryTree = industry
         self.__planned_blueprint: QPlannedBlueprint = planned_blueprint
         self.__planned_blueprints: int = planned_blueprints
         self.__planned_materials: typing.List[QPlannedMaterial] = []
+        # стоимость одного прогона (не зависит от me чертежа и не зависит от декрипторов инвента)
+        self.__industry_job_cost: typing.Optional[QPlannedJobCost] = industry_job_cost
 
     @property
     def industry(self) -> QIndustryTree:
@@ -207,6 +238,18 @@ class QPlannedActivity:
 
     def append_planned_material(self, planned_material: QPlannedMaterial):
         self.__planned_materials.append(planned_material)
+
+    def calc_job_cost(self, estimated_items_value: float) -> QPlannedJobCost:
+        self.__industry_job_cost = QPlannedJobCost(
+            self.industry.action,
+            estimated_items_value,
+            self.industry.system_indices,
+            self.industry.industry_cost_index)
+        return self.__industry_job_cost
+
+    @property
+    def industry_job_cost(self) -> typing.Optional[QPlannedJobCost]:
+        return self.__industry_job_cost
 
 
 class QIndustryMaterial:
