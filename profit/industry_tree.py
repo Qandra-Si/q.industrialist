@@ -118,6 +118,7 @@ class QIndustryTree:
                  product_name: str,
                  action: QIndustryAction,
                  products_per_single_run: int,
+                 max_production_limit: int,
                  single_run_time: int,
                  system_indices: QIndustryCostIndices,
                  industry_cost_index: float):
@@ -126,6 +127,7 @@ class QIndustryTree:
         self.__product_type_id: int = product_type_id
         self.__product_name: str = product_name
         self.__products_per_single_run: int = products_per_single_run
+        self.__max_production_limit: int = max_production_limit
         self.__single_run_time: int = single_run_time
         self.__action: QIndustryAction = action
         self.__materials: typing.List[QMaterial] = []
@@ -162,6 +164,10 @@ class QIndustryTree:
     @property
     def products_per_single_run(self) -> int:
         return self.__products_per_single_run
+
+    @property
+    def max_production_limit(self) -> int:
+        return self.__max_production_limit
 
     @property
     def single_run_time(self) -> int:

@@ -195,16 +195,40 @@ def generate_materials_tree(
         # или: проверяем, возможно ли получить данный материал с помощью его reaction-производства?
         # или: если способов производства данного вида материалов так и не найдено, то данный материал закупается,
         #      переходим к следующему
-        for activity in ['manufacturing', 'reaction', '']:
-            material_bp_tid, blueprint_dict = \
-                eve_sde_tools.get_blueprint_type_id_by_product_id(material_tid, sde_bp_materials, activity)
+        for activity in ['manufacturing', 'reaction', 'copying']:
+            if activity == 'copying':
+                # пытаемся получить чертёж и параметры копирки (если она предполагается для этого чертежа)
+                material_bp_tid, blueprint_dict = None, eve_sde_tools.get_blueprint_copying_activity(
+                    sde_bp_materials,
+                    material_tid)
+                if blueprint_dict is not None:
+                    # синтезируем фейковый dict с copying-ом так, чтобы он был подобен другим подобным dict-ам
+                    material_bp_tid = material_tid
+                    blueprint_dict = {
+                        'activities': {
+                            'copying': {
+                                'products': [{'quantity': 1, 'typeID': material_tid}],
+                                'materials': blueprint_dict.get('materials', []),
+                                'time': blueprint_dict.get('time', 0),
+                            }
+                        },
+                        'maxProductionLimit': sde_bp_materials[str(material_tid)]['maxProductionLimit']
+                    }
+                material_produce_action = profit.QIndustryAction.copying
+            else:
+                # пытаемся получить чертёж/формулу и параметры производства/реакции
+                material_bp_tid, blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
+                    material_tid,
+                    sde_bp_materials,
+                    activity)
+                material_produce_action: profit.QIndustryAction = profit.QIndustryAction.reaction \
+                    if activity == 'reaction' else profit.QIndustryAction.manufacturing
             if material_bp_tid is not None:
+                max_production_limit: int = blueprint_dict['maxProductionLimit']
                 blueprint_dict = blueprint_dict['activities'][activity]
                 assert len(blueprint_dict.get('products', [])) == 1
                 assert blueprint_dict['products'][0]['typeID'] == material_tid
                 # готовим данные для следующего уровня вложенности
-                material_produce_action: profit.QIndustryAction = profit.QIndustryAction.reaction \
-                    if activity == 'reaction' else profit.QIndustryAction.manufacturing
                 products_per_single_run: int = blueprint_dict['products'][0]['quantity']
                 single_run_time: int = blueprint_dict['time']
                 next_materials = blueprint_dict['materials']
@@ -222,20 +246,22 @@ def generate_materials_tree(
                     material_name,
                     material_produce_action,
                     products_per_single_run,
+                    max_production_limit,
                     single_run_time,
                     system_indices,
                     cost_index)
                 q_material.set_industry(next_industry)
                 # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
                 # для нового уровня вложенности
-                generate_materials_tree(
-                    next_materials,
-                    next_industry,
-                    sde_type_ids,
-                    sde_bp_materials,
-                    sde_market_groups,
-                    eve_market_prices_data,
-                    industry_cost_indices)
+                if next_materials:
+                    generate_materials_tree(
+                        next_materials,
+                        next_industry,
+                        sde_type_ids,
+                        sde_bp_materials,
+                        sde_market_groups,
+                        eve_market_prices_data,
+                        industry_cost_indices)
                 break
 
 
@@ -271,65 +297,6 @@ def schedule_industry_job__invent(
     blueprints_market_group: int = 2
     blueprints_group_name: str = sde_market_groups[str(blueprints_market_group)]['nameID']['en']
 
-    # пытаемся получить чертёж и параметры копирки (если она предполагается для этого чертежа)
-    copying_dict = eve_sde_tools.get_blueprint_copying_activity(
-        sde_bp_materials,
-        source_blueprint_type_id)
-    # если копирка данного чертежа возможен, то добавляем в дерево работ копирку и материалы
-    if copying_dict:
-        copying_run_time: int = copying_dict.get('time', 0)
-        _copying_materials = copying_dict.get('materials', [])
-
-        # пополняем список материалов T1 чертежом
-        copying_material: profit.QMaterial = profit.QMaterial(
-            source_blueprint_type_id,
-            1,
-            copied_blueprint_name,
-            blueprints_market_group,
-            blueprints_group_name,
-            0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
-            0.0,  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
-            0.0)
-        curr_industry.append_material(copying_material)
-
-        # получаем информацию о производственных индексах в системе, где крафтится этот продукт
-        system_indices, cost_index = get_industry_cost_index(
-            source_blueprint_type_id,
-            'copying',
-            industry_cost_indices)
-
-        # считаем копирку
-        copying_industry: profit.QIndustryTree = profit.QIndustryTree(
-            source_blueprint_type_id,
-            copied_blueprint_name,
-            source_blueprint_type_id,
-            copied_blueprint_name,
-            profit.QIndustryAction.copying,
-            1,
-            copying_run_time,
-            system_indices,
-            cost_index)
-        copying_industry.set_blueprint_runs_per_single_copy(1)
-        # copying_industry.set_probability(1.0)
-        copying_material.set_industry(copying_industry)
-
-        # в список материалов подкладываем чертёж, который должен скопироваться N раз
-        # invent_materials = _invent_materials[:]
-        copying_materials = []
-        copying_materials.append({'typeID': source_blueprint_type_id, 'quantity': 1})
-        copying_materials.extend(_copying_materials)
-
-        # считаем работу с материалами для этого типа копирки (копирка с материалами существует только для T2 BPO,
-        # есть и такие в Евке)
-        generate_materials_tree(
-            copying_materials,
-            copying_industry,
-            sde_type_ids,
-            sde_bp_materials,
-            sde_market_groups,
-            eve_market_prices_data,
-            industry_cost_indices)
-
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
         blueprint_type_id,
@@ -343,6 +310,7 @@ def schedule_industry_job__invent(
     curr_industry.append_material(invented_material)
 
     # теперь к T2-чертежу подключаем инвент-работу
+    max_production_limit: int = invent_dict.get('maxProductionLimit', 0)
     invent_dict = invent_dict['activities']['invention']
     assert len(invent_dict.get('products', [])) >= 1
     invent_product_dict = next((p for p in invent_dict['products'] if p['typeID'] == blueprint_type_id), None)
@@ -367,6 +335,7 @@ def schedule_industry_job__invent(
         invented_blueprint_name,
         profit.QIndustryAction.invent,
         1,
+        max_production_limit,
         invent_run_time,
         system_indices,
         cost_index)
@@ -449,6 +418,7 @@ def generate_industry_tree(
     assert len(bp0_dict.get('products', [])) == 1
     product_type_id: int = bp0_dict['products'][0]['typeID']
     single_run_quantity: int = bp0_dict['products'][0]['quantity']
+    max_production_limit: int = bp0_dict.get('maxProductionLimit', 0)
 
     # из справочной информации о чертеже здесь интересны только материалы, которые будут использоваться в производстве
     base_materials = bp0_dict.get('materials')
@@ -468,6 +438,7 @@ def generate_industry_tree(
         eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id),
         profit.QIndustryAction.manufacturing,
         single_run_quantity,
+        max_production_limit,
         bp0_dict['time'],
         system_indices,
         cost_index)
@@ -759,7 +730,6 @@ def generate_industry_plan__internal(
         industry: profit.QIndustryTree,
         # справочник текущего производства с настройками оптимизации процесса
         industry_plan: profit.QIndustryPlan) -> profit.QPlannedActivity:
-    assert len(industry.materials) > 0
     assert planned_blueprints > 0
     assert planned_runs > 0
     assert planned_quantity > 0
@@ -774,11 +744,12 @@ def generate_industry_plan__internal(
                          0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
                          0,
                          0),
-        1.0,
+        1.0,  # usage_chain,
         planned_quantity,
         planned_runs,
         industry.me,
         0)
+    # current_level_blueprint.store_usage_ratio(usage_chain)
 
     current_level_activity: profit.QPlannedActivity = profit.QPlannedActivity(
         industry,
@@ -802,12 +773,15 @@ def generate_industry_plan__internal(
         cached_material_quantity_before: int = cached_material.purchased + cached_material.manufactured
 
         # считаем необходимое и достаточное кол-во материала с учётом me текущего уровня
-        if m.industry and m.industry.action in [profit.QIndustryAction.copying, profit.QIndustryAction.invent]:
+        if m.industry and m.industry.action in [profit.QIndustryAction.invent]:
             quantity_with_efficiency: int = 1 * eve_efficiency.get_industry_material_efficiency(
                 industry.action.name,
-                1,  # кол-во run-ов чертежа (инвент или копирка считается отдельно)
+                1,  # кол-во run-ов чертежа (инвент считается отдельно)
                 m.quantity,  # кол-во из исходного чертежа (до учёта всех бонусов)
                 0)  # me на инвенты и копирку не действуют
+        elif m.industry and m.industry.action in [profit.QIndustryAction.copying]:
+            assert m.quantity == 1
+            quantity_with_efficiency = math.ceil(usage_chain)  # кол-во прогонов копий (зависит от вероятности инвента)
         else:  # if industry.action in [profit.QIndustryAction.manufacturing, profit.QIndustryAction.reaction]:
             quantity_with_efficiency: int = planned_blueprints * eve_efficiency.get_industry_material_efficiency(
                 industry.action.name,
@@ -1102,33 +1076,32 @@ def render_report(
             if lv[1]:
                 prfx += '&nbsp; '
             else:
-                prfx += '&#x2502; '          # |
+                prfx += '| '   # &#x2502;
         if is_first:
             if not prfx:
-                prfx += '&#x2514;'           # └
+                prfx += '└'    # &#x2514;
             else:
-                prfx += '&#x2502; &#x2514;'  # | └
+                prfx += '| └'  # &#x2502; &#x2514;
         elif is_last:
-            prfx += '&#x2514;&#x2500;'       # └─
+            prfx += '└─'       # &#x2514;&#x2500;
         else:
-            prfx += '&#x251C;&#x2500;'       # ├─
+            prfx += '├─'       # &#x251C;&#x2500;
         return prfx
 
     def generate_industry_plan_item(
             row0_prefix: str,
             row1_num: int,
             row0_levels,
-            __it338: profit.QIndustryTree,
             __pa339: profit.QPlannedActivity,
             planned_blueprints: int,
             planned_runs: int):
-        bp_tid = __it338.blueprint_type_id
-        bp_nm = __it338.blueprint_name
-        bp_action = __it338.action
+        bp_tid = __pa339.industry.blueprint_type_id
+        bp_nm = __pa339.industry.blueprint_name
+        bp_action = __pa339.industry.action
+        # planned_material: profit.QPlannedMaterial = __pa339.planned_blueprint
 
         job_cost: typing.Optional[profit.QPlannedJobCost] = __pa339.industry_job_cost
         assert job_cost is not None
-        __pa339.planned_blueprint.usage_chain
 
         fmt: str = \
             '<tr{tr_class}>\n' \
@@ -1139,7 +1112,7 @@ def render_report(
             + '<td></td>' \
             + '<td>{qp}</td>' \
             + '<td></td>' \
-            + '<td>{qu}</td>' \
+            + '<td></td>' \
             + '<td></td>' \
             + '<td></td>' \
             '</tr>'
@@ -1149,12 +1122,12 @@ def render_report(
                 num_prfx=row0_prefix, num=row1_num,
                 prfx='<tt><span class="text-muted">{}</span></tt>'.format(
                     get_pseudographics_prefix(row0_levels, True, False)),
-                nm=bp_nm,
-                pstfx="<sup> <strong style='color:maroon;'>{bp}&#215;{run}</strong> "
-                      "<span class='text-muted'>{act}</span></sup>".format(
+                nm="<span class='text-muted'>{act}</span>".format(
+                    act=str(bp_action).split('.')[-1],
+                ),
+                pstfx="<sup> <strong style='color:maroon;'>{bp}&#215;{run}</strong></sup>".format(
                     bp=planned_blueprints,
                     run=planned_runs,
-                    act=str(bp_action).split('.')[-1],
                 ),
                 src=render_html.__get_img_src(bp_tid, 32),
                 qp='<small>'
@@ -1169,14 +1142,11 @@ def render_report(
                         job_cost.scc_surcharge * 100.0,  # 1.tax
                         int(math.ceil(planned_blueprints * planned_runs * job_cost.total_job_cost))  # 2.out
                    ),
-                qu='<small>'
-                   '{:.8f}<sup>chain</sup>*{}<sup>pcs</sup> => '
-                   '{:.8f}<sup>ratio</sup>'
-                   '</small>'.format(
-                        m1_planned_material.usage_chain,
-                        m1_planned_material.quantity_with_efficiency,
-                        m1_planned_material.usage_chain * m1_planned_material.usage_ratio
-                    ),
+                # qu='<small>'
+                #   '{:.8f}<sup>ratio</sup>'
+                #   '</small>'.format(
+                #        planned_material.usage_chain,
+                #    ),
             )
         )
 
@@ -1200,8 +1170,8 @@ def render_report(
             m1_copying: bool = m1_industry and m1_industry.action == profit.QIndustryAction.copying
             m1_invention: bool = m1_industry and m1_industry.action == profit.QIndustryAction.invent
             if m1_copying or m1_invention:
-                m1_planned_blueprints: int = 1
-                m1_planned_runs: int = 1
+                m1_planned_blueprints: int = m1_obtaining_activity.planned_blueprints
+                m1_planned_runs: int = m1_obtaining_activity.planned_runs
             else:
                 m1_planned_blueprints: int = __ap344.planned_blueprints
                 m1_planned_runs: int = __ap344.planned_runs
@@ -1333,6 +1303,12 @@ def render_report(
                             m1_planned_material.usage_chain * m1_planned_material.usage_ratio
                        ) if not m1_material.industry else
                        '<small>'
+                       '{:.8f}<sup>chain</sup> => {}<sup>runs'
+                       '</small>'.format(
+                           m1_planned_material.usage_chain,
+                           m1_planned_material.quantity_with_efficiency
+                       ) if m1_material.industry.action == profit.QIndustryAction.copying else
+                       '<small>'
                        '{:.8f}<sup>chain</sup> * '
                        '({}<sup>me</sup>/{}{}<sup>out</sup>{} => {:.4f}) => '
                        '{:.8f}<sup>ratio</sup>'
@@ -1371,7 +1347,6 @@ def render_report(
                 row2_prefix: str = "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num)
                 generate_industry_plan_item(
                     row2_prefix, 0, row2_levels,
-                    m1_industry,
                     m1_obtaining_activity,
                     m1_planned_blueprints, m1_planned_runs)
                 generate_components_list(
@@ -1404,7 +1379,6 @@ def render_report(
     # вывод информации о работе и чертеже
     generate_industry_plan_item(
         '', 0, [],
-        industry_plan.base_industry,
         industry_plan.base_planned_activity,
         1, industry_plan.customized_runs)
     # вывод информации о чертежах
@@ -1655,13 +1629,16 @@ def main():
         # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
-        {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
+        # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 4},   # Mjolnir Fury Light Missile
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
         # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
         # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
+        # {'bptid': 34596, 'qr': 1, 'me': 2, 'te': 4},  # Entosis Link II - наибольшее кол-во материалов
+        # {'bptid': 61220, 'qr': 1, 'me': 2, 'te': 4},  # Ubiquitous Moon Mining Crystal Type C II - 3 произв. материала
+        {'bptid': 26341, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Large Stasis Drone Augmentor II - 1 производимый материал
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
