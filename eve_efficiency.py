@@ -1,5 +1,6 @@
 ﻿""" Q.Industrialist (desktop/mobile)
 """
+import typing
 import eve_sde_tools
 
 
@@ -9,7 +10,7 @@ g_module_default_settings = {
 }
 
 
-def get_corp_rules_invent_effects(sde_market_groups, qidb = None):
+def get_corp_rules_invent_effects(sde_market_groups, qidb=None):
     if not (qidb is None):
         db_generic_decryptors = qidb.select_all_rows(  # "groupID"=1304 -- Generic Decryptor
             'SELECT t."typeID","typeName",a."attributeID",a."valueFloat" '
@@ -50,12 +51,16 @@ def get_corp_rules_invent_effects(sde_market_groups, qidb = None):
     return invent_effects
 
 
-def get_t2_bpc_attributes(product_type_id, invent_effects, sde_type_ids, sde_market_groups):
+def get_t2_bpc_attributes(
+        product_type_id: int,
+        invent_effects: typing.Dict[int, typing.Any],  # см. get_corp_rules_invent_effects ?
+        sde_type_ids,
+        sde_market_groups):
     # https://wiki.eveuniversity.org/Invention
     # Tech 2 blueprint copies always have 10 runs, +2% ME and +4% TE, unless modified by a decryptor. [1]
     # T2 BPCs for ships and rigs have 1 run (again unless modified by a decryptor). The only activity you can
     # do with a T2 BPC is to manufacture it, you cannot research or copy it.
-    __market_groups_chain = eve_sde_tools.get_market_groups_chain_by_type_id(
+    __market_groups_chain: typing.List[int] = eve_sde_tools.get_market_groups_chain_by_type_id(
         sde_type_ids,
         sde_market_groups,
         product_type_id)
@@ -71,7 +76,7 @@ def get_t2_bpc_attributes(product_type_id, invent_effects, sde_type_ids, sde_mar
             t2_bpc_me += ie[1]["me"]
             t2_bpc_te += ie[1]["te"]
             t2_bpc_runs += ie[1]["runs"]
-    return {"me": t2_bpc_me, "te": t2_bpc_te, "runs": t2_bpc_runs}
+    return {"me": t2_bpc_me, "te": t2_bpc_te, "qr": t2_bpc_runs}
 
 
 def get_industry_material_efficiency(

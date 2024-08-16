@@ -95,6 +95,14 @@ g_routes = [
           28692,  # Pure Synth Sooth Sayer Booster
           28693,  # Pure Synth X-Instinct Booster
      ],
+     # Tatara: te -25% (reaction)
+     'structure': 'Tatara',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'reaction',
+          'me': -2.2,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
+          },
+     ],
     },
     {'solar_system': '9CG6-H',  # система указывается вручную для non-database скриптов
      'station': "9CG6-H - Alice' Brewery",
@@ -118,7 +126,15 @@ g_routes = [
           33360,  # Terahertz Metamaterials
           16671,  # Titanium Carbide
           16672,  # Tungsten Carbide
-     ]
+     ],
+     # Athanor: нет производственных бонусов
+     'structure': 'Athanor',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'reaction',
+          'me': -2.2,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
+          },
+     ],
     },
     {'solar_system': '9CG6-H',  # система указывается вручную для non-database скриптов
      'station': "9CG6-H - King Glorden",
@@ -177,7 +193,19 @@ g_routes = [
           #52311,  # Singularity Radiation Convertor
           #52313,  # Trinary State Processor
           #52312,  # Zero-Point Field Manipulator
-     ]
+     ],
+     # Azbel: me -1% (manufacturing), te -20% (manufacturing and science), job_cost -4% (manufacturing and science)
+     'structure': 'Azbel',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'research_material',
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          'job_cost': -21.0,  # job cost (стоимость выполнения проекта)
+          },
+         {'activity': 'copying',
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          'job_cost': -21.0,  # job cost (стоимость выполнения проекта)
+          },
+     ],
     },
     {'solar_system': 'UYU-VV',  # система указывается вручную для non-database скриптов
      'station': "UYU-VV - DarkFman vs Photon UI",
@@ -193,10 +221,27 @@ g_routes = [
           30306,  # Methanofullerene
           30304,  # PPD Fullerene Fibers
           30308,  # Scandium Metallofullerene
-     ]
+     ],
+     # Athanor: нет производственных бонусов
+     'structure': 'Athanor',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'reaction',
+          'me': -2.6,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
+          },
+     ],
     },
     {'solar_system': 'P-ZMZV',  # система указывается вручную для non-database скриптов
      'station': "P-ZMZV - Shukhov",
      'desc': 'Сотия, производство',
+     'output': [],
+     # Sotiyo: me -1% (manufacturing), te -30% (manufacturing and science), job_cost -5% (manufacturing and science)
+     'structure': 'Sotiyo',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'manufacturing',
+          'me': -4.2,  # material consumption (расход материалов в проекте)
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          },
+     ],
     },
 ]

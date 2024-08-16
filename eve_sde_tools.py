@@ -241,7 +241,7 @@ def get_market_group_name_by_id(sde_type_ids, group_id):
     return group_sid
 
 
-def get_market_group_by_type_id(sde_type_ids, type_id):
+def get_market_group_by_type_id(sde_type_ids, type_id: int) -> typing.Optional[int]:
     type_dict = sde_type_ids.get(str(type_id))
     if type_dict is None:
         return None
@@ -260,12 +260,12 @@ def get_market_group_id_by_name(sde_market_groups, name):
     return None if grp is None else grp[0]
 
 
-def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id: int) -> typing.List[int]:
+    group_id: typing.Optional[int] = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return []
-    __group_id = group_id
-    __groups_chain = [group_id]
+    __group_id: int = group_id
+    __groups_chain: typing.List[int] = [group_id]
     while True:
         __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
@@ -317,8 +317,12 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
 
 
-def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
-    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+def is_type_id_nested_into_market_group(
+        type_id: int,
+        market_groups: typing.Union[typing.List[int], typing.Set[int]],
+        sde_type_ids,
+        sde_market_groups) -> typing.Optional[bool]:
+    groups_chain: typing.List[int] = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
     if groups_chain is None:
         return None
     return bool(set(groups_chain) & set(market_groups))

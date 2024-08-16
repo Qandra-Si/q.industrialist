@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+import math
 import typing
 from .industry_tree import QBaseMaterial
 from .industry_tree import QMaterial
@@ -181,14 +182,36 @@ class QPlannedJobCost:
             self.__job_cost_base: float = self.estimated_items_value  # ISK
         else:
             self.__job_cost_base: float = self.estimated_items_value * 0.02  # ISK
-        self.system_cost: float = self.__job_cost_base * self.industry_cost_index  # ISK
-        self.structure_bonus_rigs: float = -0.05  # TODO: процент
-        self.structure_role_bonus: float = self.system_cost * self.structure_bonus_rigs  # ISK
-        self.total_job_gross_cost: float = self.system_cost + self.structure_role_bonus  # ISK
+        # внимание! недостаточная точность расчёта общей стоимости проекта в этом месте возможна потому, что
+        # индекс стоимости проектов в системе ingame показывается как 5.97%, от ESI он же приходит как 0.0597,
+        # хотя на самом деле является 878020 / 14719117 = 0.05965167611616919683429379629226
+        # а если быть точнее, то      878019 / 14719117 = 0.05965160817731117973992597517908
+        #                             878021 / 14719117 = 0.05965174405502721392866161740545
+        # число должно иметь точность как минимум 8 знаков после запятой, а не 4 (как приходит по ESI)
+        # --- итоги расчёта:
+        # |                       |     моя версия |     ingame | на самом деле |
+        # | estimated_items_value |     14'719'117 | 14'719'117 |               | <== правильно
+        # |   industry_cost_index |          5.97% |      5.97% |      5.965167 | <== низкая точность, страдает расчёт
+        # |           system_cost |   878'731.2849 |            |               |
+        # |                       |        878'732 |    878'020 |     878'019.9 | <== разница в  712 ISK
+        # |  structure_bonus_rigs |          -5.0% |      -5.0% |               |
+        # |  structure_role_bonus | -43'936.564245 |            |               |
+        # |                       |        -43'937 |    -43'901 |               | <== разница в  36 ISK
+        # |  total_job_gross_cost | 834'794.720655 |            |               |
+        # |                       |        834'795 |    834'119 |               | <== разница в  676 ISK
+        # |         scc_surcharge |         -4.00% |      4.00% |               |
+        # |     tax_scc_surcharge |     588'764.68 |            |               |
+        # |                       |        588'765 |    588'765 |               | <== правильно
+        # |           total_taxes |        588'765 |    588'765 |               | <== правильно
+        # |        total_job_cost |      1'423'560 |  1'422'884 |               | <== разница в  676 ISK
+        self.system_cost: int = int(math.ceil(self.__job_cost_base * self.industry_cost_index))  # ISK
+        self.structure_bonus_rigs: float = system_indices.factory_bonuses.get_role_bonus(str(action), 'job_cost')
+        self.structure_role_bonus: int = int(math.ceil(self.system_cost * self.structure_bonus_rigs))  # ISK
+        self.total_job_gross_cost: int = self.system_cost + self.structure_role_bonus  # ISK
         self.scc_surcharge: float = 0.04  # TODO: процент
-        self.tax_scc_surcharge: float = self.__job_cost_base * self.scc_surcharge  # ISK
-        self.total_taxes: float = self.tax_scc_surcharge  # ISK
-        self.total_job_cost: float = self.total_job_gross_cost + self.total_taxes  # ISK
+        self.tax_scc_surcharge: int = int(math.ceil(self.__job_cost_base * self.scc_surcharge))  # ISK
+        self.total_taxes: int = self.tax_scc_surcharge  # ISK
+        self.total_job_cost: int = self.total_job_gross_cost + self.total_taxes  # ISK
 
 
 class QPlannedActivity:
@@ -239,10 +262,10 @@ class QPlannedActivity:
     def append_planned_material(self, planned_material: QPlannedMaterial):
         self.__planned_materials.append(planned_material)
 
-    def calc_job_cost(self, estimated_items_value: float) -> QPlannedJobCost:
+    def calc_industry_job_cost(self) -> QPlannedJobCost:
         self.__industry_job_cost = QPlannedJobCost(
             self.industry.action,
-            estimated_items_value,
+            self.industry.estimated_items_value,
             self.industry.system_indices,
             self.industry.industry_cost_index)
         return self.__industry_job_cost
@@ -261,6 +284,7 @@ class QIndustryMaterial:
         self.__available_in_assets: int = 0
         self.__in_progress: int = 0
         self.__purchased_ratio: float = 0.0
+        self.__job_cost: int = 0
         self.__last_known_planned_material: typing.Optional[QPlannedMaterial] = None
 
     @property
@@ -361,6 +385,13 @@ class QIndustryMaterial:
         self.__purchased_ratio += purchased_ratio
 
     @property
+    def job_cost(self) -> int:
+        return self.__job_cost
+
+    def increase_job_cost(self, job_cost: int) -> None:
+        self.__job_cost += job_cost
+
+    @property
     def last_known_planned_material(self) -> typing.Optional[QPlannedMaterial]:
         return self.__last_known_planned_material
 
@@ -390,9 +421,11 @@ class QIndustryPlanCustomization:
     def __init__(self,
                  reaction_runs: typing.Optional[int],
                  industry_time: typing.Optional[int],
+                 common_components: typing.Optional[typing.List[int]],
                  min_probability: typing.Optional[float]):
         self.__reaction_runs: typing.Optional[int] = reaction_runs
         self.__industry_time: typing.Optional[int] = industry_time
+        self.__common_components: typing.Optional[typing.List[int]] = common_components
         self.__min_probability: typing.Optional[float] = min_probability
 
     @property
@@ -402,6 +435,10 @@ class QIndustryPlanCustomization:
     @property
     def industry_time(self) -> typing.Optional[int]:
         return self.__industry_time
+
+    @property
+    def common_components(self) -> typing.Optional[typing.List[int]]:
+        return self.__common_components
 
     @property
     def min_probability(self) -> typing.Optional[float]:

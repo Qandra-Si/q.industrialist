@@ -118,19 +118,12 @@ def get_material_price(type_id: int, sde_type_ids, eve_market_prices_data) -> ty
     return price
 
 
-def get_material_adjusted_price(type_id: int, sde_type_ids, eve_market_prices_data) -> typing.Optional[float]:
-    price: typing.Optional[float] = None
+def get_material_adjusted_price(type_id: int, eve_market_prices_data) -> float:
     price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
-    if price_dict is not None:
-        if "adjusted_price" in price_dict:  # используется в расчётах стоимости запуска работы
-            price = float(price_dict["adjusted_price"])
-        elif "average_price" in price_dict:
-            price = float(price_dict["average_price"])
-    if not price:
-        type_dict = sde_type_ids[str(type_id)]
-        if "basePrice" in type_dict:
-            price = float(type_dict["basePrice"])
-    return price
+    if price_dict:
+        return price_dict.get('adjusted_price', 0.0)
+    else:
+        return 0.0
 
 
 def get_industry_cost_index(
@@ -157,6 +150,47 @@ def get_industry_cost_index(
     return system_indices, cost_index
 
 
+def calc_estimated_items_value(
+        blueprint_type_id: int,
+        activity: str,
+        sde_bp_materials,
+        sde_type_ids,
+        eve_market_prices_data) -> float:
+    if activity in ['manufacturing', 'reaction']:
+        # EIV считается по материалам используемым в производственной активности
+        bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, activity, blueprint_type_id)
+    elif activity in ['invention']:
+        # EIV считается по материалам используемым в производстве T2 продукта (из продукта инвента)
+        """
+        bp1_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'invention', blueprint_type_id)
+        assert bp1_dict is not None and 'products' in bp1_dict
+        assert len(bp1_dict['products']) == 1  # TODO: сюда надо притащить продукт для которого считается инвент
+        blueprint_type_id: int = bp1_dict['products'][0]['typeID']
+        """
+        bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
+    elif activity in ['copying']:
+        # EIV считается по материалам используемым в производстве T1 продукта (из копии)
+        bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
+    else:
+        assert 0
+    assert bp0_dict is not None and 'materials' in bp0_dict
+
+    estimated_items_value: float = 0.0
+    materials = bp0_dict.get('materials')
+
+    # перебираем список материалов, которые будут использоваться в производстве
+    for m in materials:
+        material_tid: int = int(m['typeID'])
+        material_qty: int = int(m['quantity'])
+        material_adjusted_price: float = get_material_adjusted_price(
+            material_tid,
+            eve_market_prices_data)
+        estimated_items_value += material_qty * material_adjusted_price
+
+    # считаем EIV, который потребуется для вычисления стоимости job cost
+    return math.ceil(estimated_items_value)
+
+
 # составляем дерево материалов, которые будут использоваться в производстве
 def generate_materials_tree(
         # входной список материалов, используемых в производстве
@@ -170,23 +204,32 @@ def generate_materials_tree(
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
-        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
+        # настройки оптимизации производства
+        industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization]):
     for m1 in enumerate(curr_materials, start=1):
         material_tid: int = int(m1[1]['typeID'])
         material_qty: int = int(m1[1]['quantity'])
         material_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_tid)
-        material_market_group: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
-        material_group_name: str = sde_market_groups[str(material_market_group)]['nameID']['en']
+        material_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
+        material_market_group_name: str = sde_market_groups[str(material_market_group_id)]['nameID']['en']
         material_volume: float = sde_type_ids[str(material_tid)].get('volume', 0.0)
         material_price: typing.Optional[float] = get_material_price(material_tid, sde_type_ids, eve_market_prices_data)
-        material_adjusted_price: typing.Optional[float] = get_material_adjusted_price(material_tid, sde_type_ids, eve_market_prices_data)
+        material_adjusted_price: float = get_material_adjusted_price(material_tid, eve_market_prices_data)
+        material_is_commonly_used: bool = eve_sde_tools.is_type_id_nested_into_market_group(
+                material_tid,
+                industry_plan_customization.common_components,
+                sde_type_ids,
+                sde_market_groups
+        ) if industry_plan_customization and industry_plan_customization.common_components else False
         # пополняем список материалов
         q_material: profit.QMaterial = profit.QMaterial(
             material_tid,
             material_qty,
             material_name,
-            material_market_group,
-            material_group_name,
+            material_market_group_id,
+            material_market_group_name,
+            material_is_commonly_used,
             material_volume,
             material_price,
             material_adjusted_price)
@@ -232,6 +275,13 @@ def generate_materials_tree(
                 products_per_single_run: int = blueprint_dict['products'][0]['quantity']
                 single_run_time: int = blueprint_dict['time']
                 next_materials = blueprint_dict['materials']
+                # считаем EIV, который потребуется для вычисления стоимости job cost
+                estimated_items_value: float = calc_estimated_items_value(
+                    material_bp_tid,
+                    activity,
+                    sde_bp_materials,
+                    sde_type_ids,
+                    eve_market_prices_data)
                 # получаем информацию о производственных индексах в системе, где крафтится этот продукт
                 system_indices, cost_index = get_industry_cost_index(
                     material_tid,
@@ -242,12 +292,12 @@ def generate_materials_tree(
                 next_industry: profit.QIndustryTree = profit.QIndustryTree(
                     material_bp_tid,
                     eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_bp_tid),
-                    material_tid,
-                    material_name,
+                    q_material,
                     material_produce_action,
                     products_per_single_run,
                     max_production_limit,
                     single_run_time,
+                    estimated_items_value,
                     system_indices,
                     cost_index)
                 q_material.set_industry(next_industry)
@@ -261,7 +311,8 @@ def generate_materials_tree(
                         sde_bp_materials,
                         sde_market_groups,
                         eve_market_prices_data,
-                        industry_cost_indices)
+                        industry_cost_indices,
+                        industry_plan_customization)
                 break
 
 
@@ -281,7 +332,9 @@ def schedule_industry_job__invent(
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
-        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
+        # настройки оптимизации производства
+        industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization]):
     # пытаемся получить чертёж и параметры инвента (если он предполагается для этого чертежа)
     source_blueprint_type_id, invent_dict = eve_sde_tools.get_blueprint_type_id_by_invention_product_id(
         blueprint_type_id,
@@ -294,16 +347,17 @@ def schedule_industry_job__invent(
     # (и предварительной копирки)
     copied_blueprint_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, source_blueprint_type_id)
     invented_blueprint_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id)
-    blueprints_market_group: int = 2
-    blueprints_group_name: str = sde_market_groups[str(blueprints_market_group)]['nameID']['en']
+    blueprints_market_group_id: int = 2
+    blueprints_market_group_name: str = sde_market_groups[str(blueprints_market_group_id)]['nameID']['en']
 
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
         blueprint_type_id,
         1,
         invented_blueprint_name,
-        blueprints_market_group,
-        blueprints_group_name,
+        blueprints_market_group_id,
+        blueprints_market_group_name,
+        False,
         0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
         0.0,  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
         0.0)
@@ -321,22 +375,28 @@ def schedule_industry_job__invent(
     _invent_materials = invent_dict['materials']
     invent_probability: float = invent_product_dict['probability']
 
+    # считаем EIV, который потребуется для вычисления стоимости job cost
+    estimated_items_value: float = calc_estimated_items_value(
+        blueprint_type_id,
+        'invention',
+        sde_bp_materials,
+        sde_type_ids,
+        eve_market_prices_data)
     # получаем информацию о производственных индексах в системе, где крафтится этот продукт
     system_indices, cost_index = get_industry_cost_index(
         blueprint_type_id,
         'invention',
         industry_cost_indices)
-
     # инициализируем базовый объект-справочник со сведениями о производстве
     invent_industry: profit.QIndustryTree = profit.QIndustryTree(
         source_blueprint_type_id,
         copied_blueprint_name,
-        blueprint_type_id,
-        invented_blueprint_name,
-        profit.QIndustryAction.invent,
+        invented_material,
+        profit.QIndustryAction.invention,
         1,
         max_production_limit,
         invent_run_time,
+        estimated_items_value,
         system_indices,
         cost_index)
     invent_industry.set_blueprint_runs_per_single_copy(blueprint_runs_per_single_copy)
@@ -394,12 +454,14 @@ def schedule_industry_job__invent(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        industry_cost_indices)
+        industry_cost_indices,
+        industry_plan_customization)
 
 
 def generate_industry_tree(
         # вход и выход для расчёта
         calc_input,
+        industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization],
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
@@ -408,6 +470,7 @@ def generate_industry_tree(
         eve_market_prices_data,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> profit.QIndustryTree:
+    assert 'bptid' in calc_input
     blueprint_type_id = calc_input.get('bptid')
     assert blueprint_type_id is not None
 
@@ -416,46 +479,92 @@ def generate_industry_tree(
     bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
     assert bp0_dict is not None
     assert len(bp0_dict.get('products', [])) == 1
+
     product_type_id: int = bp0_dict['products'][0]['typeID']
     single_run_quantity: int = bp0_dict['products'][0]['quantity']
     max_production_limit: int = bp0_dict.get('maxProductionLimit', 0)
+
+    # если me, te и qr не заданы, то пытаемся получить их автоматизированно
+    if 'me' not in calc_input or 'te' not in calc_input or 'qr' not in calc_input:
+        calc_input.update(eve_efficiency.get_t2_bpc_attributes(
+            product_type_id,
+            {},
+            sde_type_ids,
+            sde_market_groups))
+    assert 'me' in calc_input
+    assert 'te' in calc_input
+    assert 'qr' in calc_input
+    customized_runs: int = calc_input['qr']
 
     # из справочной информации о чертеже здесь интересны только материалы, которые будут использоваться в производстве
     base_materials = bp0_dict.get('materials')
     assert base_materials is not None
 
+    # генерируем дескриптор продукта, который будем крафтить
+    product_type_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id)
+    product_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, product_type_id)
+    product_market_group_name: str = sde_market_groups[str(product_market_group_id)]['nameID']['en']
+    product_volume: float = sde_type_ids[str(product_type_id)].get('volume', 0.0)
+    product_price: typing.Optional[float] = get_material_price(product_type_id, sde_type_ids, eve_market_prices_data)
+    product_adjusted_price: float = get_material_adjusted_price(product_type_id, eve_market_prices_data)
+    product_is_commonly_used: bool = eve_sde_tools.is_type_id_nested_into_market_group(
+        product_type_id,
+        industry_plan_customization.common_components,
+        sde_type_ids,
+        sde_market_groups
+    ) if industry_plan_customization and industry_plan_customization.common_components else False
+    # составляем продукт/материал, который будет подключен к дереву индустрии
+    product: profit.QMaterial = profit.QMaterial(
+        product_type_id,
+        customized_runs * single_run_quantity,
+        product_type_name,
+        product_market_group_id,
+        product_market_group_name,
+        product_is_commonly_used,
+        product_volume,
+        product_price,
+        product_adjusted_price)
+    # считаем EIV, который потребуется для вычисления стоимости job cost
+    estimated_items_value: float = calc_estimated_items_value(
+        blueprint_type_id,
+        'manufacturing',
+        sde_bp_materials,
+        sde_type_ids,
+        eve_market_prices_data)
     # получаем информацию о производственных индексах в системе, где крафтится этот продукт
     system_indices, cost_index = get_industry_cost_index(
         product_type_id,
         'manufacturing',
         industry_cost_indices)
-
     # инициализируем базовый объект-справочник со сведениями о производстве
     base_industry: profit.QIndustryTree = profit.QIndustryTree(
         blueprint_type_id,
         eve_sde_tools.get_item_name_by_type_id(sde_type_ids, blueprint_type_id),
-        product_type_id,
-        eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id),
+        product,
         profit.QIndustryAction.manufacturing,
         single_run_quantity,
         max_production_limit,
         bp0_dict['time'],
+        estimated_items_value,
         system_indices,
         cost_index)
-    base_industry.set_me(calc_input.get('me', 2))
+    base_industry.set_me(calc_input['me'])
+    base_industry.set_blueprint_runs_per_single_copy(customized_runs)
+    # TODO: base_industry.set_te(calc_input['te'])
 
     # планируем работу (инвент если потребуется)
     schedule_industry_job__invent(
         blueprint_type_id,
-        calc_input.get('qr', 10),
-        calc_input.get('me', 2),
-        calc_input.get('te', 4),
+        customized_runs,
+        calc_input['me'],
+        calc_input['te'],
         base_industry,
         sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        industry_cost_indices)
+        industry_cost_indices,
+        industry_plan_customization)
 
     # составляем дерево материалов, которые будут использоваться в производстве
     generate_materials_tree(
@@ -465,7 +574,8 @@ def generate_industry_tree(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        industry_cost_indices)
+        industry_cost_indices,
+        industry_plan_customization)
 
     return base_industry
 
@@ -486,7 +596,7 @@ def get_optimized_runs_quantity(
         customized_reaction_runs = industry_plan_customization.reaction_runs if industry_plan_customization else None
         if customized_reaction_runs:
             runs_number_per_day = customized_reaction_runs
-    else:
+    elif industry.action == profit.QIndustryAction.manufacturing and industry.product.is_commonly_used:
         # если не None, то длительность запуска производственных работ
         customized_industry_time = industry_plan_customization.industry_time if industry_plan_customization else None
         if customized_industry_time:
@@ -538,7 +648,7 @@ def calculate_industry_ratio(
         industry: profit.QIndustryTree,
         # справочник текущего производства с настройками оптимизации процесса
         industry_plan: profit.QIndustryPlan) -> float:
-    if industry.action and industry.action in [profit.QIndustryAction.invent]:
+    if industry.action and industry.action in [profit.QIndustryAction.invention]:
         # сохраняем пропорцию использования текущего материала для текущей работы
         invent_probability: float = industry.invent_probability
         decryptor_probability: float = 1.0
@@ -741,6 +851,7 @@ def generate_industry_plan__internal(
                          industry.blueprint_name,
                          2,
                          "Blueprints & Reactions",  # sde_market_groups[str(blueprints_market_group)]['nameID']['en']
+                         False,
                          0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
                          0,
                          0),
@@ -757,10 +868,8 @@ def generate_industry_plan__internal(
         planned_blueprints,
         None)
 
-    # считаем EIV, который потребуется для вычисления стоимости job cost
-    estimated_items_value: float = math.ceil(sum([_.adjusted_price * _.quantity for _ in industry.materials]))
-    # считаем стоимость работы
-    current_level_activity.calc_job_cost(estimated_items_value)
+    # используем  EIV, считаем стоимость работы
+    current_level_activity.calc_industry_job_cost()
 
     # кешируем указатель на репозиторий материалов
     materials_repository: profit.QIndustryMaterialsRepository = industry_plan.materials_repository
@@ -773,7 +882,7 @@ def generate_industry_plan__internal(
         cached_material_quantity_before: int = cached_material.purchased + cached_material.manufactured
 
         # считаем необходимое и достаточное кол-во материала с учётом me текущего уровня
-        if m.industry and m.industry.action in [profit.QIndustryAction.invent]:
+        if m.industry and m.industry.action in [profit.QIndustryAction.invention]:
             quantity_with_efficiency: int = 1 * eve_efficiency.get_industry_material_efficiency(
                 industry.action.name,
                 1,  # кол-во run-ов чертежа (инвент считается отдельно)
@@ -909,6 +1018,13 @@ def generate_industry_plan__internal(
                     industry_plan)
                 produced_material.obtaining_plan.store_manufacturing_activity_plan(next_level_activity)
 
+                # считаем стоимость работы с учётом кол-ва запусков
+                next_level_job_cost: int = \
+                    next_industry_level_blueprints * \
+                    next_industry_level_runs * \
+                    next_level_activity.industry_job_cost.total_job_cost
+                cached_material.increase_job_cost(next_level_job_cost)
+
             if not used_rest_materials and not not_enough_materials:
                 assert 0  # TODO: это случай с расчётом остатков в коробках
 
@@ -944,18 +1060,9 @@ def generate_industry_plan(
         customized_runs: int,
         base_industry: profit.QIndustryTree,
         # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
-        calc_customization=None) -> profit.QIndustryPlan:
+        industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization]) -> profit.QIndustryPlan:
     assert len(base_industry.materials) > 0
     assert customized_runs > 0
-
-    # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
-    # см. также eve_conveyor_tools.py : setup_blueprint_details
-    industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization] = None
-    if calc_customization:
-        industry_plan_customization = profit.QIndustryPlanCustomization(
-            reaction_runs=calc_customization.get('reaction_runs'),
-            industry_time=calc_customization.get('industry_time'),
-            min_probability=calc_customization.get('min_probability'))
 
     # формируем отчёт с планом производства
     industry_plan: profit.QIndustryPlan = profit.QIndustryPlan(
@@ -1029,7 +1136,8 @@ def render_report(
               'Экономия материалов при производстве (от других чертежей): -10.0%<br>\n'
               'Установленный модификатор: -4.2%<br>\n'
               'Бонус профиля сооружения: -1.0%<br>\n'
-              'Длительность производственных работ: {mtm}<br>\n'
+              'Длительность производственных работ общих компонентов: {mtm}<br>\n'
+              ' └─ Группы компонентов общего назначения: {mcm}<br>\n'
               'Длительность запуска формул и реакций: {ftm}<br>\n'
               'Минимальная вероятность успеха по навыкам и имплантам: {mip}</p>'
               '<hr>\n'.
@@ -1046,6 +1154,9 @@ def render_report(
                      mtm='(настройка не задана)' if not industry_plan.customization or
                                                     not industry_plan.customization.industry_time else
                          '{:.1f} часов'.format(float(industry_plan.customization.industry_time) / (5*60*60)),
+                     mcm='(настройка не задана)' if not industry_plan.customization or
+                                                    not industry_plan.customization.common_components else
+                         f'{industry_plan.customization.common_components}',
                      ftm='(настройка не задана)' if not industry_plan.customization or
                                                     not industry_plan.customization.reaction_runs else
                          '{} прогонов'.format(industry_plan.customization.reaction_runs),
@@ -1088,20 +1199,33 @@ def render_report(
             prfx += '├─'       # &#x251C;&#x2500;
         return prfx
 
+    class TotalAllJobCost:
+        def __init__(self):
+            self.job_cost: float = 0.0
+
+        def increase(self, val: float) -> float:
+            self.job_cost += val
+            return self.job_cost
+
+    total_all_job_cost: TotalAllJobCost = TotalAllJobCost()
+
     def generate_industry_plan_item(
             row0_prefix: str,
             row1_num: int,
             row0_levels,
             __pa339: profit.QPlannedActivity,
-            planned_blueprints: int,
-            planned_runs: int):
+            usage_chain: float):
         bp_tid = __pa339.industry.blueprint_type_id
-        bp_nm = __pa339.industry.blueprint_name
         bp_action = __pa339.industry.action
+        # bp_nm = __pa339.industry.blueprint_name
         # planned_material: profit.QPlannedMaterial = __pa339.planned_blueprint
+        planned_blueprints: int = __pa339.planned_blueprints
+        planned_runs: int = __pa339.planned_runs
 
         job_cost: typing.Optional[profit.QPlannedJobCost] = __pa339.industry_job_cost
         assert job_cost is not None
+        current_level_job_cost: float = int(math.ceil(planned_blueprints * planned_runs * job_cost.total_job_cost))
+        usage_chain_job_cost: float = usage_chain * current_level_job_cost
 
         fmt: str = \
             '<tr{tr_class}>\n' \
@@ -1112,9 +1236,9 @@ def render_report(
             + '<td></td>' \
             + '<td>{qp}</td>' \
             + '<td></td>' \
+            + '<td>{qu}</td>' \
             + '<td></td>' \
-            + '<td></td>' \
-            + '<td></td>' \
+            + '<td>{qsr}</td>' \
             '</tr>'
         glf.write(
             fmt.format(
@@ -1123,7 +1247,7 @@ def render_report(
                 prfx='<tt><span class="text-muted">{}</span></tt>'.format(
                     get_pseudographics_prefix(row0_levels, True, False)),
                 nm="<span class='text-muted'>{act}</span>".format(
-                    act=str(bp_action).split('.')[-1],
+                    act=str(bp_action),
                 ),
                 pstfx="<sup> <strong style='color:maroon;'>{bp}&#215;{run}</strong></sup>".format(
                     bp=planned_blueprints,
@@ -1131,24 +1255,36 @@ def render_report(
                 ),
                 src=render_html.__get_img_src(bp_tid, 32),
                 qp='<small>'
-                   '{}<sup>eiv</sup>*{}<sup>runs</sup>*{:.2f}%<sup>{}</sup>*{}%<sup>rig</sup>'
+                   '{}<sup>eiv</sup>*{}<sup>runs</sup>*{:.2f}%<sup>{}</sup>{}'
                    '*{}%<sup>tax</sup> => {}<sup>job</sup>'
                    '</small>'.format(
                         job_cost.estimated_items_value,  # 1.eiv
                         planned_blueprints * planned_runs,  # 1.runs
                         job_cost.industry_cost_index * 100.0,  # 1.const_index
                         job_cost.system_indices.solar_system,  # 1.solar_system
-                        job_cost.structure_bonus_rigs * 100.0,  # 1.rig
+                        '' if not job_cost.structure_bonus_rigs else
+                        f'*{job_cost.structure_bonus_rigs * 100.0:.2f}%<sup>rig</sup>',  # 1.rig
                         job_cost.scc_surcharge * 100.0,  # 1.tax
-                        int(math.ceil(planned_blueprints * planned_runs * job_cost.total_job_cost))  # 2.out
+                        current_level_job_cost  # 2.out
                    ),
-                # qu='<small>'
-                #   '{:.8f}<sup>ratio</sup>'
-                #   '</small>'.format(
-                #        planned_material.usage_chain,
-                #    ),
+                qu='<small style="color:maroon;">'
+                   '{:.8f}<sup>chain</sup>*{}<sup>job</sup> => '
+                   '{:.2f}<sup>ratio</sup>'
+                   '</small>'.format(
+                       usage_chain,
+                       current_level_job_cost,
+                       usage_chain_job_cost
+                   ),
+                qsr='<small style="color:maroon;">'
+                    '{:.2f}=<sup>{:d}+{:d}</sup>'
+                    '</small>'.format(
+                        total_all_job_cost.job_cost + usage_chain_job_cost,
+                        math.ceil(total_all_job_cost.job_cost),
+                        math.ceil(usage_chain_job_cost)
+                    ),
             )
         )
+        total_all_job_cost.increase(usage_chain_job_cost)
 
     def generate_components_list(
             with_current_industry_progress: bool,
@@ -1168,7 +1304,7 @@ def render_report(
             m1_quantity: int = m1_material.quantity
 
             m1_copying: bool = m1_industry and m1_industry.action == profit.QIndustryAction.copying
-            m1_invention: bool = m1_industry and m1_industry.action == profit.QIndustryAction.invent
+            m1_invention: bool = m1_industry and m1_industry.action == profit.QIndustryAction.invention
             if m1_copying or m1_invention:
                 m1_planned_blueprints: int = m1_obtaining_activity.planned_blueprints
                 m1_planned_runs: int = m1_obtaining_activity.planned_runs
@@ -1348,7 +1484,9 @@ def render_report(
                 generate_industry_plan_item(
                     row2_prefix, 0, row2_levels,
                     m1_obtaining_activity,
-                    m1_planned_blueprints, m1_planned_runs)
+                    1.0 if m1_copying or m1_invention else
+                    m1_planned_material.usage_chain * m1_planned_material.usage_ratio
+                )
                 generate_components_list(
                     with_current_industry_progress,
                     row2_prefix,
@@ -1380,21 +1518,22 @@ def render_report(
     generate_industry_plan_item(
         '', 0, [],
         industry_plan.base_planned_activity,
-        1, industry_plan.customized_runs)
+        1.0)
     # вывод информации о чертежах
     generate_components_list(False, '', [], industry_plan.base_planned_activity)
 
-    glf.write("""
+    glf.write(f"""
 </tbody>
 </table>
   </div> <!--media-body-->
  </div> <!--media-->
 <hr>
  <div class="media">
-  <div class="media-left">""")
-
-    glf.write('<img class="media-object icn64" src="{src}" alt="Сводная таблица производства">\n'.
-              format(src=render_html.__get_icon_src(1201, sde_icon_ids)))  # Materials
+  <div class="media-left">
+   <img class="media-object icn64" src="{render_html.__get_icon_src(1201, sde_icon_ids)}" alt="Сводная таблица производства">
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Сводная таблица производства</h4>""")
 
     def generate_summary_raw_header(with_current_industry_progress: bool):
         glf.write('<tr>\n'
@@ -1405,15 +1544,15 @@ def render_report(
                   + ('<th>Прогресс, %</th>\n' if with_current_industry_progress else '')
                   + '<th style="text-align:right;">Цена,&nbsp;ISK/шт.</th>'
                   '<th style="text-align:right;">Цена,&nbsp;ISK</th>'
-                  '<th style="text-align:right;">Пропорция,&nbsp;шт.</th>'
-                  '<th style="text-align:right;">Пропорция,&nbsp;ISK</th>'
+                  '<th style="text-align:right;">Пропорция,<br>шт.</th>'
+                  '<th style="text-align:right;">Пропорция,<br>ISK</th>'
+                  '<th style="text-align:right;color:maroon;">Доля 1шт<br>продукта,&nbsp;ISK</th>'
                   '<th style="text-align:right;"><strike>Объём,&nbsp;m&sup3;</strike></th>'
                   '</tr>\n')
 
-    glf.write("""
-  </div>
-  <div class="media-body">
-   <h4 class="media-heading">Сводная таблица производства</h4>""")
+    def generate_group_header(group_name: str) -> None:
+        clbrd: str = ''
+        glf.write(f'<tr><td class="active" colspan="11"><strong>{group_name}</strong><!--{id}-->{clbrd}</td></tr>\n')
 
     glf.write("""
 <div class="table-responsive">
@@ -1426,28 +1565,33 @@ def render_report(
 </thead>
 <tbody>""")
 
+    def get_grayed_material_not_purchased(is_purchased: int, is_first: bool) -> str:
+        if is_purchased:
+            return ''
+        else:
+            return '<span style="color:#aaa;">' if is_first else '</span>'
+
     material_groups: typing.Dict[int, typing.List[profit.QIndustryMaterial]] = {}
     for type_id in industry_plan.materials_repository.materials.keys():
         m: profit.QIndustryMaterial = industry_plan.materials_repository.get_material(type_id)
-        mg: typing.List[profit.QIndustryMaterial] = material_groups.get(m.base.group_id)
+        mg: typing.List[profit.QIndustryMaterial] = material_groups.get(m.base.market_group_id)
         if mg is None:
             mg = []
-            material_groups[m.base.group_id] = mg
+            material_groups[m.base.market_group_id] = mg
         mg.append(m)
 
     row3_num: int = 0
+    total_purchase: float = 0.0
+    total_purchase_volume: float = 0.0
+
     for group_id in material_groups.keys():
         mg: typing.List[profit.QIndustryMaterial] = material_groups.get(group_id)
-        is_blueprints_group: bool = group_id == 2
         if group_id == 1857:
             mg.sort(key=lambda __m685: __m685.purchased+__m685.manufactured, reverse=True)
         else:
             mg.sort(key=lambda __m685: __m685.purchased+__m685.manufactured)
         # рисуем заголовок группы
-        glf.write('<tr><td class="active" colspan="10"><strong>{nm}</strong><!--{id}-->{clbrd}</td></tr>\n'.format(
-            nm=mg[0].base.group_name,
-            id=group_id,
-            clbrd=''))
+        generate_group_header(mg[0].base.market_group_name)
         # выводим товары группы
         for m in mg:
             row3_num += 1
@@ -1459,7 +1603,12 @@ def render_report(
             m3_a = m.available_in_assets  # available in assets
             m3_j = m.in_progress  # in progress (runs of jobs)
             m3_v = m.base.volume  # volume
-            m3_p = m.base.price   # price
+            # получение стоимости закупа материала (или стоимость копирки/инвента чертежей)
+            is_blueprints_group: bool = m.base.market_group_id == 2
+            if not is_blueprints_group:
+                m3_p = m.base.price   # price
+            else:
+                m3_p = m.job_cost  # blueprints * runs * job_cost
             # расчёт прогресса выполнения (постройки, сбора) материалов (m1_j пропускаем, т.к. они не готовы ещё)
             if m.available_in_assets >= m3_q:
                 m3_progress = 100.0
@@ -1467,6 +1616,10 @@ def render_report(
                 m3_progress = 100.0
             else:
                 m3_progress = float(100.0 * float(m3_a) / m3_q)
+            # получение стоимости за одну штуку
+            if m.purchased:
+                total_purchase += (m3_p * m3_r)
+                total_purchase_volume += (m3_v * m3_r)
             # вывод наименования ресурса
             glf.write(
                 '<tr>\n'
@@ -1481,6 +1634,7 @@ def render_report(
                 ' <td align="right">{costn}</td>'
                 ' <td align="right">{qratio}</td>'
                 ' <td align="right">{pratio}</td>'
+                ' <td align="right" style="color:maroon;">{instance_isk}</td>'
                 ' <td align="right"><strike>{volume}</strike></td>'
                 '</tr>'.format(
                     num=row3_num,
@@ -1496,14 +1650,125 @@ def render_report(
                     prcnt=int(m3_progress),
                     fprcnt=m3_progress,
                     prcnt100=" progress-bar-success" if m3_progress == 100 else '',
-                    price='{:,.1f}'.format(m3_p) if m3_p is not None else '',
-                    costn='{:,.1f}'.format(m3_p * m3_q) if m3_p is not None else '',
-                    qratio='' if not m.purchased else
-                           '{:,.8f}'.format(m3_r),
-                    pratio='' if not m.purchased or m3_p is None else
+                    price='' if is_blueprints_group else
+                          '{}{:,.2f}{}'.format(
+                              get_grayed_material_not_purchased(m.purchased, True),
+                              m3_p,
+                              get_grayed_material_not_purchased(m.purchased, False),
+                          ) if m3_p is not None else
+                          '',
+                    costn='{:,d}'.format(m3_p) if is_blueprints_group else
+                          '{}{:,.2f}{}'.format(
+                              get_grayed_material_not_purchased(m.purchased, True),
+                              m3_p * m3_q,
+                              get_grayed_material_not_purchased(m.purchased, False),
+                          ) if m3_p is not None else
+                          '',
+                    qratio='' if is_blueprints_group else
+                           '' if not m.purchased else
+                           '{:,.5f}'.format(m3_r),
+                    pratio='' if is_blueprints_group else
+                           '' if not m.purchased or m3_p is None else
                            '{:,.1f}'.format(m3_p*m3_r+0.004999),
-                    volume='{:,.1f}'.format(m3_v * m3_q) if not is_blueprints_group else ''
+                    instance_isk='{}{:,.2f}{}'.format(
+                                     get_grayed_material_not_purchased(False, True),
+                                     m3_p / industry_plan.customized_runs,
+                                     get_grayed_material_not_purchased(False, True),
+                                 ) if is_blueprints_group else
+                                 '' if not m.purchased else
+                                 '{:,.2f}'.format((m3_p*m3_r+0.004999) / industry_plan.customized_runs),
+                    volume='{:,.2f}'.format(m3_v * m3_r) if not is_blueprints_group else ''
                 ))
+
+    glf.write(f"""
+</tbody>
+</table>
+</div> <!--table-responsive-->
+  </div> <!--media-body-->
+ </div> <!--media-->
+<hr>
+ <div class="media">
+  <div class="media-left">
+   <img class="media-object icn64" src="{render_html.__get_icon_src(2512, sde_icon_ids)}" alt="Общая стоимость проекта">
+  </div>
+  <div class="media-body">
+   <h4 class="media-heading">Общая стоимость проекта</h4>
+<div class="table-responsive">
+<table class="table table-condensed" style="font-size:small">
+<thead>
+ <tr>
+  <th class="active">{base_industry.product_name}</th>
+  <th class="active" style="text-align:right;">Производство {industry_plan.customized_runs}шт продукта</th>
+  <th class="active" style="text-align:right;">Доля 1шт продукта</th>
+ </tr>
+</thead>
+<tbody>""")
+
+    def generate_summary_lines(
+            caption: str,
+            total_summary: str,
+            one_instance_summary: str):
+        glf.write(f"""<tr>
+ <td class="active">{caption}</td>
+ <td style="text-align:right">{total_summary}</td>
+ <td style="text-align:right;">{one_instance_summary}</td>
+</tr>""")
+
+    total_gross_cost: float = 0.0
+
+    generate_summary_lines(
+        'Стоимость закупки материалов, ISK',
+        f'{total_purchase * 1.02:,.2f}',
+        f'{(total_purchase * 1.02) / industry_plan.customized_runs:,.2f}')
+    generate_summary_lines(
+        '└─ Стоимость материалов, ISK',
+        f'{total_purchase:,.2f}',
+        f'{total_purchase / industry_plan.customized_runs:,.2f}')
+    generate_summary_lines(
+        '└─ Комиссия брокера, ISK',
+        f'{total_purchase * 0.02:,.2f}',
+        f'{(total_purchase * 0.02) / industry_plan.customized_runs:,.2f}')
+
+    total_gross_cost += total_purchase * 1.02
+
+    # Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
+    # до Jita дистанция 64'484 свет.лет со всеми скилами в 5 понадобится сжечь 79'353 Nitrogen Isotopes (buy 545.40 ISK)
+    transfer_cost: float = total_purchase_volume * ((79353 * 545.40) / 386404)
+    generate_summary_lines(
+        'Объём закупаемых материалов, m&sup3;',
+        f'{total_purchase_volume:,.1f}',
+        f'{total_purchase_volume / industry_plan.customized_runs:,.1f}')
+    generate_summary_lines(
+        '└─ Стоимость доставки закупаемых материалов, ISK',
+        f'{transfer_cost:,.2f} m&sup3;',
+        f'{transfer_cost / industry_plan.customized_runs:,.2f} m&sup3;')
+
+    total_gross_cost += transfer_cost
+
+    generate_summary_lines(
+        'Стоимость запуска работ, ISK',
+        f'{total_all_job_cost.job_cost:,.2f}',
+        f'{total_all_job_cost.job_cost / industry_plan.customized_runs:,.2f}')
+
+    total_gross_cost += total_all_job_cost.job_cost * 0.0
+
+    total_ready_volume: float = industry_plan.base_industry.product.volume * industry_plan.customized_runs
+    transfer_cost: float = total_ready_volume * ((79353 * 545.40) / 386404)
+    generate_summary_lines(
+        'Объём готовой продукции, m&sup3;',
+        f'{total_ready_volume:,.1f} m&sup3;',
+        f'{total_ready_volume / industry_plan.customized_runs:,.1f} m&sup3;')
+    generate_summary_lines(
+        '└─ Стоимость доставки готовой продукции, ISK',
+        f'{transfer_cost:,.2f}',
+        f'{transfer_cost / industry_plan.customized_runs:,.2f}')
+
+    total_gross_cost += transfer_cost
+
+    generate_summary_lines(
+        'Общая стоимость проекта, ISK',
+        f'<b>{total_gross_cost:,.2f}</b>',
+        f'<b>{total_gross_cost / industry_plan.customized_runs:,.2f}</b>')
 
     glf.write("""
 </tbody>
@@ -1637,8 +1902,10 @@ def main():
         # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
         # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
         # {'bptid': 34596, 'qr': 1, 'me': 2, 'te': 4},  # Entosis Link II - наибольшее кол-во материалов
-        # {'bptid': 61220, 'qr': 1, 'me': 2, 'te': 4},  # Ubiquitous Moon Mining Crystal Type C II - 3 произв. материала
-        {'bptid': 26341, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Large Stasis Drone Augmentor II - 1 производимый материал
+        # {'bptid': 61220, 'qr': 10, 'me': 2, 'te': 4},  # Ubiquitous Moon Mining Crystal Type C II - 3 произв. матер.
+        # {'bptid': 26341, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Large Stasis Drone Augmentor II - 1 производимый матер.
+        # {'bptid': 21018, 'qr': 1, 'me': 10, 'te': 20},  # Capital Armor Plates (Methanofullerene с бонусом и ригами)
+        {'bptid': 41356},  # Ametat II (Antimatter Reactor Unit с бонусом и ригами)
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
@@ -1648,6 +1915,7 @@ def main():
     # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
     industry_cost_indices: typing.List[profit.QIndustryCostIndices] = []
     for r in q_router_settings.g_routes:
+        assert 'solar_system' in r
         solar_system: str = r['solar_system']
         solar_system_id: typing.Optional[int] = next((int(_[0]) for _ in sde_inv_names.items()
                                                       if _[1] == solar_system), None)
@@ -1655,19 +1923,34 @@ def main():
         cost_indices = next((_['cost_indices'] for _ in eve_industry_systems_data
                              if _['solar_system_id'] == solar_system_id), None)
         assert cost_indices is not None
+        assert 'structure' in r
+        factory_bonuses: profit.QIndustryFactoryBonuses = profit.QIndustryFactoryBonuses(
+            r['structure'],
+            r.get('structure_rigs', []))
         iic: profit.QIndustryCostIndices = profit.QIndustryCostIndices(
             solar_system_id,
             solar_system,
             cost_indices,
-            set(r['output']))
+            set(r['output']),
+            factory_bonuses)
         industry_cost_indices.append(iic)
     del eve_industry_systems_data
 
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
     # см. также eve_conveyor_tools.py : setup_blueprint_details
     calc_customization = {
+        # длительность всех реакций - около 1 суток
         'reaction_runs': 15,
-        # 'industry_time': 5 * 60 * 60 * 24,
+        # длительность производства компонентов общего потребления (таких как Advanced Components или Fuel Blocks)
+        # тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме, в котором необходимо
+        'industry_time': 5 * 60 * 60 * 24,
+        'common_components': [  # market-группы компонентов общего потребления
+            1870,  # Fuel Blocks
+            65,  # Advanced Components
+            2768,  # Protective Components
+            1908,  # R.A.M.
+            1147,  # Subsystem Components
+        ],
         # === min_probability ===
         # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
         #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
@@ -1683,11 +1966,22 @@ def main():
         'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
     }
 
+    # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
+    # см. также eve_conveyor_tools.py : setup_blueprint_details
+    industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization] = None
+    if calc_customization:
+        industry_plan_customization = profit.QIndustryPlanCustomization(
+            reaction_runs=calc_customization.get('reaction_runs'),
+            industry_time=calc_customization.get('industry_time'),
+            common_components=calc_customization.get('common_components'),
+            min_probability=calc_customization.get('min_probability'))
+
     for calc_input in calc_inputs:
         # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
         industry_tree: profit.QIndustryTree = generate_industry_tree(
             # вход и выход для расчёта
             calc_input,
+            industry_plan_customization,
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
             sde_bp_materials,
@@ -1697,9 +1991,9 @@ def main():
 
         # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
         industry_plan: profit.QIndustryPlan = generate_industry_plan(
-            calc_input.get('qr', 1),
+            industry_tree.blueprint_runs_per_single_copy,
             industry_tree,
-            calc_customization)
+            industry_plan_customization)
 
         dump_industry_plan(
             industry_plan,
