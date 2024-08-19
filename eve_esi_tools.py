@@ -684,3 +684,26 @@ def get_containers_on_stations(
         found_containers.append(station_containers)
 
     return found_containers
+
+
+def get_material_price(type_id: int, sde_type_ids, eve_market_prices_data) -> typing.Optional[float]:
+    price: typing.Optional[float] = None
+    price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
+    if price_dict is not None:
+        if "average_price" in price_dict:
+            price = float(price_dict["average_price"])
+        elif "adjusted_price" in price_dict:
+            price = float(price_dict["adjusted_price"])
+    if not price:
+        type_dict = sde_type_ids[str(type_id)]
+        if "basePrice" in type_dict:
+            price = float(type_dict["basePrice"])
+    return price
+
+
+def get_material_adjusted_price(type_id: int, eve_market_prices_data) -> float:
+    price_dict = next((p for p in eve_market_prices_data if p['type_id'] == int(type_id)), None)
+    if price_dict:
+        return price_dict.get('adjusted_price', 0.0)
+    else:
+        return 0.0
