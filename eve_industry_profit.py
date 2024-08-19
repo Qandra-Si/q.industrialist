@@ -203,7 +203,6 @@ def generate_materials_tree(
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
-        eve_jita_orders_data: profit.QMarketOrders,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
         # настройки оптимизации производства
@@ -216,7 +215,6 @@ def generate_materials_tree(
         material_market_group_name: str = sde_market_groups[str(material_market_group_id)]['nameID']['en']
         material_meta_group_id: typing.Optional[int] = sde_type_ids[str(material_tid)].get('metaGroupID', None)
         material_volume: float = sde_type_ids[str(material_tid)].get('volume', 0.0)
-        material_price: typing.Optional[float] = get_material_price(material_tid, sde_type_ids, eve_market_prices_data)
         material_adjusted_price: float = get_material_adjusted_price(material_tid, eve_market_prices_data)
         material_is_commonly_used: bool = eve_sde_tools.is_type_id_nested_into_market_group(
                 material_tid,
@@ -224,8 +222,6 @@ def generate_materials_tree(
                 sde_type_ids,
                 sde_market_groups
         ) if industry_plan_customization and industry_plan_customization.common_components else False
-        material_jita_buy_orders: typing.Optional[profit.QMarketOrders.Orders] = \
-            eve_jita_orders_data.get_orders(material_tid)
         # пополняем список материалов
         q_material: profit.QMaterial = profit.QMaterial(
             material_tid,
@@ -235,9 +231,7 @@ def generate_materials_tree(
             material_market_group_name,
             material_is_commonly_used,
             material_volume,
-            material_price,
             material_adjusted_price,
-            material_jita_buy_orders,
             material_meta_group_id)
         curr_industry.append_material(q_material)
         # или: проверяем, возможно ли получить данный материал с помощью его manufacturing-производства?
@@ -327,7 +321,6 @@ def generate_materials_tree(
                     sde_bp_materials,
                     sde_market_groups,
                     eve_market_prices_data,
-                    eve_jita_orders_data,
                     industry_cost_indices,
                     industry_plan_customization)
             break
@@ -348,7 +341,6 @@ def schedule_industry_job__invent(
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
-        eve_jita_orders_data: profit.QMarketOrders,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
         # настройки оптимизации производства
@@ -381,9 +373,7 @@ def schedule_industry_job__invent(
         blueprints_market_group_name,
         False,
         0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
-        0.0,  # TODO: х.з. пока, надо ли что-то тут вписать по цене?
         0.0,
-        None,  # чертежи покупать не пранируем
         blueprint_meta_group_id)
     curr_industry.append_material(invented_material)
 
@@ -475,7 +465,6 @@ def schedule_industry_job__invent(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        eve_jita_orders_data,
         industry_cost_indices,
         industry_plan_customization)
 
@@ -490,7 +479,6 @@ def generate_industry_tree(
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
-        eve_jita_orders_data: profit.QMarketOrders,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> profit.QIndustryTree:
     assert 'bptid' in calc_input
@@ -517,7 +505,6 @@ def generate_industry_tree(
     product_market_group_name: str = sde_market_groups[str(product_market_group_id)]['nameID']['en']
     product_volume: float = sde_type_ids[str(product_type_id)].get('volume', 0.0)
     product_meta_group_id: typing.Optional[int] = sde_type_ids[str(product_type_id)].get('metaGroupID', None)
-    product_price: typing.Optional[float] = get_material_price(product_type_id, sde_type_ids, eve_market_prices_data)
     product_adjusted_price: float = get_material_adjusted_price(product_type_id, eve_market_prices_data)
     product_is_commonly_used: bool = eve_sde_tools.is_type_id_nested_into_market_group(
         product_type_id,
@@ -525,8 +512,6 @@ def generate_industry_tree(
         sde_type_ids,
         sde_market_groups
     ) if industry_plan_customization and industry_plan_customization.common_components else False
-    product_jita_buy_orders: typing.Optional[profit.QMarketOrders.Orders] = \
-        eve_jita_orders_data.get_orders(product_type_id)
 
     # если me, te и qr не заданы, то пытаемся получить их автоматизированно
     if 'me' not in calc_input or 'te' not in calc_input or 'qr' not in calc_input:
@@ -556,9 +541,7 @@ def generate_industry_tree(
         product_market_group_name,
         product_is_commonly_used,
         product_volume,
-        product_price,
         product_adjusted_price,
-        product_jita_buy_orders,
         product_meta_group_id)
     # считаем EIV, который потребуется для вычисления стоимости job cost
     estimated_items_value: float = calc_estimated_items_value(
@@ -599,7 +582,6 @@ def generate_industry_tree(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        eve_jita_orders_data,
         industry_cost_indices,
         industry_plan_customization)
 
@@ -611,7 +593,6 @@ def generate_industry_tree(
         sde_bp_materials,
         sde_market_groups,
         eve_market_prices_data,
-        eve_jita_orders_data,
         industry_cost_indices,
         industry_plan_customization)
 
@@ -902,8 +883,6 @@ def generate_industry_plan__internal(
                          False,
                          0.0,  # чертёж не перевозится, он копируется и инвентится "на месте"
                          0,
-                         0,
-                         None,  # чертежи покупать не планируем
                          industry.product.meta_group_id),  # TODO: технологический уровень продукта, а не от чертежа :(
         1.0,  # usage_chain,
         planned_quantity,
@@ -1163,8 +1142,10 @@ def render_report(
         # данные о продуктах, которые надо отобразить в отчёте
         industry_plan: profit.QIndustryPlan,
         # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        eve_market_prices_data,
         sde_icon_ids,
         # ордера, выставленные в Jita 4-4
         eve_jita_orders_data: profit.QMarketOrders):
@@ -1686,16 +1667,22 @@ def render_report(
             m3_j = m.in_progress  # in progress (runs of jobs)
             m3_v = m.base.volume  # volume
             # получение стоимости закупа материала (или стоимость копирки/инвента чертежей)
+            m3_p: typing.Optional[float] = None
             is_blueprints_group: bool = m.base.market_group_id == 2
             if not is_blueprints_group:
-                if m.base.jita_orders:
-                    max_buy: typing.Optional[profit.QMarketOrder] = m.base.jita_orders.max_buy_order
+                if eve_jita_orders_data:
+                    max_buy: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_max_buy_order(m3_tid)
                     if max_buy:
                         m3_p = profit.eve_ceiling_change_by_point(max_buy.price, +1)
                     else:
-                        m3_p = m.base.price  # price
-                else:
-                    m3_p = m.base.price  # price
+                        min_sell: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(m3_tid)
+                        if min_sell:
+                            m3_p = min_sell.price
+                            # TODO: внимание, с этой цены налог не выплачивается!
+                if not m3_p:
+                    m3_p = get_material_price(m3_tid, sde_type_ids, eve_market_prices_data)
+                if not m3_p:
+                    m3_p = -1000000000.00  # fake price
             else:
                 m3_p = m.job_cost  # blueprints * runs * job_cost
             # расчёт прогресса выполнения (постройки, сбора) материалов (m1_j пропускаем, т.к. они не готовы ещё)
@@ -1810,11 +1797,11 @@ def render_report(
         f'{total_purchase * 1.02:,.2f}',
         f'{(total_purchase * 1.02) / industry_plan.customized_runs:,.2f}')
     generate_summary_lines(
-        '└─ Стоимость материалов, ISK',
+        '├─ Стоимость материалов, ISK',
         f'{total_purchase:,.2f}',
         f'{total_purchase / industry_plan.customized_runs:,.2f}')
     generate_summary_lines(
-        '└─ Комиссия брокера, ISK',
+        '└─ Брокерская комиссия, ISK',
         f'{total_purchase * 0.02:,.2f}',
         f'{(total_purchase * 0.02) / industry_plan.customized_runs:,.2f}')
 
@@ -1822,21 +1809,31 @@ def render_report(
 
     # Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
     # до Jita дистанция 64'484 свет.лет со всеми скилами в 5 понадобится сжечь 79'353 Nitrogen Isotopes (buy 545.40 ISK)
-    nitrogen_isotopes_isk = 545.40  # price
-    nitrogen_isotopes: typing.Optional[profit.QMarketOrders.Orders] = eve_jita_orders_data.get_orders(17888)  # Nitrogen Isotopes
-    if nitrogen_isotopes:
-        max_buy: typing.Optional[profit.QMarketOrder] = nitrogen_isotopes.max_buy_order
+    nitrogen_isotopes_type_id: int = 17888  # Nitrogen Isotopes
+    nitrogen_isotopes_isk: typing.Optional[float] = None  # price
+    if eve_jita_orders_data:
+        max_buy: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_max_buy_order(nitrogen_isotopes_type_id)
         if max_buy:
             nitrogen_isotopes_isk = profit.eve_ceiling_change_by_point(max_buy.price, +1) * 1.02
+        else:
+            min_sell: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(nitrogen_isotopes_type_id)
+            if min_sell:
+                nitrogen_isotopes_isk = min_sell.price  # с этой цены налог и комиссии не удерживаются
+    if not nitrogen_isotopes_isk:
+        # ого! в Жите топляк закончился?
+        nitrogen_isotopes_isk = get_material_price(nitrogen_isotopes_type_id, sde_type_ids, eve_market_prices_data)
+    if not nitrogen_isotopes_isk:
+        nitrogen_isotopes_isk = 545.40  # hardcoded price (august 2024)
+
     transfer_cost: float = total_purchase_volume * ((79353 * nitrogen_isotopes_isk) / 386404)
     generate_summary_lines(
-        'Объём закупаемых материалов, m&sup3;',
-        f'{total_purchase_volume:,.1f} m&sup3;',
-        f'{total_purchase_volume / industry_plan.customized_runs:,.1f} m&sup3;')
-    generate_summary_lines(
-        '└─ Стоимость доставки закупаемых материалов, ISK',
+        'Стоимость доставки закупаемых материалов, ISK',
         f'{transfer_cost:,.2f}',
         f'{transfer_cost / industry_plan.customized_runs:,.2f}')
+    generate_summary_lines(
+        '└─ Объём закупаемых материалов, m&sup3;',
+        f'{total_purchase_volume:,.1f} m&sup3;',
+        f'{total_purchase_volume / industry_plan.customized_runs:,.1f} m&sup3;')
 
     total_gross_cost += transfer_cost
 
@@ -1850,15 +1847,16 @@ def render_report(
 
     total_ready_volume: float = industry_plan.base_industry.product.volume * industry_plan.customized_runs
     # TODO: total_ready_volume: float = 50000 * industry_plan.customized_runs
+    total_ready_volume: float = 2500 * industry_plan.customized_runs
     transfer_cost: float = total_ready_volume * ((79353 * nitrogen_isotopes_isk) / 386404) * 1.02
     generate_summary_lines(
-        'Объём готовой продукции, m&sup3;',
-        f'{total_ready_volume:,.1f} m&sup3;',
-        f'{total_ready_volume / industry_plan.customized_runs:,.1f} m&sup3;')
-    generate_summary_lines(
-        '└─ Стоимость отправки готовой продукции, ISK',
+        'Стоимость отправки готовой продукции, ISK',
         f'{transfer_cost:,.2f}',
         f'{transfer_cost / industry_plan.customized_runs:,.2f}')
+    generate_summary_lines(
+        '└─ Объём готовой продукции, m&sup3;',
+        f'{total_ready_volume:,.1f} m&sup3;',
+        f'{total_ready_volume / industry_plan.customized_runs:,.1f} m&sup3;')
 
     total_gross_cost += transfer_cost
 
@@ -1867,27 +1865,32 @@ def render_report(
         f'<b>{total_gross_cost:,.2f}</b>',
         f'<b>{total_gross_cost / industry_plan.customized_runs:,.2f}</b>')
 
-    sell_order_isk: float = 0  # price
-    if industry_plan.base_industry.product.jita_orders:
-        min_sell: typing.Optional[profit.QMarketOrder] = industry_plan.base_industry.product.jita_orders.min_sell_order
+    product_type_id: int = industry_plan.base_industry.product.type_id
+    product_sell_order_isk: typing.Optional[float] = None
+    if eve_jita_orders_data:
+        min_sell: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(product_type_id)
         if min_sell:
-            sell_order_isk = profit.eve_ceiling_change_by_point(min_sell.price, -1)
+            product_sell_order_isk = profit.eve_ceiling_change_by_point(min_sell.price, -1)
+    if not product_sell_order_isk:
+        product_sell_order_isk = get_material_price(product_type_id, sde_type_ids, eve_market_prices_data)
+    if not product_sell_order_isk:
+        product_sell_order_isk = 1000000000.00  # fake price
 
-    sell_order_isk *= industry_plan.customized_runs
-    sales_broker_fee: float = sell_order_isk * 0.02
-    sales_tax: float = sell_order_isk * 0.016
-    sales_profit: float = sell_order_isk - sales_broker_fee - sales_tax
+    product_sell_order_isk *= industry_plan.customized_runs
+    sales_broker_fee: float = product_sell_order_isk * 0.02
+    sales_tax: float = product_sell_order_isk * 0.016
+    sales_profit: float = product_sell_order_isk - sales_broker_fee - sales_tax
 
     generate_summary_lines(
         'Доход с продаж, ISK',
         f'{sales_profit:,.2f}',
         f'{sales_profit / industry_plan.customized_runs:,.2f}')
     generate_summary_lines(
-        '└─ Рыночная цена, ISK',
-        f'{sell_order_isk:,.2f}',
-        f'{sell_order_isk / industry_plan.customized_runs:,.2f}')
+        '├─ Рыночная цена, ISK',
+        f'{product_sell_order_isk:,.2f}',
+        f'{product_sell_order_isk / industry_plan.customized_runs:,.2f}')
     generate_summary_lines(
-        '└─ Брокерская комиссия, ISK',
+        '├─ Брокерская комиссия, ISK',
         f'{sales_broker_fee:,.2f}',
         f'{sales_broker_fee / industry_plan.customized_runs:,.2f}')
     generate_summary_lines(
@@ -1915,8 +1918,10 @@ def dump_industry_plan(
         # путь, где будет сохранён отчёт
         ws_dir,
         # sde данные, загруженные из .converted_xxx.json файлов
+        sde_type_ids,
         sde_bp_materials,
         sde_market_groups,
+        eve_market_prices_data,
         sde_icon_ids,
         # ордера, выставленные в Jita 4-4
         eve_jita_orders_data: profit.QMarketOrders):
@@ -1930,8 +1935,10 @@ def dump_industry_plan(
         render_report(
             ghf,
             industry_plan,
+            sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            eve_market_prices_data,
             sde_icon_ids,
             eve_jita_orders_data)
         render_html.__dump_footer(ghf)
@@ -2051,14 +2058,14 @@ def main():
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
-        # {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
+        {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
         # {'bptid': 12035, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Hound (runs +9, me -2, te +2)
         # {'bptid': 12031, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Manticore (runs +9, me -2, te +2)
         # {'bptid': 11378, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Nemesis (runs +9, me -2, te +2)
-        {'bptid': 28666, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Vargur (runs +7, me +2, te +0)
-        {'bptid': 28662, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Kronos (runs +7, me +2, te +0)
-        {'bptid': 28660, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Paladin (runs +7, me +2, te +0)
-        {'bptid': 28711, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Golem (runs +7, me +2, te +0)
+        # {'bptid': 28666, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Vargur (runs +7, me +2, te +0)
+        # {'bptid': 28662, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Kronos (runs +7, me +2, te +0)
+        # {'bptid': 28660, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Paladin (runs +7, me +2, te +0)
+        # {'bptid': 28711, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Golem (runs +7, me +2, te +0)
         # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
         # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
         # {'bptid': 34596, 'qr': 1, 'me': 2, 'te': 4},  # Entosis Link II - наибольшее кол-во материалов
@@ -2149,7 +2156,6 @@ def main():
             sde_bp_materials,
             sde_market_groups,
             eve_market_prices_data,
-            eve_jita_orders_data,
             industry_cost_indices)
 
         # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
@@ -2161,8 +2167,10 @@ def main():
         dump_industry_plan(
             industry_plan,
             '{}/industry_cost'.format(argv_prms["workspace_cache_files_dir"]),
+            sde_type_ids,
             sde_bp_materials,
             sde_market_groups,
+            eve_market_prices_data,
             sde_icon_ids,
             eve_jita_orders_data)
 

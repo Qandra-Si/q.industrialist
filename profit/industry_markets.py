@@ -101,6 +101,18 @@ class QMarketOrders:
         else:
             return orders.sell
 
+    def get_min_sell_order(self, type_id: int) -> typing.Optional[QMarketOrder]:
+        orders: typing.Optional[QMarketOrders.Orders] = self.__market_orders.get(type_id)
+        if not orders or not orders.sell:
+            return None
+        return orders.sell[0]
+
+    def get_max_buy_order(self, type_id: int) -> typing.Optional[QMarketOrder]:
+        orders: typing.Optional[QMarketOrders.Orders] = self.__market_orders.get(type_id)
+        if not orders or not orders.buy:
+            return None
+        return orders.buy[0]
+
     def load_orders(self, eve_orders_data) -> int:
         num_orders: int = 0
         for o in eve_orders_data:
