@@ -34,11 +34,11 @@ def get_industry_cost_indices_desc(
     else:
         max0: int = len(industry_cost_indices) - 1
         for lvl0, i in enumerate(industry_cost_indices):
-            desc += '<br>' + get_pseudographics_prefix([], lvl0 == 0, lvl0 == max0)
-            desc += f'{i.factory_name} производит {f'{len(i.product_ids)} видов' if i.product_ids else 'все виды'} продукции'
+            desc += '<br>\n' + get_pseudographics_prefix([], lvl0 == 0, lvl0 == max0)
+            desc += f' {i.factory_name} производит {f'{len(i.product_ids)} видов' if i.product_ids else 'все виды'} продукции'
             bonuses: typing.List[str] = []
-            for activity in ['manufacturing', 'copying', 'invent', 'reaction']:
-                for num in range(2):
+            for num in range(2):
+                for activity in ['manufacturing', 'copying', 'invent', 'reaction']:
                     if num == 0:
                         me: float = i.factory_bonuses.get_role_bonus(activity, 'me')
                         jc: float = i.factory_bonuses.get_role_bonus(activity, 'job_cost')
@@ -58,9 +58,19 @@ def get_industry_cost_indices_desc(
             if bonuses:
                 max1: int = len(bonuses) - 1
                 for lvl1, bonus in enumerate(bonuses):
-                    desc += '<br>' + get_pseudographics_prefix([1], lvl1 == 0, lvl1 == max1) + ' ' + bonus
-    # Установленный модификатор: -4.2%<br>
-    # Бонус профиля сооружения: -1.0%<br>
+                    desc += '<br>\n' + get_pseudographics_prefix([1], lvl1 == 0, lvl1 == max1) + ' ' + bonus
+    return desc
+
+
+def get_common_components_desc(market_group_ids: typing.List[int], sde_market_groups):
+    groups: typing.List[str] = []
+    for market_group_id in market_group_ids:
+        group_name: str = sde_market_groups[str(market_group_id)]['nameID']['en']
+        groups.append(group_name)
+    desc: str = ''
+    max2: int = len(groups) - 1
+    for lvl2, group_name in enumerate(groups):
+        desc += '<br>\n &nbsp; &nbsp; ' + get_pseudographics_prefix([], lvl2 == 0, lvl2 == max2) + ' ' + group_name
     return desc
 
 
@@ -132,7 +142,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 Длительность производственных работ общих компонентов: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.industry_time else
                                                         '{:.1f} часов'.format(float(industry_plan.customization.industry_time) / (5*60*60))}<br>
  └─ Группы компонентов общего назначения: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.common_components else
-                                           f'{industry_plan.customization.common_components}'}<br>
+    f'{get_common_components_desc(industry_plan.customization.common_components, sde_market_groups)}'}<br>
 Длительность запуска формул и реакций: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.reaction_runs else
                                         '{} прогонов'.format(industry_plan.customization.reaction_runs)}<br>
 Минимальная вероятность успеха по навыкам и имплантам: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.min_probability else
