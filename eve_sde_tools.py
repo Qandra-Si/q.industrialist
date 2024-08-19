@@ -432,11 +432,22 @@ def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
     return products_for_bps
 
 
-def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activity: str = "manufacturing"):
+def get_blueprint_type_id_by_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids,
+        activity: str = "manufacturing") -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
+    Внимание!
+    * в игре можно найти неопубликованный предмет, который можно произвести (чёртеж существует)
+    * в игре нельзя найти неопубликованный чертёж (его не существует)
     """
     for blueprint_type_id in sde_bp_materials:
+        bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
+        if not bp_tid_dict or not bp_tid_dict.get("published", False):
+            bp_tid_dict = bp_tid_dict
+            continue
         __bpm1 = sde_bp_materials[blueprint_type_id]["activities"]
         __bpm2 = __bpm1.get(activity)
         if not __bpm2:
@@ -451,18 +462,24 @@ def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activ
     return None, None
 
 
-def get_blueprint_type_id_by_manufacturing_product_id(product_id, sde_bp_materials):
-    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing")
+def get_blueprint_type_id_by_manufacturing_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids) -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, sde_type_ids, activity="manufacturing")
     return a, b
 
 
-def get_blueprint_type_id_by_invention_product_id(product_id, sde_bp_materials):
-    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="invention")
+def get_blueprint_type_id_by_invention_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids) -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, sde_type_ids, activity="invention")
     return a, b
 
 
 def get_products_by_blueprint_type_id(
-        blueprint_type_id,
+        blueprint_type_id: int,
         activity_id,
         sde_bp_materials) -> typing.Optional[typing.List[typing.Tuple[int, int]]]:
     """

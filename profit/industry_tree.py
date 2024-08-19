@@ -2,6 +2,8 @@
 import typing
 import enum
 
+from .industry_markets import QMarketOrders
+
 
 class QBaseMaterial:
     def __init__(self,
@@ -12,7 +14,9 @@ class QBaseMaterial:
                  is_commonly_used: bool,
                  volume: float,
                  price: typing.Optional[float],
-                 adjusted_price: float):
+                 adjusted_price: float,
+                 jita_orders: typing.Optional[QMarketOrders.Orders],
+                 meta_group_id: typing.Optional[int]):
         self.__type_id: int = type_id
         self.__name: str = name
         self.__market_group_id: int = market_group_id
@@ -21,6 +25,8 @@ class QBaseMaterial:
         self.__volume: float = volume  # TODO: это не упакованный размер! актуальные данные скачиваются в БД
         self.__price: typing.Optional[float] = price
         self.__adjusted_price: float = adjusted_price
+        self.__jita_orders: typing.Optional[QMarketOrders.Orders] = jita_orders
+        self.__meta_group_id: typing.Optional[int] = meta_group_id
 
     @property
     def type_id(self) -> int:
@@ -54,6 +60,14 @@ class QBaseMaterial:
     def adjusted_price(self) -> float:
         return self.__adjusted_price
 
+    @property
+    def jita_orders(self) -> typing.Optional[QMarketOrders.Orders]:
+        return self.__jita_orders
+
+    @property
+    def meta_group_id(self) -> typing.Optional[int]:
+        return self.__meta_group_id
+
 
 class QMaterial(QBaseMaterial):
     def __init__(self,
@@ -65,8 +79,20 @@ class QMaterial(QBaseMaterial):
                  is_commonly_used: bool,
                  volume: float,
                  price: typing.Optional[float],
-                 adjusted_price: float):
-        super().__init__(type_id, name, group_id, group_name, is_commonly_used, volume, price, adjusted_price)
+                 adjusted_price: float,
+                 jita_orders: typing.Optional[QMarketOrders.Orders],
+                 meta_group_id: typing.Optional[int]):
+        super().__init__(
+            type_id,
+            name,
+            group_id,
+            group_name,
+            is_commonly_used,
+            volume,
+            price,
+            adjusted_price,
+            jita_orders,
+            meta_group_id)
         self.__quantity: int = quantity
         self.__industry: typing.Optional[QIndustryTree] = None
 

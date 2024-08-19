@@ -79,6 +79,26 @@ def get_t2_bpc_attributes(
     return {"me": t2_bpc_me, "te": t2_bpc_te, "qr": t2_bpc_runs}
 
 
+def get_t3_bpc_attributes(
+        product_type_id: int,
+        invent_effects: typing.Dict[int, typing.Any],  # см. get_corp_rules_invent_effects ?
+        sde_type_ids,
+        sde_market_groups):
+    # https://wiki.eveuniversity.org/Tech_3_Production
+    #  Intact - highest chance of BPC invention (26% base chance of success, 20-run BPC)
+    #  Malfunctioning - medium chance of BPC invention (21% base, 10-run BPC)
+    #  Wrecked - lowest chance of BPC invention (14% base, 3-run BPC)
+    __market_groups_chain: typing.List[int] = eve_sde_tools.get_market_groups_chain_by_type_id(
+        sde_type_ids,
+        sde_market_groups,
+        product_type_id)
+    __market_groups = set(__market_groups_chain)
+    t3_bpc_me = 2
+    t3_bpc_te = 3
+    t3_bpc_runs = 3  # TODO: тут надо понимать промежуточный артефакт (см. комментарий выше)
+    return {"me": t3_bpc_me, "te": t3_bpc_te, "qr": t3_bpc_runs}
+
+
 def get_industry_material_efficiency(
         # тип производства - это чертёж или формула, или реакция?
         manufacturing_activity: str,

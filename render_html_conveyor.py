@@ -332,6 +332,7 @@ def get_ntier_materials_list_of_not_available__obsolete(
         (blueprint_type_id, blueprint_dict) = eve_sde_tools.get_blueprint_type_id_by_product_id(
             m_id,
             sde_bp_materials,
+            sde_type_ids,
             ntier_activity)
         if not blueprint_type_id:
             calc_materials_summary__obsolete([m], ntier_materials_list_for_buy)

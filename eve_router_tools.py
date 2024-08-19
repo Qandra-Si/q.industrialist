@@ -2509,6 +2509,12 @@ class ConveyorDemands:
         return invent_plan
 
 
+class ManufacturingPlan:
+    def __init__(self, product_type_id: int):
+        self.product_type_id: int = product_type_id
+        self.data: typing.List[ConveyorMaterialRequirements.StackOfBlueprints] = []
+
+
 class ConveyorCalculations:
     class NthPriority:
         def __init__(self, corporation: db.QSwaggerCorporation):
@@ -2525,8 +2531,9 @@ class ConveyorCalculations:
             self.completed_jobs: typing.List[db.QSwaggerCorporationIndustryJob] = []
             # список тех чертежей, запуск которых невозможен
             self.active_blueprint_ids: typing.Set[int] = set()
-            # чертежи, которые не подходят к текущей activity конвейера
+            # чертежи, которые подходят к текущей activity конвейера (могут быть запущены)
             self.possible_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
+            # чертежи, которые не подходят к текущей activity конвейера
             self.lost_blueprints: typing.List[db.QSwaggerCorporationBlueprint] = []
             # 2024-05-07 выяснилась проблема: CCP отдают отчёт со сведениями о чертежах в котором чертёж есть,
             # и отдают его 2 дня подряд... а в коробке (в игре) чертежа на самом деле нет, в отчёте с ассетами
@@ -2557,7 +2564,9 @@ class ConveyorCalculations:
                 router_settings: typing.List[RouterSettings],
                 all_possible_conveyors: typing.List[ConveyorSettings],
                 # список доступных материалов в стоках конвейеров
-                available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials]):
+                available_materials: typing.Dict[ConveyorSettings, ConveyorCorporationStockMaterials],
+                # список продукции для производства без учёта приоритетов (список сквозной)
+                manufacturing_plan: typing.Dict[int, ManufacturingPlan]):
             # инициализируем интервал отсеивания фантомных чертежей из списка corporation blueprints
             phantom_timedelta = datetime.timedelta(hours=3)
 
@@ -2709,7 +2718,11 @@ class ConveyorCalculations:
         # инициализируем основные дескрипторы для расчётов
         self.corporation: typing.Optional[db.QSwaggerCorporation] = None
         # контейнеры, сгруппированные по приоритетам
+        # (справочник по номерам приоритетов и типам конвейера)
         self.prioritized: typing.Dict[int, typing.Dict[ConveyorSettings, ConveyorCalculations.Prioritized]] = {}
+        # план производства составленный из списка чертежей за вычетом настроек лимита (перепроизводства)
+        # (справочник по типам конвейера и номерам продуктов)
+        self.manufacturing_plan: typing.Dict[ConveyorSettings, typing.Dict[int, ConveyorCalculations.ManufacturingPlan]] = {}
 
     def calc_corp_conveyors(
             self,
@@ -2750,10 +2763,15 @@ class ConveyorCalculations:
                     p0[s] = p1
                 p1.data.corp_containers.append(container)
 
+        # группируем продукция конвейеров без учёта производства
+        self.manufacturing_plan: typing.Dict[ConveyorSettings, typing.Dict[int, ConveyorCalculations.ManufacturingPlan]] = {}
+        for s in conveyor_settings:
+            self.manufacturing_plan[s] = {}
+
         # перебираем сгруппированные преоритизированные группы
         for priority in sorted(self.prioritized.keys()):
             p0 = self.prioritized.get(priority)
-            for p1 in p0.values():
+            for conveyor_settings, p1 in p0.values():
                 p1.data.calc_stage1(
                     qid,
                     global_dictionary,
@@ -2761,7 +2779,8 @@ class ConveyorCalculations:
                     p1.conveyor_settings,
                     router_settings,
                     conveyor_settings,
-                    available_materials)
+                    available_materials,
+                    self.manufacturing_plan[conveyor_settings])
 
 
 # ConveyorDictionary - долговременный справочник материалов конвейера, хранится долго и накапливает информацию из

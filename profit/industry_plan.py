@@ -417,6 +417,18 @@ class QIndustryMaterialsRepository:
         return m
 
 
+class QIndustryJobCostAccumulator:
+    def __init__(self):
+        self.__total_paid: float = 0.0
+
+    @property
+    def total_paid(self) -> float:
+        return self.__total_paid
+
+    def increment_total_paid(self, job_cost: float):
+        self.__total_paid += job_cost
+
+
 class QIndustryPlanCustomization:
     def __init__(self,
                  reaction_runs: typing.Optional[int],
@@ -453,6 +465,7 @@ class QIndustryPlan:
         self.__base_planned_activity: typing.Optional[QPlannedActivity] = None
         self.__customization: typing.Optional[QIndustryPlanCustomization] = customization
         self.__materials_repository: QIndustryMaterialsRepository = QIndustryMaterialsRepository()
+        self.__job_cost_accumulator: QIndustryJobCostAccumulator = QIndustryJobCostAccumulator()
 
     @property
     def base_industry(self) -> QIndustryTree:
@@ -476,3 +489,7 @@ class QIndustryPlan:
     @property
     def materials_repository(self) -> QIndustryMaterialsRepository:
         return self.__materials_repository
+
+    @property
+    def job_cost_accumulator(self) -> QIndustryJobCostAccumulator:
+        return self.__job_cost_accumulator
