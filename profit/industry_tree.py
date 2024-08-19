@@ -223,11 +223,13 @@ class QIndustryCostIndices:
                  solar_system_id: int,
                  solar_system: str,
                  cost_indices,
+                 factory_name: str,
                  product_ids: typing.Set[int],
                  factory_bonuses: QIndustryFactoryBonuses):
         self.__solar_system_id: int = solar_system_id
         self.__solar_system: str = solar_system
         self.__cost_indices = cost_indices
+        self.__factory_name: str = factory_name
         self.__product_ids: typing.Set[int] = product_ids
         self.__factory_bonuses: QIndustryFactoryBonuses = factory_bonuses
 
@@ -242,6 +244,10 @@ class QIndustryCostIndices:
     @property
     def cost_indices(self):
         return self.__cost_indices
+
+    @property
+    def factory_name(self):
+        return self.__factory_name
 
     @property
     def product_ids(self) -> typing.Set[int]:

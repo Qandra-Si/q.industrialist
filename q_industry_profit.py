@@ -253,6 +253,7 @@ def main():
             solar_system_id,
             solar_system,
             cost_indices,
+            r['station'],
             set(r['output']),
             factory_bonuses)
         industry_cost_indices.append(iic)
@@ -286,6 +287,8 @@ def main():
         #       )
         #  ) * Decryptor_Modifier
         'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
+        # экономия материалов (material efficiency) промежуточных чертежей
+        'unknown_blueprints_me': 10,
     }
 
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
@@ -296,7 +299,8 @@ def main():
             reaction_runs=calc_customization.get('reaction_runs'),
             industry_time=calc_customization.get('industry_time'),
             common_components=calc_customization.get('common_components'),
-            min_probability=calc_customization.get('min_probability'))
+            min_probability=calc_customization.get('min_probability'),
+            unknown_blueprints_me=calc_customization.get('unknown_blueprints_me'))
 
     for calc_input in calc_inputs:
         # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
@@ -325,7 +329,8 @@ def main():
             sde_market_groups,
             eve_market_prices_data,
             sde_icon_ids,
-            eve_jita_orders_data)
+            eve_jita_orders_data,
+            industry_cost_indices)
 
 
 if __name__ == "__main__":

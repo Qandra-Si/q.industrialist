@@ -6,6 +6,64 @@ import render_html
 import profit
 
 
+def get_pseudographics_prefix(levels, is_first, is_last):
+    prfx: str = ''
+    for lv in enumerate(levels):
+        if lv[1]:
+            prfx += '&nbsp; '
+        else:
+            prfx += '| '  # &#x2502;
+    if is_first:
+        if not prfx:
+            prfx += '└'  # &#x2514;
+        else:
+            prfx += '| └'  # &#x2502; &#x2514;
+    elif is_last:
+        prfx += '└─'  # &#x2514;&#x2500;
+    else:
+        prfx += '├─'  # &#x251C;&#x2500;
+    return prfx
+
+
+def get_industry_cost_indices_desc(
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> str:
+    desc: str = ''
+    if not industry_cost_indices:
+        desc = '(настройка не задана)'
+    else:
+        max0: int = len(industry_cost_indices) - 1
+        for lvl0, i in enumerate(industry_cost_indices):
+            desc += '<br>' + get_pseudographics_prefix([], lvl0 == 0, lvl0 == max0)
+            desc += f'{i.factory_name} производит {f'{len(i.product_ids)} видов' if i.product_ids else 'все виды'} продукции'
+            bonuses: typing.List[str] = []
+            for activity in ['manufacturing', 'copying', 'invent', 'reaction']:
+                for num in range(2):
+                    if num == 0:
+                        me: float = i.factory_bonuses.get_role_bonus(activity, 'me')
+                        jc: float = i.factory_bonuses.get_role_bonus(activity, 'job_cost')
+                        prfx: str = f'{activity} бонус профиля сооружения: '
+                    else:
+                        me = i.factory_bonuses.get_rigs_bonus(activity, 'me')
+                        jc = i.factory_bonuses.get_rigs_bonus(activity, 'job_cost')
+                        prfx: str = f'установленный {activity} модификатор: '
+                    if me < -0.001 or jc < -0.001:
+                        bonus = prfx
+                        if me < -0.001:
+                            bonus += f'расход материалов {me*100.0:.1f}%'
+                            bonus += ', ' if jc < -0.001 else ''
+                        if jc < -0.001:
+                            bonus += f'стоимость проекта {jc*100.0:.1f}%'
+                        bonuses.append(bonus)
+            if bonuses:
+                max1: int = len(bonuses) - 1
+                for lvl1, bonus in enumerate(bonuses):
+                    desc += '<br>' + get_pseudographics_prefix([1], lvl1 == 0, lvl1 == max1) + ' ' + bonus
+    # Установленный модификатор: -4.2%<br>
+    # Бонус профиля сооружения: -1.0%<br>
+    return desc
+
+
 def render_report(
         glf,
         # данные о продуктах, которые надо отобразить в отчёте
@@ -17,7 +75,9 @@ def render_report(
         eve_market_prices_data,
         sde_icon_ids,
         # ордера, выставленные в Jita 4-4
-        eve_jita_orders_data: profit.QMarketOrders):
+        eve_jita_orders_data: profit.QMarketOrders,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
     base_industry: profit.QIndustryTree = industry_plan.base_industry
 
     def generate_manuf_materials_list(__it157: profit.QIndustryTree):
@@ -28,68 +88,57 @@ def render_report(
                    '</span>\n'.format(src=render_html.__get_img_src(m.type_id, 32), q=m.quantity, nm=m.name)
         return res
 
-    glf.write('<div class="container-fluid">')
-    glf.write('<div class="media">\n'
-              ' <div class="media-left"><img class="media-object icn64" src="{src1}" alt="{nm1}"></div>\n'
-              ' <div class="media-body">\n'
-              '  <h4 class="media-heading">{nm1}</h4>\n'
-              '<p>\n'
-              'EveUniversity {nm2} wiki: <a href="https://wiki.eveuniversity.org/{nm2}">https://wiki.eveuniversity.org/{nm2}</a><br/>\n'
-              'EveMarketer {nm2} tradings: <a href="https://evemarketer.com/types/{pid}">https://evemarketer.com/types/{pid}</a><br/>\n'
-              'EveMarketer {nm2} Blueprint tradings: <a href="https://evemarketer.com/types/{bid}">https://evemarketer.com/types/{bid}</a><br/>\n'
-              'Adam4EVE {nm2} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={bid}">https://www.adam4eve.eu/manu_calc.php?typeID={bid}</a><br/>\n'
-              'Adam4EVE {nm2} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={pid}">https://www.adam4eve.eu/commodity.php?typeID={pid}</a><br/>\n'
-              'Adam4EVE {nm2} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={bid}">https://www.adam4eve.eu/commodity.php?typeID={bid}</a>\n'
-              '</p>\n'
-              ' </div> <!--media-body-->\n'
-              '</div> <!--media-->\n'
-              '<hr>\n'
-              '<div class="media">\n'
-              ' <div class="media-left"><img class="media-object icn64" src="{src2}" alt="Требуемые комплектующие"></div>\n'
-              ' <div class="media-body">\n'
-              '  <h4 class="media-heading">Организация производства <small>Требуемые комплектующие</small></h4>\n'
-              '  {mml}'
-              ' </div> <!--media-body-->\n'
-              '</div> <!--media-->\n'
-              '<hr>\n'
-              '<div class="media">\n'
-              ' <div class="media-left"><img class="media-object icn64" src="{src0}"></div>\n'
-              ' <div class="media-body">\n'
-              '<!--<p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,'
-              '<br>where <var>material_efficiency</var> for unknown and unavailable blueprint is ?.</p>-->\n'
-              '<p>Число прогонов: {cr}<br>\n'
-              'Экономия материалов при производстве: -{me}.0%<br>\n'
-              'Экономия материалов при производстве (от других чертежей): -10.0%<br>\n'
-              'Установленный модификатор: -4.2%<br>\n'
-              'Бонус профиля сооружения: -1.0%<br>\n'
-              'Длительность производственных работ общих компонентов: {mtm}<br>\n'
-              ' └─ Группы компонентов общего назначения: {mcm}<br>\n'
-              'Длительность запуска формул и реакций: {ftm}<br>\n'
-              'Минимальная вероятность успеха по навыкам и имплантам: {mip}</p>'
-              '<hr>\n'.
-              format(bid=base_industry.blueprint_type_id,
-                     nm1=base_industry.blueprint_name,
-                     src1=render_html.__get_img_src(base_industry.blueprint_type_id, 64),
-                     pid=base_industry.product_type_id,
-                     nm2=base_industry.product_name,
-                     src2=render_html.__get_img_src(base_industry.product_type_id, 64),
-                     src0=render_html.__get_icon_src(1436, sde_icon_ids),
-                     mml=generate_manuf_materials_list(base_industry),
-                     cr=industry_plan.customized_runs,
-                     me=base_industry.me,
-                     mtm='(настройка не задана)' if not industry_plan.customization or
-                                                    not industry_plan.customization.industry_time else
-                         '{:.1f} часов'.format(float(industry_plan.customization.industry_time) / (5*60*60)),
-                     mcm='(настройка не задана)' if not industry_plan.customization or
-                                                    not industry_plan.customization.common_components else
-                         f'{industry_plan.customization.common_components}',
-                     ftm='(настройка не задана)' if not industry_plan.customization or
-                                                    not industry_plan.customization.reaction_runs else
-                         '{} прогонов'.format(industry_plan.customization.reaction_runs),
-                     mip='(настройка не задана)' if not industry_plan.customization or
-                                                    not industry_plan.customization.min_probability else
-                         '{:.1f}%'.format(industry_plan.customization.min_probability)
-              ))
+    industry_cost_indices_desc: str = get_industry_cost_indices_desc(industry_cost_indices)
+
+    glf.write(f"""
+<div class="container-fluid">
+<div class="media">
+ <div class="media-left"><img class="media-object icn64" src="{render_html.__get_img_src(base_industry.blueprint_type_id, 64)}" alt="{base_industry.blueprint_name}"></div>
+ <div class="media-body">
+  <h4 class="media-heading">{base_industry.blueprint_name}</h4>
+<p>
+EveUniversity {base_industry.product_name} wiki: <a href="https://wiki.eveuniversity.org/{base_industry.product_name}">https://wiki.eveuniversity.org/{base_industry.product_name}</a><br/>
+EveMarketer {base_industry.product_name} tradings: <a href="https://evemarketer.com/types/{base_industry.product_type_id}">https://evemarketer.com/types/{base_industry.product_type_id}</a><br/>
+EveMarketer {base_industry.product_name} Blueprint tradings: <a href="https://evemarketer.com/types/{base_industry.blueprint_type_id}">https://evemarketer.com/types/{base_industry.blueprint_type_id}</a><br/>
+Adam4EVE {base_industry.product_name} manufacturing calculator: <a href="https://www.adam4eve.eu/manu_calc.php?typeID={base_industry.blueprint_type_id}">https://www.adam4eve.eu/manu_calc.php?typeID={base_industry.blueprint_type_id}</a><br/>
+Adam4EVE {base_industry.product_name} price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={base_industry.product_type_id}">https://www.adam4eve.eu/commodity.php?typeID={base_industry.product_type_id}</a><br/>
+Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://www.adam4eve.eu/commodity.php?typeID={base_industry.blueprint_type_id}">https://www.adam4eve.eu/commodity.php?typeID={base_industry.blueprint_type_id}</a>
+</p>
+ </div> <!--media-body-->
+</div> <!--media-->
+<hr>
+<div class="media">
+ <div class="media-left"><img class="media-object icn64" src="{render_html.__get_img_src(base_industry.product_type_id, 64)}" alt="Требуемые комплектующие"></div>
+ <div class="media-body">
+  <h4 class="media-heading">Организация производства <small>Требуемые комплектующие</small></h4>
+  {generate_manuf_materials_list(base_industry)}
+ </div> <!--media-body-->
+</div> <!--media-->
+<hr>
+<div class="media">
+ <div class="media-left"><img class="media-object icn64" src="{render_html.__get_icon_src(1436, sde_icon_ids)}"></div>
+ <div class="media-body">
+<!--<p><var>Efficiency</var> = <var>Required</var> * (100 - <var>material_efficiency</var> - 1 - 4.2) / 100,
+<br>where <var>material_efficiency</var> for unknown and unavailable blueprint is ?.</p>-->
+<p>
+Параметры чертежа:<br>
+ ├─ Число прогонов: {industry_plan.customized_runs}<br>
+ └─ Экономия материалов при производстве: -{base_industry.me}.0%<br>
+Экономия материалов промежуточных чертежей: {'(настройка не задана)' if not industry_plan.customization or industry_plan.customization.unknown_blueprints_me is None else
+                                             f'-{industry_plan.customization.unknown_blueprints_me}.0%'}<br>
+<br>
+Бонусы сооружений: {industry_cost_indices_desc}<br>
+<br>
+Длительность производственных работ общих компонентов: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.industry_time else
+                                                        '{:.1f} часов'.format(float(industry_plan.customization.industry_time) / (5*60*60))}<br>
+ └─ Группы компонентов общего назначения: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.common_components else
+                                           f'{industry_plan.customization.common_components}'}<br>
+Длительность запуска формул и реакций: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.reaction_runs else
+                                        '{} прогонов'.format(industry_plan.customization.reaction_runs)}<br>
+Минимальная вероятность успеха по навыкам и имплантам: {'(настройка не задана)' if not industry_plan.customization or not industry_plan.customization.min_probability else
+                                                        '{:.1f}%'.format(industry_plan.customization.min_probability)}
+</p>
+<hr>""")
 
     def generate_components_header(with_current_industry_progress: bool):
         glf.write('<tr>\n'
@@ -106,24 +155,6 @@ def render_report(
                   '<th>Итог<br/>(закуп.)</th>\n'
                   '<th>Итог<br/>(рентаб.)</th>\n'
                   '</tr>\n')
-
-    def get_pseudographics_prefix(levels, is_first, is_last):
-        prfx: str = ''
-        for lv in enumerate(levels):
-            if lv[1]:
-                prfx += '&nbsp; '
-            else:
-                prfx += '| '   # &#x2502;
-        if is_first:
-            if not prfx:
-                prfx += '└'    # &#x2514;
-            else:
-                prfx += '| └'  # &#x2502; &#x2514;
-        elif is_last:
-            prfx += '└─'       # &#x2514;&#x2500;
-        else:
-            prfx += '├─'       # &#x251C;&#x2500;
-        return prfx
 
     class TotalAllJobCost:
         def __init__(self):
@@ -793,7 +824,9 @@ def dump_industry_plan(
         eve_market_prices_data,
         sde_icon_ids,
         # ордера, выставленные в Jita 4-4
-        eve_jita_orders_data: profit.QMarketOrders):
+        eve_jita_orders_data: profit.QMarketOrders,
+        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
     assert industry_plan.base_industry
 
     product_name: str = industry_plan.base_industry.product_name
@@ -809,7 +842,8 @@ def dump_industry_plan(
             sde_market_groups,
             eve_market_prices_data,
             sde_icon_ids,
-            eve_jita_orders_data)
+            eve_jita_orders_data,
+            industry_cost_indices)
         render_html.__dump_footer(ghf)
     finally:
         ghf.close()

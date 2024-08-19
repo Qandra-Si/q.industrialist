@@ -434,11 +434,15 @@ class QIndustryPlanCustomization:
                  reaction_runs: typing.Optional[int],
                  industry_time: typing.Optional[int],
                  common_components: typing.Optional[typing.List[int]],
-                 min_probability: typing.Optional[float]):
+                 min_probability: typing.Optional[float],
+                 unknown_blueprints_me: typing.Optional[int]):
+        if unknown_blueprints_me is not None:
+            assert 0 <= unknown_blueprints_me <= 10
         self.__reaction_runs: typing.Optional[int] = reaction_runs
         self.__industry_time: typing.Optional[int] = industry_time
         self.__common_components: typing.Optional[typing.List[int]] = common_components
         self.__min_probability: typing.Optional[float] = min_probability
+        self.__unknown_blueprints_me: typing.Optional[int] = unknown_blueprints_me
 
     @property
     def reaction_runs(self) -> typing.Optional[int]:
@@ -455,6 +459,10 @@ class QIndustryPlanCustomization:
     @property
     def min_probability(self) -> typing.Optional[float]:
         return self.__min_probability
+
+    @property
+    def unknown_blueprints_me(self) -> typing.Optional[int]:
+        return self.__unknown_blueprints_me
 
 
 class QIndustryPlan:

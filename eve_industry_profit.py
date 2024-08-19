@@ -189,9 +189,10 @@ def generate_materials_tree(
                 system_indices,
                 cost_index)
             # настраиваем ME чертежа (нам его знать неоткуда, поэтому ставим максимальное ME)
-            if material_produce_action == profit.QIndustryAction.manufacturing:
-                if q_material.meta_group_id is None or q_material.meta_group_id in {2, 14}:  # TODO: не Tech II и не Tech III
-                    next_industry.set_me(10)  # TODO: перенести это в настройки
+            if industry_plan_customization and industry_plan_customization.unknown_blueprints_me is not None:
+                if material_produce_action == profit.QIndustryAction.manufacturing:
+                    if q_material.meta_group_id is None or q_material.meta_group_id in {2, 14}:  # TODO: не Tech II и не Tech III
+                        next_industry.set_me(industry_plan_customization.unknown_blueprints_me)
             # подключаем к метариалу следующий уровень производства
             q_material.set_industry(next_industry)
             # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
