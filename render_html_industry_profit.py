@@ -6,16 +6,28 @@ import render_html
 import profit
 
 
-def get_pseudographics_prefix(levels, is_first, is_last):
+def get_pseudographics_prefix(
+        levels: typing.List[bool],
+        is_first_standard: bool = False,
+        is_first_nested: bool = False,
+        is_last: bool = False):
     prfx: str = ''
-    for lv in enumerate(levels):
-        if lv[1]:
+    for lv in levels:
+        if lv:
             prfx += '&nbsp; '
         else:
             prfx += '| '  # &#x2502;
-    if is_first:
+    if is_first_standard:
+        if is_last:
+            prfx += '└─'  # &#x2514;
+        else:
+            prfx += '├─'  # &#x2514;
+    elif is_first_nested:
         if not prfx:
-            prfx += '└'  # &#x2514;
+            if is_last:
+                prfx += '└'  # &#x2514;
+            else:
+                prfx += '├'  # &#x2514;
         else:
             prfx += '| └'  # &#x2502; &#x2514;
     elif is_last:
@@ -34,7 +46,10 @@ def get_industry_cost_indices_desc(
     else:
         max0: int = len(industry_cost_indices) - 1
         for lvl0, i in enumerate(industry_cost_indices):
-            desc += '<br>\n' + get_pseudographics_prefix([], lvl0 == 0, lvl0 == max0)
+            desc += '<br>\n ' + get_pseudographics_prefix(
+                levels=[],
+                is_first_standard=lvl0 == 0,
+                is_last=lvl0 == max0)
             desc += f' {i.factory_name} производит {f'{len(i.product_ids)} видов' if i.product_ids else 'все виды'} продукции'
             bonuses: typing.List[str] = []
             for num in range(2):
@@ -58,7 +73,11 @@ def get_industry_cost_indices_desc(
             if bonuses:
                 max1: int = len(bonuses) - 1
                 for lvl1, bonus in enumerate(bonuses):
-                    desc += '<br>\n' + get_pseudographics_prefix([1], lvl1 == 0, lvl1 == max1) + ' ' + bonus
+                    desc += '<br>\n ' + get_pseudographics_prefix(
+                        levels=[lvl0 == max0],
+                        is_first_standard=lvl1 == 0,
+                        is_last=lvl1 == max1
+                    ) + ' ' + bonus
     return desc
 
 
@@ -70,8 +89,12 @@ def get_common_components_desc(market_group_ids: typing.List[int], sde_market_gr
     desc: str = ''
     max2: int = len(groups) - 1
     for lvl2, group_name in enumerate(groups):
-        desc += '<br>\n &nbsp; &nbsp; ' + get_pseudographics_prefix([], lvl2 == 0, lvl2 == max2) + ' ' + group_name
-    return desc
+        desc += '<br>\n' + get_pseudographics_prefix(
+            levels=[True, True],
+            is_first_standard=lvl2 == 0,
+            is_last=lvl2 == max2
+        ) + ' ' + group_name
+    return desc + '<br>\n'
 
 
 def render_report(
@@ -218,7 +241,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                 tr_class=' class="active"' if not row0_prefix else '',
                 num_prfx=row0_prefix, num=row1_num,
                 prfx='<tt><span class="text-muted">{}</span></tt>'.format(
-                    get_pseudographics_prefix(row0_levels, True, False)),
+                    get_pseudographics_prefix(row0_levels, is_first_nested=True, is_last=False)),
                 nm="<span class='text-muted'>{act}</span>".format(
                     act=str(bp_action),
                 ),
@@ -268,6 +291,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
             row0_levels,
             __ap344: profit.QPlannedActivity):
         # вывод информации о материалах
+        row1_max: int = len(__ap344.planned_materials)
         for m1 in enumerate(__ap344.planned_materials, start=1):
             row1_num: int = int(m1[0])
             m1_planned_material: profit.QPlannedMaterial = m1[1]
@@ -308,7 +332,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                     tr_class=' class="active"' if not row0_prefix else '',
                     num_prfx=row0_prefix, num=row1_num,
                     prfx='<tt><span class="text-muted">{}</span></tt>'.format(
-                        get_pseudographics_prefix(row0_levels, False, row1_num == len(__ap344.planned_materials))),
+                        get_pseudographics_prefix(row0_levels, is_first_standard=False, is_last=row1_num == row1_max)),
                     nm=m1_tnm,
                     pstfx='{qm}{bpq}'.format(
                         qm="<sup> <strong style='color:darkblue;'>x{}</strong></sup>".format(m1_quantity),
@@ -450,7 +474,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                 ))
             if m1_obtaining_activity:
                 row2_levels = row0_levels[:]
-                row2_levels.append(row1_num == len(__ap344.planned_materials))
+                row2_levels.append(row1_num == row1_max)
                 row2_prefix: str = "{prfx}{num1}.".format(prfx=row0_prefix, num1=row1_num)
                 generate_industry_plan_item(
                     row2_prefix, 0, row2_levels,
