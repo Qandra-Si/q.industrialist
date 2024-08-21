@@ -24,5 +24,7 @@ from .industry_markets import eve_ceiling_change_by_point  # noqa
 from .industry_markets import QMarketOrder  # noqa
 from .industry_markets import QMarketOrders  # noqa
 from .industry_formula import QIndustryFormula  # noqa
+from .industry_utils import get_industry_cost_index
+from .industry_utils import calc_estimated_items_value
 
 __version__ = '0.1.2'

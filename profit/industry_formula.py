@@ -36,7 +36,7 @@ class QIndustryFormula:
             # [reaction] -> reaction; [manufacturing, copying, invention] -> manufacturing
             self.activity_eiv: int = 9 if activity_code == 9 else 1
             # [manufacturing, reaction] -> 1.0; [copying, invention] -> 0.2
-            self.job_cost_base_multiplier: float = 1.0 if activity_code in [1, 9] else 0.2
+            self.job_cost_base_multiplier: float = 1.0 if activity_code in [1, 9] else 0.02
             # ролевой бонус структуры для выбранного activity_code
             self.role_bonus_job_cost: float = role_bonus_job_cost
             # бонусы модификаторов для выбранного activity_code
@@ -101,15 +101,12 @@ class QIndustryFormula:
             scc_surcharge if scc_surcharge is not None else 0.04,
             facility_tax if facility_tax is not None else 0.0))
 
-    def calc_industry_cost(self) -> float:
-        def calc_estimated_items_value(blueprint_type_id: int, activity_eiv: int) -> float: return 1000.0
-        def get_industry_cost_index(solar_system_id: int) -> float: return 0.24
-
+    def calc_industry_cost(self, calc_estimated_items_value, get_industry_cost_index) -> float:
         industry_cost: float = 0.0
         for jc in self.job_costs:
             # внешние данные
             estimated_items_value: float = calc_estimated_items_value(jc.blueprint_type_id, jc.activity_eiv)
-            industry_cost_index: float = get_industry_cost_index(jc.solar_system_id)
+            industry_cost_index: float = get_industry_cost_index(jc.solar_system_id, jc.activity_code)
             # вычисления
             job_cost_base: float = estimated_items_value * jc.job_cost_base_multiplier  # ISK
             system_cost: int = int(math.ceil(job_cost_base * industry_cost_index))  # ISK

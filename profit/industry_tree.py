@@ -124,6 +124,19 @@ class QIndustryAction(enum.Enum):
         else:
             raise Exception('Unknown activity label')
 
+    @staticmethod
+    def from_code(code: int):
+        if code == 1:
+            return QIndustryAction.manufacturing
+        elif code == 8:
+            return QIndustryAction.invention
+        elif code == 5:
+            return QIndustryAction.copying
+        elif code == 9:
+            return QIndustryAction.reaction
+        else:
+            raise Exception('Unknown activity code')
+
 
 class QIndustryFactoryBonuses:
     class Bonus:

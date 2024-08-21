@@ -715,6 +715,22 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 </thead>
 <tbody>""")
 
+    def calc_estimated_items_value(blueprint_type_id: int, activity_eiv: int) -> float:
+        activity: str = str(profit.QIndustryAction.from_code(activity_eiv))
+        return profit.calc_estimated_items_value(
+            blueprint_type_id,
+            activity,
+            sde_bp_materials,
+            eve_market_prices_data)
+
+    def get_industry_cost_index(solar_system_id: int, activity_code: int) -> float:
+        cost_indices = next((_.cost_indices for _ in industry_cost_indices if _.solar_system_id==solar_system_id), None)
+        assert cost_indices is not None
+        activity: str = str(profit.QIndustryAction.from_code(activity_code))
+        cost_index: float = next((_['cost_index'] for _ in cost_indices if _['activity'] == activity), None)
+        assert cost_index is not None
+        return cost_index
+
     formula_purchase_verification: float = 0.0
     for p in industry_formula.purchase:
         formula_purchase_verification += get_material_buy_price(p.type_id, -1000000000.00) * p.quantity
@@ -722,7 +738,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
         (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)
 
     formula_cost_verification: float = \
-        industry_formula.calc_industry_cost() / \
+        industry_formula.calc_industry_cost(calc_estimated_items_value, get_industry_cost_index) / \
         (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)
 
     def generate_summary_lines(
