@@ -409,7 +409,7 @@ $$;
 CREATE OR REPLACE PROCEDURE qi.ethh_clean_obsolete()
 LANGUAGE SQL
 AS $$
- delete from esi_trade_hub_history
+ delete from qi.esi_trade_hub_history
  where ethh_done < (current_timestamp at time zone 'GMT' - interval '14 day');
  ;
 $$;

@@ -192,12 +192,12 @@ create or replace view qi.eve_sde_workable_blueprints as
     sdebp_quantity as quantity,
     sdebp_probability as probability
   from (
-    select b.* from eve_sde_blueprints b
-      inner join eve_sde_type_ids bt on (bt.sdet_type_id=sdeb_blueprint_type_id and bt.sdet_published)
+    select b.* from qi.eve_sde_blueprints b
+      inner join qi.eve_sde_type_ids bt on (bt.sdet_type_id=sdeb_blueprint_type_id and bt.sdet_published)
   ) b
     left outer join (
-      select p.* from eve_sde_blueprint_products p
-        inner join eve_sde_type_ids bt on (bt.sdet_type_id=sdebp_product_id and bt.sdet_published)
+      select p.* from qi.eve_sde_blueprint_products p
+        inner join qi.eve_sde_type_ids bt on (bt.sdet_type_id=sdebp_product_id and bt.sdet_published)
     ) p on (sdebp_blueprint_type_id=sdeb_blueprint_type_id AND sdebp_activity=sdeb_activity);
 --------------------------------------------------------------------------------
 
@@ -214,8 +214,8 @@ create or replace view qi.eve_sde_available_blueprint_materials as
     m.sdebm_material_id as material_type_id,
     m.sdebm_quantity as quantity
   from
-    (select distinct blueprint_type_id, activity_id from eve_sde_workable_blueprints) b
-      inner join eve_sde_blueprint_materials m on (m.sdebm_blueprint_type_id=b.blueprint_type_id and m.sdebm_activity=b.activity_id)
+    (select distinct blueprint_type_id, activity_id from qi.eve_sde_workable_blueprints) b
+      inner join qi.eve_sde_blueprint_materials m on (m.sdebm_blueprint_type_id=b.blueprint_type_id and m.sdebm_activity=b.activity_id)
       inner join qi.eve_sde_type_ids on (m.sdebm_material_id = sdet_type_id and sdet_published);
 --------------------------------------------------------------------------------
 
@@ -228,9 +228,9 @@ create or replace view qi.eve_ri4_personal_containers as
   select a.eca_corporation_id as corporation_id, a.eca_item_id as container_id
    --, a.eca_name as name
    --, eca_location_flag as hangar
-   --, (select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
+   --, (select name from esi_known_stations where location_id in (select x.eca_location_id from qi.esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
    --, (select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
-  from esi_corporation_assets a
+  from qi.esi_corporation_assets a
   where
    eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
    ( select substring(eca_location_flag,8,1) in ('1','7') or -- CorpSAG1, CorpSAG7
@@ -249,7 +249,7 @@ create or replace view qi.eve_ri4_manufacturing_containers as
    --, eca_location_flag as hangar
    --, (select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
    -- , (select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
-  from esi_corporation_assets a
+  from qi.esi_corporation_assets a
   where
    eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
    ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
@@ -268,7 +268,7 @@ create or replace view qi.eve_ri4_stock_containers as
    --,eca_location_flag as hangar
    --,(select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
    --,(select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
-  from esi_corporation_assets a
+  from qi.esi_corporation_assets a
   where
    eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
    ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
@@ -287,7 +287,7 @@ create or replace view qi.eve_ri4_invent_containers as
    --,eca_location_flag as hangar
    --,(select name from esi_known_stations where location_id in (select x.eca_location_id from esi_corporation_assets x where x.eca_item_id=a.eca_location_id)) as station
    --,(select sdet_type_name from eve_sde_type_ids where sdet_type_id=a.eca_type_id) as nm
-  from esi_corporation_assets a
+  from qi.esi_corporation_assets a
   where
    eca_location_type='item' and eca_location_flag like 'CorpSAG%' and eca_is_singleton and 
    ( select substring(eca_location_flag,8,1) not in ('1','7') and -- не в CorpSAG1, CorpSAG7
