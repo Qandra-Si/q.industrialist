@@ -16,7 +16,7 @@ def get_pseudographics_prefix(
         if lv:
             prfx += '&nbsp; '
         else:
-            prfx += '| '  # &#x2502;
+            prfx += '│ '  # &#x2502;
     if is_first_standard:
         if is_last:
             prfx += '└─'  # &#x2514;
@@ -29,7 +29,7 @@ def get_pseudographics_prefix(
             else:
                 prfx += '├'  # &#x2514;
         else:
-            prfx += '| └'  # &#x2502; &#x2514;
+            prfx += '│ └'  # &#x2502; &#x2514;
     elif is_last:
         prfx += '└─'  # &#x2514;&#x2500;
     else:
@@ -110,8 +110,11 @@ def render_report(
         # ордера, выставленные в Jita 4-4
         eve_jita_orders_data: profit.QMarketOrders,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
-        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
+        # формула производства (здесь для проверки)
+        industry_formula: profit.QIndustryFormula):
     base_industry: profit.QIndustryTree = industry_plan.base_industry
+    customized_run_products: int = industry_plan.base_industry.products_per_single_run * industry_plan.customized_runs
 
     def generate_manuf_materials_list(__it157: profit.QIndustryTree):
         res: str = ''
@@ -156,6 +159,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 <p>
 Параметры чертежа:<br>
  ├─ Число прогонов: {industry_plan.customized_runs}<br>
+ │ └─ Выходное количество продуктов: {customized_run_products} шт<br>
  └─ Экономия материалов при производстве: -{base_industry.me}.0%<br>
 Экономия материалов промежуточных чертежей: {'(настройка не задана)' if not industry_plan.customization or industry_plan.customization.unknown_blueprints_me is None else
                                              f'-{industry_plan.customization.unknown_blueprints_me}.0%'}<br>
@@ -188,14 +192,6 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                   '<th>Итог<br/>(закуп.)</th>\n'
                   '<th>Итог<br/>(рентаб.)</th>\n'
                   '</tr>\n')
-
-    class TotalAllJobCost:
-        def __init__(self):
-            self.job_cost: float = 0.0
-
-        def increase(self, val: float) -> float:
-            self.job_cost += val
-            return self.job_cost
 
     linear_cost_verification: profit.QIndustryJobCostAccumulator = profit.QIndustryJobCostAccumulator()
 
@@ -259,9 +255,9 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                         planned_blueprints * planned_runs,  # 1.runs
                         job_cost.industry_cost_index * 100.0,  # 1.const_index
                         job_cost.system_indices.solar_system,  # 1.solar_system
-                        '' if not job_cost.structure_bonus_rigs else
-                        f'*{job_cost.structure_bonus_rigs * 100.0:.2f}%<sup>rig</sup>',  # 1.rig
-                        job_cost.scc_surcharge * 100.0,  # 1.tax
+                        '' if not job_cost.role_bonus_job_cost and not job_cost.rigs_bonus_job_cost else
+                        f'*{(job_cost.role_bonus_job_cost + job_cost.rigs_bonus_job_cost) * 100.0:.2f}%<sup>rig</sup>',  # 1.rig
+                        (job_cost.scc_surcharge + job_cost.facility_tax) * 100.0,  # 1.tax
                         current_level_job_cost,  # 2.out
                         generate_grayed_reused_duplicate(__op340, False),  # after ALL
                    ),
@@ -568,6 +564,23 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
         else:
             return '<span style="color:#aaa;">' if is_first else '</span>'
 
+    def get_material_buy_price(__type_id565: int, fake_price: float) -> float:
+        __p566: typing.Optional[float] = None
+        if eve_jita_orders_data:
+            __maxbuy568: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_max_buy_order(__type_id565)
+            if __maxbuy568:
+                __p566 = profit.eve_ceiling_change_by_point(__maxbuy568.price, +1)
+            else:
+                __minsell572: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(__type_id565)
+                if __minsell572:
+                    __p566 = __minsell572.price
+                    # TODO: внимание, с этой цены налог не выплачивается! (в формулах ниже налог считается безусловно)
+        if not __p566:
+            __p566 = eve_esi_tools.get_material_price(__type_id565, sde_type_ids, eve_market_prices_data)
+        if not __p566:
+            __p566 = fake_price
+        return __p566
+
     material_groups: typing.Dict[int, typing.List[profit.QIndustryMaterial]] = {}
     for type_id in industry_plan.materials_repository.materials.keys():
         m: profit.QIndustryMaterial = industry_plan.materials_repository.get_material(type_id)
@@ -595,8 +608,8 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
             # получение данных по материалу
             m3_tid: int = m.base.type_id
             m3_tnm: str = m.base.name
-            m3_q = m.purchased + m.manufactured  # quantity (required)
-            m3_r = m.purchased_ratio  # ratio (пропорция от требуемого кол-ва с учётом вложенных уровней)
+            m3_q = m.purchased + m.manufactured  # количество (общее всоответствии с настройками производства)
+            m3_r = m.purchased_ratio  # количество (доля от требуемого кол-ва с учётом вложенных уровней)
             m3_a = m.available_in_assets  # available in assets
             m3_j = m.in_progress  # in progress (runs of jobs)
             m3_v = m.base.volume  # volume
@@ -604,19 +617,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
             m3_p: typing.Optional[float] = None
             is_blueprints_group: bool = m.base.market_group_id == 2
             if not is_blueprints_group:
-                if eve_jita_orders_data:
-                    max_buy: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_max_buy_order(m3_tid)
-                    if max_buy:
-                        m3_p = profit.eve_ceiling_change_by_point(max_buy.price, +1)
-                    else:
-                        min_sell: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(m3_tid)
-                        if min_sell:
-                            m3_p = min_sell.price
-                            # TODO: внимание, с этой цены налог не выплачивается!
-                if not m3_p:
-                    m3_p = eve_esi_tools.get_material_price(m3_tid, sde_type_ids, eve_market_prices_data)
-                if not m3_p:
-                    m3_p = -1000000000.00  # fake price
+                m3_p = get_material_buy_price(m3_tid, -1000000000.00)
             else:
                 m3_p = m.job_cost  # blueprints * runs * job_cost
             # расчёт прогресса выполнения (постройки, сбора) материалов (m1_j пропускаем, т.к. они не готовы ещё)
@@ -628,8 +629,8 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
                 m3_progress = float(100.0 * float(m3_a) / m3_q)
             # получение стоимости за одну штуку
             if m.purchased:
-                total_purchase += (m3_p * m3_r)
-                total_purchase_volume += (m3_v * m3_r)
+                total_purchase += (m3_p * m3_r)  # цену 1 шт. умножаем на долю
+                total_purchase_volume += (m3_v * m3_r)  # объём (ЭТО НЕ ОБЪЁМ ТОЛЬКО МАТЕРИАЛОВ) 1 шт. умножаем на долю
             # вывод наименования ресурса
             glf.write(
                 '<tr>\n'
@@ -708,11 +709,21 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 <thead>
  <tr>
   <th class="active">{base_industry.product_name}</th>
-  <th class="active" style="text-align:right;">Производство {industry_plan.customized_runs}шт продукта</th>
+  <th class="active" style="text-align:right;">Производство {customized_run_products}шт продукта</th>
   <th class="active" style="text-align:right;">Доля 1шт продукта</th>
  </tr>
 </thead>
 <tbody>""")
+
+    formula_purchase_verification: float = 0.0
+    for p in industry_formula.purchase:
+        formula_purchase_verification += get_material_buy_price(p.type_id, -1000000000.00) * p.quantity
+    formula_purchase_verification /= \
+        (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)
+
+    formula_cost_verification: float = \
+        industry_formula.calc_industry_cost() / \
+        (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)
 
     def generate_summary_lines(
             caption: str,
@@ -729,45 +740,33 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
     generate_summary_lines(
         'Стоимость закупки материалов, ISK',
         f'{total_purchase * 1.02:,.2f}',
-        f'{(total_purchase * 1.02) / industry_plan.customized_runs:,.2f}')
+        f'{(total_purchase * 1.02) / customized_run_products:,.2f}')
     generate_summary_lines(
         '├─ Стоимость материалов, ISK',
         f'{total_purchase:,.2f}',
-        f'{total_purchase / industry_plan.customized_runs:,.2f}')
+        f'{total_purchase / customized_run_products:,.2f}<br>'
+        f'<span style="color:lightgray;">проверка: {formula_purchase_verification:,.2f}</span>')
     generate_summary_lines(
         '└─ Брокерская комиссия, ISK',
         f'{total_purchase * 0.02:,.2f}',
-        f'{(total_purchase * 0.02) / industry_plan.customized_runs:,.2f}')
+        f'{(total_purchase * 0.02) / customized_run_products:,.2f}')
 
     total_gross_cost += total_purchase * 1.02
 
+    # Nitrogen Isotopes, hardcoded price (august 2024)
+    nitrogen_isotopes_isk = get_material_buy_price(17888, 545.40) * 1.02
+
     # Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
     # до Jita дистанция 64'484 свет.лет со всеми скилами в 5 понадобится сжечь 79'353 Nitrogen Isotopes (buy 545.40 ISK)
-    nitrogen_isotopes_type_id: int = 17888  # Nitrogen Isotopes
-    nitrogen_isotopes_isk: typing.Optional[float] = None  # price
-    if eve_jita_orders_data:
-        max_buy: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_max_buy_order(nitrogen_isotopes_type_id)
-        if max_buy:
-            nitrogen_isotopes_isk = profit.eve_ceiling_change_by_point(max_buy.price, +1) * 1.02
-        else:
-            min_sell: typing.Optional[profit.QMarketOrder] = eve_jita_orders_data.get_min_sell_order(nitrogen_isotopes_type_id)
-            if min_sell:
-                nitrogen_isotopes_isk = min_sell.price  # с этой цены налог и комиссии не удерживаются
-    if not nitrogen_isotopes_isk:
-        # ого! в Жите топляк закончился?
-        nitrogen_isotopes_isk = eve_esi_tools.get_material_price(nitrogen_isotopes_type_id, sde_type_ids, eve_market_prices_data)
-    if not nitrogen_isotopes_isk:
-        nitrogen_isotopes_isk = 545.40  # hardcoded price (august 2024)
-
     transfer_cost: float = total_purchase_volume * ((79353 * nitrogen_isotopes_isk) / 386404)
     generate_summary_lines(
         'Стоимость доставки закупаемых материалов, ISK',
         f'{transfer_cost:,.2f}',
-        f'{transfer_cost / industry_plan.customized_runs:,.2f}')
+        f'{transfer_cost / customized_run_products:,.2f}')
     generate_summary_lines(
         '└─ Объём закупаемых материалов, m&sup3;',
         f'{total_purchase_volume:,.1f} m&sup3;',
-        f'{total_purchase_volume / industry_plan.customized_runs:,.1f} m&sup3;')
+        f'{total_purchase_volume / customized_run_products:,.1f} m&sup3;')
 
     total_gross_cost += transfer_cost
 
@@ -775,29 +774,30 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
         'Стоимость запуска работ, ISK',
         f'{industry_plan.job_cost_accumulator.total_paid:,.2f}<br>'
         f'<span style="color:lightgray;">проверка: {linear_cost_verification.total_paid:,.2f}</span>',
-        f'{industry_plan.job_cost_accumulator.total_paid / industry_plan.customized_runs:,.2f}')
+        f'{industry_plan.job_cost_accumulator.total_paid / customized_run_products:,.2f}<br>'
+        f'<span style="color:lightgray;">проверка: {formula_cost_verification:,.2f}</span>')
 
     total_gross_cost += industry_plan.job_cost_accumulator.total_paid * 0.0
 
-    total_ready_volume: float = industry_plan.base_industry.product.volume * industry_plan.customized_runs
-    # TODO: total_ready_volume: float = 50000 * industry_plan.customized_runs
-    total_ready_volume: float = 2500 * industry_plan.customized_runs
+    total_ready_volume: float = industry_plan.base_industry.product.volume * customized_run_products
+    # TODO: total_ready_volume: float = 50000 * customized_run_products
+    total_ready_volume: float = 2500 * customized_run_products
     transfer_cost: float = total_ready_volume * ((79353 * nitrogen_isotopes_isk) / 386404) * 1.02
     generate_summary_lines(
         'Стоимость отправки готовой продукции, ISK',
         f'{transfer_cost:,.2f}',
-        f'{transfer_cost / industry_plan.customized_runs:,.2f}')
+        f'{transfer_cost / customized_run_products:,.2f}')
     generate_summary_lines(
         '└─ Объём готовой продукции, m&sup3;',
         f'{total_ready_volume:,.1f} m&sup3;',
-        f'{total_ready_volume / industry_plan.customized_runs:,.1f} m&sup3;')
+        f'{total_ready_volume / customized_run_products:,.1f} m&sup3;')
 
     total_gross_cost += transfer_cost
 
     generate_summary_lines(
         'Общая стоимость проекта, ISK',
         f'<b>{total_gross_cost:,.2f}</b>',
-        f'<b>{total_gross_cost / industry_plan.customized_runs:,.2f}</b>')
+        f'<b>{total_gross_cost / customized_run_products:,.2f}</b>')
 
     product_type_id: int = industry_plan.base_industry.product.type_id
     product_sell_order_isk: typing.Optional[float] = None
@@ -810,7 +810,7 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
     if not product_sell_order_isk:
         product_sell_order_isk = 1000000000.00  # fake price
 
-    product_sell_order_isk *= industry_plan.customized_runs
+    product_sell_order_isk *= customized_run_products
     sales_broker_fee: float = product_sell_order_isk * 0.02
     sales_tax: float = product_sell_order_isk * 0.016
     sales_profit: float = product_sell_order_isk - sales_broker_fee - sales_tax
@@ -818,24 +818,24 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
     generate_summary_lines(
         'Доход с продаж, ISK',
         f'{sales_profit:,.2f}',
-        f'{sales_profit / industry_plan.customized_runs:,.2f}')
+        f'{sales_profit / customized_run_products:,.2f}')
     generate_summary_lines(
         '├─ Рыночная цена, ISK',
         f'{product_sell_order_isk:,.2f}',
-        f'{product_sell_order_isk / industry_plan.customized_runs:,.2f}')
+        f'{product_sell_order_isk / customized_run_products:,.2f}')
     generate_summary_lines(
         '├─ Брокерская комиссия, ISK',
         f'{sales_broker_fee:,.2f}',
-        f'{sales_broker_fee / industry_plan.customized_runs:,.2f}')
+        f'{sales_broker_fee / customized_run_products:,.2f}')
     generate_summary_lines(
         '└─ Налог с продаж, ISK',
         f'{sales_tax:,.2f}',
-        f'{sales_tax / industry_plan.customized_runs:,.2f}')
+        f'{sales_tax / customized_run_products:,.2f}')
 
     generate_summary_lines(
         'Итоговый профит проекта, ISK',
         f'<b>{sales_profit-total_gross_cost:,.2f}</b>',
-        f'<b>{(sales_profit-total_gross_cost) / industry_plan.customized_runs:,.2f}</b>')
+        f'<b>{(sales_profit-total_gross_cost) / customized_run_products:,.2f}</b>')
 
     glf.write("""
 </tbody>
@@ -860,7 +860,9 @@ def dump_industry_plan(
         # ордера, выставленные в Jita 4-4
         eve_jita_orders_data: profit.QMarketOrders,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
-        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]):
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
+        # формула производства (здесь для проверки)
+        industry_formula: profit.QIndustryFormula):
     assert industry_plan.base_industry
 
     product_name: str = industry_plan.base_industry.product_name
@@ -877,7 +879,8 @@ def dump_industry_plan(
             eve_market_prices_data,
             sde_icon_ids,
             eve_jita_orders_data,
-            industry_cost_indices)
+            industry_cost_indices,
+            industry_formula)
         render_html.__dump_footer(ghf)
     finally:
         ghf.close()

@@ -37,19 +37,12 @@ def calc_estimated_items_value(
         blueprint_type_id: int,
         activity: str,
         sde_bp_materials,
-        sde_type_ids,
         eve_market_prices_data) -> float:
     if activity in ['manufacturing', 'reaction']:
         # EIV считается по материалам используемым в производственной активности
         bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, activity, blueprint_type_id)
     elif activity in ['invention']:
         # EIV считается по материалам используемым в производстве T2 продукта (из продукта инвента)
-        """
-        bp1_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'invention', blueprint_type_id)
-        assert bp1_dict is not None and 'products' in bp1_dict
-        assert len(bp1_dict['products']) == 1  # TODO: сюда надо притащить продукт для которого считается инвент
-        blueprint_type_id: int = bp1_dict['products'][0]['typeID']
-        """
         bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
     elif activity in ['copying']:
         # EIV считается по материалам используемым в производстве T1 продукта (из копии)
@@ -168,7 +161,6 @@ def generate_materials_tree(
                 material_bp_tid,
                 activity,
                 sde_bp_materials,
-                sde_type_ids,
                 eve_market_prices_data)
             # получаем информацию о производственных индексах в системе, где крафтится этот продукт
             system_indices, cost_index = get_industry_cost_index(
@@ -278,7 +270,6 @@ def schedule_industry_job__invent(
         blueprint_type_id,
         'invention',
         sde_bp_materials,
-        sde_type_ids,
         eve_market_prices_data)
     # получаем информацию о производственных индексах в системе, где крафтится этот продукт
     system_indices, cost_index = get_industry_cost_index(
@@ -338,8 +329,8 @@ def schedule_industry_job__invent(
         # TODO: invent_materials[0]['quantity'] = math.ceil(usage_ratio)
         # сохраняем параметры декриптора
         invent_materials.append({'typeID': decryptor_type_id, 'quantity': 1})
-        if decryptor_probability is not None:
-            invent_industry.set_decryptor_probability(decryptor_probability)
+        assert decryptor_probability is not None
+        invent_industry.set_decryptor_probability(decryptor_probability)
 
     # составляем дерево материалов, которые будут использоваться для инвента
     generate_materials_tree(
@@ -432,7 +423,6 @@ def generate_industry_tree(
         blueprint_type_id,
         'manufacturing',
         sde_bp_materials,
-        sde_type_ids,
         eve_market_prices_data)
     # получаем информацию о производственных индексах в системе, где крафтится этот продукт
     system_indices, cost_index = get_industry_cost_index(
@@ -836,7 +826,7 @@ def generate_industry_plan__internal(
             # cached_material.set_last_known_planned_material(purchased_material)
 
             # сохраняем сводку по использованию материала для формирования последующего отчёта
-            cached_material_quantity_after: int = cached_material.purchased + cached_material.manufactured
+            cached_material_quantity_after: int = cached_material.purchased
             purchased_material.store_summary_quantity(
                 cached_material_quantity_before,
                 cached_material_quantity_after)
@@ -911,7 +901,7 @@ def generate_industry_plan__internal(
                 cached_material.set_last_known_planned_material(produced_material)
 
                 # сохраняем сводку по использованию материала для формирования последующего отчёта
-                cached_material_quantity_after: int = cached_material.purchased + cached_material.manufactured
+                cached_material_quantity_after: int = cached_material.manufactured
                 produced_material.store_summary_quantity(
                     cached_material_quantity_before,
                     cached_material_quantity_after)
@@ -975,6 +965,9 @@ def generate_industry_plan__internal(
                 #    cached_material.last_known_planned_material.obtaining_plan.industry_output,
                 #    produced_material)
 
+        # и производство и закуп одного и того же материала тоже не допускаем
+        assert (cached_material.purchased > 0) != (cached_material.manufactured > 0)
+
     return current_level_activity
 
 
@@ -1019,3 +1012,65 @@ def generate_industry_plan(
     industry_plan.job_cost_accumulator.increment_total_paid(next_level_job_cost)
 
     return industry_plan
+
+
+def assemble_industry_jobs(
+        planned_activity: profit.QPlannedActivity,
+        industry_formula: profit.QIndustryFormula,
+        usage_chain: float) -> None:
+    job_cost: typing.Optional[profit.QPlannedJobCost] = planned_activity.industry_job_cost
+    assert job_cost is not None
+
+    industry_formula.append_job_cost(
+        usage_chain,
+        job_cost.system_indices.solar_system_id,
+        planned_activity.industry.blueprint_type_id,
+        planned_activity.planned_blueprints,
+        planned_activity.planned_runs,
+        planned_activity.industry.action.to_int(),
+        job_cost.role_bonus_job_cost,
+        job_cost.rigs_bonus_job_cost,
+        job_cost.scc_surcharge,
+        job_cost.facility_tax)
+
+    for m1_planned_material in planned_activity.planned_materials:
+        m1_obtaining_plan: profit.QIndustryObtainingPlan = m1_planned_material.obtaining_plan
+        m1_planned_activity: profit.QPlannedActivity = m1_obtaining_plan.activity_plan
+        if m1_planned_activity:
+            assemble_industry_jobs(
+                m1_planned_activity,
+                industry_formula,
+                m1_planned_material.usage_chain * m1_planned_material.usage_ratio)
+
+
+def assemble_industry_formula(industry_plan: profit.QIndustryPlan) -> profit.QIndustryFormula:
+    # пытаемся получить использованный декриптор
+    used_decryptor_type_id: typing.Optional[int] = None
+    invent_tree: typing.Optional[profit.QIndustryTree] = next((
+        _.obtaining_plan.activity_plan.industry for _ in industry_plan.base_planned_activity.planned_materials
+        if _.obtaining_plan.activity_plan and
+        _.obtaining_plan.activity_plan.industry.action == profit.QIndustryAction.invention), None)
+    if invent_tree and invent_tree.decryptor_probability is not None:
+        used_decryptor_type_id = invent_tree.materials[-1].type_id
+    # составляем производственную формулу
+    industry_formula: profit.QIndustryFormula = profit.QIndustryFormula(
+        industry_plan.base_industry.product_type_id,
+        used_decryptor_type_id,
+        industry_plan.customized_runs)
+    # выполняем рекурсивный поиск всех работ чтобы посчитать их стоимость
+    assemble_industry_jobs(industry_plan.base_planned_activity, industry_formula, 1.0)
+    # считаем сколько покупных материалов и в какой пропорции необходимо для постройки продукта
+    for type_id in industry_plan.materials_repository.materials.keys():
+        m: profit.QIndustryMaterial = industry_plan.materials_repository.get_material(type_id)
+        # алгоритм не должен запускаться с загруженными сведениями по имеющимся ассетам и ведущимся работам,
+        # иначе формула будет неправильной
+        assert m.in_progress == 0 and m.available_in_assets == 0
+        # и производство и закуп одного и того же материала тоже не пропускаем
+        assert (m.purchased > 0) != (m.manufactured > 0)
+        # получение данных по материалу
+        if m.purchased:
+            m3_tid: int = m.base.type_id
+            # m3_tnm: str = m.base.name
+            m3_r: float = m.purchased_ratio  # количество (доля от требуемого кол-ва с учётом вложенных уровней)
+            industry_formula.append_purchase(m3_tid, m3_r)
+    return industry_formula

@@ -12,11 +12,11 @@ def get_pseudographics_prefix(levels, is_last):
         if lv[1]:
             prfx += '&nbsp; '
         else:
-            prfx += '&#x2502; '  # |
+            prfx += '│ '  # &#x2502;
     if is_last:
-        prfx += '&#x2514;&#x2500;'  # └─
+        prfx += '└─'  # &#x2514;&#x2500;
     else:
-        prfx += '&#x251C;&#x2500;'  # ├─
+        prfx += '├─'  # &#x251C;&#x2500;
     return prfx
 
 

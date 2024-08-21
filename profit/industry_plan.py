@@ -180,7 +180,7 @@ class QPlannedJobCost:
         # расчёт стоимости работы
         if action in [QIndustryAction.manufacturing, QIndustryAction.reaction]:
             self.__job_cost_base: float = self.estimated_items_value  # ISK
-        else:
+        else:  # copying, invention
             self.__job_cost_base: float = self.estimated_items_value * 0.02  # ISK
         # внимание! недостаточная точность расчёта общей стоимости проекта в этом месте возможна потому, что
         # индекс стоимости проектов в системе ingame показывается как 5.97%, от ESI он же приходит как 0.0597,
@@ -205,12 +205,16 @@ class QPlannedJobCost:
         # |           total_taxes |        588'765 |    588'765 |               | <== правильно
         # |        total_job_cost |      1'423'560 |  1'422'884 |               | <== разница в  676 ISK
         self.system_cost: int = int(math.ceil(self.__job_cost_base * self.industry_cost_index))  # ISK
-        self.structure_bonus_rigs: float = system_indices.factory_bonuses.get_role_bonus(str(action), 'job_cost')
-        self.structure_role_bonus: int = int(math.ceil(self.system_cost * self.structure_bonus_rigs))  # ISK
-        self.total_job_gross_cost: int = self.system_cost + self.structure_role_bonus  # ISK
-        self.scc_surcharge: float = 0.04  # TODO: процент
+        self.role_bonus_job_cost: float = system_indices.factory_bonuses.get_role_bonus(str(action), 'job_cost')
+        self.structure_role_bonus: int = int(math.ceil(self.system_cost * self.role_bonus_job_cost))  # ISK
+        self.rigs_bonus_job_cost: float = system_indices.factory_bonuses.get_rigs_bonus(str(action), 'job_cost')
+        self.structure_rigs_bonus: int = int(math.ceil(self.system_cost * self.rigs_bonus_job_cost))  # ISK
+        self.total_job_gross_cost: int = self.system_cost + self.structure_role_bonus + self.structure_rigs_bonus  # ISK
+        self.scc_surcharge: float = 0.04  # TODO: процент должен быть перенесён в настройки routing-а (system_indices)?
         self.tax_scc_surcharge: int = int(math.ceil(self.__job_cost_base * self.scc_surcharge))  # ISK
-        self.total_taxes: int = self.tax_scc_surcharge  # ISK
+        self.facility_tax: float = 0.00  # TODO: процент должен быть перенесён в настройки routing-а (system_indices)?
+        self.tax_facility: int = int(math.ceil(self.__job_cost_base * self.facility_tax))  # ISK
+        self.total_taxes: int = self.tax_scc_surcharge + self.tax_facility  # ISK
         self.total_job_cost: int = self.total_job_gross_cost + self.total_taxes  # ISK
 
 
@@ -278,12 +282,15 @@ class QPlannedActivity:
 class QIndustryMaterial:
     def __init__(self, base: QBaseMaterial):
         self.__base: QBaseMaterial = base
+        # это количество материалов, которые надо закупить с учётом настроек производства (некоторые материалы
+        # производятся партиями на интервалах 1 суток), количество суммируется на всяком очередном закупе
         self.__purchased: int = 0
+        # это __количество__ материала, накопленное с учётом пропорций "на сколько задействован материал в общем плане"
+        self.__purchased_ratio: float = 0.0
         self.__manufactured: int = 0
         self.__manufacture_rest: int = 0
         self.__available_in_assets: int = 0
         self.__in_progress: int = 0
-        self.__purchased_ratio: float = 0.0
         self.__job_cost: int = 0
         self.__last_known_planned_material: typing.Optional[QPlannedMaterial] = None
 
