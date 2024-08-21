@@ -73,6 +73,8 @@ def main():
         'trade_history',
         # сведения о trade goods (ids), т.е. предметах добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
         'goods',
+        # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО
+        'industry_systems',
         # ----- ----- ----- ----- -----
         # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
         # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
@@ -147,7 +149,7 @@ def main():
 
             # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'public', 'rare', 'trade_hubs'}:
+            if categories & {'all', 'public', 'rare', 'trade_hubs', 'industry_indicies'}:
                 # Requires: public access
                 markets_prices_updated = dbtools.actualize_markets_prices()
                 print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
@@ -171,6 +173,13 @@ def main():
                             'not new' if found_market_goods is None else found_market_goods,
                             'no' if updated_market_orders is None else updated_market_orders))
                         sys.stdout.flush()
+
+            # загружаем производственные индексы всех солнечных систем вселенной
+            if categories & {'all', 'public', 'rare', 'industry_systems'}:
+                # Requires: public access
+                industry_systems_updated = dbtools.actualize_industry_systems()
+                print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
+                sys.stdout.flush()
 
         # в зависимости от заданных настроек загружаем цены на альянсовых структурах
         # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,

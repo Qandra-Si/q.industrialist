@@ -295,5 +295,18 @@ create or replace view qi.eve_ri4_invent_containers as
    );
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+-- esi_industry_cost_indices
+-- "повёрнутое" представление с производственными индексами
+--------------------------------------------------------------------------------
+create or replace view qi.esi_industry_cost_indices as
+  select
+    eis_system_id as system_id,
+    unnest(array[1, 5, 8, 9]) AS activity,
+    unnest(array[eis_manufacturing, eis_copying, eis_invention, eis_reaction]) AS cost_index
+  from qi.esi_industry_systems;
+--------------------------------------------------------------------------------
+
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.
