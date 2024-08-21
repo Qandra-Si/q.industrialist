@@ -3,7 +3,9 @@
 Prerequisites:
     * Have a Python 3 environment available to you (possibly by using a
       virtual environment: https://virtualenv.pypa.io/en/stable/).
-    * Run pip install -r requirements.txt with this directory as your root.
+    * Run pip install -r requirements.txt --user with this directory.
+      or
+      Run pip install -r requirements.txt with this directory as your root.
 
     * Copy q_industrialist_settings.py.template into q_industrialist_settings.py and
       mood for your needs.
