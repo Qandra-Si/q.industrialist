@@ -715,6 +715,9 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 </thead>
 <tbody>""")
 
+    def get_buy_material_price(material_type_id: int) -> float:
+        return get_material_buy_price(material_type_id, -1000000000.00)
+
     def calc_estimated_items_value(blueprint_type_id: int, activity_eiv: int) -> float:
         activity: str = str(profit.QIndustryAction.from_code(activity_eiv))
         return profit.calc_estimated_items_value(
@@ -731,12 +734,9 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
         assert cost_index is not None
         return cost_index
 
-    formula_purchase_verification: float = 0.0
-    for p in industry_formula.purchase:
-        formula_purchase_verification += get_material_buy_price(p.type_id, -1000000000.00) * p.quantity
-    formula_purchase_verification /= \
+    formula_purchase_verification: float = \
+        industry_formula.calc_materials_cost(get_buy_material_price) / \
         (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)
-
     formula_cost_verification: float = \
         industry_formula.calc_industry_cost(calc_estimated_items_value, get_industry_cost_index) / \
         (industry_formula.customized_runs * industry_plan.base_industry.products_per_single_run)

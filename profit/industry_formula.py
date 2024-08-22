@@ -101,6 +101,12 @@ class QIndustryFormula:
             scc_surcharge if scc_surcharge is not None else 0.04,
             facility_tax if facility_tax is not None else 0.0))
 
+    def calc_materials_cost(self, get_buy_material_price) -> float:
+        materials_cost: float = 0.0
+        for p in self.purchase:
+            materials_cost += get_buy_material_price(p.type_id) * p.quantity
+        return materials_cost
+
     def calc_industry_cost(self, calc_estimated_items_value, get_industry_cost_index) -> float:
         industry_cost: float = 0.0
         for jc in self.job_costs:
