@@ -2771,7 +2771,7 @@ class ConveyorCalculations:
         # перебираем сгруппированные преоритизированные группы
         for priority in sorted(self.prioritized.keys()):
             p0 = self.prioritized.get(priority)
-            for conveyor_settings, p1 in p0.items():
+            for p1 in p0.values():
                 p1.data.calc_stage1(
                     qid,
                     global_dictionary,
@@ -2780,7 +2780,7 @@ class ConveyorCalculations:
                     router_settings,
                     conveyor_settings,
                     available_materials,
-                    self.manufacturing_plan[conveyor_settings])
+                    self.manufacturing_plan[p1.conveyor_settings])
 
 
 # ConveyorDictionary - долговременный справочник материалов конвейера, хранится долго и накапливает информацию из
