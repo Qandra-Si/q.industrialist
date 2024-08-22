@@ -9,6 +9,7 @@ __pycache__/
 *.save
 *.py~
 *.py.save.*
+.#*.*
 
 # C extensions
 *.so

@@ -1295,6 +1295,7 @@ def main():
     calc_inputs = [
         # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
         {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+        {'bptid': 12041, 'qr': 100, 'me': 4, 'te': 14},  # Rocket Launcher II
         # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
         # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
         # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 0},   # Mjolnir Fury Light Missile
