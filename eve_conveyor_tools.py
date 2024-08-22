@@ -136,6 +136,7 @@ class ConveyorItem:
         (self.blueprint_type_id, activity_dict) = eve_sde_tools.get_blueprint_type_id_by_product_id(
             self.type_id,
             sde_bp_materials,
+            sde_type_ids,
             'reaction')
         if self.blueprint_type_id is not None:
             self.is_reaction = True
@@ -147,6 +148,7 @@ class ConveyorItem:
             (self.blueprint_type_id, activity_dict) = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 self.type_id,
                 sde_bp_materials,
+                sde_type_ids,
                 'manufacturing')
             if self.blueprint_type_id is None:
                 # если продукт не производится в результате производства, то оставляем поля None

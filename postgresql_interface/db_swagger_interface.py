@@ -2838,3 +2838,106 @@ class QSwaggerInterface:
              'at': updated_at
              }
         )
+
+    # -------------------------------------------------------------------------
+    # /industry/systems/
+    # -------------------------------------------------------------------------
+
+    def get_industry_systems(self):
+        rows = self.db.select_all_rows(
+            "SELECT"
+            " eis_system_id,"
+            " eis_manufacturing,"
+            " eis_research_te,"
+            " eis_research_me,"
+            " eis_copying,"
+            " eis_invention,"
+            " eis_reaction,"
+            " eis_updated_at "
+            "FROM esi_industry_systems;",
+        )
+        if rows is None:
+            return None
+        data = []
+        for row in rows:
+            ext = {'updated_at': row[7]}
+            data_item = {
+                'system_id': row[0],
+                'manufacturing': row[1],
+                'research_te': row[2],
+                'research_me': row[3],
+                'copying': row[4],
+                'invention': row[5],
+                'reaction': row[6],
+                'ext': ext,
+            }
+            data.append(data_item)
+        return data
+
+    def insert_or_update_industry_systems(self, data, updated_at):
+        """ inserts industry systems data into database
+
+        :param data: industry cost inicies data in solar system
+        """
+        # {"cost_indices":
+        #  [
+        #   {"activity": "manufacturing",
+        #    "cost_index": 0.0625
+        #   },
+        #   {"activity": "researching_time_efficiency",
+        #    "cost_index": 0.0161
+        #   },
+        #   {"activity": "researching_material_efficiency",
+        #    "cost_index": 0.0178
+        #   },
+        #   {"activity": "copying",
+        #    "cost_index": 0.0381
+        #   },
+        #   {"activity": "invention",
+        #    "cost_index": 0.1446
+        #   },
+        #   {"activity": "reaction",
+        #    "cost_index": 0.0306
+        #   }
+        #  ],
+        #  "solar_system_id": 30001115
+        # }
+        self.db.execute(
+            "INSERT INTO esi_industry_systems("
+            " eis_system_id,"
+            " eis_manufacturing,"
+            " eis_research_te,"
+            " eis_research_me,"
+            " eis_copying,"
+            " eis_invention,"
+            " eis_reaction,"
+            " eis_created_at,"
+            " eis_updated_at) "
+            "VALUES ("
+            " %(ss)s,"
+            " %(m)s,"
+            " %(me)s,"
+            " %(te)s,"
+            " %(c)s,"
+            " %(i)s,"
+            " %(r)s,"
+            " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
+            "ON CONFLICT ON CONSTRAINT pk_eis DO UPDATE SET"
+            " eis_manufacturing=%(m)s,"
+            " eis_research_te=%(te)s,"
+            " eis_research_me=%(me)s,"
+            " eis_copying=%(c)s,"
+            " eis_invention=%(i)s,"
+            " eis_reaction=%(r)s,"
+            " eis_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            {'ss': data['system_id'],
+             'm': data['manufacturing'],
+             'te': data['research_te'],
+             'me': data['research_me'],
+             'c': data['copying'],
+             'i': data['invention'],
+             'r': data['reaction'],
+             'at': updated_at,
+             }
+        )

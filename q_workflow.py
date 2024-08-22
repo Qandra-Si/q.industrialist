@@ -3,7 +3,9 @@
 Prerequisites:
     * Have a Python 3 environment available to you (possibly by using a
       virtual environment: https://virtualenv.pypa.io/en/stable/).
-    * Run pip install -r requirements.txt with this directory as your root.
+    * Run pip install -r requirements.txt --user with this directory.
+      or
+      Run pip install -r requirements.txt with this directory as your root.
 
     * Copy q_industrialist_settings.py.template into q_industrialist_settings.py and
       mood for your needs.
@@ -193,7 +195,8 @@ def __get_monthly_manufacturing_scheduler(
         if not (__converted["ship"] is None):
             __blueprint_type_id, __blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 __converted["ship"]["type_id"],
-                sde_bp_materials
+                sde_bp_materials,
+                sde_type_ids
             )
             __converted["ship"].update({"blueprint": {
                 "type_id": __blueprint_type_id,
@@ -204,7 +207,8 @@ def __get_monthly_manufacturing_scheduler(
             __item_type_id = __item_dict["type_id"]
             __blueprint_type_id, __blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
                 __item_type_id,
-                sde_bp_materials
+                sde_bp_materials,
+                sde_type_ids
             )
             if not (__blueprint_type_id is None) and ("manufacturing" in __blueprint_dict["activities"]):
                 __item_dict.update({"blueprint": {

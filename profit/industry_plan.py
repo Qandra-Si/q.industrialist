@@ -1,8 +1,11 @@
 # -*- encoding: utf-8 -*-
+import math
 import typing
 from .industry_tree import QBaseMaterial
 from .industry_tree import QMaterial
 from .industry_tree import QIndustryTree
+from .industry_tree import QIndustryAction
+from .industry_tree import QIndustryCostIndices
 
 
 class QIndustryObtainingPlan:
@@ -19,7 +22,7 @@ class QIndustryObtainingPlan:
         return self.__purchase_quantity
 
     @property
-    def activity_plan(self):
+    def activity_plan(self):  # -> typing.Optional[QPlannedActivity]
         return self.__activity_plan
 
     @property
@@ -70,7 +73,7 @@ class QPlannedMaterial:
         self.__prior_planned_material: typing.Optional[QPlannedMaterial] = prior_planned_material
         self.__quantity_with_efficiency: int = quantity_with_efficiency
         self.__obtaining_plan: QIndustryObtainingPlan = QIndustryObtainingPlan()
-        self.__usage_chain: float =usage_chain
+        self.__usage_chain: float = usage_chain
         self.__usage_ratio: float = 0.0
         self.__summary_ratio_before: float = 0.0
         self.__summary_ratio_after: float = 0.0
@@ -136,12 +139,12 @@ class QPlannedBlueprint(QPlannedMaterial):
     def __init__(self,
                  blueprint: QMaterial,
                  usage_chain: float,
-                 planned_quantity: int,
+                 products_per_single_run: int,
                  planned_runs: int,
                  planned_me: int,
                  planned_te: int):
         super().__init__(blueprint, None, 1, usage_chain)
-        self.__products_per_single_run: int = planned_quantity
+        self.__products_per_single_run: int = products_per_single_run
         self.__runs: int = planned_runs
         self.__me: int = planned_me
         self.__te: int = planned_te
@@ -163,15 +166,70 @@ class QPlannedBlueprint(QPlannedMaterial):
         return self.__te
 
 
+class QPlannedJobCost:
+    def __init__(self,
+                 action: QIndustryAction,
+                 estimated_items_value: float,
+                 system_indices: QIndustryCostIndices,
+                 industry_cost_index: float):
+        # входные данные для расчёта (стоимость материалов, производственный индекс в системе)
+        self.estimated_items_value: float = estimated_items_value  # ISK
+        # сведения о производственных индексах в системе
+        self.system_indices: QIndustryCostIndices = system_indices
+        self.industry_cost_index: float = industry_cost_index  # процент
+        # расчёт стоимости работы
+        if action in [QIndustryAction.manufacturing, QIndustryAction.reaction]:
+            self.__job_cost_base: float = self.estimated_items_value  # ISK
+        else:  # copying, invention
+            self.__job_cost_base: float = self.estimated_items_value * 0.02  # ISK
+        # внимание! недостаточная точность расчёта общей стоимости проекта в этом месте возможна потому, что
+        # индекс стоимости проектов в системе ingame показывается как 5.97%, от ESI он же приходит как 0.0597,
+        # хотя на самом деле является 878020 / 14719117 = 0.05965167611616919683429379629226
+        # а если быть точнее, то      878019 / 14719117 = 0.05965160817731117973992597517908
+        #                             878021 / 14719117 = 0.05965174405502721392866161740545
+        # число должно иметь точность как минимум 8 знаков после запятой, а не 4 (как приходит по ESI)
+        # --- итоги расчёта:
+        # |                       |     моя версия |     ingame | на самом деле |
+        # | estimated_items_value |     14'719'117 | 14'719'117 |               | <== правильно
+        # |   industry_cost_index |          5.97% |      5.97% |      5.965167 | <== низкая точность, страдает расчёт
+        # |           system_cost |   878'731.2849 |            |               |
+        # |                       |        878'732 |    878'020 |     878'019.9 | <== разница в  712 ISK
+        # |  structure_bonus_rigs |          -5.0% |      -5.0% |               |
+        # |  structure_role_bonus | -43'936.564245 |            |               |
+        # |                       |        -43'937 |    -43'901 |               | <== разница в  36 ISK
+        # |  total_job_gross_cost | 834'794.720655 |            |               |
+        # |                       |        834'795 |    834'119 |               | <== разница в  676 ISK
+        # |         scc_surcharge |         -4.00% |      4.00% |               |
+        # |     tax_scc_surcharge |     588'764.68 |            |               |
+        # |                       |        588'765 |    588'765 |               | <== правильно
+        # |           total_taxes |        588'765 |    588'765 |               | <== правильно
+        # |        total_job_cost |      1'423'560 |  1'422'884 |               | <== разница в  676 ISK
+        self.system_cost: int = int(math.ceil(self.__job_cost_base * self.industry_cost_index))  # ISK
+        self.role_bonus_job_cost: float = system_indices.factory_bonuses.get_role_bonus(str(action), 'job_cost')
+        self.structure_role_bonus: int = int(math.ceil(self.system_cost * self.role_bonus_job_cost))  # ISK
+        self.rigs_bonus_job_cost: float = system_indices.factory_bonuses.get_rigs_bonus(str(action), 'job_cost')
+        self.structure_rigs_bonus: int = int(math.ceil(self.system_cost * self.rigs_bonus_job_cost))  # ISK
+        self.total_job_gross_cost: int = self.system_cost + self.structure_role_bonus + self.structure_rigs_bonus  # ISK
+        self.scc_surcharge: float = 0.04  # TODO: процент должен быть перенесён в настройки routing-а (system_indices)?
+        self.tax_scc_surcharge: int = int(math.ceil(self.__job_cost_base * self.scc_surcharge))  # ISK
+        self.facility_tax: float = 0.00  # TODO: процент должен быть перенесён в настройки routing-а (system_indices)?
+        self.tax_facility: int = int(math.ceil(self.__job_cost_base * self.facility_tax))  # ISK
+        self.total_taxes: int = self.tax_scc_surcharge + self.tax_facility  # ISK
+        self.total_job_cost: int = self.total_job_gross_cost + self.total_taxes  # ISK
+
+
 class QPlannedActivity:
     def __init__(self,
                  industry: QIndustryTree,
                  planned_blueprint: QPlannedBlueprint,
-                 planned_blueprints: int):k
+                 planned_blueprints: int,
+                 industry_job_cost: typing.Optional[QPlannedJobCost]):
         self.__industry: QIndustryTree = industry
         self.__planned_blueprint: QPlannedBlueprint = planned_blueprint
         self.__planned_blueprints: int = planned_blueprints
         self.__planned_materials: typing.List[QPlannedMaterial] = []
+        # стоимость одного прогона (не зависит от me чертежа и не зависит от декрипторов инвента)
+        self.__industry_job_cost: typing.Optional[QPlannedJobCost] = industry_job_cost
 
     @property
     def industry(self) -> QIndustryTree:
@@ -208,16 +266,32 @@ class QPlannedActivity:
     def append_planned_material(self, planned_material: QPlannedMaterial):
         self.__planned_materials.append(planned_material)
 
+    def calc_industry_job_cost(self) -> QPlannedJobCost:
+        self.__industry_job_cost = QPlannedJobCost(
+            self.industry.action,
+            self.industry.estimated_items_value,
+            self.industry.system_indices,
+            self.industry.industry_cost_index)
+        return self.__industry_job_cost
+
+    @property
+    def industry_job_cost(self) -> typing.Optional[QPlannedJobCost]:
+        return self.__industry_job_cost
+
 
 class QIndustryMaterial:
     def __init__(self, base: QBaseMaterial):
         self.__base: QBaseMaterial = base
+        # это количество материалов, которые надо закупить с учётом настроек производства (некоторые материалы
+        # производятся партиями на интервалах 1 суток), количество суммируется на всяком очередном закупе
         self.__purchased: int = 0
+        # это __количество__ материала, накопленное с учётом пропорций "на сколько задействован материал в общем плане"
+        self.__purchased_ratio: float = 0.0
         self.__manufactured: int = 0
         self.__manufacture_rest: int = 0
         self.__available_in_assets: int = 0
         self.__in_progress: int = 0
-        self.__purchased_ratio: float = 0.0
+        self.__job_cost: int = 0
         self.__last_known_planned_material: typing.Optional[QPlannedMaterial] = None
 
     @property
@@ -318,6 +392,13 @@ class QIndustryMaterial:
         self.__purchased_ratio += purchased_ratio
 
     @property
+    def job_cost(self) -> int:
+        return self.__job_cost
+
+    def increase_job_cost(self, job_cost: int) -> None:
+        self.__job_cost += job_cost
+
+    @property
     def last_known_planned_material(self) -> typing.Optional[QPlannedMaterial]:
         return self.__last_known_planned_material
 
@@ -343,14 +424,32 @@ class QIndustryMaterialsRepository:
         return m
 
 
+class QIndustryJobCostAccumulator:
+    def __init__(self):
+        self.__total_paid: float = 0.0
+
+    @property
+    def total_paid(self) -> float:
+        return self.__total_paid
+
+    def increment_total_paid(self, job_cost: float):
+        self.__total_paid += job_cost
+
+
 class QIndustryPlanCustomization:
     def __init__(self,
                  reaction_runs: typing.Optional[int],
                  industry_time: typing.Optional[int],
-                 min_probability: typing.Optional[float]):
+                 common_components: typing.Optional[typing.List[int]],
+                 min_probability: typing.Optional[float],
+                 unknown_blueprints_me: typing.Optional[int]):
+        if unknown_blueprints_me is not None:
+            assert 0 <= unknown_blueprints_me <= 10
         self.__reaction_runs: typing.Optional[int] = reaction_runs
         self.__industry_time: typing.Optional[int] = industry_time
+        self.__common_components: typing.Optional[typing.List[int]] = common_components
         self.__min_probability: typing.Optional[float] = min_probability
+        self.__unknown_blueprints_me: typing.Optional[int] = unknown_blueprints_me
 
     @property
     def reaction_runs(self) -> typing.Optional[int]:
@@ -361,8 +460,16 @@ class QIndustryPlanCustomization:
         return self.__industry_time
 
     @property
+    def common_components(self) -> typing.Optional[typing.List[int]]:
+        return self.__common_components
+
+    @property
     def min_probability(self) -> typing.Optional[float]:
         return self.__min_probability
+
+    @property
+    def unknown_blueprints_me(self) -> typing.Optional[int]:
+        return self.__unknown_blueprints_me
 
 
 class QIndustryPlan:
@@ -373,6 +480,7 @@ class QIndustryPlan:
         self.__base_planned_activity: typing.Optional[QPlannedActivity] = None
         self.__customization: typing.Optional[QIndustryPlanCustomization] = customization
         self.__materials_repository: QIndustryMaterialsRepository = QIndustryMaterialsRepository()
+        self.__job_cost_accumulator: QIndustryJobCostAccumulator = QIndustryJobCostAccumulator()
 
     @property
     def base_industry(self) -> QIndustryTree:
@@ -396,3 +504,7 @@ class QIndustryPlan:
     @property
     def materials_repository(self) -> QIndustryMaterialsRepository:
         return self.__materials_repository
+
+    @property
+    def job_cost_accumulator(self) -> QIndustryJobCostAccumulator:
+        return self.__job_cost_accumulator

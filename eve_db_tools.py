@@ -119,6 +119,7 @@ class QDatabaseTools:
     character_industry_job_diff = ['status']
     market_order_diff = ['price', 'volume_remain']
     markets_prices_diff = ['adjusted_price', 'average_price']
+    industry_systems_diff = ['manufacturing', 'research_te', 'research_me', 'copying', 'invention', 'reaction']
 
     def __init__(self, module_name, client_scope, database_prms, debug):
         """ constructor
@@ -153,6 +154,7 @@ class QDatabaseTools:
         self.__cached_group_ids: typing.Set[int] = set()
         self.__cached_market_group_ids: typing.Set[int] = set()
         self.__cached_type_ids: typing.Set[int] = set()
+        self.__cached_industry_systems: typing.Dict[int, QEntity] = {}
         self.__universe_items_with_names: typing.Set[int] = set()
         self.prepare_cache()
 
@@ -164,6 +166,7 @@ class QDatabaseTools:
         del self.depth
 
         del self.__universe_items_with_names
+        del self.__cached_industry_systems
         del self.__cached_type_ids
         del self.__cached_market_group_ids
         del self.__cached_group_ids
@@ -266,6 +269,14 @@ class QDatabaseTools:
                 updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
                 del row['ext']
                 self.__cached_markets_prices[type_id] = QEntity(True, False, row, updated_at)
+
+        rows = self.dbswagger.get_industry_systems()
+        if rows:
+            for row in rows:
+                solar_system_id = row['system_id']
+                updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
+                del row['ext']
+                self.__cached_industry_systems[solar_system_id] = QEntity(True, False, row, updated_at)
 
         # загрузка из БД type_ids, market_group_ids, group_ids, category_ids (в таблицах в БД таких данных может быть
         # больше, чем может выдать ESI, т.к. БД может хранить устаревшие non published товары)
@@ -2589,3 +2600,65 @@ class QDatabaseTools:
         self.prepare_goods_dictionaries()
 
         return quantity_of_actualized_type_ids
+
+    # -------------------------------------------------------------------------
+    # /industry/systems/
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def get_industry_systems_url() -> str:
+        # Requires: piblic access
+        return "industry/systems/"
+
+    def actualize_industry_systems(self):
+        url: str = self.get_industry_systems_url()
+        data, updated_at, is_updated = self.load_from_esi(url)
+        if data is None:
+            return None
+        if self.esiswagger.offline_mode:
+            updated_at = self.eve_now
+        elif not is_updated:
+            return None
+
+        # чтобы не мусорить в консоль лишними отладочными данными (их и так идёт целый поток) - отключаем отладку
+        db_debug: bool = self.dbswagger.db.debug
+        if db_debug:
+            self.dbswagger.db.disable_debug()
+
+        # актуализация (добавление) market цен в БД
+        industry_systems_updated: int = 0
+        for solar_system_data in data:
+            # актуализация кеша (сравнение данных в кеше для минимизации обращений к БД)
+            solar_system_id: int = solar_system_data['solar_system_id']
+            in_cache = self.__cached_industry_systems.get(solar_system_id)
+            # конвертируем "неудобный" dict с list-ами внутри которых новые dict-ы в новый fake-овый "плоский" dict
+            # он потребуется для внутреннего хранения в кешированном справочнике (в таком же виде данные отдаются из БД)
+            fake_dict = {
+                'system_id': solar_system_id,
+                'manufacturing': next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'manufacturing'), None),
+                'research_te':   next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'researching_time_efficiency'), None),
+                'research_me':   next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'researching_material_efficiency'), None),
+                'copying':       next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'copying'), None),
+                'invention':     next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'invention'), None),
+                'reaction':      next((_['cost_index'] for _ in solar_system_data['cost_indices'] if _['activity'] == 'reaction'), None),
+            }
+            if not in_cache:
+                self.__cached_industry_systems[solar_system_id] = QEntity(True, True, fake_dict, updated_at)
+            elif not in_cache.is_obj_equal_by_keys(fake_dict, self.industry_systems_diff):
+                in_cache.store(True, True, fake_dict, updated_at)
+            else:
+                continue
+            # отправка в БД цену товара
+            self.dbswagger.insert_or_update_industry_systems(fake_dict, updated_at)
+            # подсчёт статистики
+            industry_systems_updated += 1
+
+        self.qidb.commit()
+
+        # если отладка была отключена, то включаем её
+        if db_debug:
+            self.dbswagger.db.enable_debug()
+
+        del data
+
+        return industry_systems_updated

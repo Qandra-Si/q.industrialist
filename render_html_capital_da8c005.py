@@ -12,11 +12,11 @@ def get_pseudographics_prefix(levels, is_last):
         if lv[1]:
             prfx += '&nbsp; '
         else:
-            prfx += '&#x2502; '  # |
+            prfx += '│ '  # &#x2502;
     if is_last:
-        prfx += '&#x2514;&#x2500;'  # └─
+        prfx += '└─'  # &#x2514;&#x2500;
     else:
-        prfx += '&#x251C;&#x2500;'  # ├─
+        prfx += '├─'  # &#x251C;&#x2500;
     return prfx
 
 
@@ -100,12 +100,18 @@ def __dump_blueprint_materials(
         if bpmm1_not_enough < 0:
             bpmm1_not_enough = 0
         # поиск чертежа для этого типа продукта (которого может и не быть, например если возможен только закуп)
-        bpmm1_blueprint_type_id, bpmm1_blueprint_data = \
-            eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "manufacturing")
+        bpmm1_blueprint_type_id, bpmm1_blueprint_data = eve_sde_tools.get_blueprint_type_id_by_product_id(
+            bpmm1_tid,
+            sde_bp_materials,
+            sde_type_ids,
+            "manufacturing")
         bpmm1_is_reaction_formula = False
         if bpmm1_blueprint_type_id is None:
-            bpmm1_blueprint_type_id, bpmm1_blueprint_data = \
-                eve_sde_tools.get_blueprint_type_id_by_product_id(bpmm1_tid, sde_bp_materials, "reaction")
+            bpmm1_blueprint_type_id, bpmm1_blueprint_data = eve_sde_tools.get_blueprint_type_id_by_product_id(
+                bpmm1_tid,
+                sde_bp_materials,
+                sde_type_ids,
+                "reaction")
             bpmm1_is_reaction_formula = bpmm1_blueprint_type_id is not None
         if bpmm1_blueprint_type_id is None:
             bpmm1_product_quantity = None
@@ -283,7 +289,10 @@ def __dump_corp_capital(
     __type_id = eve_sde_tools.get_type_id_by_item_name(sde_type_ids, product_name)
     if __type_id is None:
         return
-    __capital_blueprint_type_id, __capital_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(__type_id, sde_bp_materials)
+    __capital_blueprint_type_id, __capital_blueprint_materials = eve_sde_tools.get_blueprint_type_id_by_product_id(
+        __type_id,
+        sde_bp_materials,
+        sde_type_ids)
     __is_reaction_formula = eve_sde_tools.is_type_id_nested_into_market_group(__type_id, [1849], sde_type_ids, sde_market_groups)
 
     glf.write("""

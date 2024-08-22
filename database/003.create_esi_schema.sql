@@ -162,6 +162,9 @@ DROP INDEX IF EXISTS qi.idx_eco_home_station_id;
 DROP INDEX IF EXISTS qi.idx_eco_pk;
 DROP TABLE IF EXISTS qi.esi_characters;
 
+DROP INDEX IF EXISTS qi.idx_eis_pk;
+DROP TABLE IF EXISTS qi.esi_industry_systems;
+
 
 
 --------------------------------------------------------------------------------
@@ -1314,6 +1317,31 @@ TABLESPACE pg_default;
 CREATE INDEX idx_ethh_updated_at
     ON qi.esi_trade_hub_history USING btree
     (ethh_updated_at ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+-- industry_systems
+--------------------------------------------------------------------------------
+CREATE TABLE qi.esi_industry_systems
+(
+    eis_system_id BIGINT NOT NULL,
+    eis_manufacturing DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_research_te DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_research_me DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_copying DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_invention DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_reaction DOUBLE PRECISION NOT NULL DEFAULT 0.0001,
+    eis_created_at TIMESTAMP,
+    eis_updated_at TIMESTAMP,
+    CONSTRAINT pk_eis PRIMARY KEY (eis_system_id)
+)
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_eis_pk
+    ON qi.esi_industry_systems USING btree
+    (eis_system_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

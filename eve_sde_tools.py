@@ -241,7 +241,7 @@ def get_market_group_name_by_id(sde_type_ids, group_id):
     return group_sid
 
 
-def get_market_group_by_type_id(sde_type_ids, type_id):
+def get_market_group_by_type_id(sde_type_ids, type_id: int) -> typing.Optional[int]:
     type_dict = sde_type_ids.get(str(type_id))
     if type_dict is None:
         return None
@@ -260,12 +260,12 @@ def get_market_group_id_by_name(sde_market_groups, name):
     return None if grp is None else grp[0]
 
 
-def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+def get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id: int) -> typing.List[int]:
+    group_id: typing.Optional[int] = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return []
-    __group_id = group_id
-    __groups_chain = [group_id]
+    __group_id: int = group_id
+    __groups_chain: typing.List[int] = [group_id]
     while True:
         __grp1 = sde_market_groups[str(__group_id)]
         if "parentGroupID" in __grp1:
@@ -317,8 +317,12 @@ def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
     return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
 
 
-def is_type_id_nested_into_market_group(type_id, market_groups, sde_type_ids, sde_market_groups):
-    groups_chain = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
+def is_type_id_nested_into_market_group(
+        type_id: int,
+        market_groups: typing.Union[typing.List[int], typing.Set[int]],
+        sde_type_ids,
+        sde_market_groups) -> typing.Optional[bool]:
+    groups_chain: typing.List[int] = get_market_groups_chain_by_type_id(sde_type_ids, sde_market_groups, type_id)
     if groups_chain is None:
         return None
     return bool(set(groups_chain) & set(market_groups))
@@ -357,6 +361,10 @@ def get_blueprint_any_materials(blueprints, activity: str, type_id: int):
     if a is None:
         return None
     return a['materials']
+
+
+def get_blueprint_copying_activity(sde_bp_materials, type_id: int):
+    return get_blueprint_any_activity(sde_bp_materials, 'copying', type_id)
 
 
 def get_blueprint_manufacturing_activity(blueprints, type_id: int):
@@ -424,11 +432,22 @@ def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
     return products_for_bps
 
 
-def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activity: str = "manufacturing"):
+def get_blueprint_type_id_by_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids,
+        activity: str = "manufacturing") -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
     """
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
+    Внимание!
+    * в игре можно найти неопубликованный предмет, который можно произвести (чёртеж существует)
+    * в игре нельзя найти неопубликованный чертёж (его не существует)
     """
     for blueprint_type_id in sde_bp_materials:
+        bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
+        if not bp_tid_dict or not bp_tid_dict.get("published", False):
+            bp_tid_dict = bp_tid_dict
+            continue
         __bpm1 = sde_bp_materials[blueprint_type_id]["activities"]
         __bpm2 = __bpm1.get(activity)
         if not __bpm2:
@@ -443,18 +462,24 @@ def get_blueprint_type_id_by_product_id(product_id: int, sde_bp_materials, activ
     return None, None
 
 
-def get_blueprint_type_id_by_manufacturing_product_id(product_id, sde_bp_materials):
-    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="manufacturing")
+def get_blueprint_type_id_by_manufacturing_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids) -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, sde_type_ids, activity="manufacturing")
     return a, b
 
 
-def get_blueprint_type_id_by_invention_product_id(product_id, sde_bp_materials):
-    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, activity="invention")
+def get_blueprint_type_id_by_invention_product_id(
+        product_id: int,
+        sde_bp_materials,
+        sde_type_ids) -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+    a, b = get_blueprint_type_id_by_product_id(product_id, sde_bp_materials, sde_type_ids, activity="invention")
     return a, b
 
 
 def get_products_by_blueprint_type_id(
-        blueprint_type_id,
+        blueprint_type_id: int,
         activity_id,
         sde_bp_materials) -> typing.Optional[typing.List[typing.Tuple[int, int]]]:
     """
