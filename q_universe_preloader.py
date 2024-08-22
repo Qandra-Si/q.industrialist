@@ -38,6 +38,7 @@ Required application scopes:
     * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
 """
 import sys
+import typing
 
 import eve_db_tools
 import console_app
@@ -73,8 +74,10 @@ def main():
         'trade_history',
         # сведения о trade goods (ids), т.е. предметах добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
         'goods',
-        # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО
+        # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО (обновляется редко)
         'industry_systems',
+        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (обновляется по четвергам)
+        'market_prices',
         # ----- ----- ----- ----- -----
         # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
         # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
@@ -149,11 +152,15 @@ def main():
 
             # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'public', 'rare', 'trade_hubs', 'industry_indicies'}:
-                # Requires: public access
-                markets_prices_updated = dbtools.actualize_markets_prices()
-                print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
-                sys.stdout.flush()
+            if categories & {'all', 'public', 'rare', 'trade_hubs', 'market_prices'}:
+                if categories & {'all', 'public', 'rare', 'market_prices'}:
+                    # Requires: public access
+                    markets_prices_updated: typing.Optional[typing.Tuple[int, int]] = dbtools.actualize_markets_prices()
+                    if markets_prices_updated is None:
+                        print("Markets prices has no updates\n")
+                    else:
+                        print(f"Markets prices has {markets_prices_updated[0]} average updates, {markets_prices_updated[1]} adjusted updates\n")
+                    sys.stdout.flush()
 
                 # Requires: public access
                 for region in q_industrialist_settings.g_market_hubs:

@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 import pytz
 import typing
+import datetime
 
 
 class QSwaggerInterface:
@@ -2221,61 +2222,92 @@ class QSwaggerInterface:
     # /markets/prices/
     # -------------------------------------------------------------------------
 
-    def get_last_known_markets_prices(self):
+    def get_last_known_markets_prices(self) \
+            -> typing.Optional[typing.Tuple[typing.List[typing.Any], typing.List[typing.Any]]]:
         rows = self.db.select_all_rows(
             "SELECT"
             " emp_type_id,"
             " emp_adjusted_price,"
             " emp_average_price,"
-            " emp_updated_at "
+            " emp_adj_updated_at,"
+            " emp_avg_updated_at "
             "FROM esi_markets_prices;",
         )
         if rows is None:
             return None
-        data = []
+        avg_data, adj_data = [], []
         for row in rows:
-            ext = {'updated_at': row[3]}
             data_item = {
                 'type_id': row[0],
-                'ext': ext,
+                'ext': {'updated_at': row[4]},
+            }
+            if row[2] is not None:
+                data_item.update({'average_price': row[2]})
+            avg_data.append(data_item)
+            # ---
+            data_item = {
+                'type_id': row[0],
+                'ext': {'updated_at': row[3]},
             }
             if row[1] is not None:
                 data_item.update({'adjusted_price': row[1]})
-            if row[2] is not None:
-                data_item.update({'average_price': row[2]})
-            data.append(data_item)
-        return data
+            adj_data.append(data_item)
+        return avg_data, adj_data
 
-    def insert_or_update_markets_price(self, data, updated_at):
+    def insert_or_update_markets_price(
+            self,
+            data,
+            updated_avg_at: typing.Optional[datetime.datetime],
+            updated_adj_at: typing.Optional[datetime.datetime]) -> None:
         """ inserts markets price data into database
 
         :param data: market price data
+        :param updated_avg_at: время обновления average_price
+        :param updated_adj_at: время обновления adjusted_price
         """
         # { "adjusted_price": 306988.09,
         #   "average_price": 306292.67,
         #   "type_id": 32772
         # }
+
+        if updated_adj_at is not None:
+            if updated_avg_at is not None:
+                on_conflict: str = \
+                    "emp_adjusted_price=%(aj)s," \
+                    "emp_average_price=%(av)s," \
+                    "emp_adj_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s," \
+                    "emp_avg_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s"
+            else:
+                on_conflict: str = \
+                    "emp_adjusted_price=%(aj)s," \
+                    "emp_adj_updated_at=TIMESTAMP WITHOUT TIME ZONE %(atj)s"
+        else:
+            on_conflict: str = \
+                "emp_average_price=%(av)s," \
+                "emp_avg_updated_at=TIMESTAMP WITHOUT TIME ZONE %(atv)s"
+
         self.db.execute(
             "INSERT INTO esi_markets_prices("
             " emp_type_id,"
             " emp_adjusted_price,"
             " emp_average_price,"
             " emp_created_at,"
-            " emp_updated_at) "
+            " emp_adj_updated_at,"
+            " emp_avg_updated_at) "
             "VALUES ("
             " %(t)s,"
             " %(aj)s,"
             " %(av)s,"
             " CURRENT_TIMESTAMP AT TIME ZONE 'GMT',"
+            " TIMESTAMP WITHOUT TIME ZONE %(at)s,"
             " TIMESTAMP WITHOUT TIME ZONE %(at)s) "
-            "ON CONFLICT ON CONSTRAINT pk_emp DO UPDATE SET"
-            " emp_adjusted_price=%(aj)s,"
-            " emp_average_price=%(av)s,"
-            " emp_updated_at=TIMESTAMP WITHOUT TIME ZONE %(at)s;",
+            "ON CONFLICT ON CONSTRAINT pk_emp DO UPDATE SET " + on_conflict + ";",
             {'t': data['type_id'],
              'aj': data.get('adjusted_price', None),
              'av': data.get('average_price', None),
-             'at': updated_at,
+             'at': updated_adj_at if updated_adj_at is not None else updated_avg_at,
+             'atj': updated_adj_at,
+             'atv': updated_avg_at,
              }
         )
 

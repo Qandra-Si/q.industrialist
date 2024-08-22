@@ -1142,7 +1142,8 @@ CREATE TABLE qi.esi_markets_prices
     emp_adjusted_price DOUBLE PRECISION,
     emp_average_price DOUBLE PRECISION,
     emp_created_at TIMESTAMP,
-    emp_updated_at TIMESTAMP,
+    emp_adj_updated_at TIMESTAMP,
+    emp_avg_updated_at TIMESTAMP,
     CONSTRAINT pk_emp PRIMARY KEY (emp_type_id)
 )
 TABLESPACE pg_default;
