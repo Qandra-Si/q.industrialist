@@ -150,18 +150,27 @@ def main():
                           format(universe_structures_stat[1], universe_structures_stat[0]))
                 sys.stdout.flush()
 
+            # загружаем производственные индексы всех солнечных систем вселенной
+            if categories & {'all', 'public', 'rare', 'industry_systems'}:
+                # Requires: public access
+                industry_systems_updated = dbtools.actualize_industry_systems()
+                print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
+                sys.stdout.flush()
+
+            # загружаем цены во вселенной: производственные adjusted и торговые averaged
+            if categories & {'all', 'public', 'rare', 'market_prices'}:
+                # Requires: public access
+                markets_prices_updated: typing.Optional[typing.Tuple[int, int]] = dbtools.actualize_markets_prices()
+                if markets_prices_updated is None:
+                    print("Markets prices has no updates\n")
+                else:
+                    print(
+                        f"Markets prices has {markets_prices_updated[0]} average updates, {markets_prices_updated[1]} adjusted updates\n")
+                sys.stdout.flush()
+
             # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'public', 'rare', 'trade_hubs', 'market_prices'}:
-                if categories & {'all', 'public', 'rare', 'market_prices'}:
-                    # Requires: public access
-                    markets_prices_updated: typing.Optional[typing.Tuple[int, int]] = dbtools.actualize_markets_prices()
-                    if markets_prices_updated is None:
-                        print("Markets prices has no updates\n")
-                    else:
-                        print(f"Markets prices has {markets_prices_updated[0]} average updates, {markets_prices_updated[1]} adjusted updates\n")
-                    sys.stdout.flush()
-
+            if categories & {'all', 'public', 'rare', 'trade_hubs'}:
                 # Requires: public access
                 for region in q_industrialist_settings.g_market_hubs:
                     found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
@@ -180,13 +189,6 @@ def main():
                             'not new' if found_market_goods is None else found_market_goods,
                             'no' if updated_market_orders is None else updated_market_orders))
                         sys.stdout.flush()
-
-            # загружаем производственные индексы всех солнечных систем вселенной
-            if categories & {'all', 'public', 'rare', 'industry_systems'}:
-                # Requires: public access
-                industry_systems_updated = dbtools.actualize_industry_systems()
-                print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
-                sys.stdout.flush()
 
         # в зависимости от заданных настроек загружаем цены на альянсовых структурах
         # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,
