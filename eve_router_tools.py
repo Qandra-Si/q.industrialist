@@ -2771,7 +2771,7 @@ class ConveyorCalculations:
         # перебираем сгруппированные преоритизированные группы
         for priority in sorted(self.prioritized.keys()):
             p0 = self.prioritized.get(priority)
-            for conveyor_settings, p1 in p0.values():
+            for conveyor_settings, p1 in p0.items():
                 p1.data.calc_stage1(
                     qid,
                     global_dictionary,
