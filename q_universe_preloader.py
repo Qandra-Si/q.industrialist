@@ -38,6 +38,7 @@ Required application scopes:
     * esi-wallet.read_corporation_wallets.v1 - Requires one of: Accountant, Junior_Accountant
 """
 import sys
+import typing
 
 import eve_db_tools
 import console_app
@@ -73,8 +74,12 @@ def main():
         'trade_history',
         # сведения о trade goods (ids), т.е. предметах добавленных во вселенную - раз в день ОЧЕНЬ МЕДЛЕННО
         'goods',
-        # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО
+        # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО (обновляется редко)
         'industry_systems',
+        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (обновляется по четвергам)
+        'market_prices',
+        # пересчёт кеша таблиц для conveyor-формул (выборка данных по стоимости производства различных предметов)
+        'conveyor_formulas',
         # ----- ----- ----- ----- -----
         # предустановка для набора категорий, например категория 'corporation' обуславливает загрузку 'assets',
         # 'blueprints', и т.п. то есть всех тех данных, которые относятся именно к корпорации (не цен по вселенной)
@@ -83,7 +88,7 @@ def main():
         # откладывать, либо запускать "в фоне"
         'rare',
         # предустановка для категорий и действий, которые выполняются крайне медленно, и выполнение которых желательно
-        # запускать раз в сутки
+        # запускать раз в сутки (либо однократно при обновлении набора данных в sde.zip от CCPшников)
         'once',
     ]
 
@@ -108,9 +113,14 @@ def main():
         q_industrialist_settings.g_database,
         debug=argv_prms['verbose_mode']
     )
-    first_time = True
 
-    for pilot_num, pilot_name in enumerate(argv_prms["character_names"]):
+    first_time: bool = True
+    conveyor_formulas_jobs_refresh: bool = False
+    conveyor_formulas_purchase_refresh: bool = False
+    conveyor_formulas_delivery_refresh: bool = False
+    pilot_max_num: int = len(argv_prms["character_names"])
+
+    for pilot_num, pilot_name in enumerate(argv_prms["character_names"], start=1):
         # настройка Eve Online ESI Swagger interface
         authz = dbtools.auth_pilot_by_name(
             pilot_name,
@@ -131,7 +141,7 @@ def main():
         print("\n{} is from '{}' corporation".format(character_name, corporation_name))
         sys.stdout.flush()
 
-        last_time: bool = pilot_num == len(argv_prms["character_names"])-1
+        last_time: bool = pilot_num == pilot_max_num
         if first_time:
             first_time = False
 
@@ -151,10 +161,39 @@ def main():
             # market-хабам и пишем в БД
             if categories & {'all', 'public', 'rare', 'trade_hubs'}:
                 # Requires: public access
-                markets_prices_updated = dbtools.actualize_markets_prices()
-                print("Markets prices has {} updates\n".format('no' if markets_prices_updated is None else markets_prices_updated))
+                industry_systems_updated = dbtools.actualize_industry_systems()
+                print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
+                sys.stdout.flush()
+                # готовим признаки пересчёта conveyor-формул
+                if industry_systems_updated:
+                    # industry system cost index используется в расчёте стоимости работ, возможно индекс поменялся в
+                    # наших производственных системах?
+                    conveyor_formulas_jobs_refresh = True
+
+            # загружаем цены во вселенной: производственные adjusted и торговые averaged
+            if categories & {'all', 'public', 'rare', 'market_prices'}:
+                # Requires: public access
+                markets_prices_updated: typing.Optional[typing.Tuple[int, int]] = dbtools.actualize_markets_prices()
+                if markets_prices_updated is None:
+                    print("Markets prices has no updates\n")
+                else:
+                    average_price_num: int = markets_prices_updated[0]
+                    adjusted_price_num: int = markets_prices_updated[1]
+                    print(f"Markets prices has {average_price_num} average updates, {adjusted_price_num} adjusted updates\n")
+                    # готовим признаки пересчёта conveyor-формул
+                    if average_price_num:
+                        # average price используется в расчёте materials purchase (используется тогда и только тогда,
+                        # когда цена в jita по buy неизвестна, а также неизвестна и jite sell цена), так что непонятно
+                        # сколько стоит материал? ...может он вообще по контрактам продаётся?!
+                        conveyor_formulas_purchase_refresh = True
+                    if adjusted_price_num:
+                        # adjusted price используется в estimated_items_value при расчёте job_cost
+                        conveyor_formulas_jobs_refresh = True
                 sys.stdout.flush()
 
+            # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
+            # market-хабам и пишем в БД
+            if categories & {'all', 'public', 'rare', 'trade_hubs'}:
                 # Requires: public access
                 for region in q_industrialist_settings.g_market_hubs:
                     found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
@@ -163,6 +202,12 @@ def main():
                         'not new' if found_market_goods is None else found_market_goods,
                         'no' if updated_market_orders is None else updated_market_orders))
                     sys.stdout.flush()
+                    # готовим признаки пересчёта conveyor-формул
+                    if updated_market_orders:
+                        if region['region'] == "The Forge":
+                            # цены региона The Forge (там где расположена Jita 4-4 используются в расчёте materials
+                            # purchase
+                            conveyor_formulas_purchase_refresh = True
 
                 # Requires: public access
                 for structure in q_industrialist_settings.g_market_structures:
@@ -173,13 +218,6 @@ def main():
                             'not new' if found_market_goods is None else found_market_goods,
                             'no' if updated_market_orders is None else updated_market_orders))
                         sys.stdout.flush()
-
-            # загружаем производственные индексы всех солнечных систем вселенной
-            if categories & {'all', 'public', 'rare', 'industry_systems'}:
-                # Requires: public access
-                industry_systems_updated = dbtools.actualize_industry_systems()
-                print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
-                sys.stdout.flush()
 
         # в зависимости от заданных настроек загружаем цены на альянсовых структурах
         # и пишем в БД (внимание! в настройках запуска могут будет заданы РАЗНЫЕ корпорации,
@@ -257,8 +295,8 @@ def main():
         if categories & {'all', 'corporation', 'blueprints', 'industry'}:
             # Пытаемся отследить и сохраняем связи между чертежами и работами
             dbtools.link_blueprints_and_jobs(corporation_id)
-            print("'{}' corporation link blueprints and jobs completed\n".
-                  format(corporation_name))
+            print(f"'{corporation_name}' corporation link blueprints and jobs completed\n")
+            sys.stdout.flush()
 
         # приступаем к загрузке тех данных, что грузятся крайне медленно (публичные и их много)
 
@@ -269,24 +307,50 @@ def main():
             # тысяч предметов - долго)
             if categories & {'all', 'public', 'once', 'goods'}:
                 # Public information about type_id
-                actualized: int = dbtools.actualize_type_ids(full_database_upgrade=True)
-                if actualized == 0:
+                num_actualized: int = dbtools.actualize_type_ids(full_database_upgrade=True)
+                if num_actualized == 0:
                     print("No new items found in the Universe")
                 else:
-                    print("{} Universe' items actualized in database".format(actualized))
+                    print("{} Universe' items actualized in database".format(num_actualized))
+                sys.stdout.flush()
+                # готовим признаки пересчёта conveyor-формул
+                if num_actualized:
+                    # мы здесь не знаем что именно поменялось в предметах? (скорее всего не поменялось, а добавились
+                    # новые предметы); однако иногда через эту точку мы проходим на инструкции из шапки этого файла,
+                    # т.е. после запуска q_dictionaries.py --category=all когда программа заново загружает все сведения
+                    # о предметах, в том числе и параметр packaged_volume, который используется в расчёте
+                    # conveyor-формул в части касающейся транспортных расходов (топляк помноженный на кубометры, где
+                    # упакованный размер предмета влияет на стоимость транспортировки от конвейера до торгового хаба)
+                    conveyor_formulas_delivery_refresh = True
 
             # загрузка исторических цен по регионам (ОЧЕНЬ МЕДЛЕННО из-за большого кол-ва данных), как
             # правило загрузка рыночных данных одного крупного региона, например The Forge, занимает
             # несколько часов
-            # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned from using ESI. Please contact Technical Support. (support@eveonline.com)
-            #if categories & {'all', 'public', 'once', 'trade_history'}:
+            # ---
+            # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned
+            # from using ESI. Please contact Technical Support. (support@eveonline.com)
+            # ---
+            # if categories & {'all', 'public', 'once', 'trade_history'}:
             #    # Requires: public access
             #    if dbtools.is_market_regions_history_refreshed():
             #        for region in q_industrialist_settings.g_market_regions:
             #            market_region_history_updates = dbtools.actualize_market_region_history(region)
             #            print("Region '{}' has {} market history updates\n".
-            #                  format(region, 'no' if market_region_history_updates is None else market_region_history_updates))
+            #                  format(region, 'no' if market_region_history_updates is None
+            #                  else market_region_history_updates))
             #            sys.stdout.flush()
+
+            # если признаки пересчёта conveyor-формул установлены, то надо отреагировать и пересчитать кеши таблиц
+            if categories & {'all', 'once', 'conveyor_formulas'} or \
+               conveyor_formulas_jobs_refresh or \
+               conveyor_formulas_purchase_refresh or \
+               conveyor_formulas_delivery_refresh:
+                print("Conveyor formulas must be recalculated because {} have been updated".format(
+                    ','.join(filter(str,
+                                    ['jobs cost' if conveyor_formulas_jobs_refresh else '',
+                                     'purchase' if conveyor_formulas_purchase_refresh else '',
+                                     'delivery' if conveyor_formulas_delivery_refresh else '']))
+                ))
 
     sys.stdout.flush()
 

@@ -118,7 +118,8 @@ class QDatabaseTools:
     corporation_industry_job_diff = ['status']
     character_industry_job_diff = ['status']
     market_order_diff = ['price', 'volume_remain']
-    markets_prices_diff = ['adjusted_price', 'average_price']
+    markets_prices_avg_diff = ['average_price']
+    markets_prices_adj_diff = ['adjusted_price']
     industry_systems_diff = ['manufacturing', 'research_te', 'research_me', 'copying', 'invention', 'reaction']
 
     def __init__(self, module_name, client_scope, database_prms, debug):
@@ -149,7 +150,8 @@ class QDatabaseTools:
         self.__cached_corporation_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_character_industry_jobs: typing.Dict[int, typing.Dict[int, QEntity]] = {}
         self.__cached_corporation_orders: typing.Dict[int, typing.Dict[int, QEntity]] = {}
-        self.__cached_markets_prices: typing.Dict[int, QEntity] = {}
+        self.__cached_markets_avg_prices: typing.Dict[int, QEntity] = {}
+        self.__cached_markets_adj_prices: typing.Dict[int, QEntity] = {}
         self.__cached_category_ids: typing.Set[int] = set()
         self.__cached_group_ids: typing.Set[int] = set()
         self.__cached_market_group_ids: typing.Set[int] = set()
@@ -171,7 +173,8 @@ class QDatabaseTools:
         del self.__cached_market_group_ids
         del self.__cached_group_ids
         del self.__cached_category_ids
-        del self.__cached_markets_prices
+        del self.__cached_markets_adj_prices
+        del self.__cached_markets_avg_prices
         del self.__cached_corporation_orders
         del self.__cached_character_industry_jobs
         del self.__cached_corporation_industry_jobs
@@ -262,13 +265,22 @@ class QDatabaseTools:
                     prev_corporation_id = corporation_id
                 corporation_cache[item_id] = row[2]
 
-        rows = self.dbswagger.get_last_known_markets_prices()
-        if rows:
-            for row in rows:
-                type_id = row['type_id']
-                updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
-                del row['ext']
-                self.__cached_markets_prices[type_id] = QEntity(True, False, row, updated_at)
+        rows: typing.Optional[typing.Tuple[typing.List[typing.Any], typing.List[typing.Any]]] = \
+            self.dbswagger.get_last_known_markets_prices()
+        if rows is not None:
+            avg_rows, adj_rows = rows
+            if avg_rows:
+                for row in avg_rows:
+                    type_id = row['type_id']
+                    updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
+                    del row['ext']
+                    self.__cached_markets_avg_prices[type_id] = QEntity(True, False, row, updated_at)
+            if adj_rows:
+                for row in adj_rows:
+                    type_id = row['type_id']
+                    updated_at = row['ext']['updated_at'].replace(tzinfo=pytz.UTC)
+                    del row['ext']
+                    self.__cached_markets_adj_prices[type_id] = QEntity(True, False, row, updated_at)
 
         rows = self.dbswagger.get_industry_systems()
         if rows:
@@ -1894,7 +1906,7 @@ class QDatabaseTools:
         # Requires: public access
         return "markets/prices/"
 
-    def actualize_markets_prices(self):
+    def actualize_markets_prices(self) -> typing.Optional[typing.Tuple[int, int]]:
         url: str = self.get_markets_prices_url()
         data, updated_at, is_updated = self.load_from_esi_paged_data(url)
         if data is None:
@@ -1910,17 +1922,41 @@ class QDatabaseTools:
             self.dbswagger.db.disable_debug()
 
         # актуализация (добавление) narket цен в БД
-        markets_prices_updated: int = 0
+        markets_prices_avg_updated: int = 0
+        markets_prices_adj_updated: int = 0
         for price_data in data:
-            # актуализация кеша (сравнение данных в кеше для минимизации обращений к БД)
             type_id: int = price_data['type_id']
-            in_cache = self.__cached_markets_prices.get(type_id)
-            if not in_cache:
-                self.__cached_markets_prices[type_id] = QEntity(True, True, price_data, updated_at)
-            elif not in_cache.is_obj_equal_by_keys(price_data, self.markets_prices_diff):
-                in_cache.store(True, True, price_data, updated_at)
-            else:
-                continue
+            # актуализация кеша (сравнение данных в кеше для минимизации обращений к БД)
+            in_avg_cache = self.__cached_markets_avg_prices.get(type_id)
+            avg_dict = {'type_id': type_id, 'average_price': price_data['average_price']} \
+                       if 'average_price' in price_data else {'type_id': type_id}
+            avg_updated: bool = False
+            if not in_avg_cache:
+                # добавление в кеш
+                self.__cached_markets_avg_prices[type_id] = QEntity(True, True, avg_dict, updated_at)
+                avg_updated = True
+            elif not in_avg_cache.is_obj_equal_by_keys(avg_dict, self.markets_prices_avg_diff):
+                # обновление в кеше
+                in_avg_cache.store(True, True, avg_dict, updated_at)
+                avg_updated = True
+            # актуализация кеша (сравнение данных в кеше для минимизации обращений к БД)
+            in_adj_cache = self.__cached_markets_adj_prices.get(type_id)
+            adj_dict = {'type_id': type_id, 'adjusted_price': price_data['adjusted_price']} \
+                       if 'adjusted_price' in price_data else {'type_id': type_id}
+            adj_updated: bool = False
+            if not in_adj_cache:
+                # добавление в кеш
+                self.__cached_markets_adj_prices[type_id] = QEntity(True, True, adj_dict, updated_at)
+                adj_updated = True
+            elif not in_adj_cache.is_obj_equal_by_keys(adj_dict, self.markets_prices_adj_diff):
+                # обновление в кеше
+                in_adj_cache.store(True, True, adj_dict, updated_at)
+                adj_updated = True
+            # подсчёт статистики
+            if avg_updated:
+                markets_prices_avg_updated += 1
+            if adj_updated:
+                markets_prices_adj_updated += 1
             # добавление в БД возможно отсутствующего типа товара
             if type_id not in self.__cached_type_ids:
                 url: str = self.get_type_id_url(type_id)
@@ -1928,9 +1964,11 @@ class QDatabaseTools:
                     self.actualize_type_id(type_id)
                     self.depth.pop()
             # отправка в БД цену товара
-            self.dbswagger.insert_or_update_markets_price(price_data, updated_at)
-            # подсчёт статистики
-            markets_prices_updated += 1
+            if avg_updated or adj_updated:
+                self.dbswagger.insert_or_update_markets_price(
+                    price_data,
+                    updated_at if avg_updated else None,
+                    updated_at if adj_updated else None)
 
         self.qidb.commit()
 
@@ -1940,7 +1978,7 @@ class QDatabaseTools:
 
         del data
 
-        return markets_prices_updated
+        return markets_prices_avg_updated, markets_prices_adj_updated
 
     # -------------------------------------------------------------------------
     # /markets/{region_id}/history/
