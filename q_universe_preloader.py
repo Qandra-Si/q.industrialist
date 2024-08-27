@@ -159,7 +159,7 @@ def main():
 
             # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
-            if categories & {'all', 'public', 'rare', 'trade_hubs'}:
+            if categories & {'all', 'public', 'rare', 'industry_systems'}:
                 # Requires: public access
                 industry_systems_updated = dbtools.actualize_industry_systems()
                 print("Industry indicies has {} updates\n".format('no' if industry_systems_updated is None else industry_systems_updated))
