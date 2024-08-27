@@ -89,17 +89,26 @@ class QIndustryFormula:
             rigs_bonus_job_cost: typing.Optional[float],
             scc_surcharge: typing.Optional[float],
             facility_tax: typing.Optional[float]) -> None:
-        self.job_costs.append(QIndustryFormula.JobCost(
-            usage_chain,
-            solar_system_id,
-            blueprint_type_id,
-            planned_blueprints,
-            planned_runs,
-            activity_code,
-            role_bonus_job_cost if role_bonus_job_cost is not None else 0.0,
-            rigs_bonus_job_cost if rigs_bonus_job_cost is not None else 0.0,
-            scc_surcharge if scc_surcharge is not None else 0.04,
-            facility_tax if facility_tax is not None else 0.0))
+        exist: QIndustryFormula.JobCost = next((
+            _ for _ in self.job_costs if _.solar_system_id == solar_system_id and
+                                         _.blueprint_type_id == blueprint_type_id and
+                                         _.planned_blueprints == planned_blueprints and
+                                         _.planned_runs == planned_runs and
+                                         _.activity_code == activity_code), None)
+        if exist:
+            exist.usage_chain += usage_chain
+        else:
+            self.job_costs.append(QIndustryFormula.JobCost(
+                usage_chain,
+                solar_system_id,
+                blueprint_type_id,
+                planned_blueprints,
+                planned_runs,
+                activity_code,
+                role_bonus_job_cost if role_bonus_job_cost is not None else 0.0,
+                rigs_bonus_job_cost if rigs_bonus_job_cost is not None else 0.0,
+                scc_surcharge if scc_surcharge is not None else 0.04,
+                facility_tax if facility_tax is not None else 0.0))
 
     def calc_industry_cost(self, calc_estimated_items_value, get_industry_cost_index) -> float:
         industry_cost: float = 0.0
@@ -118,6 +127,25 @@ class QIndustryFormula:
             total_taxes: int = tax_scc_surcharge + tax_facility  # ISK
             single_run_job_cost: int = total_job_gross_cost + total_taxes  # ISK
             total_job_cost: float = jc.usage_chain * jc.planned_blueprints * jc.planned_runs * single_run_job_cost
+            """
+            # ----------------------------------------------------------------------------------------------------------
+            total_job_cost: float = jc.usage_chain * jc.planned_blueprints * jc.planned_runs * \    
+                (  # single_run_job_cost
+                    (   # total_job_gross_cost
+                        # system_cost
+                        int(math.ceil(job_cost_base * industry_cost_index)) +
+                        # structure_role_bonus
+                        int(math.ceil(system_cost * jc.role_bonus_job_cost)) +
+                        # structure_rigs_bonus
+                        int(math.ceil(system_cost * jc.rigs_bonus_job_cost))
+                    ) +
+                    (   # total_taxes
+                        int(math.ceil(job_cost_base * jc.scc_surcharge)) +  # tax_scc_surcharge
+                        int(math.ceil(job_cost_base * jc.facility_tax))  # tax_facility
+                    )
+                )
+            # ----------------------------------------------------------------------------------------------------------
+            """
             # аккумулятор цены
             industry_cost += total_job_cost
         return industry_cost

@@ -326,6 +326,10 @@ def main():
 
         industry_formula: profit.QIndustryFormula = eve_industry_profit.assemble_industry_formula(
             industry_plan)
+        # данные для ручного ввода в таблицы conveyor_formulas
+        # print('conveyor_formulas', 100, industry_formula.product_type_id, industry_formula.customized_runs, industry_formula.decryptor_type_id, None)
+        # print('conveyor_formula_purchase', [(100, _.type_id, _.quantity) for _ in industry_formula.purchase])
+        # print('conveyor_formula_jobs', [(100, _.usage_chain, _.solar_system_id, _.blueprint_type_id, _.planned_blueprints, _.planned_runs, _.activity_code, _.activity_eiv, _.job_cost_base_multiplier, _.role_bonus_job_cost, _.rigs_bonus_job_cost, _.scc_surcharge, _.facility_tax) for _ in industry_formula.job_costs])
 
         render_html_industry_profit.dump_industry_plan(
             industry_plan,
