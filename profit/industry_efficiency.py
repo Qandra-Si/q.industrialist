@@ -5,6 +5,41 @@ from .industry_tree import QIndustryAction
 from .industry_tree import QIndustryFactoryBonuses
 
 
+class QPossibleDecryptor:
+    def __init__(self,
+                 me: int, te: int, runs: int,
+                 name: typing.Optional[str], type_id: typing.Optional[int], probability: typing.Optional[float]):
+        self.me: int = me
+        self.te: int = te
+        self.runs: int = runs
+        self.name: typing.Optional[str] = name
+        self.type_id: typing.Optional[int] = type_id
+        self.probability: typing.Optional[float] = probability
+
+
+def get_list_of_decryptors() -> typing.List[QPossibleDecryptor]:
+    # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
+    # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
+    # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
+    # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
+    # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
+    # Parity Decryptor : probability +50%, runs +3, me +1, te -2
+    # Process Decryptor : probability +10%, runs +0, me +3, te +6
+    # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
+    decryptors: typing.List[QPossibleDecryptor] = [
+        QPossibleDecryptor(+0,  +0, +0, None, None, None),
+        QPossibleDecryptor(+2, +10, +1, 'Accelerant Decryptor', 34201, +0.2),
+        QPossibleDecryptor(-1,  +4, +4, 'Attainment Decryptor', 34202, +0.8),
+        QPossibleDecryptor(-2,  +2, +9, 'Augmentation Decryptor', 34203, -0.4),
+        QPossibleDecryptor(+1,  -2, +2, 'Optimized Attainment Decryptor', 34207, +0.9),
+        QPossibleDecryptor(+2,  +0, +7, 'Optimized Augmentation Decryptor', 34208, -0.1),
+        QPossibleDecryptor(+1,  -2, +3, 'Parity Decryptor', 34204, +0.5),
+        QPossibleDecryptor(+3,  +6, +0, 'Process Decryptor', 34205, +0.1),
+        QPossibleDecryptor(+1,  +8, +2, 'Symmetry Decryptor', 34206, +0.0),
+    ]
+    return decryptors
+
+
 def get_decryptor_parameters(
         blueprint_me: int,
         blueprint_te: int,
@@ -14,81 +49,26 @@ def get_decryptor_parameters(
         -> typing.Optional[typing.Tuple[int, float]]:  # type_id, probability
     decryptor_type_id: typing.Optional[int] = None
     decryptor_probability: typing.Optional[float] = None
+    possible_decryptors: typing.List[QPossibleDecryptor] = get_list_of_decryptors()
 
     if blueprint_meta_group_id == 2:  # Tech II
-        if blueprint_me == 2 and blueprint_te == 4:  # and blueprint_runs == blueprint_runs_per_single_copy:
-            pass
-        elif blueprint_me == (2+2) and blueprint_te == (4+10) and blueprint_runs == (blueprint_runs_per_single_copy+1):
-            # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
-            decryptor_type_id = 34201
-            decryptor_probability = +0.2
-        elif blueprint_me == (2-1) and blueprint_te == (4+4) and blueprint_runs == (blueprint_runs_per_single_copy+4):
-            # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
-            decryptor_type_id = 34202
-            decryptor_probability = +0.8
-        elif blueprint_me == (2-2) and blueprint_te == (4+2) and blueprint_runs == (blueprint_runs_per_single_copy+9):
-            # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
-            decryptor_type_id = 34203
-            decryptor_probability = -0.4
-        elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-            # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
-            decryptor_type_id = 34207
-            decryptor_probability = +0.9
-        elif blueprint_me == (2+2) and blueprint_te == (4+0) and blueprint_runs == (blueprint_runs_per_single_copy+7):
-            # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
-            decryptor_type_id = 34208
-            decryptor_probability = -0.1
-        elif blueprint_me == (2+1) and blueprint_te == (4-2) and blueprint_runs == (blueprint_runs_per_single_copy+3):
-            # Parity Decryptor : probability +50%, runs +3, me +1, te -2
-            decryptor_type_id = 34204
-            decryptor_probability = +0.5
-        elif blueprint_me == (2+3) and blueprint_te == (4+6) and blueprint_runs == (blueprint_runs_per_single_copy+0):
-            # Process Decryptor : probability +10%, runs +0, me +3, te +6
-            decryptor_type_id = 34205
-            decryptor_probability = +0.1
-        elif blueprint_me == (2+1) and blueprint_te == (4+8) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-            # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
-            decryptor_type_id = 34206
-            decryptor_probability = +0.0
-        else:
-            assert 0
+        found: bool = False
+        for d in possible_decryptors:
+            if blueprint_me == (2+d.me) and blueprint_te == (4+d.te) and blueprint_runs==(blueprint_runs_per_single_copy+d.runs):
+                decryptor_type_id = d.type_id
+                decryptor_probability = d.probability
+                found = True
+                break
+        assert found
     elif blueprint_meta_group_id == 14:  # Tech III
-        if blueprint_me == 2 and blueprint_te == 3:  # and blueprint_runs == blueprint_runs_per_single_copy:
-            pass
-        elif blueprint_me == (2+2) and blueprint_te == (3+10) and blueprint_runs == (blueprint_runs_per_single_copy+1):
-            # Accelerant Decryptor : probability +20%, runs +1, me +2, te +10
-            decryptor_type_id = 34201
-            decryptor_probability = +0.2
-        elif blueprint_me == (2-1) and blueprint_te == (3+4) and blueprint_runs == (blueprint_runs_per_single_copy+4):
-            # Attainment Decryptor : probability +80%, runs +4, me -1, te +4
-            decryptor_type_id = 34202
-            decryptor_probability = +0.8
-        elif blueprint_me == (2-2) and blueprint_te == (3+2) and blueprint_runs == (blueprint_runs_per_single_copy+9):
-            # Augmentation Decryptor : probability -40%, runs +9, me -2, te +2
-            decryptor_type_id = 34203
-            decryptor_probability = -0.4
-        elif blueprint_me == (2+1) and blueprint_te == (3-2) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-            # Optimized Attainment Decryptor : probability +90%, runs +2, me +1, te -2
-            decryptor_type_id = 34207
-            decryptor_probability = +0.9
-        elif blueprint_me == (2+2) and blueprint_te == (3+0) and blueprint_runs == (blueprint_runs_per_single_copy+7):
-            # Optimized Augmentation Decryptor : probability -10%, runs +7, me +2, te +0
-            decryptor_type_id = 34208
-            decryptor_probability = -0.1
-        elif blueprint_me == (2+1) and blueprint_te == (3-2) and blueprint_runs == (blueprint_runs_per_single_copy+3):
-            # Parity Decryptor : probability +50%, runs +3, me +1, te -2
-            decryptor_type_id = 34204
-            decryptor_probability = +0.5
-        elif blueprint_me == (2+3) and blueprint_te == (3+6) and blueprint_runs == (blueprint_runs_per_single_copy+0):
-            # Process Decryptor : probability +10%, runs +0, me +3, te +6
-            decryptor_type_id = 34205
-            decryptor_probability = +0.1
-        elif blueprint_me == (2+1) and blueprint_te == (3+8) and blueprint_runs == (blueprint_runs_per_single_copy+2):
-            # Symmetry Decryptor : probability +0, runs +2, me +1, te +8
-            decryptor_type_id = 34206
-            decryptor_probability = +0.0
-        else:
-            assert 0
+        found: bool = False
+        for d in possible_decryptors:
+            if blueprint_me == (2+d.me) and blueprint_te == (3+d.te) and blueprint_runs==(blueprint_runs_per_single_copy+d.runs):
+                decryptor_type_id = d.type_id
+                decryptor_probability = d.probability
+                found = True
+                break
+        assert found
 
     if decryptor_type_id:
         if decryptor_probability:

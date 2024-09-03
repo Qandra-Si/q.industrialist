@@ -1,5 +1,6 @@
 ﻿# -*- encoding: utf-8 -*-
 import typing
+import profit
 
 
 class QDictionaries:
@@ -454,3 +455,102 @@ class QDictionaries:
             self.insert_market_group(group_id, mg)
         del sde_market_groups_keys
 
+    def clean_conveyor_formulas(self) -> None:
+        self.db.execute("DELETE FROM conveyor_formulas;")
+
+    def actualize_conveyor_formula(self, conveyor_formula: profit.QIndustryFormula) -> None:
+        ancient_relics: str = 'unused'
+        """
+        self.db.execute(
+            "DELETE FROM conveyor_formulas "
+            "WHERE"
+            " cf_product_type_id=%(p)s AND"
+            " cf_customized_runs=%(cr)s AND"
+            " coalesce(cf_decryptor_type_id,0)=coalesce(%(d)s,0) AND"
+            " coalesce(cf_ancient_relics,'unused')=coalesce(%(ar)s,'unused'::esi_formulas_relics);",
+            {'p': conveyor_formula.product_type_id,
+             'cr': conveyor_formula.customized_runs,
+             'd': conveyor_formula.decryptor_type_id,  # м.б. None
+             'ar': ancient_relics,
+             }
+        )
+        """
+        cf_formula_row = self.db.select_one_row(
+            "INSERT INTO conveyor_formulas("
+            " cf_product_type_id,"
+            " cf_customized_runs,"
+            " cf_decryptor_type_id,"
+            " cf_ancient_relics)"
+            "VALUES("
+            " %(p)s,"
+            " %(cr)s,"
+            " %(d)s,"
+            " %(ar)s)"
+            "RETURNING cf_formula;",
+            {'p': conveyor_formula.product_type_id,
+             'cr': conveyor_formula.customized_runs,
+             'd': conveyor_formula.decryptor_type_id,  # м.б. None
+             'ar': ancient_relics,
+             }
+        )
+        cf_formula: int = cf_formula_row[0]
+        for p in conveyor_formula.purchase:
+            self.db.execute(
+                "INSERT INTO conveyor_formula_purchase("
+                " cfp_formula,"
+                " cfp_material_type_id,"
+                " cfp_quantity)"
+                "VALUES("
+                " %(f)s,"
+                " %(m)s,"
+                " %(q)s);",
+                {'f': cf_formula,
+                 'm': p.type_id,
+                 'q': p.quantity,
+                 }
+            )
+        for jc in conveyor_formula.job_costs:
+            self.db.execute(
+                "INSERT INTO conveyor_formula_jobs("
+                " cfj_formula,"
+                " cfj_usage_chain,"
+                " cfj_solar_system_id,"
+                " cfj_blueprint_type_id,"
+                " cfj_planned_blueprints,"
+                " cfj_planned_runs,"
+                " cfj_activity_code,"
+                " cfj_activity_eiv,"
+                " cfj_job_cost_base_multiplier,"
+                " cfj_role_bonus_job_cost,"
+                " cfj_rigs_bonus_job_cost,"
+                " cfj_scc_surcharge,"
+                " cfj_facility_tax)"
+                "VALUES("
+                " %(f)s,"
+                " %(uc)s,"
+                " %(ss)s,"
+                " %(b)s,"
+                " %(pb)s,"
+                " %(pr)s,"
+                " %(ac)s,"
+                " %(ae)s,"
+                " %(jm)s,"
+                " %(ro)s,"
+                " %(ri)s,"
+                " %(scc)s,"
+                " %(tax)s);",
+                {'f': cf_formula,
+                 'uc': jc.usage_chain,
+                 'ss': jc.solar_system_id,
+                 'b': jc.blueprint_type_id,
+                 'pb': jc.planned_blueprints,
+                 'pr': jc.planned_runs,
+                 'ac': jc.activity_code,
+                 'ae': jc.activity_eiv,
+                 'jm': jc.job_cost_base_multiplier,
+                 'ro': jc.role_bonus_job_cost,
+                 'ri': jc.rigs_bonus_job_cost,
+                 'scc': jc.scc_surcharge,
+                 'tax': jc.facility_tax,
+                 }
+            )
