@@ -607,7 +607,7 @@ def copy_reused_industry_plan__internal(
 def copy_reused_industry_plan(
         reused_materials_quantity: int,
         # исходные данные для формирования отчёта и плана производства
-        planned_material: typing.Optional[profit.QPlannedMaterial],
+        prior_planned_material: typing.Optional[profit.QPlannedMaterial],
         current_material: profit.QMaterial,
         cached_material: profit.QIndustryMaterial,
         # соотношение использования материалов в данном текущем цикле производственной активности
@@ -615,15 +615,17 @@ def copy_reused_industry_plan(
         # справочник текущего производства с настройками оптимизации процесса
         industry_plan: profit.QIndustryPlan) -> profit.QPlannedMaterial:
     assert reused_materials_quantity > 0
-    assert planned_material is not None
     assert current_material is not None
     assert current_material.industry is not None
     assert cached_material is not None
 
     # составляем план использования материала в рамках текущего плана производства
+    # Внимание! это нормально, что prior_planned_material м.б. None, т.к. например в производстве Scourge Rage Rocket
+    # требуется 45 Titanium Carbide, излишки которого остаются при получении 1 шт Graviton Pulse Generator, в таком
+    # случае prior_planned_material==None
     reused_material: profit.QPlannedMaterial = profit.QPlannedMaterial(
         current_material,
-        planned_material,
+        prior_planned_material,
         reused_materials_quantity,
         usage_chain)
 
