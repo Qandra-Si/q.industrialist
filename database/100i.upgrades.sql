@@ -154,7 +154,7 @@ TABLESPACE pg_default;
 create or replace view qi.conveyor_formulas_purchase_materials as
   select 
    x.formula,
-   sum(x.quantity * coalesce(x.jita_buy, coalesce(x.average_price, x.jita_sell)))
+   sum(x.quantity * coalesce(x.jita_buy, coalesce(x.average_price, x.jita_sell))) as materials_cost
   from (
    select
     f.cf_formula as formula,
