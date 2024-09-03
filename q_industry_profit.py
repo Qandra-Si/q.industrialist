@@ -149,7 +149,7 @@ def main():
 
     try:
         # Public information about market prices
-        eve_market_prices_data = interface.get_esi_data("markets/prices/")
+        eve_market_prices_data = interface.get_esi_paged_data("markets/prices/")
         print("\nEVE market has {} prices".format(len(eve_market_prices_data) if not (eve_market_prices_data is None) else 0))
         sys.stdout.flush()
     except requests.exceptions.HTTPError as err:
