@@ -270,7 +270,7 @@ def main():
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
-        {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
+        # {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
         # {'bptid': 12035, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Hound (runs +9, me -2, te +2)
         # {'bptid': 12031, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Manticore (runs +9, me -2, te +2)
         # {'bptid': 11378, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Nemesis (runs +9, me -2, te +2)
@@ -287,7 +287,13 @@ def main():
         # {'bptid': 41356},  # Ametat II (Antimatter Reactor Unit с бонусом и ригами)
         # {'bptid': 45718},  # Legion Core - Augmented Antimatter Reactor
         # {'bptid': 20352},  # 800mm Steel Plates II
-        # {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # падает калькулятор
+        # {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # используется Titanium Carbide + промежуточно крафтится
+        # {'bptid': 3619, 'qr': 6, 'me': 4, 'te': 14},  # инвент копии с 5 прогонами
+        # {'bptid': 4275, 'qr': 10, 'me': 2, 'te': 4},  # у продукта и у материалов нет market группы
+        # {'bptid': 47326, 'qr': 5, 'me': 5, 'te': 10},  # Structure Tech II (53)
+        # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4},   # так нельзя, см. ниже
+        # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4, 'bpc': 41627},  # Capital Hull Repairer II из разных чертежей
+        {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845},  # Small Vorton Projector II Blueprint (Tech I)
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:

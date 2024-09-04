@@ -7,16 +7,16 @@ class QBaseMaterial:
     def __init__(self,
                  type_id: int,
                  name: str,
-                 market_group_id: int,
-                 market_group_name: str,
+                 market_group_id: typing.Optional[int],
+                 market_group_name: typing.Optional[str],
                  is_commonly_used: bool,
                  volume: float,
                  adjusted_price: float,
                  meta_group_id: typing.Optional[int]):
         self.__type_id: int = type_id
         self.__name: str = name
-        self.__market_group_id: int = market_group_id
-        self.__market_group_name: str = market_group_name
+        self.__market_group_id: typing.Optional[int] = market_group_id
+        self.__market_group_name: typing.Optional[str] = market_group_name
         self.__is_commonly_used: bool = is_commonly_used
         self.__volume: float = volume  # TODO: это не упакованный размер! актуальные данные скачиваются в БД
         self.__adjusted_price: float = adjusted_price
@@ -31,11 +31,11 @@ class QBaseMaterial:
         return self.__name
 
     @property
-    def market_group_id(self) -> int:
+    def market_group_id(self) -> typing.Optional[int]:
         return self.__market_group_id
 
     @property
-    def market_group_name(self) -> str:
+    def market_group_name(self) -> typing.Optional[str]:
         return self.__market_group_name
 
     @property
@@ -60,8 +60,8 @@ class QMaterial(QBaseMaterial):
                  type_id: int,
                  quantity: int,
                  name: str,
-                 group_id: int,
-                 group_name: str,
+                 group_id: typing.Optional[int],
+                 group_name: typing.Optional[str],
                  is_commonly_used: bool,
                  volume: float,
                  adjusted_price: float,

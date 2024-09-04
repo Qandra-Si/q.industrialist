@@ -51,7 +51,7 @@ def get_decryptor_parameters(
     decryptor_probability: typing.Optional[float] = None
     possible_decryptors: typing.List[QPossibleDecryptor] = get_list_of_decryptors()
 
-    if blueprint_meta_group_id == 2:  # Tech II
+    if blueprint_meta_group_id in {2, 53}:  # Tech II (2), Structure Tech II (53)
         found: bool = False
         for d in possible_decryptors:
             if blueprint_me == (2+d.me) and blueprint_te == (4+d.te) and blueprint_runs==(blueprint_runs_per_single_copy+d.runs):
@@ -60,7 +60,7 @@ def get_decryptor_parameters(
                 found = True
                 break
         assert found
-    elif blueprint_meta_group_id == 14:  # Tech III
+    elif blueprint_meta_group_id == 14:  # Tech III (14)
         found: bool = False
         for d in possible_decryptors:
             if blueprint_me == (2+d.me) and blueprint_te == (3+d.te) and blueprint_runs==(blueprint_runs_per_single_copy+d.runs):

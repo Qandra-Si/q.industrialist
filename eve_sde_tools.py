@@ -310,8 +310,8 @@ def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
             return __group_id
 
 
-def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id: int) -> typing.Optional[int]:
+    group_id: typing.Optional[int] = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return None
     return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
@@ -451,7 +451,7 @@ class EveSDEProduct:
 def construct_products_for_blueprints(
         sde_bp_materials: typing.Dict[str, typing.Dict[str, typing.Any]],
         sde_type_ids: typing.Dict[str, typing.Dict[str, typing.Any]]) \
-        -> typing.Dict[str, typing.Dict[int, EveSDEProduct]]:
+        -> typing.Dict[str, typing.Dict[int, typing.Union[EveSDEProduct, typing.List[EveSDEProduct]]]]:
     products: typing.Dict[str, typing.Dict[int, typing.Any]] = {
         'manufacturing': dict(),
         'research_time': dict(),
@@ -466,20 +466,28 @@ def construct_products_for_blueprints(
         blueprint_type_id__int: int = int(blueprint_type_id)
         for activity, activity_data in blueprint_data['activities'].items():
             products_data = activity_data.get('products')
+            activity_of_products: typing.Dict[int, typing.Union[EveSDEProduct, typing.List[EveSDEProduct]]] = products[activity]
             if products_data:
                 for p in products_data:
                     product_type_id: int = p['typeID']
-                    products[activity][product_type_id] = EveSDEProduct(
+                    product_obj: EveSDEProduct = EveSDEProduct(
                         product_type_id,
                         blueprint_type_id__int,
                         bp_tid_dict,
                         blueprint_data['maxProductionLimit'],
                         activity_data,
                         p['quantity'])
+                    product_dict: typing.Union[EveSDEProduct, typing.List[EveSDEProduct]] = activity_of_products.get(product_type_id)
+                    if product_dict is None:
+                        activity_of_products[product_type_id] = product_obj
+                    elif isinstance(product_dict, list):
+                        product_dict.append(product_obj)
+                    else:
+                        activity_of_products[product_type_id] = [product_dict, product_obj]
             elif activity in {'research_time', 'research_material', 'copying'}:
                 # Внимание! Coalesced Element Blueprint (36949) является published и имеет invent без продукта
                 product_type_id = int(blueprint_type_id)
-                products[activity][product_type_id] = EveSDEProduct(
+                activity_of_products[product_type_id] = EveSDEProduct(
                         product_type_id,
                         blueprint_type_id__int,
                         bp_tid_dict,

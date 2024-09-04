@@ -65,9 +65,13 @@ class QIndustryFormula:
             """
 
     def __init__(self,
+                 prior_blueprint_type_id: typing.Optional[int],
+                 blueprint_type_id: int,
                  product_type_id: int,
                  decryptor_type_id: typing.Optional[int],
                  customized_runs: int):
+        self.prior_blueprint_type_id: typing.Optional[int] = prior_blueprint_type_id  # исходный чертёж, при инвенте
+        self.blueprint_type_id: int = blueprint_type_id  # чертёж продукта
         self.product_type_id: int = product_type_id
         self.decryptor_type_id: typing.Optional[int] = decryptor_type_id
         self.customized_runs: int = customized_runs

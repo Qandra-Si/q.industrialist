@@ -40,10 +40,12 @@ ALTER SEQUENCE qi.seq_cf OWNER TO qi_user;
 CREATE TABLE qi.conveyor_formulas
 (
     cf_formula INTEGER NOT NULL DEFAULT NEXTVAL('qi.seq_cf'::regclass), -- идентификатор формулы
+    cf_blueprint_type_id INTEGER NOT NULL,
     cf_product_type_id INTEGER NOT NULL,
     cf_customized_runs INTEGER NOT NULL,
-    cf_decryptor_type_id INTEGER NULL,
+    cf_decryptor_type_id INTEGER,
     cf_ancient_relics qi.esi_formulas_relics NOT NULL DEFAULT 'unused',
+	cf_prior_blueprint_type_id INTEGER, -- Capital Hull Repairer II делается из разных bpc/bpo
     CONSTRAINT pk_cf PRIMARY KEY (cf_formula),
     CONSTRAINT fk_cf_product_type_id FOREIGN KEY (cf_product_type_id)
         REFERENCES qi.eve_sde_type_ids(sdet_type_id) MATCH SIMPLE
@@ -65,13 +67,23 @@ TABLESPACE pg_default;
 
 CREATE UNIQUE INDEX idx_unq_cf1
     ON qi.conveyor_formulas USING btree
-	(cf_product_type_id, cf_customized_runs, cf_decryptor_type_id, cf_ancient_relics)
-    WHERE (cf_decryptor_type_id IS NOT NULL);
+	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id, cf_prior_blueprint_type_id)
+    WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf2
     ON qi.conveyor_formulas USING btree
-	(cf_product_type_id, cf_customized_runs, cf_ancient_relics)
-    WHERE (cf_decryptor_type_id IS NULL);
+	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_prior_blueprint_type_id)
+	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
+
+CREATE UNIQUE INDEX idx_unq_cf3
+    ON qi.conveyor_formulas USING btree
+	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id)
+    WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NULL));
+
+CREATE UNIQUE INDEX idx_unq_cf4
+    ON qi.conveyor_formulas USING btree
+	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics)
+	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NULL));
 
 CREATE INDEX idx_cf_product_type_id
     ON qi.conveyor_formulas USING btree

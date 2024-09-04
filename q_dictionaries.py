@@ -276,6 +276,8 @@ def main():
                     if 'products' in blueprint['activities']['invention']:  # тут м.б. Coalesced Element Blueprint
                         for t2_blueprint_invent in blueprint['activities']['invention']['products']:
                             t2_blueprint_type_id: int = t2_blueprint_invent['typeID']
+                            # if t2_blueprint_type_id != 54850: continue
+                            t2_blueprint_runs: int = t2_blueprint_invent['quantity']
                             t2_blueprint_tid = sde_type_ids.get(str(t2_blueprint_type_id))
                             if t2_blueprint_tid and t2_blueprint_tid.get('published', False):
                                 t2_blueprint = sde_blueprints.get(str(t2_blueprint_type_id))
@@ -292,16 +294,18 @@ def main():
                                             for d in possible_decryptors:
                                                 calc_inputs.append({
                                                     'bptid': t2_blueprint_type_id,
-                                                    'qr': t2_blueprint['maxProductionLimit'] + d.runs,
+                                                    'qr': t2_blueprint_runs + d.runs,
                                                     'me': 2 + d.me,
-                                                    'te': 4 + d.te})
+                                                    'te': 4 + d.te,
+                                                    'bpc': blueprint_type_id})
                                         elif meta_group_id == 14:  # Tech III
                                             # for d in possible_decryptors:
                                             #    calc_inputs.append({
                                             #        'bptid': t2_blueprint_type_id,
                                             #        'qr': t2_blueprint['maxProductionLimit'] + d.runs,
                                             #        'me': 2 + d.me,
-                                            #        'te': 3 + d.te})
+                                            #        'te': 3 + d.te,
+                                            #        'bpc': blueprint_type_id})
                                             pass
                                         else:
                                             assert 0
@@ -344,31 +348,45 @@ def main():
 
             calc_num: int = 0
             for calc_input in calc_inputs:
-                print(calc_input)
-                # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
-                industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
-                    # вход и выход для расчёта
-                    calc_input,
-                    industry_plan_customization,
-                    # sde данные, загруженные из .converted_xxx.json файлов
-                    sde_type_ids,
-                    sde_blueprints,
-                    sde_products,
-                    sde_market_groups,
-                    eve_market_prices_data,
-                    industry_cost_indices)
+                conveyor_formula: typing.Optional[profit.QIndustryFormula] = None
+                try:
+                    # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
+                    industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
+                        # вход и выход для расчёта
+                        calc_input,
+                        industry_plan_customization,
+                        # sde данные, загруженные из .converted_xxx.json файлов
+                        sde_type_ids,
+                        sde_blueprints,
+                        sde_products,
+                        sde_market_groups,
+                        eve_market_prices_data,
+                        industry_cost_indices)
 
-                # выходные данные после расчёта: список материалов и ratio-показатели их расхода для
-                # производства qr-ранов
-                industry_plan: profit.QIndustryPlan = eve_industry_profit.generate_industry_plan(
-                    industry_tree.blueprint_runs_per_single_copy,
-                    industry_tree,
-                    industry_plan_customization)
+                    # выходные данные после расчёта: список материалов и ratio-показатели их расхода для
+                    # производства qr-ранов
+                    industry_plan: profit.QIndustryPlan = eve_industry_profit.generate_industry_plan(
+                        industry_tree.blueprint_runs_per_single_copy,
+                        industry_tree,
+                        industry_plan_customization)
 
-                conveyor_formula: profit.QIndustryFormula = eve_industry_profit.assemble_industry_formula(
-                    industry_plan)
+                    conveyor_formula: typing.Optional[profit.QIndustryFormula] = \
+                        eve_industry_profit.assemble_industry_formula(industry_plan)
 
-                qidbdics.actualize_conveyor_formula(conveyor_formula)
+                    qidbdics.actualize_conveyor_formula(conveyor_formula)
+                except:
+                    if conveyor_formula:
+                        print('Input:',
+                              calc_input,
+                              'Product:',
+                              conveyor_formula.product_type_id,
+                              'Runs:',
+                              conveyor_formula.customized_runs,
+                              'Decryptor:',
+                              conveyor_formula.decryptor_type_id)
+                    else:
+                        print('Input:', calc_input)
+                    raise
 
                 calc_num += 1
                 if (calc_num % 20) == 0:

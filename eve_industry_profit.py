@@ -30,8 +30,8 @@ def generate_materials_tree(
         material_tid: int = int(m1['typeID'])
         material_qty: int = int(m1['quantity'])
         material_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_tid)
-        material_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
-        material_market_group_name: str = sde_market_groups[str(material_market_group_id)]['nameID']['en']
+        material_market_group_id: typing.Optional[int] = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
+        material_market_group_name: typing.Optional[str] = sde_market_groups[str(material_market_group_id)]['nameID']['en'] if material_market_group_id else None
         material_meta_group_id: typing.Optional[int] = sde_type_ids[str(material_tid)].get('metaGroupID', None)
         material_volume: float = sde_type_ids[str(material_tid)].get('volume', 0.0)
         material_adjusted_price: float = eve_esi_tools.get_material_adjusted_price(material_tid, eve_market_prices_data)
@@ -131,6 +131,8 @@ def generate_materials_tree(
 
 # генерация чертежа/чертежей (в результате запуска научки) для точного расчёта научки с учётом datacores и decryptors
 def schedule_industry_job__invent(
+        # идентификатор "предыдущего" чертежа, из которого делается blueprint_type_id (могут быть варианты)
+        prior_blueprint_type_id: typing.Optional[int],
         # идентификатор чертежа, для которого производится планирование производственной работы
         blueprint_type_id: int,
         blueprint_runs: int,
@@ -154,6 +156,12 @@ def schedule_industry_job__invent(
     # если инвент данного чертежа возможен, то добавляем в дерево работ декрипторы и датакоры
     if not cached_product:
         return
+    # если возможны варианты инвента данного чертежа, как например для Capital Hull Repairer II Blueprint, то выполняем
+    # поиск исходного чертежа по заданному входному параметру (номер должен быть задан корректно, а не огульно)
+    if isinstance(cached_product, list):
+        assert prior_blueprint_type_id is not None
+        cached_product = next((_ for _ in cached_product if _.blueprint_type_id == prior_blueprint_type_id), None)
+        assert cached_product is not None
     source_blueprint_type_id: int = cached_product.blueprint_type_id
     # TODO: принимаем за точку отсчёта один чертёж
     blueprint_quantity: int = 1
@@ -165,6 +173,12 @@ def schedule_industry_job__invent(
     blueprints_market_group_id: int = 2
     blueprints_market_group_name: str = sde_market_groups[str(blueprints_market_group_id)]['nameID']['en']
     blueprint_meta_group_id: typing.Optional[int] = sde_type_ids[str(blueprint_type_id)].get('metaGroupID', None)
+
+    # коррекция meta группы 1 => 2 для, например, Small Vorton Projector II (который является продукцией Tech II),
+    # но чертёж Small Vorton Projector II Blueprint у него (к сожалению) относится к Tech I - это ошибка в sde
+    if blueprint_meta_group_id == 1:
+        if curr_industry.product.meta_group_id == 2:
+            blueprint_meta_group_id = 2
 
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
@@ -304,8 +318,8 @@ def generate_industry_tree(
 
     # генерируем дескриптор продукта, который будем крафтить
     product_type_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id)
-    product_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, product_type_id)
-    product_market_group_name: str = sde_market_groups[str(product_market_group_id)]['nameID']['en']
+    product_market_group_id: typing.Optional[int] = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, product_type_id)
+    product_market_group_name: typing.Optional[str] = sde_market_groups[str(product_market_group_id)]['nameID']['en'] if product_market_group_id else None
     product_volume: float = sde_type_ids[str(product_type_id)].get('volume', 0.0)
     product_meta_group_id: typing.Optional[int] = sde_type_ids[str(product_type_id)].get('metaGroupID', None)
     product_adjusted_price: float = eve_esi_tools.get_material_adjusted_price(product_type_id, eve_market_prices_data)
@@ -318,13 +332,13 @@ def generate_industry_tree(
 
     # если me, te и qr не заданы, то пытаемся получить их автоматизированно
     if 'me' not in calc_input or 'te' not in calc_input or 'qr' not in calc_input:
-        if product_meta_group_id == 2:  # Tech II
+        if product_meta_group_id in {2, 53}:  # Tech II (2), Structure Tech II (53)
             calc_input.update(eve_efficiency.get_t2_bpc_attributes(
                 product_type_id,
                 {},
                 sde_type_ids,
                 sde_market_groups))
-        elif product_meta_group_id == 14:  # Tech III
+        elif product_meta_group_id == 14:  # Tech III (14)
             calc_input.update(eve_efficiency.get_t3_bpc_attributes(
                 product_type_id,
                 {},
@@ -375,6 +389,7 @@ def generate_industry_tree(
 
     # планируем работу (инвент если потребуется)
     schedule_industry_job__invent(
+        calc_input.get('bpc'),
         blueprint_type_id,
         customized_runs,
         calc_input['me'],
@@ -988,8 +1003,14 @@ def assemble_industry_formula(industry_plan: profit.QIndustryPlan) -> profit.QIn
         _.obtaining_plan.activity_plan.industry.action == profit.QIndustryAction.invention), None)
     if invent_tree and invent_tree.decryptor_probability is not None:
         used_decryptor_type_id = invent_tree.materials[-1].type_id
+    # получаем информацию об исходном чертеже (актуально для чертежей, в которые инвентятся разные варианты)
+    prior_blueprint_type_id: typing.Optional[int] = next((
+        _.industry.blueprint_type_id for _ in industry_plan.base_industry.materials
+        if _.industry and _.industry.action == profit.QIndustryAction.invention), None)
     # составляем производственную формулу
     industry_formula: profit.QIndustryFormula = profit.QIndustryFormula(
+        prior_blueprint_type_id,
+        industry_plan.base_industry.blueprint_type_id,
         industry_plan.base_industry.product_type_id,
         used_decryptor_type_id,
         industry_plan.customized_runs)

@@ -460,37 +460,28 @@ class QDictionaries:
 
     def actualize_conveyor_formula(self, conveyor_formula: profit.QIndustryFormula) -> None:
         ancient_relics: str = 'unused'
-        """
-        self.db.execute(
-            "DELETE FROM conveyor_formulas "
-            "WHERE"
-            " cf_product_type_id=%(p)s AND"
-            " cf_customized_runs=%(cr)s AND"
-            " coalesce(cf_decryptor_type_id,0)=coalesce(%(d)s,0) AND"
-            " coalesce(cf_ancient_relics,'unused')=coalesce(%(ar)s,'unused'::esi_formulas_relics);",
-            {'p': conveyor_formula.product_type_id,
-             'cr': conveyor_formula.customized_runs,
-             'd': conveyor_formula.decryptor_type_id,  # м.б. None
-             'ar': ancient_relics,
-             }
-        )
-        """
         cf_formula_row = self.db.select_one_row(
             "INSERT INTO conveyor_formulas("
+            " cf_blueprint_type_id,"
             " cf_product_type_id,"
             " cf_customized_runs,"
             " cf_decryptor_type_id,"
-            " cf_ancient_relics)"
+            " cf_ancient_relics,"
+            " cf_prior_blueprint_type_id)"
             "VALUES("
+            " %(bp)s,"
             " %(p)s,"
             " %(cr)s,"
             " %(d)s,"
-            " %(ar)s)"
+            " %(ar)s,"
+            " %(bpo)s)"
             "RETURNING cf_formula;",
-            {'p': conveyor_formula.product_type_id,
+            {'bp': conveyor_formula.blueprint_type_id,
+             'p': conveyor_formula.product_type_id,
              'cr': conveyor_formula.customized_runs,
              'd': conveyor_formula.decryptor_type_id,  # м.б. None
              'ar': ancient_relics,
+             'bpo': conveyor_formula.prior_blueprint_type_id,  # м.б. None (но возможны варианты либо BPO либо BPC)
              }
         )
         cf_formula: int = cf_formula_row[0]
