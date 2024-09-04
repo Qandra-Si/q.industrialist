@@ -65,8 +65,8 @@ def main():
     materials_for_bps = set(eve_sde_tools.get_materials_for_blueprints(sde_bp_materials))
     research_materials_for_bps = set(eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials))
     # индексация списка продуктов, которые ПОЯВЛЯЮТСЯ в результате производства
-    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="manufacturing"))
-    reaction_products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials, activity="reaction"))
+    products_for_bps = set(eve_sde_tools.construct_products_for_blueprints_by_activity(sde_bp_materials, activity="manufacturing"))
+    reaction_products_for_bps = set(eve_sde_tools.construct_products_for_blueprints_by_activity(sde_bp_materials, activity="reaction"))
 
     # подготовка списка контейнеров (их содержимого, которое будет исключено из плана производства)
     products_to_exclude: typing.List[typing.Tuple[typing.Tuple[str, str], typing.List[int]]] = []

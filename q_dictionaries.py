@@ -202,14 +202,12 @@ def main():
             sde_market_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "marketGroups")
             sde_blueprints = eve_sde_tools.read_converted(workspace_cache_files_dir, "blueprints")
             sde_inv_names = eve_sde_tools.read_converted(workspace_cache_files_dir, "invNames")
+            sde_products = eve_sde_tools.construct_products_for_blueprints(sde_blueprints, sde_type_ids)
 
             # TODO: генерируем фейковые данные
             eve_market_prices_data = []
+            # TODO: генерируем фейковые данные
             eve_industry_systems_data = []
-            # TODO: генерируем фейковые данные
-            eve_jita_orders_data: profit.QMarketOrders = profit.QMarketOrders(
-                profit.QMarketOrders.location_jita4_4_id())
-            # TODO: генерируем фейковые данные
             for r in q_router_settings.g_routes:
                 assert 'solar_system' in r
                 solar_system: str = r['solar_system']
@@ -355,6 +353,7 @@ def main():
                     # sde данные, загруженные из .converted_xxx.json файлов
                     sde_type_ids,
                     sde_blueprints,
+                    sde_products,
                     sde_market_groups,
                     eve_market_prices_data,
                     industry_cost_indices)

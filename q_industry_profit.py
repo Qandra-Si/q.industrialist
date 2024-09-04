@@ -27,6 +27,7 @@ Requires application scopes:
 import sys
 import typing
 import requests
+#import cProfile
 
 # from memory_profiler import profile
 
@@ -101,6 +102,32 @@ where ecb_location_id in (
 """
 
 
+"""
+g_industry_tree: profit.QIndustryTree = None
+g_calc_input = None
+g_industry_plan_customization = None
+g_sde_type_ids = None
+g_sde_bp_materials = None
+g_sde_products = None
+g_sde_market_groups = None
+g_eve_market_prices_data = None
+g_industry_cost_indices = None
+
+
+def foo():
+    global g_industry_tree
+    g_industry_tree = eve_industry_profit.generate_industry_tree(
+        g_calc_input,
+        g_industry_plan_customization,
+        g_sde_type_ids,
+        g_sde_bp_materials,
+        g_sde_products,
+        g_sde_market_groups,
+        g_eve_market_prices_data,
+        g_industry_cost_indices)
+"""
+
+
 def main():
     # работа с параметрами командной строки, получение настроек запуска программы, как то: работа в offline-режиме,
     # имя пилота ранее зарегистрированного и для которого имеется аутентификационный токен, регистрация нового и т.д.
@@ -111,6 +138,7 @@ def main():
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
     sde_icon_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "iconIDs")
+    sde_products = eve_sde_tools.construct_products_for_blueprints(sde_bp_materials, sde_type_ids)
 
     # загрузка данных из ESI
     # настройка Eve Online ESI Swagger interface
@@ -242,7 +270,7 @@ def main():
         # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
         # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
         # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
-        # {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
+        {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
         # {'bptid': 12035, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Hound (runs +9, me -2, te +2)
         # {'bptid': 12031, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Manticore (runs +9, me -2, te +2)
         # {'bptid': 11378, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Nemesis (runs +9, me -2, te +2)
@@ -259,7 +287,7 @@ def main():
         # {'bptid': 41356},  # Ametat II (Antimatter Reactor Unit с бонусом и ригами)
         # {'bptid': 45718},  # Legion Core - Augmented Antimatter Reactor
         # {'bptid': 20352},  # 800mm Steel Plates II
-        {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # падает калькулятор
+        # {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # падает калькулятор
     ]
 
     # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
@@ -313,6 +341,20 @@ def main():
 
     for calc_input in calc_inputs:
         # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
+        """
+        global g_calc_input, g_industry_plan_customization, g_sde_type_ids, g_sde_bp_materials, g_sde_products
+        global g_sde_market_groups, g_eve_market_prices_data, g_industry_cost_indices, g_industry_tree
+        g_calc_input = calc_input
+        g_industry_plan_customization = industry_plan_customization
+        g_sde_type_ids = sde_type_ids
+        g_sde_bp_materials = sde_bp_materials
+        g_sde_products = sde_products
+        g_sde_market_groups = sde_market_groups
+        g_eve_market_prices_data = eve_market_prices_data
+        g_industry_cost_indices = industry_cost_indices
+        cProfile.run('foo()', sort=1)
+        industry_tree: profit.QIndustryTree = g_industry_tree
+        """
         industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
             # вход и выход для расчёта
             calc_input,
@@ -320,6 +362,7 @@ def main():
             # sde данные, загруженные из .converted_xxx.json файлов
             sde_type_ids,
             sde_bp_materials,
+            sde_products,
             sde_market_groups,
             eve_market_prices_data,
             industry_cost_indices)
