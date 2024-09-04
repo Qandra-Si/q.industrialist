@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+﻿# -*- encoding: utf-8 -*-
 import math
 import typing
 from .industry_tree import QIndustryAction
