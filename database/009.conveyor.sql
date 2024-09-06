@@ -269,6 +269,7 @@ CREATE TABLE qi.conveyor_formula_calculus
 	-- вычисляемые и кешированные данные формулы
 	cfc_products_per_single_run INTEGER NOT NULL, -- кешируется: количество продукции, производимой за один прогон (из таблицы eve_sde_blueprint_products)
 	cfc_products_num INTEGER NOT NULL, -- вычисляется: количество продукции, производимой формулой (как произведение customized_runs и products_per_single_run)
+	cfc_best_choice BOOLEAN NOT NULL DEFAULT FALSE, -- вычисляется: наилучшая формула (наиболее прибыльный вариант) производства выбранного продукта
     -- производстенные и торговые локации
     cfc_industry_hub BIGINT NOT NULL, -- ожидается 1 вариант: фабрика, где расположено основное производство (откуда идёт торговый маршрут и куда привозятся материалы из Jita)
     cfc_trade_hub BIGINT NOT NULL, -- вариантность: торговый хаб, где продаются произведённые продукты
@@ -852,6 +853,42 @@ AS $procedure$
      conveyor_formula_calculus.cfc_single_product_cost = excluded.cfc_single_product_cost and
      conveyor_formula_calculus.cfc_product_mininum_price = excluded.cfc_product_mininum_price
    THEN conveyor_formula_calculus.cfc_updated_at ELSE excluded.cfc_updated_at END;
+  --- --- ---
+  UPDATE qi.conveyor_formula_calculus
+  SET cfc_best_choice = false;
+  --- --- ---
+  UPDATE qi.conveyor_formula_calculus
+  SET cfc_best_choice = true
+  FROM (
+   SELECT best_formula.formula
+   FROM
+    -- поиск минимальных цен на продукты в разных хабах
+    (SELECT
+      c.cfc_trade_hub trade_hub,
+      c.cfc_trader_corp trader_corp,
+      f.cf_product_type_id product_type_id,
+      min(c.cfc_single_product_cost) min_product_cost
+     FROM
+      qi.conveyor_formula_calculus c,
+      qi.conveyor_formulas f
+     WHERE f.cf_formula=c.cfc_formula
+     GROUP BY c.cfc_trade_hub, c.cfc_trader_corp, f.cf_product_type_id
+    ) min_price
+     -- поиск формулы с минимальной стоимостью производства
+     LEFT OUTER JOIN (
+      SELECT
+       f.cf_formula formula,
+       c.cfc_trade_hub trade_hub,
+       c.cfc_trader_corp trader_corp,
+       f.cf_product_type_id product_type_id,
+       c.cfc_single_product_cost product_cost
+      FROM
+       qi.conveyor_formula_calculus c,
+       qi.conveyor_formulas f
+      WHERE f.cf_formula=c.cfc_formula
+     ) best_formula ON (min_price.trade_hub=best_formula.trade_hub AND min_price.trader_corp=best_formula.trader_corp AND min_price.min_product_cost=best_formula.product_cost)
+  ) best_formula
+  WHERE cfc_formula = best_formula.formula;
 $procedure$
 ;
 --------------------------------------------------------------------------------

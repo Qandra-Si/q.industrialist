@@ -442,33 +442,23 @@ EOD;
     //---
     $query = <<<EOD
 select
- ic.formula as f,
- f.type_id id,
- mic.min_product_cost mpc, -- равен ic.product_cost (стоимость производства)
- ic.product_mininum_price mpp, -- min цена в jite, ниже которой не следует продавать товар
- --ic.decryptor_type_id as decr,
- did.sdet_type_name as dnm
- --,ic.ancient_relics as ar 
+ c.cfc_formula f,
+ f.cf_product_type_id id,
+ c.cfc_single_product_cost mpc, -- min prodict cost
+ c.cfc_product_mininum_price mpp, -- min цена в jite, ниже которой не следует продавать товар
+ --f.cf_decryptor_type_id decr,
+ did.sdet_type_name dnm
+ --,f.cf_ancient_relics ar 
 from
- (select distinct f.cf_product_type_id type_id
-  from qi.conveyor_formulas f
- ) f,
- (select product_type_id, min(product_cost) min_product_cost
-  from qi.conveyor_formulas_industry_costs
-  where trade_hub=60003760
-  group by product_type_id
- ) mic
-  -- поиск формулы с минимальной стоимостью производства
-  left outer join (
-   select *
-   from qi.conveyor_formulas_industry_costs
-   where trade_hub=60003760
-  )ic on (ic.product_cost=mic.min_product_cost and ic.product_type_id=mic.product_type_id)
+ qi.conveyor_formula_calculus c,
+ qi.conveyor_formulas f
   -- сведения о декрипторе
-  left outer join qi.eve_sde_type_ids as did on (ic.decryptor_type_id is not null and did.sdet_type_id=ic.decryptor_type_id)
+  left outer join qi.eve_sde_type_ids as did on (f.cf_decryptor_type_id is not null and did.sdet_type_id=f.cf_decryptor_type_id)
 where
- f.type_id=mic.product_type_id
-order by f.type_id;
+ c.cfc_formula=f.cf_formula and
+ c.cfc_best_choice and
+ cfc_trade_hub=60003760
+order by f.cf_product_type_id;
 EOD;
     $conveyor_formulas_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());
