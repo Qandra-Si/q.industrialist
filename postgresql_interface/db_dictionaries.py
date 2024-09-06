@@ -463,6 +463,7 @@ class QDictionaries:
         cf_formula_row = self.db.select_one_row(
             "INSERT INTO conveyor_formulas("
             " cf_blueprint_type_id,"
+            " cf_activity,"
             " cf_product_type_id,"
             " cf_customized_runs,"
             " cf_decryptor_type_id,"
@@ -470,6 +471,7 @@ class QDictionaries:
             " cf_prior_blueprint_type_id)"
             "VALUES("
             " %(bp)s,"
+            " %(a)s,"
             " %(p)s,"
             " %(cr)s,"
             " %(d)s,"
@@ -477,6 +479,7 @@ class QDictionaries:
             " %(bpo)s)"
             "RETURNING cf_formula;",
             {'bp': conveyor_formula.blueprint_type_id,
+             'a': 1,
              'p': conveyor_formula.product_type_id,
              'cr': conveyor_formula.customized_runs,
              'd': conveyor_formula.decryptor_type_id,  # м.б. None

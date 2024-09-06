@@ -1013,7 +1013,8 @@ def assemble_industry_formula(industry_plan: profit.QIndustryPlan) -> profit.QIn
         industry_plan.base_industry.blueprint_type_id,
         industry_plan.base_industry.product_type_id,
         used_decryptor_type_id,
-        industry_plan.customized_runs)
+        industry_plan.customized_runs,
+        industry_plan.base_industry.products_per_single_run)
     # выполняем рекурсивный поиск всех работ чтобы посчитать их стоимость
     assemble_industry_jobs(industry_plan.base_planned_activity, industry_formula, 1.0)
     # считаем сколько покупных материалов и в какой пропорции необходимо для постройки продукта

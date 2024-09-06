@@ -64,30 +64,29 @@ function __dump_industry_group(&$industry_group, $MV) {
             $nm = $product['name'];
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
-            $min_product_cost = $product['mpc'];
+            $recommended_price = $product['rp']; // цена в jite, по которой товар можно попытаться продать
+
             $jita_profit = $product['jprft'];
             $jita_percent = $product['jprct'];
-			$formulas = $product['frmls'];
             if ($MV)
             {
                 $jita_sell_volume = $product['jsv'];
                 $jita_buy_volume = $product['jbv'];
             }
 			
-			$best_formula = null;
-			if ($formulas)
+			$best_formula = $product['frml'];
+			$industry_cost = null;
+			$product_mininum_price = null;
+			if (!is_null($best_formula))
 			{
-				foreach ($formulas as &$formula)
-				{
-					$best_formula = $formula;
-					break;
-				}
+				$industry_cost = $best_formula['mpc'];
+				$product_mininum_price = $best_formula['mpp'];
 			}
 
             if ($first)
             {
                 $first = false;
-                ?><tr><td class="active" colspan="<?=5+($MV?1:0)?>"><strong><?=$market_group?></strong></td></tr><?php
+                ?><tr><td class="active" colspan="<?=6+($MV?1:0)?>"><strong><?=$market_group?></strong></td></tr><?php
             }
 ?>
 <tr>
@@ -106,10 +105,7 @@ function __dump_industry_group(&$industry_group, $MV) {
 <?php
 	if (!is_null($best_formula))
 	{
-		?><span class="text-muted"> - лучшая формула №</span> <?=$formula['f']?><!--,
-		прогоны <?=$formula['cr']?>,
-		материалы <?=number_format($formula['mc'],0,'.',',')?>,
-		работы <?=number_format($formula['jc'],0,'.',',')?>--><?php
+		?><span class="text-muted"> - лучшая формула №</span> <?=$best_formula['f']?><?php
 	}
 ?>
 </td>
@@ -123,13 +119,23 @@ function __dump_industry_group(&$industry_group, $MV) {
         ?><td align="right"<?=($jita_profit<=0)?" style='color: #c60000'":""?>><?=number_format($jita_profit,0,'.',',')?><br><?=$jita_percent?number_format($jita_percent,1,'.',',').'%':""?></td><?php
     }
 
-    if (is_null($min_product_cost))
+	if (is_null($industry_cost) && is_null($product_mininum_price))
+	{
+        ?><td></td><?php
+	}
+	else
+	{
+		?><td align="right"><?=number_format($industry_cost,0,'.',',')?><br><?=is_null($product_mininum_price)?'':number_format($product_mininum_price,0,'.',',')?></td><?php
+	}
+
+
+    if (is_null($recommended_price))
     {
         ?><td></td><?php
     }
     else
     {
-        ?><td align="right"><?=number_format($min_product_cost,0,'.',',')?></td><?php
+        ?><td align="right"><?=is_null($recommended_price)?'':number_format($recommended_price,0,'.',',')?></td><?php
     }
 
     if (is_null($jita_sell) && is_null($jita_buy))
@@ -228,7 +234,7 @@ function __dump_industry_cost(&$industry_cost, &$conveyor_formulas, $SORT, $GRPs
 <thead>
  <tr>
   <th></th>
-  <th width="100%">Items</th>
+  <th width="100%">Продукция</th>
   <th style="text-align: right;"><a href="<?=
 ($SORT==SORT_PRFT_ASC)?
 get_actual_url(SORT_PRFT_DESC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU):
@@ -236,7 +242,8 @@ get_actual_url(SORT_PRFT_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Jita Profit</a><
 ($SORT==SORT_PERC_ASC)?
 get_actual_url(SORT_PERC_DESC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU):
 get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
-  <th style="text-align: right;">Industry<br>Cost</th>
+  <th style="text-align: right;">Стоим.&nbsp;произв<br>Мин.порог&nbsp;цены</th>
+  <th style="text-align: right;">Рекомендов.<br>цена</th>
   <th style="text-align: right;">Jita Sell<br>Jita Buy</th>
   <?php if ($MV) { ?>
     <th style="text-align: right;">Jita Vol.<br>Sell / Buy</th>
@@ -276,7 +283,7 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
 
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
-            $min_product_cost = $product['mpc'];
+            $recommended_price = $product['rp'];
 
 			$pid = $product['id'];
 			$curr_product_formulas = array();
@@ -286,29 +293,41 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
 				if ($fproduct < $pid) continue;
 				if ($fproduct > $pid) break;
 				$curr_product_formulas[$cfkey] = $formula;
-			}				
+			}
+			$best_formula = null;
+			$product_mininum_price = null;
+			if ($curr_product_formulas)
+			{
+				foreach ($curr_product_formulas as &$formula)
+				{
+					$best_formula = $formula;
+					$product_mininum_price = $best_formula['mpp'];
+					break;
+				}
+			}
+			$curr_product_formulas = null;
 
             $jprft = null;
             $jprct = null;
 
             if ($PBS == 1)
             {
-                if (is_null($min_product_cost) || is_null($jita_sell))
+                if (is_null($product_mininum_price) || is_null($recommended_price))
                     ;
                 else
                 {
-                    $jprft = $jita_sell - $min_product_cost;
-                    $jprct = $jita_sell ? (100.0 * (1 - $min_product_cost / $jita_sell)) : 0;
+                    $jprft = $recommended_price - $product_mininum_price;
+                    $jprct = $recommended_price ? (100.0 * (1 - $product_mininum_price / $recommended_price)) : 0;
                 }
             }
             else // if ($PBS == 0)
             {
-                if (is_null($min_product_cost) || is_null($jita_buy))
+                if (is_null($product_mininum_price) || is_null($jita_buy))
                     ;
                 else
                 {
-                    $jprft = $jita_buy - $min_product_cost;
-                    $jprct = $jita_buy ? (100.0 * (1 - $min_product_cost / $jita_buy)) : 0;
+                    $jprft = $jita_buy - $product_mininum_price;
+                    $jprct = $jita_buy ? (100.0 * (1 - $product_mininum_price / $jita_buy)) : 0;
                 }
             }
 
@@ -317,7 +336,7 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
             $curr_market_group[$pkey] = $product;
             $curr_market_group[$pkey]['jprft'] = $jprft;
             $curr_market_group[$pkey]['jprct'] = $jprct;
-            $curr_market_group[$pkey]['frmls'] = $curr_product_formulas;
+            $curr_market_group[$pkey]['frml'] = $best_formula;
         }
     if ($curr_market_group)
     {
@@ -389,43 +408,32 @@ if (!isset($_GET['hu'])) $HIDE_UNPROFITABLE = HIDE_UNPROFITABLE_DEFAULT; else {
     //---
     $query = <<<EOD
 select
- -- f.formula as f,
- f.product_type_id as id,
- -- f.decryptor_type_id as decr,
- f.min_product_cost as mpc,
- p.sdebp_blueprint_type_id as bp_id,
+ p.type_id id,
+ p.hub_recommended_price rp,
+ bp.sdebp_blueprint_type_id as bp_id,
  market_group.semantic_id as grp_id,
  market_group.name as grp,
  tid.sdet_type_name as name,
  tid.sdet_meta_group_id as meta,
- jita.ethp_sell as js,
- jita.ethp_buy as jb,
- jita.ethp_sell_volume as jsv,
- jita.ethp_buy_volume as jbv
+ p.jita_sell js,
+ p.jita_sell_volume jsv,
+ p.jita_buy jb,
+ p.jita_buy_volume jbv,
+ p.average_price as avg
 from
- (select product_type_id, min(product_cost) as min_product_cost
-  from conveyor_formulas_industry_costs
-  group by product_type_id
- ) f
-  -- цены на продукт производства в жите прямо сейчас
-  left outer join (
-    select ethp_type_id, ethp_sell, ethp_buy, ethp_sell_volume, ethp_buy_volume
-    from qi.esi_trade_hub_prices
-    where ethp_location_id = 60003760
-  ) jita on (f.product_type_id = jita.ethp_type_id)
+ qi.conveyor_formulas_products_prices p
   -- сведения о чертеже
-  left outer join qi.eve_sde_blueprint_products as p on (
-   p.sdebp_activity=1 and
-   p.sdebp_product_id=f.product_type_id
-  ),
+  left outer join qi.eve_sde_blueprint_products as bp on (
+   bp.sdebp_activity=1 and
+   bp.sdebp_product_id=p.type_id
+  )
   -- сведения о предмете
-  qi.eve_sde_type_ids as tid,
+  left outer join qi.eve_sde_type_ids as tid on (tid.sdet_type_id=p.type_id)
   -- сведения о market-группе предмета
-  qi.eve_sde_market_groups_semantic as market_group
+  left outer join qi.eve_sde_market_groups_semantic as market_group on (market_group.id=tid.sdet_market_group_id)
 where
-  tid.sdet_type_id = f.product_type_id and
-  tid.sdet_published and
-  market_group.id = tid.sdet_market_group_id
+ p.trade_hub=60003760 and 
+ p.type_id=tid.sdet_type_id
 order by market_group.name, tid.sdet_type_name;
 EOD;
     $industry_cost_cursor = pg_query($conn, $query)
@@ -434,26 +442,33 @@ EOD;
     //---
     $query = <<<EOD
 select
- f.formula as f,
- f.product_type_id as id,
- f.customized_runs as cr,
- f.decryptor_type_id as decr,
- did.sdet_type_name as dnm,
- f.ancient_relics as ar,
- f.materials_cost as mc,
- f.job_cost as jc,
- f.product_cost as pc
-from conveyor_formulas_industry_costs f
-  -- поиск лучших декрипторов
+ ic.formula as f,
+ f.type_id id,
+ mic.min_product_cost mpc, -- равен ic.product_cost (стоимость производства)
+ ic.product_mininum_price mpp, -- min цена в jite, ниже которой не следует продавать товар
+ --ic.decryptor_type_id as decr,
+ did.sdet_type_name as dnm
+ --,ic.ancient_relics as ar 
+from
+ (select distinct f.cf_product_type_id type_id
+  from qi.conveyor_formulas f
+ ) f,
+ (select product_type_id, min(product_cost) min_product_cost
+  from qi.conveyor_formulas_industry_costs
+  where trade_hub=60003760
+  group by product_type_id
+ ) mic
+  -- поиск формулы с минимальной стоимостью производства
   left outer join (
-   select product_type_id, min(product_cost) min_product_cost
-   from conveyor_formulas_industry_costs
-   group by product_type_id
-  ) best on best.product_type_id=f.product_type_id and best.min_product_cost=f.product_cost
+   select *
+   from qi.conveyor_formulas_industry_costs
+   where trade_hub=60003760
+  )ic on (ic.product_cost=mic.min_product_cost and ic.product_type_id=mic.product_type_id)
   -- сведения о декрипторе
-  left outer join qi.eve_sde_type_ids as did on (did.sdet_type_id=f.decryptor_type_id)
-where best.product_type_id is not null
-order by f.product_type_id;
+  left outer join qi.eve_sde_type_ids as did on (ic.decryptor_type_id is not null and did.sdet_type_id=ic.decryptor_type_id)
+where
+ f.type_id=mic.product_type_id
+order by f.type_id;
 EOD;
     $conveyor_formulas_cursor = pg_query($conn, $query)
             or die('pg_query err: '.pg_last_error());

@@ -1,6 +1,13 @@
 DROP VIEW IF EXISTS qi.conveyor_formulas_industry_costs;
+DROP VIEW IF EXISTS qi.conveyor_formulas_products_prices;
+DROP VIEW IF EXISTS qi.conveyor_formulas_market_routes;
 DROP VIEW IF EXISTS qi.conveyor_formulas_jobs_costs;
 DROP VIEW IF EXISTS qi.conveyor_formulas_purchase_materials;
+DROP VIEW IF EXISTS qi.conveyor_formulas_transfer_cost;
+
+DROP FUNCTION IF EXISTS qi.eve_ceiling(double precision);
+DROP FUNCTION IF EXISTS qi.eve_ceiling_change_by_point(double precision, integer);
+DROP FUNCTION IF EXISTS qi.nitrogen_isotopes_price();
 
 DROP INDEX IF EXISTS qi.idx_cfj_blueprint_type_id;
 DROP INDEX IF EXISTS qi.idx_cfj_formula;
@@ -10,13 +17,10 @@ DROP INDEX IF EXISTS qi.idx_cfp_formula_material;
 DROP INDEX IF EXISTS qi.idx_cfp_formula;
 DROP TABLE IF EXISTS qi.conveyor_formula_purchase;
 
-DROP INDEX IF EXISTS qi.idx_cl_trade_hub;
-DROP INDEX IF EXISTS qi.idx_cl_trader_corp;
-DROP INDEX IF EXISTS qi.idx_cl_pk;
-DROP TABLE IF EXISTS qi.conveyor_limits;
-
 DROP INDEX IF EXISTS qi.idx_cf_decryptor_type_id;
 DROP INDEX IF EXISTS qi.idx_cf_product_type_id;
+DROP INDEX IF EXISTS qi.idx_unq_cf4;
+DROP INDEX IF EXISTS qi.idx_unq_cf3;
 DROP INDEX IF EXISTS qi.idx_unq_cf2;
 DROP INDEX IF EXISTS qi.idx_unq_cf1;
 DROP INDEX IF EXISTS qi.idx_cf_pk;
@@ -41,6 +45,7 @@ CREATE TABLE qi.conveyor_formulas
 (
     cf_formula INTEGER NOT NULL DEFAULT NEXTVAL('qi.seq_cf'::regclass), -- идентификатор формулы
     cf_blueprint_type_id INTEGER NOT NULL,
+    cf_activity INTEGER NOT NULL,
     cf_product_type_id INTEGER NOT NULL,
     cf_customized_runs INTEGER NOT NULL,
     cf_decryptor_type_id INTEGER,
@@ -67,22 +72,22 @@ TABLESPACE pg_default;
 
 CREATE UNIQUE INDEX idx_unq_cf1
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id, cf_prior_blueprint_type_id)
+	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id, cf_prior_blueprint_type_id)
     WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf2
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_prior_blueprint_type_id)
+	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_prior_blueprint_type_id)
 	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf3
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id)
+	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id)
     WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf4
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_product_type_id, cf_customized_runs, cf_ancient_relics)
+	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics)
 	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NULL));
 
 CREATE INDEX idx_cf_product_type_id
@@ -163,17 +168,136 @@ CREATE INDEX idx_cfj_blueprint_type_id
     (cfj_blueprint_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
+CREATE OR REPLACE FUNCTION qi.eve_ceiling(isk double precision)
+ RETURNS double precision
+ LANGUAGE plpgsql
+ IMMUTABLE STRICT
+AS $function$
+begin
+ if isk is null then return null;
+ elsif isk < 100.0 then isk = round(isk::numeric, 2);
+ elsif isk < 1000.0 then isk = ceil(isk * 10.0) / 10.0;
+ elsif isk < 10000.0 then isk = ceil(isk);
+ elsif isk < 100000.0 then isk = round(isk::numeric, -1);
+ elsif isk < 1000000.0 then isk = round(isk::numeric, -2);
+ elsif isk < 10000000.0 then isk = round(isk::numeric, -3);
+ elsif isk < 100000000.0 then isk = round(isk::numeric, -4); -- 25990000.00 -> 25990000.00
+ elsif isk < 1000000000.0 then isk = round(isk::numeric, -5);
+ elsif isk < 10000000000.0 then isk = round(isk::numeric, -6);
+ elsif isk < 100000000000.0 then isk = round(isk::numeric, -7);
+ elsif isk < 1000000000000.0 then isk = round(isk::numeric, -8);
+ elsif isk < 10000000000000.0 then isk = round(isk::numeric, -9);
+ else assert false, 'too much isk at time';
+ end if;
+ return isk;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION qi.eve_ceiling_change_by_point(isk double precision, points integer)
+ RETURNS double precision
+ LANGUAGE plpgsql
+ IMMUTABLE STRICT
+AS $function$
+declare 
+ pip double precision;
+begin
+ assert points = +1 or points = -1, 'incorrect points for eve ceiling change';
+ if isk is null then return null;
+ elsif isk < 100.0 then pip = 0.01; -- 99.99 -> 0.01
+ elsif isk < 1000.0 then pip = 0.1; -- 999.90 -> 0.1
+ elsif isk < 10000.0 then pip = 1.0; -- 9999 -> 1
+ elsif isk < 100000.0 then pip = 10.0; -- 99990 -> 10
+ elsif isk < 1000000.0 then pip = 100.0; -- 999900 -> 100
+ elsif isk < 10000000.0 then pip = 1000.0; -- 9999000 -> 1000
+ elsif isk < 100000000.0 then pip = 10000.0; -- ...
+ elsif isk < 1000000000.0 then pip = 100000.0;
+ elsif isk < 10000000000.0 then pip = 1000000.0;
+ elsif isk < 100000000000.0 then pip = 10000000.0;
+ elsif isk < 1000000000000.0 then pip = 100000000.0;
+ elsif isk < 10000000000000.0 then pip = 1000000000.0;
+ else assert false, 'too much isk at time';
+ end if;
+ return qi.eve_ceiling((isk + pip * points)::numeric);
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION qi.nitrogen_isotopes_price()
+ RETURNS double precision
+ LANGUAGE sql
+ STABLE
+AS $function$
+   select coalesce(x.buy, (select emp_average_price as average_price from esi_markets_prices universe where emp_type_id = 17888), x.sell)
+   from (
+    select
+     qi.eve_ceiling_change_by_point(ethp_buy,1) * 1.0132 as buy, -- TODO: Jita 1.32 fee
+     ethp_sell as sell
+    from esi_trade_hub_prices
+    where ethp_location_id = 60003760 and ethp_type_id = 17888 -- Nitrogen Isotopes
+   ) x
+  $function$
+;
+
+create or replace view qi.conveyor_formulas_transfer_cost as
+  select
+   -- formula
+   raw_materials.formula,
+   ready_products.products_per_single_run,
+   ready_products.customized_runs,
+   -- raw_materials
+   raw_materials.purchase_volume,
+   -- ready_products
+   ready_products.product_packed,
+   ready_products.product_packed * ready_products.products_per_single_run * ready_products.customized_runs as ready_volume
+  from
+   (select
+     x.formula,
+     sum(x.quantity * x.material_packed) as purchase_volume
+    from (
+     select
+      f.cf_formula as formula,
+      --p.cfp_material_type_id as material_type_id,
+      p.cfp_quantity as quantity,
+      tp.sdet_packaged_volume as material_packed
+     from
+      qi.conveyor_formulas f,
+      qi.conveyor_formula_purchase p
+       left outer join qi.eve_sde_type_ids tp on (tp.sdet_type_id=p.cfp_material_type_id)
+     where f.cf_formula=p.cfp_formula
+    ) x
+    group by x.formula
+   ) raw_materials,
+   (select
+    f.cf_formula as formula,
+    f.cf_customized_runs as customized_runs,
+    --f.cf_product_type_id,
+    tf.sdet_packaged_volume as product_packed,
+    p.sdebp_activity as activity,
+    p.sdebp_quantity as products_per_single_run
+   from
+    qi.conveyor_formulas f,
+    qi.eve_sde_type_ids tf,
+    qi.eve_sde_blueprint_products p
+   where
+    f.cf_product_type_id=tf.sdet_type_id and
+    f.cf_product_type_id=p.sdebp_product_id and
+    f.cf_activity=p.sdebp_activity
+   ) ready_products
+  where raw_materials.formula=ready_products.formula;
+
 create or replace view qi.conveyor_formulas_purchase_materials as
   select 
    x.formula,
-   sum(x.quantity * coalesce(x.jita_buy, coalesce(x.average_price, x.jita_sell))) as materials_cost
+   sum(x.quantity * coalesce(x.jita_buy, x.average_price, x.jita_sell)) as materials_cost
   from (
    select
     f.cf_formula as formula,
     -- cfp_material_type_id as material_type_id,
     cfp_quantity as quantity,
     jita.sell as jita_sell,
-    jita.buy as jita_buy,
+    --jita.buy as jita_buy,
+    qi.eve_ceiling_change_by_point(jita.buy,1) as jita_buy,
     universe.emp_average_price as average_price
    from
     conveyor_formulas f,
@@ -258,20 +382,184 @@ create or replace view qi.conveyor_formulas_jobs_costs as
   group by z.formula
   ;
 
-create or replace view qi.conveyor_formulas_industry_costs as
+create or replace view qi.conveyor_formulas_market_routes as
   select
-   cf.cf_formula as formula,
-   cf.cf_product_type_id as product_type_id,
-   cf.cf_customized_runs as customized_runs,
-   cf.cf_decryptor_type_id as decryptor_type_id,
-   cf.cf_ancient_relics as ancient_relics,
-   m.materials_cost,
-   j.job_cost,
-   (m.materials_cost+j.job_cost) / cf.cf_customized_runs as product_cost
+   -- input and output locations
+   trnsfr_from_jita.industry_hub,
+   trnsfr_to_market.trade_hub,
+   -- sales and buying fee and taxes
+   trnsfr_from_jita.buying_brokers_fee,
+   trnsfr_to_market.sales_brokers_fee,
+   trnsfr_to_market.sales_tax,
+   -- Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
+   -- из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
+   fuel_price.isk as fuel_price_isk,
+   -- raw material buying details
+   trnsfr_from_jita.input_fuel_quantity,
+   (trnsfr_from_jita.input_fuel_quantity * fuel_price.isk) / 386404 as input_m3_cost,
+   -- ready product selling details
+   trnsfr_to_market.output_fuel_quantity,
+   (trnsfr_to_market.output_fuel_quantity * fuel_price.isk) / 386404 as output_m3_cost
   from
-   conveyor_formulas cf,
-   conveyor_formulas_purchase_materials m,
-   conveyor_formulas_jobs_costs j
-  where cf.cf_formula=m.formula and cf.cf_formula=j.formula
-  --order by cf.cf_product_type_id, product_cost asc
-  ;
+   (select qi.nitrogen_isotopes_price() as isk) as fuel_price, -- ожидается одна строка, вызов будет однократный
+   (select
+     r.mr_src_hub as industry_hub,
+     r.mr_isotopes_dst_src as input_fuel_quantity,
+     h.mh_brokers_fee as buying_brokers_fee
+    from
+     qi.market_routes r, qi.market_hubs h
+    where
+     r.mr_dst_hub=60003760 and
+     h.mh_hub_id=60003760 and 
+     not h.mh_archive
+   ) trnsfr_from_jita,
+   (select
+     r.mr_src_hub as industry_hub,
+     r.mr_dst_hub as trade_hub,
+     r.mr_isotopes_src_dst as output_fuel_quantity,
+     h.mh_brokers_fee as sales_brokers_fee,
+     h.mh_trade_hub_tax as sales_tax
+    from qi.market_routes r, qi.market_hubs h
+    where
+     r.mr_dst_hub=h.mh_hub_id and
+     --r.mr_dst_hub<>60003760 and
+     not h.mh_archive
+   ) trnsfr_to_market
+  where
+   trnsfr_from_jita.industry_hub=trnsfr_to_market.industry_hub
+;
+
+create or replace view qi.conveyor_formulas_products_prices as
+  select
+   type_id,
+   trade_hub,
+   case when hub_sell is not null then qi.eve_ceiling_change_by_point(hub_sell, -1)
+        when jita_sell is not null then jita_sell
+        when average_price is not null then qi.eve_ceiling(average_price)
+        when jita_buy is not null then qi.eve_ceiling_change_by_point(jita_buy * (1.0+0.02+0.025+0.036), 1)
+        when hub_buy is not null then qi.eve_ceiling_change_by_point(hub_buy * (1.0+0.02+0.025+0.036), 1)
+        else null
+   end hub_recommended_price,
+   case when hub_sell is not null then hub_sell_volume else 0 end hub_sell_volume
+   ,jita_sell
+   ,jita_sell_volume
+   ,jita_buy
+   ,jita_buy_volume
+   ,hub_sell
+   ,hub_buy
+   --,hub_sell_volume
+   ,hub_buy_volume
+   ,average_price
+  from (
+   select
+    x.type_id,
+    x.trade_hub,
+    hub.sell hub_sell,
+    hub.buy hub_buy,
+    hub.sell_volume hub_sell_volume,
+    hub.buy_volume hub_buy_volume,
+    jita.sell jita_sell,
+    jita.buy jita_buy,
+    jita.sell_volume jita_sell_volume,
+    jita.buy_volume jita_buy_volume,
+    universe.emp_average_price average_price
+   from
+    (select distinct f.cf_product_type_id as type_id, r.trade_hub
+     from conveyor_formulas f, qi.conveyor_formulas_market_routes r
+     --where f.cf_product_type_id=40560
+    ) x
+     -- цены на продукт производства в торговом хабе прямо сейчас
+     left outer join (
+       select ethp_type_id as type_id, ethp_location_id as trade_hub, ethp_sell as sell, ethp_buy as buy, ethp_sell_volume as sell_volume, ethp_buy_volume as buy_volume
+       from qi.esi_trade_hub_prices
+     ) hub on (hub.type_id=x.type_id and hub.trade_hub=x.trade_hub)
+     -- цены на продукт производства в jita прямо сейчас
+     left outer join (
+       select ethp_type_id as type_id, ethp_sell as sell, ethp_buy as buy, ethp_sell_volume as sell_volume, ethp_buy_volume as buy_volume
+       from qi.esi_trade_hub_prices
+       where ethp_location_id=60003760
+     ) jita on (jita.type_id=x.type_id)
+     -- усреднённые цены на продукт производства во вселенной
+     left outer join esi_markets_prices universe on (emp_type_id=x.type_id)
+   ) prices;
+
+
+create or replace view qi.conveyor_formulas_industry_costs as
+ select
+  z.*,
+  z.total_gross_cost / (z.customized_runs*z.products_per_single_run) as product_cost,
+  qi.eve_ceiling((z.total_gross_cost + z.products_sell_fee_and_tax) / (z.customized_runs*z.products_per_single_run)) as product_mininum_price
+ from (
+  select
+   w.*,
+   ( w.materials_cost_with_fee +
+     w.jobs_cost + 
+     w.materials_transfer_cost + 
+     w.ready_transfer_cost
+   ) as total_gross_cost
+  from (
+   select
+    -- input and output locations
+    r.industry_hub,
+    r.trade_hub,
+    -- sales and buying fee and taxes
+    r.buying_brokers_fee,
+    r.sales_brokers_fee,
+    r.sales_tax,
+    -- formula
+    x.formula,
+    x.product_type_id,
+    x.customized_runs,
+    x.products_per_single_run,
+    x.decryptor_type_id,
+    x.ancient_relics,
+    -- Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
+    -- из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
+    r.fuel_price_isk,
+    -- raw material buying details
+    --r.input_fuel_quantity,
+    x.materials_cost,
+    x.materials_cost * (1.0 + r.buying_brokers_fee) as materials_cost_with_fee,
+    x.purchase_volume,
+    x.purchase_volume * r.input_m3_cost as materials_transfer_cost,
+    -- jobs cost
+    x.jobs_cost,
+    -- ready product selling details
+    --r.output_fuel_quantity,
+    x.ready_volume,
+    x.ready_volume * r.output_m3_cost as ready_transfer_cost,
+    x.products_recommended_price,
+    x.products_recommended_price * (r.sales_brokers_fee + r.sales_tax) as products_sell_fee_and_tax
+   from (
+    select
+     p.trade_hub,
+     cf.cf_formula as formula,
+     cf.cf_product_type_id as product_type_id,
+     cf.cf_customized_runs as customized_runs,
+     t.products_per_single_run as products_per_single_run,
+     cf.cf_decryptor_type_id as decryptor_type_id,
+     cf.cf_ancient_relics as ancient_relics,
+     m.materials_cost,
+     j.job_cost as jobs_cost,
+     t.purchase_volume,
+     t.ready_volume,
+     p.hub_recommended_price * cf.cf_customized_runs * t.products_per_single_run as products_recommended_price
+    from
+     qi.conveyor_formulas cf
+      left outer join qi.conveyor_formulas_products_prices p on (p.type_id=cf.cf_product_type_id),
+     qi.conveyor_formulas_purchase_materials m,
+     qi.conveyor_formulas_jobs_costs j,
+     qi.conveyor_formulas_transfer_cost t
+    where
+     cf.cf_formula=m.formula and
+     cf.cf_formula=j.formula and
+     cf.cf_formula=t.formula --and cf_formula=2332
+    ) x,
+    qi.conveyor_formulas_market_routes r
+    where x.trade_hub=r.trade_hub --and formula=2332
+  ) w
+ ) z
+ --where z.formula in (1157,1189)
+ --where z.formula in (2332)
+ ;
+

@@ -773,18 +773,19 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
     nitrogen_isotopes_isk = get_material_buy_price(17888, 545.40) * 1.02
 
     # Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
-    # до Jita дистанция 64'484 свет.лет со всеми скилами в 5 понадобится сжечь 79'353 Nitrogen Isotopes (buy 545.40 ISK)
-    transfer_cost: float = total_purchase_volume * ((79353 * nitrogen_isotopes_isk) / 386404)
+    # из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
+    # до Jita дистанция 27.884 свет.лет со всеми скилами в 5 понадобится сжечь 69'708 Nitrogen Isotopes (buy 545.40 ISK)
+    input_transfer_cost: float = total_purchase_volume * ((88998 * nitrogen_isotopes_isk) / 386404)
     generate_summary_lines(
         'Стоимость доставки закупаемых материалов, ISK',
-        f'{transfer_cost:,.2f}',
-        f'{transfer_cost / customized_run_products:,.2f}')
+        f'{input_transfer_cost:,.2f}',
+        f'{input_transfer_cost / customized_run_products:,.2f}')
     generate_summary_lines(
         '└─ Объём закупаемых материалов, m&sup3;',
         f'{total_purchase_volume:,.1f} m&sup3;',
         f'{total_purchase_volume / customized_run_products:,.1f} m&sup3;')
 
-    total_gross_cost += transfer_cost
+    total_gross_cost += input_transfer_cost
 
     generate_summary_lines(
         'Стоимость запуска работ, ISK',
@@ -797,18 +798,18 @@ Adam4EVE {base_industry.product_name} Blueprint price history: <a href="https://
 
     total_ready_volume: float = industry_plan.base_industry.product.volume * customized_run_products
     # TODO: total_ready_volume: float = 50000 * customized_run_products
-    total_ready_volume: float = 2500 * customized_run_products
-    transfer_cost: float = total_ready_volume * ((79353 * nitrogen_isotopes_isk) / 386404) * 1.02
+    # TODO: total_ready_volume: float = 2500 * customized_run_products
+    output_transfer_cost: float = total_ready_volume * ((69708 * nitrogen_isotopes_isk) / 386404) * 1.02
     generate_summary_lines(
         'Стоимость отправки готовой продукции, ISK',
-        f'{transfer_cost:,.2f}',
-        f'{transfer_cost / customized_run_products:,.2f}')
+        f'{output_transfer_cost:,.2f}',
+        f'{output_transfer_cost / customized_run_products:,.2f}')
     generate_summary_lines(
         '└─ Объём готовой продукции, m&sup3;',
         f'{total_ready_volume:,.1f} m&sup3;',
         f'{total_ready_volume / customized_run_products:,.1f} m&sup3;')
 
-    total_gross_cost += transfer_cost
+    total_gross_cost += output_transfer_cost
 
     generate_summary_lines(
         'Общая стоимость проекта, ISK',
