@@ -116,7 +116,7 @@ function __dump_industry_group(&$industry_group, $MV) {
     }
     else
     {
-        ?><td align="right"<?=($jita_profit<=0)?" style='color: #c60000'":""?>><?=number_format($jita_profit,0,'.',',')?><br><?=$jita_percent?number_format($jita_percent,1,'.',',').'%':""?></td><?php
+        ?><td align="right"<?=($jita_profit<=0)?" style='color:#c60000'":""?>><?=number_format($jita_profit,0,'.',',')?><br><?=$jita_percent?number_format($jita_percent,1,'.',',').'%':""?></td><?php
     }
 
 	if (is_null($industry_cost) && is_null($product_mininum_price))
@@ -125,7 +125,7 @@ function __dump_industry_group(&$industry_group, $MV) {
 	}
 	else
 	{
-		?><td align="right"><?=number_format($industry_cost,0,'.',',')?><br><?=is_null($product_mininum_price)?'':number_format($product_mininum_price,0,'.',',')?></td><?php
+		?><td align="right"><?=is_null($industry_cost)?'':'<span style="color:#ea6300">'.number_format($industry_cost,0,'.',',').'</span>'?><br><?=is_null($product_mininum_price)?'':number_format($product_mininum_price,0,'.',',')?></td><?php
 	}
 
 
