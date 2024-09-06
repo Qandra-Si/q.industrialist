@@ -29,6 +29,13 @@ Usually single launch for one corporation takes 1.5-2 minutes, but in case of a 
 downtime, it will take up to 3-4 minutes for each very active corporation.
 Loading market prices for The Forge region will require about 1GB of memory.
 
+To refresh blueprints you need to feel market_hubs and market_routes tables and then
+run the following command from this directory:
+
+$ chcp 65001 & @rem on Windows only!
+$ python q_dictionaries.py --category=conveyor_formulas --cache_dir=~/.q_industrialist
+$ python q_universe_preloader.py --category=trade_hubs --category=industry_systems --category=market_prices --category=conveyor_formulas --pilot="Your Name" --online --cache_dir=~/.q_industrialist
+
 Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
     * esi-corporations.read_structures.v1 - Requires role(s): Station_Manager
@@ -60,7 +67,6 @@ def main():
         # * markets region history, т.е. рыночных цен по регионам - раз в день ОЧЕНЬ МЕДЛЕННО
         'public',
         # актуализация рыночных цен на товары во вселенной, в частности:
-        # * adjusted и average цен, которые которые отображаются в ingame-клиенте (т.н. universe price) - БЫСТРО
         # * цен в market-хабах по заданным настройках - скорость зависит от региона, но в частности Jita ДОЛГО
         # * цен на структурах по заданным настройкам - доступ зависит от корпорации, если альянс оч.крупный то НЕ БЫСТРО
         'trade_hubs',
@@ -76,7 +82,7 @@ def main():
         'goods',
         # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО (обновляется редко)
         'industry_systems',
-        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (обновляется по четвергам)
+        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (в EVE Online обновляется по четвергам)
         'market_prices',
         # пересчёт кеша таблиц для conveyor-формул (выборка данных по стоимости производства различных предметов)
         'conveyor_formulas',
@@ -351,6 +357,7 @@ def main():
                                      'purchase' if conveyor_formulas_purchase_refresh else '',
                                      'delivery' if conveyor_formulas_delivery_refresh else '']))
                 ))
+                dbtools.actualize_conveyor_formulas_calculus()
 
     sys.stdout.flush()
 

@@ -1,3 +1,17 @@
+--- eve_sde_blueprint_products
+
+ALTER TABLE qi.eve_sde_blueprint_products
+  ADD CONSTRAINT pk_sdebp PRIMARY KEY (sdebp_blueprint_type_id,sdebp_activity,sdebp_product_id);
+
+CREATE UNIQUE INDEX idx_sdebp_pk
+    ON qi.eve_sde_blueprint_products USING btree
+    (sdebp_blueprint_type_id ASC NULLS LAST, sdebp_activity ASC NULLS LAST, sdebp_product_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+--- conveyor_formulas
+
+DROP PROCEDURE IF EXISTS qi.cfc_full_calculus;
+
 DROP VIEW IF EXISTS qi.conveyor_formulas_industry_costs;
 DROP VIEW IF EXISTS qi.conveyor_formulas_products_prices;
 DROP VIEW IF EXISTS qi.conveyor_formulas_market_routes;
@@ -8,6 +22,12 @@ DROP VIEW IF EXISTS qi.conveyor_formulas_transfer_cost;
 DROP FUNCTION IF EXISTS qi.eve_ceiling(double precision);
 DROP FUNCTION IF EXISTS qi.eve_ceiling_change_by_point(double precision, integer);
 DROP FUNCTION IF EXISTS qi.nitrogen_isotopes_price();
+
+DROP INDEX IF EXISTS qi.idx_cfc_formula;
+DROP INDEX IF EXISTS qi.idx_cfc_market_route;
+DROP INDEX IF EXISTS qi.idx_cfc_market_hub;
+DROP INDEX IF EXISTS qi.idx_cfc_pk;
+DROP TABLE IF EXISTS qi.conveyor_formula_calculus;
 
 DROP INDEX IF EXISTS qi.idx_cfj_blueprint_type_id;
 DROP INDEX IF EXISTS qi.idx_cfj_formula;
@@ -30,6 +50,9 @@ DROP SEQUENCE IF EXISTS qi.seq_cf;
 DROP TYPE  IF EXISTS qi.esi_formulas_relics;
 
 
+--------------------------------------------------------------------------------
+-- расчёт эффективности производства на основе производственных формул
+--------------------------------------------------------------------------------
 CREATE TYPE qi.esi_formulas_relics AS ENUM ('intact','malfunctioning','wrecked','unused');
 
 CREATE SEQUENCE qi.seq_cf
@@ -58,6 +81,10 @@ CREATE TABLE qi.conveyor_formulas
         ON DELETE CASCADE,
     CONSTRAINT fk_cf_decryptor_type_id FOREIGN KEY (cf_decryptor_type_id)
         REFERENCES qi.eve_sde_type_ids(sdet_type_id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT fk_cf_blueprint_product FOREIGN KEY (cf_blueprint_type_id, cf_activity, cf_product_type_id)
+        REFERENCES qi.eve_sde_blueprint_products(sdebp_blueprint_type_id, sdebp_activity, sdebp_product_id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE
 )
@@ -100,7 +127,15 @@ CREATE INDEX idx_cf_decryptor_type_id
     (cf_decryptor_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
+CREATE INDEX idx_cf_blueprint_product
+    ON qi.conveyor_formulas USING btree
+    (cf_blueprint_type_id ASC NULLS LAST, cf_activity ASC NULLS LAST, cf_product_type_id ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- материалы, задействованные в производстве по conveyor-формулам
+--------------------------------------------------------------------------------
 CREATE TABLE qi.conveyor_formula_purchase
 (
     cfp_formula INTEGER NOT NULL,
@@ -128,8 +163,11 @@ CREATE UNIQUE INDEX idx_cfp_formula_material
     ON qi.conveyor_formula_purchase USING btree
     (cfp_formula ASC NULLS LAST, cfp_material_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
-
+--------------------------------------------------------------------------------
+-- работы, задействованные в производстве по conveyor-формулам
+--------------------------------------------------------------------------------
 CREATE TABLE qi.conveyor_formula_jobs
 (
     cfj_formula INTEGER NOT NULL,
@@ -145,7 +183,7 @@ CREATE TABLE qi.conveyor_formula_jobs
     cfj_rigs_bonus_job_cost DOUBLE PRECISION NOT NULL, -- бонусы модификаторов для выбранного activity_code
     cfj_scc_surcharge DOUBLE PRECISION NOT NULL, -- дополнительный сбор от CCP, фиксирован 0.04
     cfj_facility_tax DOUBLE PRECISION NOT NULL, -- налог на структуре (фиксированный налог на NPC структурах 0.0025; на структурах игроков устанавливается владельцем)
-    CONSTRAINT fk_cfp_formula FOREIGN KEY (cfj_formula)
+    CONSTRAINT fk_cfj_formula FOREIGN KEY (cfj_formula)
         REFERENCES qi.conveyor_formulas(cf_formula) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
@@ -167,7 +205,90 @@ CREATE INDEX idx_cfj_blueprint_type_id
     ON qi.conveyor_formula_jobs USING btree
     (cfj_blueprint_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
+--------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- предвариетльные расчёты conveyor-формул (расчёты выполняются долго, и потому
+-- результаты кешируются до момента следующего обновления зависимостей)
+--------------------------------------------------------------------------------
+CREATE TABLE qi.conveyor_formula_calculus
+(
+    cfc_formula INTEGER NOT NULL,
+	-- вычисляемые и кешированные данные формулы
+	cfc_products_per_single_run INTEGER NOT NULL, -- кешируется: количество продукции, производимой за один прогон (из таблицы eve_sde_blueprint_products)
+	cfc_products_num INTEGER NOT NULL, -- вычисляется: количество продукции, производимой формулой (как произведение customized_runs и products_per_single_run)
+    -- производстенные и торговые локации
+    cfc_industry_hub BIGINT NOT NULL, -- ожидается 1 вариант: фабрика, где расположено основное производство (откуда идёт торговый маршрут и куда привозятся материалы из Jita)
+    cfc_trade_hub BIGINT NOT NULL, -- вариантность: торговый хаб, где продаются произведённые продукты
+    cfc_trader_corp INTEGER NOT NULL, -- вариантность: корпорация, которая торгует в торговом хабе
+    -- налоги и брокерские комиссии
+    cfc_buying_brokers_fee FLOAT(25) NOT NULL, -- кешируется: брокерский налог на закупку материалов в Jita (из таблицы market_hubs для Jita)
+    cfc_sales_brokers_fee FLOAT(25) NOT NULL, -- кешируется: брокерский налог на продажу продукции в торговом хабе (из таблицы market_hubs для хаба)
+    cfc_sales_tax FLOAT(25) NOT NULL, -- кешируется: налог с продаж продукции в торговом хабе (из таблицы market_hubs для хаба)
+    -- Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
+    -- из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
+    cfc_fuel_price_isk DOUBLE PRECISION NOT NULL, -- кешируется: стоимость топляка джампака (по баям с налогами, либо усреднённая цена, либо по селам без налогов)
+    -- подробности закупки сырых материалов
+    cfc_materials_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость закупа в Jita сырых матариалов по формуле
+    cfc_materials_cost_with_fee DOUBLE PRECISION NOT NULL, -- кешируется: стоимость закупа в жита с учётом комиссии (произведение buying_brokers_fee и materials_cost)
+    cfc_purchase_volume DOUBLE PRECISION NOT NULL, -- вычисляется: объём сырых материалов закупаемых по формуле
+    cfc_materials_transfer_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость перевозки сырых материалов из Jita в пересчёте на стоимость топляка
+    -- стоимость запуска работ
+    cfc_jobs_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость запуска работ по формуле
+    -- подробности сбыта готовой продукции
+    cfc_ready_volume DOUBLE PRECISION NOT NULL, -- кешируется: объём продукции произведённой по формуле в упакованном виде (из таблицы eve_sde_type_ids)
+    cfc_ready_transfer_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость перевозки готовой продукции (общее кол-во, произведённой по формуле) в торговый хаб
+    cfc_products_recommended_price DOUBLE PRECISION, -- вычисляется: рекомендованная стоимость (общее кол-во по формуле) готовой продукции индивидуально для торгового хаба (по совокупности известных цен)
+    cfc_products_sell_fee_and_tax DOUBLE PRECISION, -- вычисляется: ориентировочные комиссии и налоги относительно рекомендованной стоимости
+	-- сводные данные по производству по формуле
+    cfc_total_gross_cost DOUBLE PRECISION NOT NULL, -- вычисляется: итоговая стоимость производственного проекта по формуле с транспортировкой до торгового хаба
+	cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость роизводства одной единицы продукции (частное от total_gross_cost и products_num)
+	cfc_product_mininum_price DOUBLE PRECISION, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
+    -- дата/время актуализации сведений о стоимости производства по формуле
+	cfc_created_at TIMESTAMP,
+    cfc_updated_at TIMESTAMP,
+    CONSTRAINT pk_cfc PRIMARY KEY (cfc_formula, cfc_industry_hub, cfc_trade_hub, cfc_trader_corp),
+    CONSTRAINT fk_cfc_formula FOREIGN KEY (cfc_formula)
+        REFERENCES qi.conveyor_formulas(cf_formula) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT fk_cfc_market_route FOREIGN KEY (cfc_industry_hub, cfc_trade_hub)
+        REFERENCES qi.market_routes(mr_src_hub, mr_dst_hub) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    CONSTRAINT fk_cfc_market_hub FOREIGN KEY (cfc_trade_hub, cfc_trader_corp)
+        REFERENCES qi.market_hubs(mh_hub_id, mh_trader_corp) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.conveyor_formula_calculus OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_cfc_pk
+    ON qi.conveyor_formula_calculus USING btree
+    (cfc_formula ASC NULLS LAST, cfc_industry_hub ASC NULLS LAST, cfc_trade_hub ASC NULLS LAST, cfc_trader_corp ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_cfc_formula
+    ON qi.conveyor_formula_calculus USING btree
+    (cfc_formula ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_cfc_market_route
+    ON qi.conveyor_formula_calculus USING btree
+    (cfc_industry_hub ASC NULLS LAST, cfc_trade_hub ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_cfc_market_hub
+    ON qi.conveyor_formula_calculus USING btree
+    (cfc_trade_hub ASC NULLS LAST, cfc_trader_corp ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- утилиты для работы с market-центами
+--------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION qi.eve_ceiling(isk double precision)
  RETURNS double precision
  LANGUAGE plpgsql
@@ -228,7 +349,11 @@ CREATE OR REPLACE FUNCTION qi.nitrogen_isotopes_price()
  LANGUAGE sql
  STABLE
 AS $function$
-   select coalesce(x.buy, (select emp_average_price as average_price from esi_markets_prices universe where emp_type_id = 17888), x.sell)
+   select coalesce(
+           x.buy,
+           (select emp_average_price as average_price from esi_markets_prices universe where emp_type_id = 17888),
+           x.sell,
+           545.40) -- hardcoded price (august 2024)
    from (
     select
      qi.eve_ceiling_change_by_point(ethp_buy,1) * 1.0132 as buy, -- TODO: Jita 1.32 fee
@@ -239,6 +364,9 @@ AS $function$
   $function$
 ;
 
+--------------------------------------------------------------------------------
+-- представления для расчёта стоимости проектов по conveyor-формулам
+--------------------------------------------------------------------------------
 create or replace view qi.conveyor_formulas_transfer_cost as
   select
    -- formula
@@ -271,6 +399,7 @@ create or replace view qi.conveyor_formulas_transfer_cost as
    (select
     f.cf_formula as formula,
     f.cf_customized_runs as customized_runs,
+    --f.cf_blueprint_type_id,
     --f.cf_product_type_id,
     tf.sdet_packaged_volume as product_packed,
     p.sdebp_activity as activity,
@@ -282,7 +411,8 @@ create or replace view qi.conveyor_formulas_transfer_cost as
    where
     f.cf_product_type_id=tf.sdet_type_id and
     f.cf_product_type_id=p.sdebp_product_id and
-    f.cf_activity=p.sdebp_activity
+    f.cf_blueprint_type_id=p.sdebp_blueprint_type_id and
+    f.cf_activity=p.sdebp_activity --and f.cf_formula=9028
    ) ready_products
   where raw_materials.formula=ready_products.formula;
 
@@ -387,6 +517,7 @@ create or replace view qi.conveyor_formulas_market_routes as
    -- input and output locations
    trnsfr_from_jita.industry_hub,
    trnsfr_to_market.trade_hub,
+   trnsfr_to_market.trader_corp,
    -- sales and buying fee and taxes
    trnsfr_from_jita.buying_brokers_fee,
    trnsfr_to_market.sales_brokers_fee,
@@ -416,6 +547,7 @@ create or replace view qi.conveyor_formulas_market_routes as
    (select
      r.mr_src_hub as industry_hub,
      r.mr_dst_hub as trade_hub,
+     h.mh_trader_corp as trader_corp,
      r.mr_isotopes_src_dst as output_fuel_quantity,
      h.mh_brokers_fee as sales_brokers_fee,
      h.mh_trade_hub_tax as sales_tax
@@ -502,6 +634,7 @@ create or replace view qi.conveyor_formulas_industry_costs as
     -- input and output locations
     r.industry_hub,
     r.trade_hub,
+    r.trader_corp,
     -- sales and buying fee and taxes
     r.buying_brokers_fee,
     r.sales_brokers_fee,
@@ -562,4 +695,111 @@ create or replace view qi.conveyor_formulas_industry_costs as
  --where z.formula in (1157,1189)
  --where z.formula in (2332)
  ;
+--------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- обновляет содержимое предварительно рассчитанного кеша с результатами
+-- информации о производстве по conveyor-формулам
+--------------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE qi.cfc_full_calculus()
+LANGUAGE sql
+AS $procedure$
+  INSERT INTO qi.conveyor_formula_calculus(
+   cfc_formula,
+   cfc_products_per_single_run,
+   cfc_products_num,
+   cfc_industry_hub,
+   cfc_trade_hub,
+   cfc_trader_corp,
+   cfc_buying_brokers_fee,
+   cfc_sales_brokers_fee,
+   cfc_sales_tax,
+   cfc_fuel_price_isk,
+   cfc_materials_cost,
+   cfc_materials_cost_with_fee,
+   cfc_purchase_volume,
+   cfc_materials_transfer_cost,
+   cfc_jobs_cost,
+   cfc_ready_volume,
+   cfc_ready_transfer_cost,
+   cfc_products_recommended_price,
+   cfc_products_sell_fee_and_tax,
+   cfc_total_gross_cost,
+   cfc_single_product_cost,
+   cfc_product_mininum_price,
+   cfc_created_at,
+   cfc_updated_at)
+      SELECT
+       formula,
+       products_per_single_run,
+       products_per_single_run * customized_runs,
+       industry_hub,
+       trade_hub,
+       trader_corp,
+       buying_brokers_fee,
+       sales_brokers_fee,
+       sales_tax,
+       fuel_price_isk,
+       materials_cost,
+       materials_cost_with_fee,
+       purchase_volume,
+       materials_transfer_cost,
+       jobs_cost,
+       ready_volume,
+       ready_transfer_cost,
+       products_recommended_price,
+       products_sell_fee_and_tax,
+       total_gross_cost,
+       product_cost,
+       product_mininum_price,
+       CURRENT_TIMESTAMP AT TIME ZONE 'GMT',
+       CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
+      FROM qi.conveyor_formulas_industry_costs
+      --WHERE formula=1782
+  ON CONFLICT ON CONSTRAINT pk_cfc DO UPDATE SET
+   --pk:cfc_formula = excluded.cfc_formula,
+   cfc_products_per_single_run = excluded.cfc_products_per_single_run,
+   cfc_products_num = excluded.cfc_products_num,
+   --pk:cfc_industry_hub = excluded.cfc_industry_hub,
+   --pk:cfc_trade_hub = excluded.cfc_trade_hub,
+   --pk:cfc_trader_corp = excluded.cfc_trader_corp,
+   cfc_buying_brokers_fee = excluded.cfc_buying_brokers_fee,
+   cfc_sales_brokers_fee = excluded.cfc_sales_brokers_fee,
+   cfc_sales_tax = excluded.cfc_sales_tax,
+   cfc_fuel_price_isk = excluded.cfc_fuel_price_isk,
+   cfc_materials_cost = excluded.cfc_materials_cost,
+   cfc_materials_cost_with_fee = excluded.cfc_materials_cost_with_fee,
+   cfc_purchase_volume = excluded.cfc_purchase_volume,
+   cfc_materials_transfer_cost = excluded.cfc_materials_transfer_cost,
+   cfc_jobs_cost = excluded.cfc_jobs_cost,
+   cfc_ready_volume = excluded.cfc_ready_volume,
+   cfc_ready_transfer_cost = excluded.cfc_ready_transfer_cost,
+   cfc_products_recommended_price = excluded.cfc_products_recommended_price,
+   cfc_products_sell_fee_and_tax = excluded.cfc_products_sell_fee_and_tax,
+   cfc_total_gross_cost = excluded.cfc_total_gross_cost,
+   cfc_single_product_cost = excluded.cfc_single_product_cost,
+   cfc_product_mininum_price = excluded.cfc_product_mininum_price,
+   --once:cfc_created_at = excluded.cfc_created_at,
+   cfc_updated_at = CASE WHEN
+     conveyor_formula_calculus.cfc_products_per_single_run = excluded.cfc_products_per_single_run and
+     conveyor_formula_calculus.cfc_products_num = excluded.cfc_products_num and
+     conveyor_formula_calculus.cfc_buying_brokers_fee = excluded.cfc_buying_brokers_fee and
+     conveyor_formula_calculus.cfc_sales_brokers_fee = excluded.cfc_sales_brokers_fee and
+     conveyor_formula_calculus.cfc_sales_tax = excluded.cfc_sales_tax and
+     conveyor_formula_calculus.cfc_fuel_price_isk = excluded.cfc_fuel_price_isk and
+     conveyor_formula_calculus.cfc_materials_cost = excluded.cfc_materials_cost and
+     conveyor_formula_calculus.cfc_materials_cost_with_fee = excluded.cfc_materials_cost_with_fee and
+     conveyor_formula_calculus.cfc_purchase_volume = excluded.cfc_purchase_volume and
+     conveyor_formula_calculus.cfc_materials_transfer_cost = excluded.cfc_materials_transfer_cost and
+     conveyor_formula_calculus.cfc_jobs_cost = excluded.cfc_jobs_cost and
+     conveyor_formula_calculus.cfc_ready_volume = excluded.cfc_ready_volume and
+     conveyor_formula_calculus.cfc_ready_transfer_cost = excluded.cfc_ready_transfer_cost and
+     conveyor_formula_calculus.cfc_products_recommended_price = excluded.cfc_products_recommended_price and
+     conveyor_formula_calculus.cfc_products_sell_fee_and_tax = excluded.cfc_products_sell_fee_and_tax and
+     conveyor_formula_calculus.cfc_total_gross_cost = excluded.cfc_total_gross_cost and
+     conveyor_formula_calculus.cfc_single_product_cost = excluded.cfc_single_product_cost and
+     conveyor_formula_calculus.cfc_product_mininum_price = excluded.cfc_product_mininum_price
+   THEN conveyor_formula_calculus.cfc_updated_at ELSE excluded.cfc_updated_at END;
+$procedure$
+;
+--------------------------------------------------------------------------------

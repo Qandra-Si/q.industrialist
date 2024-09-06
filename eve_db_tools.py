@@ -2702,3 +2702,11 @@ class QDatabaseTools:
         del data
 
         return industry_systems_updated
+
+    # -------------------------------------------------------------------------
+    # [<conveyor_formulas]
+    # -------------------------------------------------------------------------
+
+    def actualize_conveyor_formulas_calculus(self):
+        self.dbswagger.actualize_conveyor_formulas_calculus()
+        self.qidb.commit()
