@@ -2973,3 +2973,10 @@ class QSwaggerInterface:
              'at': updated_at,
              }
         )
+
+    # -------------------------------------------------------------------------
+    # [<conveyor_formulas]
+    # -------------------------------------------------------------------------
+
+    def actualize_conveyor_formulas_calculus(self):
+        self.db.execute("CALL cfc_full_calculus();")

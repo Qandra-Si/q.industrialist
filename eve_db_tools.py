@@ -25,6 +25,8 @@ def is_dicts_equal_by_keys(dict1, dict2, keys):
         else:
             if not (key in dict2):
                 continue
+            else:
+                return False
         x = dict1[key]
         y = dict2[key]
         if isinstance(x, float) or isinstance(y, float):
@@ -2700,3 +2702,11 @@ class QDatabaseTools:
         del data
 
         return industry_systems_updated
+
+    # -------------------------------------------------------------------------
+    # [<conveyor_formulas]
+    # -------------------------------------------------------------------------
+
+    def actualize_conveyor_formulas_calculus(self):
+        self.dbswagger.actualize_conveyor_formulas_calculus()
+        self.qidb.commit()

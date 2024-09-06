@@ -391,6 +391,7 @@ def main():
                 calc_num += 1
                 if (calc_num % 20) == 0:
                     print(f'Progress: {100.0 * (calc_num / len(calc_inputs)):.1f}%')
+                    sys.stdout.flush()
 
             del sde_blueprints
             del sde_market_groups
