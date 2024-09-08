@@ -81,7 +81,6 @@ function eveSysNumber(x) { return x <= 2147483647; }
 function eveUserNumber(x) { return x > 2147483647; }
 
 function numLikeEve(x) {
-  if (x < 1.0) return x;
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 (function() {

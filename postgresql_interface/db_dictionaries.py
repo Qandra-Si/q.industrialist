@@ -548,3 +548,50 @@ class QDictionaries:
                  'tax': jc.facility_tax,
                  }
             )
+
+    def clean_items(self):
+        self.db.execute("DELETE FROM eve_sde_items;")
+
+    def insert_item(self, item_id: int, location_id: int, type_id: int) -> None:
+        self.db.execute(
+            "INSERT INTO eve_sde_items("
+            " sdeii_item_id,"
+            " sdeii_location_id,"
+            " sdeii_type_id) "
+            "VALUES("
+            " %(i)s,"
+            " %(l)s,"
+            " %(t)s)"
+            "ON CONFLICT ON CONSTRAINT pk_sdeii DO UPDATE SET"
+            " sdeii_location_id=%(l)s,"
+            " sdeii_type_id=%(t)s;",
+            {'i': item_id,
+             'l': location_id,
+             't': type_id,
+             }
+        )
+
+    def actualize_items(self, sde_inv_items):
+        # "0": {  # '(none)'
+        #  "locationID": 0,
+        #  "typeID": 0  # '#System'
+        # },
+        # "9": {  # 'EVE Universe'
+        #  "locationID": 0,
+        #  "typeID": 0  # '#System'
+        # },
+        # "10000054": {  # 'Aridia'
+        #  "locationID": 9,
+        #  "typeID": 3  # 'Region'
+        # },
+        # "20000626": {  # 'Leseasesh'
+        #  "locationID": 10000054,
+        #  "typeID": 4  # 'Constellation'
+        # },
+        # "30004283": {  # 'Shafrak'
+        #  "locationID": 20000626,
+        #  "typeID": 5  # 'Solar System'
+        # },
+        for _item_id, item_dict in sde_inv_items.items():
+            item_id: int = int(_item_id)
+            self.insert_item(item_id, int(item_dict['locationID']), int(item_dict['typeID']))

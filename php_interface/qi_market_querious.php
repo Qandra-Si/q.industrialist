@@ -853,7 +853,6 @@ var g_purchase_types = [<?php
 ?>];
 
   function numLikeEve(x) {
-    if (x < 1.0) return x;
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
   (function() {

@@ -308,5 +308,27 @@ create or replace view qi.esi_industry_cost_indices as
   from qi.esi_industry_systems;
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+-- eve_sde_solar_systems
+-- список регионов, констелляций и солнечных систем в них
+--------------------------------------------------------------------------------
+create or replace view qi.eve_sde_solar_systems as
+  select
+   constellation.sdeii_location_id as region_id,
+   solar_system.sdeii_location_id as constellation_id,
+   solar_system.sdeii_item_id as solar_system_id,
+   region_name.sden_name as region,
+   constellation_name.sden_name as constellation,
+   solar_system_name.sden_name as solar_system
+  from
+   qi.eve_sde_items solar_system
+    left outer join qi.eve_sde_names as solar_system_name on (solar_system_name.sden_category=3 and solar_system_name.sden_id=solar_system.sdeii_item_id)
+    left outer join qi.eve_sde_items as constellation on (constellation.sdeii_type_id=4 and solar_system.sdeii_location_id=constellation.sdeii_item_id)
+    left outer join qi.eve_sde_names as constellation_name on (constellation_name.sden_category=3 and constellation_name.sden_id=constellation.sdeii_item_id)
+    left outer join qi.eve_sde_names as region_name on (region_name.sden_category=3 and region_name.sden_id=constellation.sdeii_location_id)
+  where solar_system.sdeii_type_id=5;
+--------------------------------------------------------------------------------
+
 -- получаем справку в конце выполнения всех запросов
 \d+ qi.

@@ -293,10 +293,12 @@ CREATE TABLE qi.conveyor_formula_calculus
     cfc_ready_transfer_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость перевозки готовой продукции (общее кол-во, произведённой по формуле) в торговый хаб
     cfc_products_recommended_price DOUBLE PRECISION, -- вычисляется: рекомендованная стоимость (общее кол-во по формуле) готовой продукции индивидуально для торгового хаба (по совокупности известных цен)
     cfc_products_sell_fee_and_tax DOUBLE PRECISION, -- вычисляется: ориентировочные комиссии и налоги относительно рекомендованной стоимости
-	-- сводные данные по производству по формуле
+	cfc_single_product_price_wo_fee_tax DOUBLE PRECISION, -- вычисляется: прибыль от продажи партии продуктов по рекомендованной цене в торговом хабе
+    -- сводные данные по производству по формуле
     cfc_total_gross_cost DOUBLE PRECISION NOT NULL, -- вычисляется: итоговая стоимость производственного проекта по формуле с транспортировкой до торгового хаба
 	cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость производства одной единицы продукции (частное от total_gross_cost и products_num)
-	cfc_product_mininum_price DOUBLE PRECISION, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
+	cfc_product_mininum_price DOUBLE PRECISION NOT NULL, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
+    cfc_single_product_profit DOUBLE PRECISION, -- кешируется: профит от производства и продажи одонго экземпляра продукта (cfc_single_product_price_wo_fee_tax-cfc_single_product_cost)
     -- дата/время актуализации сведений о стоимости производства по формуле
 	cfc_created_at TIMESTAMP,
     cfc_updated_at TIMESTAMP,
@@ -671,80 +673,86 @@ create or replace view qi.conveyor_formulas_products_prices as
 
 create or replace view qi.conveyor_formulas_industry_costs as
  select
-  z.*,
-  z.total_gross_cost / (z.customized_runs*z.products_per_single_run) as product_cost,
-  qi.eve_ceiling((z.total_gross_cost + z.products_sell_fee_and_tax) / (z.customized_runs*z.products_per_single_run)) as product_mininum_price
+  y.*,
+  y.single_product_price_wo_fee_tax - single_product_cost as single_product_profit
  from (
   select
-   w.*,
-   ( w.materials_cost_with_fee +
-     w.jobs_cost + 
-     w.materials_transfer_cost + 
-     w.ready_transfer_cost
-   ) as total_gross_cost
+   z.*,
+   z.total_gross_cost / (z.customized_runs*z.products_per_single_run) as single_product_cost,
+   qi.eve_ceiling((z.total_gross_cost * (1 + z.sales_brokers_fee + z.sales_tax)) / (z.customized_runs*z.products_per_single_run)) as product_mininum_price
   from (
    select
-    -- input and output locations
-    r.industry_hub,
-    r.trade_hub,
-    r.trader_corp,
-    -- sales and buying fee and taxes
-    r.buying_brokers_fee,
-    r.sales_brokers_fee,
-    r.sales_tax,
-    -- formula
-    x.formula,
-    x.product_type_id,
-    x.customized_runs,
-    x.products_per_single_run,
-    x.decryptor_type_id,
-    x.ancient_relics,
-    -- Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
-    -- из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
-    r.fuel_price_isk,
-    -- raw material buying details
-    --r.input_fuel_quantity,
-    x.materials_cost,
-    x.materials_cost * (1.0 + r.buying_brokers_fee) as materials_cost_with_fee,
-    x.purchase_volume,
-    x.purchase_volume * r.input_m3_cost as materials_transfer_cost,
-    -- jobs cost
-    x.jobs_cost,
-    -- ready product selling details
-    --r.output_fuel_quantity,
-    x.ready_volume,
-    x.ready_volume * r.output_m3_cost as ready_transfer_cost,
-    x.products_recommended_price,
-    x.products_recommended_price * (r.sales_brokers_fee + r.sales_tax) as products_sell_fee_and_tax
+    w.*,
+    (w.products_recommended_price - w.products_sell_fee_and_tax) / (w.customized_runs*w.products_per_single_run) as single_product_price_wo_fee_tax,
+    ( w.materials_cost_with_fee +
+      w.jobs_cost + 
+      w.materials_transfer_cost + 
+      w.ready_transfer_cost
+    ) as total_gross_cost
    from (
     select
-     p.trade_hub,
-     cf.cf_formula as formula,
-     cf.cf_product_type_id as product_type_id,
-     cf.cf_customized_runs as customized_runs,
-     t.products_per_single_run as products_per_single_run,
-     cf.cf_decryptor_type_id as decryptor_type_id,
-     cf.cf_ancient_relics as ancient_relics,
-     m.materials_cost,
-     j.job_cost as jobs_cost,
-     t.purchase_volume,
-     t.ready_volume,
-     p.hub_recommended_price * cf.cf_customized_runs * t.products_per_single_run as products_recommended_price
-    from
-     qi.conveyor_formulas cf
-      left outer join qi.conveyor_formulas_products_prices p on (p.type_id=cf.cf_product_type_id),
-     qi.conveyor_formulas_purchase_materials m,
-     qi.conveyor_formulas_jobs_costs j,
-     qi.conveyor_formulas_transfer_cost t
-    where
-     cf.cf_formula=m.formula and
-     cf.cf_formula=j.formula and
-     cf.cf_formula=t.formula --and cf_formula=2332
-    ) x,
-    qi.conveyor_formulas_market_routes r
-    where x.trade_hub=r.trade_hub --and formula=2332
-  ) w
- ) z
+     -- input and output locations
+     r.industry_hub,
+     r.trade_hub,
+     r.trader_corp,
+     -- sales and buying fee and taxes
+     r.buying_brokers_fee,
+     r.sales_brokers_fee,
+     r.sales_tax,
+     -- formula
+     x.formula,
+     x.product_type_id,
+     x.customized_runs,
+     x.products_per_single_run,
+     x.decryptor_type_id,
+     x.ancient_relics,
+     -- Rhea с 3x ORE Expanded Cargohold имеет 386'404.0 куб.м
+     -- из Jita дистанция 35.6 свет.лет со всеми скилами в 5 понадобится сжечь 88'998 Nitrogen Isotopes (buy 545.40 ISK)
+     r.fuel_price_isk,
+     -- raw material buying details
+     --r.input_fuel_quantity,
+     x.materials_cost,
+     x.materials_cost * (1.0 + r.buying_brokers_fee) as materials_cost_with_fee,
+     x.purchase_volume,
+     x.purchase_volume * r.input_m3_cost as materials_transfer_cost,
+     -- jobs cost
+     x.jobs_cost,
+     -- ready product selling details
+     --r.output_fuel_quantity,
+     x.ready_volume,
+     x.ready_volume * r.output_m3_cost as ready_transfer_cost,
+     x.products_recommended_price,
+     x.products_recommended_price * (r.sales_brokers_fee + r.sales_tax) as products_sell_fee_and_tax
+    from (
+     select
+      p.trade_hub,
+      cf.cf_formula as formula,
+      cf.cf_product_type_id as product_type_id,
+      cf.cf_customized_runs as customized_runs,
+      t.products_per_single_run as products_per_single_run,
+      cf.cf_decryptor_type_id as decryptor_type_id,
+      cf.cf_ancient_relics as ancient_relics,
+      m.materials_cost,
+      j.job_cost as jobs_cost,
+      t.purchase_volume,
+      t.ready_volume,
+      p.hub_recommended_price * cf.cf_customized_runs * t.products_per_single_run as products_recommended_price
+     from
+      qi.conveyor_formulas cf
+       left outer join qi.conveyor_formulas_products_prices p on (p.type_id=cf.cf_product_type_id),
+      qi.conveyor_formulas_purchase_materials m,
+      qi.conveyor_formulas_jobs_costs j,
+      qi.conveyor_formulas_transfer_cost t
+     where
+      cf.cf_formula=m.formula and
+      cf.cf_formula=j.formula and
+      cf.cf_formula=t.formula --and cf_formula=2332
+     ) x,
+     qi.conveyor_formulas_market_routes r
+     where x.trade_hub=r.trade_hub --and formula=2332
+   ) w
+  ) z
+ ) y
  --where z.formula in (1157,1189)
  --where z.formula in (2332)
  ;
@@ -777,9 +785,11 @@ AS $procedure$
    cfc_ready_transfer_cost,
    cfc_products_recommended_price,
    cfc_products_sell_fee_and_tax,
+   cfc_single_product_price_wo_fee_tax,
    cfc_total_gross_cost,
    cfc_single_product_cost,
    cfc_product_mininum_price,
+   cfc_single_product_profit,
    cfc_created_at,
    cfc_updated_at)
       SELECT
@@ -802,9 +812,11 @@ AS $procedure$
        ready_transfer_cost,
        products_recommended_price,
        products_sell_fee_and_tax,
+       single_product_price_wo_fee_tax,
        total_gross_cost,
-       product_cost,
+       single_product_cost,
        product_mininum_price,
+       single_product_profit,
        CURRENT_TIMESTAMP AT TIME ZONE 'GMT',
        CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
       FROM qi.conveyor_formulas_industry_costs
@@ -829,9 +841,11 @@ AS $procedure$
    cfc_ready_transfer_cost = excluded.cfc_ready_transfer_cost,
    cfc_products_recommended_price = excluded.cfc_products_recommended_price,
    cfc_products_sell_fee_and_tax = excluded.cfc_products_sell_fee_and_tax,
+   cfc_single_product_price_wo_fee_tax = excluded.cfc_single_product_price_wo_fee_tax,
    cfc_total_gross_cost = excluded.cfc_total_gross_cost,
    cfc_single_product_cost = excluded.cfc_single_product_cost,
    cfc_product_mininum_price = excluded.cfc_product_mininum_price,
+   cfc_single_product_profit = excluded.cfc_single_product_profit,
    --once:cfc_created_at = excluded.cfc_created_at,
    cfc_updated_at = CASE WHEN
      conveyor_formula_calculus.cfc_products_per_single_run = excluded.cfc_products_per_single_run and
@@ -849,9 +863,11 @@ AS $procedure$
      conveyor_formula_calculus.cfc_ready_transfer_cost = excluded.cfc_ready_transfer_cost and
      conveyor_formula_calculus.cfc_products_recommended_price = excluded.cfc_products_recommended_price and
      conveyor_formula_calculus.cfc_products_sell_fee_and_tax = excluded.cfc_products_sell_fee_and_tax and
+     conveyor_formula_calculus.cfc_single_product_price_wo_fee_tax = excluded.cfc_single_product_price_wo_fee_tax and
      conveyor_formula_calculus.cfc_total_gross_cost = excluded.cfc_total_gross_cost and
      conveyor_formula_calculus.cfc_single_product_cost = excluded.cfc_single_product_cost and
-     conveyor_formula_calculus.cfc_product_mininum_price = excluded.cfc_product_mininum_price
+     conveyor_formula_calculus.cfc_product_mininum_price = excluded.cfc_product_mininum_price and
+     conveyor_formula_calculus.cfc_single_product_profit = excluded.cfc_single_product_profit
    THEN conveyor_formula_calculus.cfc_updated_at ELSE excluded.cfc_updated_at END;
   --- --- ---
   UPDATE qi.conveyor_formula_calculus

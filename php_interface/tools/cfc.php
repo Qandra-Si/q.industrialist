@@ -36,8 +36,10 @@ select
  cfc_ready_transfer_cost ready_transfer_cost,
  cfc_products_recommended_price products_recommended_price,
  cfc_products_sell_fee_and_tax products_sell_fee_and_tax,
+ cfc_single_product_price_wo_fee_tax single_product_price_wo_fee_tax,
  cfc_total_gross_cost total_gross_cost,
  cfc_single_product_cost single_product_cost,
+ cfc_single_product_profit single_product_profit,
  cfc_product_mininum_price product_mininum_price,
  cfc_created_at created_at,
  date_trunc('minutes', CURRENT_TIMESTAMP AT TIME ZONE 'GMT'-cfc_created_at) created_at,
@@ -70,7 +72,6 @@ EOD;
         {
             if (0 == $idx++)
             {
-                $o['formula'] = intval($o['formula']);
                 $o['blueprint_type_id'] = intval($o['blueprint_type_id']);
                 if (is_null($o['blueprint'])) unset($o['blueprint']);
                 $o['activity'] = intval($o['activity']);
@@ -84,16 +85,18 @@ EOD;
             }
             else
             {
-                unset($o['formula']);
                 unset($o['blueprint_type_id']);
+                unset($o['blueprint']);
                 unset($o['activity']);
                 unset($o['prior_blueprint_type_id']);
+                unset($o['prior_blueprint']);
                 unset($o['products_per_single_run']);
                 unset($o['buying_brokers_fee']);
                 unset($o['sales_brokers_fee']);
                 unset($o['sales_tax']);
                 unset($o['fuel_price_isk']);
             }
+            $o['formula'] = intval($o['formula']);
 			if (is_null($o['decryptor_type_id'])) unset($o['decryptor_type_id']); else $o['decryptor_type_id'] = intval($o['decryptor_type_id']);
 			if (is_null($o['decryptor'])) unset($o['decryptor']);
 			if ($o['ancient_relics']=='unused') unset($o['ancient_relics']); else $o['ancient_relics'] = intval($o['ancient_relics']);
@@ -109,9 +112,11 @@ EOD;
 			$o['ready_transfer_cost'] = floatval($o['ready_transfer_cost']);
 			if (is_null($o['products_recommended_price'])) unset($o['products_recommended_price']); else $o['products_recommended_price'] = floatval($o['products_recommended_price']);
 			if (is_null($o['products_sell_fee_and_tax'])) unset($o['products_sell_fee_and_tax']); else $o['products_sell_fee_and_tax'] = floatval($o['products_sell_fee_and_tax']);
+			if (is_null($o['single_product_price_wo_fee_tax'])) unset($o['single_product_price_wo_fee_tax']); else $o['single_product_price_wo_fee_tax'] = floatval($o['single_product_price_wo_fee_tax']);
 			$o['total_gross_cost'] = floatval($o['total_gross_cost']);
 			$o['single_product_cost'] = floatval($o['single_product_cost']);
-			if (is_null($o['product_mininum_price'])) unset($o['product_mininum_price']); else $o['product_mininum_price'] = floatval($o['product_mininum_price']);
+			$o['product_mininum_price'] = floatval($o['product_mininum_price']);
+			if (is_null($o['single_product_profit'])) unset($o['single_product_profit']); else $o['single_product_profit'] = floatval($o['single_product_profit']);
 			$o['created_at'] = strval(rtrim($o['created_at'],':00'));
 			$o['updated_at'] = strval(rtrim($o['updated_at'],':00'));
         }

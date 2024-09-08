@@ -15,6 +15,12 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+DROP VIEW IF EXISTS  qi.eve_sde_solar_systems;
+DROP INDEX IF EXISTS qi.idx_sdeii_type_id;
+DROP INDEX IF EXISTS qi.idx_sdeii_location_id;
+DROP INDEX IF EXISTS qi.idx_sdeii_pk;
+DROP TABLE IF EXISTS qi.eve_sde_items;
+
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_semantic;
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree_sorted;
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree;
@@ -350,6 +356,37 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdet_created_at
     ON qi.eve_sde_type_ids USING btree
     (sdet_created_at ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (invItems)
+-- справочник по celestial объёктам вселенной (регионы, констелляции, системы, луны...)
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_items
+(
+    sdeii_item_id INTEGER NOT NULL,
+    sdeii_location_id INTEGER NOT NULL,
+    sdeii_type_id INTEGER NOT NULL,
+    CONSTRAINT pk_sdeii PRIMARY KEY (sdeii_item_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_items OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdeii_pk
+    ON qi.eve_sde_items USING btree
+    (sdeii_item_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeii_location_id
+    ON qi.eve_sde_items USING btree
+    (sdeii_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeii_type_id
+    ON qi.eve_sde_items USING btree
+    (sdeii_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 

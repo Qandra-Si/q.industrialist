@@ -162,12 +162,17 @@ class QDatabaseTools:
         self.__universe_items_with_names: typing.Set[int] = set()
         self.prepare_cache()
 
+        self.active_market_hubs: typing.List[db.QSwaggerInterface.MarketHub] = list()
+        self.prepare_settings()
+
         self.depth = QEntityDepth()
 
     def __del__(self):
         """ destructor
         """
         del self.depth
+
+        del self.active_market_hubs
 
         del self.__universe_items_with_names
         del self.__cached_industry_systems
@@ -398,6 +403,13 @@ class QDatabaseTools:
                 del ext
             else:
                 pers_cache[row_id].store_ext(ext)
+
+    # -------------------------------------------------------------------------
+    # s e t t i n g s
+    # -------------------------------------------------------------------------
+
+    def prepare_settings(self):
+        self.active_market_hubs = self.dbswagger.get_active_market_hubs()
 
     # -------------------------------------------------------------------------
     # e v e   s w a g g e r   i n t e r f a c e
@@ -2228,15 +2240,26 @@ class QDatabaseTools:
         else:
             return "markets/{region_id}/orders/?order_type={order_type}&type_id={type_id}".format(region_id=region_id, order_type=order_type, type_id=type_id)
 
-    def actualize_trade_hubs_market_orders(self, region: str, trade_hubs):
-        region_id = self.dbswagger.select_region_id_by_name(region)  # 'The Forge' = 10000002
-        if region_id is None:
-            return None, None
+    def actualize_trade_hubs_market_orders(
+            self,
+            region: str,
+            trade_hubs: typing.List[typing.Union[str, db.QSwaggerInterface.MarketHub]],
+            region_id: typing.Optional[int] = None):
+        if not region_id:
+            # 'The Forge' = 10000002
+            region_id: typing.Optional[int] = self.dbswagger.select_region_id_by_name(region)
+            if region_id is None:
+                return None, None
 
-        trade_hub_ids = []
+        trade_hub_ids: typing.List[int] = []
         for hub in trade_hubs:
-            station_id = self.dbswagger.select_station_id_by_name(hub)  # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
-            if not (station_id is None):
+            if isinstance(hub, str):
+                # 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' = 60003760
+                station_id: typing.Optional[int] = self.dbswagger.select_station_id_by_name(hub)
+                if not (station_id is None):
+                    trade_hub_ids.append(station_id)
+            elif isinstance(hub, db.QSwaggerInterface.MarketHub):
+                station_id: int = hub.trade_hub_id
                 trade_hub_ids.append(station_id)
         if not trade_hub_ids:
             return None, None

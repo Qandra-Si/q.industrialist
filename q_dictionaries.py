@@ -40,6 +40,8 @@ def main():
         # быстрый и унифицированный справочник по названиям, используемым во вселенной,
         # который разделяется по категориям в зависимости от типа
         'names',
+        # справочник по celestial объёктам вселенной (регионы, констелляции, системы, луны...)
+        'items',
         # ввод данных по чертежам, продуктам производста, типам произвосдва и материалам,
         # используемым при работе с чертежами (данные не могут быть получены по ESI), поэтому
         # это единстенный способ актаулизации информации при обновлении во вселейнной)
@@ -396,6 +398,12 @@ def main():
             del sde_blueprints
             del sde_market_groups
             del sde_type_ids
+
+    if category in ['all', 'items']:
+        sde_inv_items = eve_sde_tools.read_converted(workspace_cache_files_dir, "invItems")
+        qidbdics.clean_items()
+        qidbdics.actualize_items(sde_inv_items)
+        del sde_inv_items
 
     del qidbdics
     del qidb
