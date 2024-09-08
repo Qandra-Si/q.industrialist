@@ -418,10 +418,6 @@ function __dump_products_and_orders_dialog(&$market_hubs) { ?>
      <input type="hidden" name="tid" readonly>
     </form>
     <div id="dtlsIndustryProduct-wrapper" style="font-size: 90%;">
-     <div class="row">
-      <div class="col-md-8">Формула №</div>
-      <div class="col-md-4" align="right"><mark id="dtlsFormula"></mark><?=get_glyph_icon_button('copy','id="dtlsFormula" data-copy="" class="qind-copy-btn" data-toggle="tooltip"')?></div>
-     </div>
     </div>
   </div>
   <!-- -->
