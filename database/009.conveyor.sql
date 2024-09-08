@@ -295,7 +295,7 @@ CREATE TABLE qi.conveyor_formula_calculus
     cfc_products_sell_fee_and_tax DOUBLE PRECISION, -- вычисляется: ориентировочные комиссии и налоги относительно рекомендованной стоимости
 	-- сводные данные по производству по формуле
     cfc_total_gross_cost DOUBLE PRECISION NOT NULL, -- вычисляется: итоговая стоимость производственного проекта по формуле с транспортировкой до торгового хаба
-	cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость роизводства одной единицы продукции (частное от total_gross_cost и products_num)
+	cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость производства одной единицы продукции (частное от total_gross_cost и products_num)
 	cfc_product_mininum_price DOUBLE PRECISION, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
     -- дата/время актуализации сведений о стоимости производства по формуле
 	cfc_created_at TIMESTAMP,

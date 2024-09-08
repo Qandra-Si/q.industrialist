@@ -381,6 +381,17 @@ $(document).ready(function(){
   refreshMarketOrdersAndHistory(type_id, hub, corp);
  });
 
+ $('#dtlsSelTransferHub a').click(function(e) {
+  e.preventDefault();
+  var type_id = $('#copyTypeId').attr('data-copy');
+  var li = $(this).closest('li');
+  var hub = li.attr('hub');
+  var corp = li.attr('corp');
+  //- отправка запроса на формирование таблицы текущий маркет-ордеров
+  //- отправка запроса на формирование таблицы текущий маркет-ордеров
+  refreshIndustryProductTransferDetails(type_id, hub, corp);
+ });
+
  // работа с буфером обмена
  if (!( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) )) {
   $('price_normal,price_warning,price_ordinal,price_grayed').each(function() {

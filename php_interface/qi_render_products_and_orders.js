@@ -170,6 +170,115 @@ $("#frmMarketHistory").on("submit", function(e){
  });
 });
 
+function refreshIndustryProductTransferDetails(type_id, hub, corp) {
+ setOption('Selected Market Hub', hub);
+ setOption('Selected Trader Corp', corp);
+ for (const h of g_market_hubs) {
+  if (h === null) break;
+  if (h[0] != hub) continue;
+  if (h[1] != corp) continue;
+  $('#dtlsSelTransferHub ul').find('li').each(function() {
+   var li = $(this);
+   if ((li.attr('hub') == hub) && (li.attr('corp')))
+    li.addClass('active');
+   else
+    li.removeClass('active');
+  });
+  break;
+ }
+ //- отправка запроса на формирование формы с расчётами производства продукта
+ //$("#tblMarketOrders tbody").html('');
+ var frm = $("#frmIndustryProduct");
+ frm.find("input[name='corp']").val(corp); // мб. список
+ frm.find("input[name='hub']").val(hub);
+ frm.find("input[name='tid']").val(type_id);
+ frm.submit();
+}
+
+function rowIndustryProduct(caption, val, meas='', col1=0, col2=6, col3=6, col4=0){
+ return "<div class='row'>"+
+  ((col1==0)?'':"<div class='col-md-"+col1+"'></div>")+
+  "<div class='col-md-"+col2+"'>"+caption+"</div>"+
+  "<div class='col-md-"+col3+"' align='right'><mark>"+val+"</mark> "+meas+"</div>"+
+  ((col4==0)?'':"<div class='col-md-"+col4+"'></div>")+
+  "</div>";
+}
+
+$("#frmIndustryProduct").on("submit", function(e){
+ e.preventDefault();
+ $.ajax({
+  url: '/tools/cfc.php',
+  method: 'post',
+  dataType: 'json',
+  data: $(this).serialize(),
+  success: function(data){
+   var rows = '';
+   var products_per_single_run = 0;
+   $(data).each(function(i,row) {
+    if (i == 0)
+    {
+     rows += rowIndustryProduct('Формула №', row.formula, '', 2, 4, 4, 2);
+     if (row.prior_blueprint_type_id === undefined)
+      rows += rowIndustryProduct('Чертёж', row.blueprint, '', 2, 4, 4, 2);
+     else
+      rows += rowIndustryProduct('Чертежи', row.prior_blueprint+"<br>"+row.blueprint, '', 2, 1, 7, 2);
+     rows += rowIndustryProduct('Код производства', row.activity, '', 2, 4, 4, 2);
+     rows += rowIndustryProduct('Подукция за 1 прогон', row.products_per_single_run, '', 2, 4, 4, 2);
+     // best_choice
+     rows += rowIndustryProduct('Комиссия на закуп', (row.buying_brokers_fee*100.0).toFixed(2), '%', 2, 4, 4, 2);
+     rows += rowIndustryProduct('Комиссия, налог с продаж', ((row.sales_brokers_fee)*100.0).toFixed(2)+" + "+((row.sales_tax)*100.0).toFixed(2)+" = "+((row.sales_brokers_fee+row.sales_tax)*100.0).toFixed(2), '%', 2, 4, 4, 2);
+     rows += rowIndustryProduct('Цена топляка', numLikeEve(row.fuel_price_isk.toFixed(2)), 'ISK', 2, 4, 4, 2);
+     rows += "<hr>";
+     products_per_single_run = row.products_per_single_run;
+    }
+    else
+    {
+     rows += "<hr>";
+    }
+    // меняется от одной записи к другой
+    rows += "<div class='row'><div class='col-md-6'>";
+    //---
+    if (!(row.decryptor === undefined))
+     rows += rowIndustryProduct('Декриптор', "<span style='color:#"+(i?"8dc169":"ec5c5c")+";'>"+row.decryptor+'</span>', '('+row.decryptor_type_id+')', 0, 4, 8);
+    if (!(row.ancient_relics === undefined))
+     rows += rowIndustryProduct('Реликт', row.ancient_relics);
+    rows += rowIndustryProduct('Прогоны', row.customized_runs, 'шт');
+    rows += rowIndustryProduct('Продукция', row.customized_runs+" * "+products_per_single_run+" = "+row.products_num, 'шт');
+    rows += rowIndustryProduct('Стоимость материалов', numLikeEve(row.materials_cost.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Закуп материалов в Jita', numLikeEve(row.materials_cost_with_fee.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Объём материалов', numLikeEve(row.purchase_volume.toFixed(2)), 'm³');
+    rows += rowIndustryProduct('Доставка материалов', numLikeEve(row.materials_transfer_cost.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Запуск работ', numLikeEve(row.jobs_cost.toFixed(2)), 'ISK');
+    //---
+    rows += "</div><div class='col-md-6'>";
+    //---
+    rows += rowIndustryProduct('Объём продукции', numLikeEve(row.ready_volume.toFixed(2)), 'm³');
+    rows += rowIndustryProduct('Вывоз продукции', numLikeEve(row.ready_transfer_cost.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Рекомендованная стоимость', ((row.products_recommended_price === undefined)?'':numLikeEve(row.products_recommended_price.toFixed(2))), 'ISK');
+    rows += rowIndustryProduct('Комиссия с продаж', ((row.products_sell_fee_and_tax === undefined)?'':numLikeEve(row.products_sell_fee_and_tax.toFixed(2))), 'ISK');
+    rows += rowIndustryProduct('Итоговая стоимость проекта', numLikeEve(row.total_gross_cost.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Стоимость производства 1 шт', numLikeEve(row.single_product_cost.toFixed(2)), 'ISK');
+    rows += rowIndustryProduct('Нижний порог продажи продукта', '<span class="text-primary">'+((row.product_mininum_price === undefined)?'':numLikeEve(row.product_mininum_price.toFixed(2)))+'</span>', 'ISK');
+    rows += rowIndustryProduct('Формула расчитана', row.created_at, 'мин');
+    rows += rowIndustryProduct('Формула обновлена', row.updated_at, 'мин');
+    //---
+    rows += "</div></div>";
+   });
+   var dtls = $("#dtlsIndustryProduct-wrapper");
+   dtls.html(rows);
+  },
+  error: function (jqXHR, exception) {
+   if (jqXHR.status === 0) alert('Not connect. Verify Network.');
+   else if (jqXHR.status == 404) alert('Requested page not found (404).');
+   else if (jqXHR.status == 500) alert('Internal Server Error (500).');
+   else if (exception === 'parsererror') alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   else if (exception === 'timeout') alert('Time out error.'); // сервер завис?
+   else if (exception === 'abort') alert('Ajax request aborted.');
+   else alert('Uncaught Error. ' + jqXHR.responseText);
+  }
+ });
+});
+
 $("#frmCorpAssets").on("submit", function(e){
  e.preventDefault();
  $.ajax({
@@ -230,6 +339,7 @@ function showProductInfoDialog(elem) {
  var hub = getOption('Selected Market Hub', 60003760);
  var corp = getOption('Selected Trader Corp', 98553333);
  refreshMarketOrdersAndHistory(type_id, hub, corp);
+ refreshIndustryProductTransferDetails(type_id, hub, corp);
  //- отправка запроса на формирование таблица корпоративного имущества
  refreshCorpAssets(type_id);
  //- формирование содержимого диалогового окна
