@@ -312,8 +312,8 @@ def main():
             # {'bptid': 47326, 'qr': 5, 'me': 5, 'te': 10},  # Structure Tech II (53)
             # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4},   # так нельзя, см. ниже
             # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4, 'bpc': 41627},  # Capital Hull Repairer II из разных чертежей
-            {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845},
-            # Small Vorton Projector II Blueprint (Tech I)
+            # {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845}, # Small Vorton Projector II Blueprint (Tech I)
+            {'bptid': 79326, 'qr': 1, 'me': 0, 'te': 0},
         ]
 
     # см. также eve_conveyor_tools.py : setup_blueprint_details
