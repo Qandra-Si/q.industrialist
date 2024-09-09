@@ -555,7 +555,7 @@ class DecryptorDetails:
         return self.__time
 
 
-def which_decryptor_applies_to_blueprint(
+def which_decryptor_applies_to_blueprint__static_variant(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # продукт для проверки (внимание! чертежи плохо каталогизированы, market-группы часто не заданы,
@@ -585,6 +585,35 @@ def which_decryptor_applies_to_blueprint(
         return DecryptorDetails(decryptor_type)
     else:
         return None
+
+
+def which_decryptor_applies_to_blueprint__formula_variant(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # продукт для проверки по спискам conveyor_formulas
+        product_type: db.QSwaggerTypeId) -> typing.Optional[DecryptorDetails]:
+    conveyor_formula: typing.Optional[db.QSwaggerConveyorFormula] = qid.get_conveyor_formula(product_type.type_id)
+    # если есть предварительно рассчитанная conveyor-формула, то выбираем именно её (с неё точно всё в порядке, все
+    # варианты расчётов можно проверить и убедиться в правильности)
+    if conveyor_formula:
+        decryptor_type: typing.Optional[db.QSwaggerTypeId] = conveyor_formula.decryptor_type
+        if decryptor_type:
+            return DecryptorDetails(decryptor_type)
+        else:
+            return None
+    # если conveyor-формулы готовой нет, то скорее всего предмет не является Tech II, тогда выбираем декриптор
+    # с помощью старого алгоритма (правила принятые в ri4)
+    return which_decryptor_applies_to_blueprint__static_variant(qid, product_type)
+
+
+def which_decryptor_applies_to_blueprint(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # продукт для проверки (внимание! чертежи плохо каталогизированы, market-группы часто не заданы,
+        # или отсутствуют у T2-чертежей)
+        product_type: db.QSwaggerTypeId) -> typing.Optional[DecryptorDetails]:
+    # return which_decryptor_applies_to_blueprint__static_variant(qid, product_type)
+    return which_decryptor_applies_to_blueprint__formula_variant(qid, product_type)
 
 
 # blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]

@@ -1106,3 +1106,41 @@ class QSwaggerConveyorRequirement:
     @property
     def rest_percent(self) -> float:
         return self.__rest_percent
+
+
+class QSwaggerConveyorFormula:
+    def __init__(self,
+                 item_type: typing.Optional[QSwaggerTypeId],
+                 conveyor_limit: typing.List[QSwaggerConveyorLimit],
+                 decryptor_type: typing.Optional[QSwaggerTypeId],
+                 row):
+        self.__type_id: int = row[0]
+        self.__type: typing.Optional[QSwaggerTypeId] = item_type
+        self.__conveyor_limit: typing.Optional[typing.List[QSwaggerConveyorLimit]] = conveyor_limit
+        self.__decryptor_type_id: int = row[1]
+        self.__decryptor_type: typing.Optional[QSwaggerTypeId] = decryptor_type
+        self.__relative_profit: float = row[2]
+
+    @property
+    def type_id(self) -> int:
+        return self.__type_id
+
+    @property
+    def type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__type
+
+    @property
+    def conveyor_limit(self) -> typing.Optional[typing.List[QSwaggerConveyorLimit]]:
+        return self.__conveyor_limit
+
+    @property
+    def decryptor_type_id(self) -> int:
+        return self.__decryptor_type_id
+
+    @property
+    def decryptor_type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__decryptor_type
+
+    @property
+    def relative_profit(self) -> float:
+        return self.__relative_profit

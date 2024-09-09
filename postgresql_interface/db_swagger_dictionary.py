@@ -15,6 +15,7 @@ class QSwaggerDictionary:
         self.sde_lifetime: typing.Dict[typing.Tuple[str, int], datetime.datetime] = {}  # what:corporation_id
         self.conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]] = {}
         self.conveyor_requirements: typing.Dict[int, QSwaggerConveyorRequirement] = {}
+        self.conveyor_formulas: typing.Dict[int, QSwaggerConveyorFormula] = {}
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
         self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
@@ -40,6 +41,7 @@ class QSwaggerDictionary:
         del self.sde_groups
         del self.sde_categories
         del self.sde_market_groups
+        del self.conveyor_formulas
         del self.conveyor_requirements
         del self.conveyor_limits
         del self.sde_lifetime
@@ -452,3 +454,19 @@ class QSwaggerDictionary:
             self.sde_type_ids,
             self.conveyor_limits)
         return self.conveyor_requirements
+
+    def get_conveyor_formula(self, type_id: int) -> typing.Optional[QSwaggerConveyorFormula]:
+        cached_conveyor_formula: typing.Optional[QSwaggerConveyorFormula] = self.conveyor_formulas.get(type_id)
+        return cached_conveyor_formula
+
+    def load_conveyor_formulas(self) -> typing.Dict[int, QSwaggerConveyorFormula]:
+        if self.conveyor_formulas:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load conveyor formulas twice")
+        if not self.sde_type_ids:  # загружайте предметы
+            raise Exception("You should load type ids and conveyor limits first")
+        self.conveyor_formulas = self.__qit.get_conveyor_formulas(
+            # справочники
+            self.sde_type_ids,
+            self.conveyor_limits)
+        return self.conveyor_formulas

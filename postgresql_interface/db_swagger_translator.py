@@ -1108,3 +1108,45 @@ where
                 row)
             data[type_id] = requirement
         return data
+
+    def get_conveyor_formulas(
+            self,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]]) -> \
+            typing.Dict[int, QSwaggerConveyorFormula]:
+        rows = self.db.select_all_rows("""
+select
+ f.cf_product_type_id product_type_id,
+ --f.cf_blueprint_type_id as blueprint_type_id,
+ --f.cf_prior_blueprint_type_id as prior_blueprint_type_id,
+ f.cf_decryptor_type_id decryptor_type_id,
+ max(c.cfc_single_product_profit / c.cfc_total_gross_cost) as rel_profit
+from
+ qi.conveyor_formula_calculus c,
+ qi.conveyor_formulas f
+where
+ --f.cf_product_type_id in (54782, 54783, 54781, 54785, 54786, 54784) and
+ c.cfc_best_choice and
+ f.cf_formula=c.cfc_formula and
+ c.cfc_trade_hub=60003760
+group by f.cf_product_type_id, f.cf_decryptor_type_id;
+""")
+        if rows is None:
+            return {}
+        # обработка данных по лимитам конвейера и связывание их с другими кешированными объектами
+        data: typing.Dict[int, QSwaggerConveyorFormula] = {}
+        for row in rows:
+            # получаем информацию о предмете
+            type_id: int = row[0]
+            decryptor_type_id: int = row[1]
+            cached_item_type: QSwaggerTypeId = type_ids.get(type_id)
+            cached_decryptor_type: QSwaggerTypeId = type_ids.get(decryptor_type_id)
+            cached_conveyor_limit: typing.Optional[typing.List[QSwaggerConveyorLimit]] = conveyor_limits.get(type_id)
+            # добавляем потребность
+            requirement: QSwaggerConveyorFormula = QSwaggerConveyorFormula(
+                cached_item_type,
+                cached_conveyor_limit,
+                cached_decryptor_type,
+                row)
+            data[type_id] = requirement
+        return data

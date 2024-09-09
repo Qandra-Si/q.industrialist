@@ -284,6 +284,8 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
             $jita_sell = $product['js'];
             $jita_buy = $product['jb'];
             $recommended_price = $product['rp'];
+            $abs_profit = $product['aprft'];
+            $rel_profit = $product['rprft'];
 
 			$pid = $product['id'];
 			$curr_product_formulas = array();
@@ -295,13 +297,11 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
 				$curr_product_formulas[$cfkey] = $formula;
 			}
 			$best_formula = null;
-			$product_mininum_price = null;
 			if ($curr_product_formulas)
 			{
 				foreach ($curr_product_formulas as &$formula)
 				{
 					$best_formula = $formula;
-					$product_mininum_price = $best_formula['mpp'];
 					break;
 				}
 			}
@@ -309,15 +309,14 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
 
             $jprft = null;
             $jprct = null;
-
             if ($PBS == 1)
             {
-                if (is_null($product_mininum_price) || is_null($recommended_price))
+                if (is_null($abs_profit) || is_null($rel_profit))
                     ;
                 else
                 {
-                    $jprft = $recommended_price - $product_mininum_price;
-                    $jprct = $recommended_price ? (100.0 * (1 - $product_mininum_price / $recommended_price)) : 0;
+                    $jprft = $abs_profit;
+                    $jprct = $rel_profit * 100.0;
                 }
             }
             else // if ($PBS == 0)
@@ -326,8 +325,8 @@ get_actual_url(SORT_PERC_ASC,$GRPs,$T1,$T2,$T3,$MV,$PBS,$HU)?>">Percent</a></th>
                     ;
                 else
                 {
-                    $jprft = $jita_buy - $product_mininum_price;
-                    $jprct = $jita_buy ? (100.0 * (1 - $product_mininum_price / $jita_buy)) : 0;
+                    $jprft = -$abs_profit;
+                    $jprct = (1 - $rel_profit) * 100.0;
                 }
             }
 
@@ -410,6 +409,8 @@ if (!isset($_GET['hu'])) $HIDE_UNPROFITABLE = HIDE_UNPROFITABLE_DEFAULT; else {
 select
  p.type_id id,
  p.hub_recommended_price rp,
+ ca.profit aprft,
+ cr.profit rprft,
  bp.sdebp_blueprint_type_id as bp_id,
  market_group.semantic_id as grp_id,
  market_group.name as grp,
@@ -431,9 +432,22 @@ from
   left outer join qi.eve_sde_type_ids as tid on (tid.sdet_type_id=p.type_id)
   -- сведения о market-группе предмета
   left outer join qi.eve_sde_market_groups_semantic as market_group on (market_group.id=tid.sdet_market_group_id)
-where
- p.trade_hub=60003760 and 
- p.type_id=tid.sdet_type_id
+  -- сведения о профите от производства продукции (абсолютном)
+  left outer join (
+   select f.cf_product_type_id type_id, max(c.cfc_single_product_profit) profit
+   from qi.conveyor_formula_calculus as c, qi.conveyor_formulas as f
+   where c.cfc_trade_hub=60003760 and c.cfc_best_choice and c.cfc_formula=f.cf_formula
+   group by f.cf_product_type_id
+  ) ca on (ca.type_id=p.type_id)
+  -- сведения о профите от производства продукции (относительном)
+  left outer join (
+   select f.cf_product_type_id type_id, max(c.cfc_single_product_profit/c.cfc_total_gross_cost) profit
+   from qi.conveyor_formula_calculus as c, qi.conveyor_formulas as f
+   where c.cfc_trade_hub=60003760 and c.cfc_best_choice and c.cfc_formula=f.cf_formula
+   group by f.cf_product_type_id
+  ) cr on (cr.type_id=p.type_id)
+ where
+ p.trade_hub=60003760 -- and ca.profit is null
 order by market_group.name, tid.sdet_type_name;
 EOD;
     $industry_cost_cursor = pg_query($conn, $query)

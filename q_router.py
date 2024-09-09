@@ -78,6 +78,7 @@ def main():
     # загрузка настроек работы конвейера (редактируются online через php_interface)
     qid.load_conveyor_limits()
     qid.load_conveyor_requirements()
+    qid.load_conveyor_formulas()
     # загрузка информации об обновлении сведений в БД для загруженных корпораций
     qid.load_lifetime(list(qid.corporations.keys()))
     # загружаем сведения о станциях, которые есть в настройках маршрутизатора
