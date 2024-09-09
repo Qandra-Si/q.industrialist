@@ -879,11 +879,27 @@ def dump_industry_plan(
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
         # формула производства (здесь для проверки)
-        industry_formula: profit.QIndustryFormula):
+        industry_formula: profit.QIndustryFormula,
+        # признак использования человеко-понятного названия файла:
+        # * или kirin_r1_me2_te4_pbp683.html - здесь название продукта
+        # * или bp39581_r1_me2_te4_pbp683.html - здесь код чертежа
+        human_readable_filename: bool = True):
     assert industry_plan.base_industry
 
+    base: profit.QIndustryTree = industry_plan.base_industry
     product_name: str = industry_plan.base_industry.product_name
-    file_name_c2s: str = render_html.__camel_to_snake(product_name, True)
+    if human_readable_filename:
+        file_name_c2s: str = render_html.__camel_to_snake(product_name, True)
+    else:
+        file_name_c2s: str = f"bp{base.blueprint_type_id}"
+    file_name_c2s += f"_r{industry_plan.customized_runs}_me{base.me}_te{base.te}"
+    # получаем информацию об исходном чертеже (актуально для чертежей, в которые инвентятся разные варианты)
+    prior_blueprint_type_id: typing.Optional[int] = next((
+        _.industry.blueprint_type_id for _ in industry_plan.base_industry.materials
+        if _.industry and _.industry.action == profit.QIndustryAction.invention), None)
+    if prior_blueprint_type_id:
+        file_name_c2s += f"_pbp{prior_blueprint_type_id}"
+
     ghf = open('{dir}/{fnm}.html'.format(dir=ws_dir, fnm=file_name_c2s), "wt+", encoding='utf8')
     try:
         render_html.__dump_header(ghf, product_name)

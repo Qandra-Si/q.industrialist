@@ -23,7 +23,8 @@ DROP FUNCTION IF EXISTS qi.eve_ceiling(double precision);
 DROP FUNCTION IF EXISTS qi.eve_ceiling_change_by_point(double precision, integer);
 DROP FUNCTION IF EXISTS qi.nitrogen_isotopes_price();
 
-DROP INDEX IF EXISTS qi.idx_cfc_formula;
+DROP INDEX IF EXISTS qi.idx_cfc_formula_best_choice;
+DROP INDEX IF EXISTS qi.idx_cfc_formula; -- удалён
 DROP INDEX IF EXISTS qi.idx_cfc_market_route;
 DROP INDEX IF EXISTS qi.idx_cfc_market_hub;
 DROP INDEX IF EXISTS qi.idx_cfc_pk;
@@ -74,6 +75,8 @@ CREATE TABLE qi.conveyor_formulas
     cf_decryptor_type_id INTEGER,
     cf_ancient_relics qi.esi_formulas_relics NOT NULL DEFAULT 'unused',
 	cf_prior_blueprint_type_id INTEGER, -- Capital Hull Repairer II делается из разных bpc/bpo
+	cf_material_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
+	cf_time_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
     CONSTRAINT pk_cf PRIMARY KEY (cf_formula),
     CONSTRAINT fk_cf_product_type_id FOREIGN KEY (cf_product_type_id)
         REFERENCES qi.eve_sde_type_ids(sdet_type_id) MATCH SIMPLE
@@ -273,9 +276,9 @@ CREATE UNIQUE INDEX idx_cfc_pk
     (cfc_formula ASC NULLS LAST, cfc_industry_hub ASC NULLS LAST, cfc_trade_hub ASC NULLS LAST, cfc_trader_corp ASC NULLS LAST)
 TABLESPACE pg_default;
 
-CREATE INDEX idx_cfc_formula
+CREATE INDEX idx_cfc_formula_best_choice
     ON qi.conveyor_formula_calculus USING btree
-    (cfc_formula ASC NULLS LAST)
+    (cfc_formula ASC NULLS LAST, cfc_best_choice ASC NULLS LAST)
 TABLESPACE pg_default;
 
 CREATE INDEX idx_cfc_market_route

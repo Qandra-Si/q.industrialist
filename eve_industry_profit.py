@@ -108,10 +108,13 @@ def generate_materials_tree(
             system_indices,
             cost_index)
         # настраиваем ME чертежа (нам его знать неоткуда, поэтому ставим максимальное ME)
-        if industry_plan_customization and industry_plan_customization.unknown_blueprints_me is not None:
-            if material_produce_action == profit.QIndustryAction.manufacturing:
-                if q_material.meta_group_id is None or q_material.meta_group_id in {2, 14}:  # TODO: не Tech II и не Tech III
+        if industry_plan_customization and (material_produce_action == profit.QIndustryAction.manufacturing):
+            # TODO: не Tech II (2) и не Structure Tech II (53), и не Tech III (14)
+            if q_material.meta_group_id is None or q_material.meta_group_id in {2, 53, 14}:
+                if industry_plan_customization.unknown_blueprints_me is not None:
                     next_industry.set_me(industry_plan_customization.unknown_blueprints_me)
+                if industry_plan_customization.unknown_blueprints_te is not None:
+                    next_industry.set_te(industry_plan_customization.unknown_blueprints_te)
         # подключаем к метариалу следующий уровень производства
         q_material.set_industry(next_industry)
         # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
@@ -384,6 +387,7 @@ def generate_industry_tree(
         system_indices,
         cost_index)
     base_industry.set_me(calc_input['me'])
+    base_industry.set_te(calc_input['te'])
     base_industry.set_blueprint_runs_per_single_copy(customized_runs)
     # TODO: base_industry.set_te(calc_input['te'])
 
@@ -1014,7 +1018,9 @@ def assemble_industry_formula(industry_plan: profit.QIndustryPlan) -> profit.QIn
         industry_plan.base_industry.product_type_id,
         used_decryptor_type_id,
         industry_plan.customized_runs,
-        industry_plan.base_industry.products_per_single_run)
+        industry_plan.base_industry.products_per_single_run,
+        industry_plan.base_industry.me,
+        industry_plan.base_industry.te)
     # выполняем рекурсивный поиск всех работ чтобы посчитать их стоимость
     assemble_industry_jobs(industry_plan.base_planned_activity, industry_formula, 1.0)
     # считаем сколько покупных материалов и в какой пропорции необходимо для постройки продукта

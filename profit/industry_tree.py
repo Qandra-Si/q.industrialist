@@ -294,6 +294,7 @@ class QIndustryTree:
         # базовые, исходные сведения (даны в самом начале расчёта), во всех остальных случаях (подбор имеющихся в
         # ассетах чертежей), данные параметры должны быть упомянуты в QPlannedActivity
         self.__me: int = 10 if activity.value == QIndustryAction.manufacturing else 0
+        self.__te: int = 20 if activity.value == QIndustryAction.manufacturing else 0
         self.__blueprint_runs_per_single_copy: typing.Optional[int] = None
         self.__invent_probability: typing.Optional[float] = None
         self.__decryptor_probability: typing.Optional[float] = None
@@ -351,7 +352,16 @@ class QIndustryTree:
         return self.__me
 
     def set_me(self, me: int):
+        assert 0 <= me <= 10
         self.__me = me
+
+    @property
+    def te(self) -> int:
+        return self.__te
+
+    def set_te(self, te: int):
+        assert 0 <= te <= 20
+        self.__te = te
 
     @property
     def blueprint_runs_per_single_copy(self) -> typing.Optional[int]:

@@ -468,7 +468,9 @@ class QDictionaries:
             " cf_customized_runs,"
             " cf_decryptor_type_id,"
             " cf_ancient_relics,"
-            " cf_prior_blueprint_type_id)"
+            " cf_prior_blueprint_type_id,"
+            " cf_material_efficiency,"
+            " cf_time_efficiency)"
             "VALUES("
             " %(bp)s,"
             " %(a)s,"
@@ -476,7 +478,9 @@ class QDictionaries:
             " %(cr)s,"
             " %(d)s,"
             " %(ar)s,"
-            " %(bpo)s)"
+            " %(bpo)s,"
+            " %(me)s,"
+            " %(te)s)"
             "RETURNING cf_formula;",
             {'bp': conveyor_formula.blueprint_type_id,
              'a': 1,
@@ -485,6 +489,8 @@ class QDictionaries:
              'd': conveyor_formula.decryptor_type_id,  # м.б. None
              'ar': ancient_relics,
              'bpo': conveyor_formula.prior_blueprint_type_id,  # м.б. None (но возможны варианты либо BPO либо BPC)
+             'me': conveyor_formula.material_efficiency,
+             'te': conveyor_formula.time_efficiency,
              }
         )
         cf_formula: int = cf_formula_row[0]

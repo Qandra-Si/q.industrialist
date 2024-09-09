@@ -344,7 +344,9 @@ def main():
                 # 27.5% => min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
                 min_probability=27.5,
                 # экономия материалов (material efficiency) промежуточных чертежей
-                unknown_blueprints_me=10)
+                unknown_blueprints_me=10,
+                # экономия времени (time efficiency) промежуточных чертежей
+                unknown_blueprints_te=20)
 
             qidbdics.clean_conveyor_formulas()
 

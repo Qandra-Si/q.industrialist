@@ -25,6 +25,7 @@ Requires application scopes:
     * Public scopes
 """
 import sys
+import json
 import typing
 import requests
 #import cProfile
@@ -252,53 +253,68 @@ def main():
     del eve_industry_systems_data
     del sde_inv_names
 
-    # входные данные для расчёта: тип чертежа и сведения о его material efficiency
-    # идентификатор industry-чертежа всегда уникально указывает на тип продукта:
-    #   select sdebp_blueprint_type_id, count(sdebp_blueprint_type_id)
-    #   from qi.eve_sde_blueprint_products p
-    #   where sdebp_activity=1
-    #   group by 1
-    #   order by 2 desc;
-    # однако это не относится к другим типам activity !!!
-    calc_inputs = [
-        # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
-        # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
-        # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
-        # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
-        # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
-        # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 4},   # Mjolnir Fury Light Missile
-        # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
-        # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
-        # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
-        # {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
-        # {'bptid': 12035, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Hound (runs +9, me -2, te +2)
-        # {'bptid': 12031, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Manticore (runs +9, me -2, te +2)
-        # {'bptid': 11378, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Nemesis (runs +9, me -2, te +2)
-        # {'bptid': 28666, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Vargur (runs +7, me +2, te +0)
-        # {'bptid': 28662, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Kronos (runs +7, me +2, te +0)
-        # {'bptid': 28660, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Paladin (runs +7, me +2, te +0)
-        # {'bptid': 28711, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Golem (runs +7, me +2, te +0)
-        # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
-        # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
-        # {'bptid': 34596, 'qr': 1, 'me': 2, 'te': 4},  # Entosis Link II - наибольшее кол-во материалов
-        # {'bptid': 61220, 'qr': 10, 'me': 2, 'te': 4},  # Ubiquitous Moon Mining Crystal Type C II - 3 произв. матер.
-        # {'bptid': 26341, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Large Stasis Drone Augmentor II - 1 производимый матер.
-        # {'bptid': 21018, 'qr': 1, 'me': 10, 'te': 20},  # Capital Armor Plates (Methanofullerene с бонусом и ригами)
-        # {'bptid': 41356},  # Ametat II (Antimatter Reactor Unit с бонусом и ригами)
-        # {'bptid': 45718},  # Legion Core - Augmented Antimatter Reactor
-        # {'bptid': 20352},  # 800mm Steel Plates II
-        # {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # используется Titanium Carbide + промежуточно крафтится
-        # {'bptid': 3619, 'qr': 6, 'me': 4, 'te': 14},  # инвент копии с 5 прогонами
-        # {'bptid': 4275, 'qr': 10, 'me': 2, 'te': 4},  # у продукта и у материалов нет market группы
-        # {'bptid': 47326, 'qr': 5, 'me': 5, 'te': 10},  # Structure Tech II (53)
-        # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4},   # так нельзя, см. ниже
-        # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4, 'bpc': 41627},  # Capital Hull Repairer II из разных чертежей
-        {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845},  # Small Vorton Projector II Blueprint (Tech I)
-    ]
-
-    # with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
-    #    s = f.read()
-    #    calc_inputs = (json.loads(s))
+    """
+    select json_agg(f)
+    from (
+     select
+      --f.cf_formula formula,
+      f.cf_blueprint_type_id bptid,
+      f.cf_customized_runs qr,
+      f.cf_material_efficiency me,
+      f.cf_time_efficiency te,
+      f.cf_prior_blueprint_type_id bpc
+     from conveyor_formulas f
+    ) f;
+    """
+    try:
+        with open('{}/industry_cost/dataset.json'.format(argv_prms["workspace_cache_files_dir"]), 'r', encoding='utf8') as f:
+            s = f.read()
+            calc_inputs = (json.loads(s))
+    except FileNotFoundError:
+        # входные данные для расчёта: тип чертежа и сведения о его material efficiency
+        # идентификатор industry-чертежа всегда уникально указывает на тип продукта:
+        #   select sdebp_blueprint_type_id, count(sdebp_blueprint_type_id)
+        #   from qi.eve_sde_blueprint_products p
+        #   where sdebp_activity=1
+        #   group by 1
+        #   order by 2 desc;
+        # однако это не относится к другим типам activity !!!
+        calc_inputs = [
+            # {'bptid': 784, 'qr': 10, 'me': 2, 'te': 4},  # Miner II Blueprint
+            # {'bptid': 10632, 'qr': 10, 'me': 2, 'te': 4},  # Rocket Launcher II
+            # {'bptid': 10632, 'qr': 10+1, 'me': 2+2, 'te': 4+10},  # Rocket Launcher II (runs +1, me +2, te +10)
+            # {'bptid': 10632, 'qr': 1, 'me': 2, 'te': 4},  # Rocket Launcher II
+            # {'bptid': 45698, 'qr': 23, 'me': 3, 'te': 2},  # Tengu Offensive - Support Processor
+            # {'bptid': 2614, 'qr': 10, 'me': 2, 'te': 4},   # Mjolnir Fury Light Missile
+            # {'bptid': 1178, 'qr': 10, 'me': 0, 'te': 0},   # Cap Booster 25
+            # {'bptid': 12041, 'qr': 1, 'me': 2, 'te': 4},  # Purifier
+            # {'bptid': 12041, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Purifier (runs +1, me +2, te +10)
+            # {'bptid': 12041, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Purifier (runs +9, me -2, te +2)
+            # {'bptid': 12035, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Hound (runs +9, me -2, te +2)
+            # {'bptid': 12031, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Manticore (runs +9, me -2, te +2)
+            # {'bptid': 11378, 'qr': 1+9, 'me': 2-2, 'te': 4+2},  # Nemesis (runs +9, me -2, te +2)
+            # {'bptid': 28666, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Vargur (runs +7, me +2, te +0)
+            # {'bptid': 28662, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Kronos (runs +7, me +2, te +0)
+            # {'bptid': 28660, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Paladin (runs +7, me +2, te +0)
+            # {'bptid': 28711, 'qr': 1+7, 'me': 2+2, 'te': 4+0},  # Golem (runs +7, me +2, te +0)
+            # {'bptid': 1072, 'qr': 1, 'me': 10, 'te': 20},  # 1MN Afterburner I Blueprint
+            # {'bptid': 1071, 'qr': 10, 'me': 2, 'te': 4},  # 1MN Afterburner II Blueprint
+            # {'bptid': 34596, 'qr': 1, 'me': 2, 'te': 4},  # Entosis Link II - наибольшее кол-во материалов
+            # {'bptid': 61220, 'qr': 10, 'me': 2, 'te': 4},  # Ubiquitous Moon Mining Crystal Type C II - 3 произв. матер.
+            # {'bptid': 26341, 'qr': 1+1, 'me': 2+2, 'te': 4+10},  # Large Stasis Drone Augmentor II - 1 производимый матер.
+            # {'bptid': 21018, 'qr': 1, 'me': 10, 'te': 20},  # Capital Armor Plates (Methanofullerene с бонусом и ригами)
+            # {'bptid': 41356},  # Ametat II (Antimatter Reactor Unit с бонусом и ригами)
+            # {'bptid': 45718},  # Legion Core - Augmented Antimatter Reactor
+            # {'bptid': 20352},  # 800mm Steel Plates II
+            # {'bptid': 24472, 'qr': 10, 'me': 2, 'te': 4},  # используется Titanium Carbide + промежуточно крафтится
+            # {'bptid': 3619, 'qr': 6, 'me': 4, 'te': 14},  # инвент копии с 5 прогонами
+            # {'bptid': 4275, 'qr': 10, 'me': 2, 'te': 4},  # у продукта и у материалов нет market группы
+            # {'bptid': 47326, 'qr': 5, 'me': 5, 'te': 10},  # Structure Tech II (53)
+            # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4},   # так нельзя, см. ниже
+            # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4, 'bpc': 41627},  # Capital Hull Repairer II из разных чертежей
+            {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845},
+            # Small Vorton Projector II Blueprint (Tech I)
+        ]
 
     # см. также eve_conveyor_tools.py : setup_blueprint_details
     # см. также q_industry_profit.py : main
@@ -332,6 +348,8 @@ def main():
         'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
         # экономия материалов (material efficiency) промежуточных чертежей
         'unknown_blueprints_me': 10,
+        # экономия времени (time efficiency) промежуточных чертежей
+        'unknown_blueprints_te': 20,
     }
 
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
@@ -343,8 +361,10 @@ def main():
             industry_time=calc_customization.get('industry_time'),
             common_components=calc_customization.get('common_components'),
             min_probability=calc_customization.get('min_probability'),
-            unknown_blueprints_me=calc_customization.get('unknown_blueprints_me'))
+            unknown_blueprints_me=calc_customization.get('unknown_blueprints_me'),
+            unknown_blueprints_te=calc_customization.get('unknown_blueprints_te'))
 
+    calc_num: int = 0
     for calc_input in calc_inputs:
         # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
         """
@@ -361,42 +381,63 @@ def main():
         cProfile.run('foo()', sort=1)
         industry_tree: profit.QIndustryTree = g_industry_tree
         """
-        industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
-            # вход и выход для расчёта
-            calc_input,
-            industry_plan_customization,
-            # sde данные, загруженные из .converted_xxx.json файлов
-            sde_type_ids,
-            sde_bp_materials,
-            sde_products,
-            sde_market_groups,
-            eve_market_prices_data,
-            industry_cost_indices)
+        conveyor_formula: typing.Optional[profit.QIndustryFormula] = None
+        try:
+            industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
+                # вход и выход для расчёта
+                calc_input,
+                industry_plan_customization,
+                # sde данные, загруженные из .converted_xxx.json файлов
+                sde_type_ids,
+                sde_bp_materials,
+                sde_products,
+                sde_market_groups,
+                eve_market_prices_data,
+                industry_cost_indices)
 
-        # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
-        industry_plan: profit.QIndustryPlan = eve_industry_profit.generate_industry_plan(
-            industry_tree.blueprint_runs_per_single_copy,
-            industry_tree,
-            industry_plan_customization)
+            # выходные данные после расчёта: список материалов и ratio-показатели их расхода для производства qr-ранов
+            industry_plan: profit.QIndustryPlan = eve_industry_profit.generate_industry_plan(
+                industry_tree.blueprint_runs_per_single_copy,
+                industry_tree,
+                industry_plan_customization)
 
-        conveyor_formula: profit.QIndustryFormula = eve_industry_profit.assemble_industry_formula(
-            industry_plan)
-        # данные для ручного ввода в таблицы conveyor_formulas
-        # print('conveyor_formulas', 100, conveyor_formula.product_type_id, conveyor_formula.customized_runs, conveyor_formula.decryptor_type_id, None)
-        # print('conveyor_formula_purchase', [(100, _.type_id, _.quantity) for _ in conveyor_formula.purchase])
-        # print('conveyor_formula_jobs', [(100, _.usage_chain, _.solar_system_id, _.blueprint_type_id, _.planned_blueprints, _.planned_runs, _.activity_code, _.activity_eiv, _.job_cost_base_multiplier, _.role_bonus_job_cost, _.rigs_bonus_job_cost, _.scc_surcharge, _.facility_tax) for _ in conveyor_formula.job_costs])
+            conveyor_formula: profit.QIndustryFormula = eve_industry_profit.assemble_industry_formula(
+                industry_plan)
+            # данные для ручного ввода в таблицы conveyor_formulas
+            # print('conveyor_formulas', 100, conveyor_formula.product_type_id, conveyor_formula.customized_runs, conveyor_formula.decryptor_type_id, None)
+            # print('conveyor_formula_purchase', [(100, _.type_id, _.quantity) for _ in conveyor_formula.purchase])
+            # print('conveyor_formula_jobs', [(100, _.usage_chain, _.solar_system_id, _.blueprint_type_id, _.planned_blueprints, _.planned_runs, _.activity_code, _.activity_eiv, _.job_cost_base_multiplier, _.role_bonus_job_cost, _.rigs_bonus_job_cost, _.scc_surcharge, _.facility_tax) for _ in conveyor_formula.job_costs])
 
-        render_html_industry_profit.dump_industry_plan(
-            industry_plan,
-            '{}/industry_cost'.format(argv_prms["workspace_cache_files_dir"]),
-            sde_type_ids,
-            sde_bp_materials,
-            sde_market_groups,
-            eve_market_prices_data,
-            sde_icon_ids,
-            eve_jita_orders_data,
-            industry_cost_indices,
-            conveyor_formula)
+            render_html_industry_profit.dump_industry_plan(
+                industry_plan,
+                '{}/industry_cost'.format(argv_prms["workspace_cache_files_dir"]),
+                sde_type_ids,
+                sde_bp_materials,
+                sde_market_groups,
+                eve_market_prices_data,
+                sde_icon_ids,
+                eve_jita_orders_data,
+                industry_cost_indices,
+                conveyor_formula,
+                human_readable_filename=True)
+        except:
+            if conveyor_formula:
+                print('Input:',
+                      calc_input,
+                      'Product:',
+                      conveyor_formula.product_type_id,
+                      'Runs:',
+                      conveyor_formula.customized_runs,
+                      'Decryptor:',
+                      conveyor_formula.decryptor_type_id)
+            else:
+                print('Input:', calc_input)
+            raise
+
+        calc_num += 1
+        if (calc_num % 20) == 0:
+            print(f'Progress: {100.0 * (calc_num / len(calc_inputs)):.1f}%')
+            sys.stdout.flush()
 
     del sde_icon_ids
     del conveyor_formula
