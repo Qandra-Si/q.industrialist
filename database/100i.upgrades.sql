@@ -24,7 +24,6 @@ DROP FUNCTION IF EXISTS qi.eve_ceiling_change_by_point(double precision, integer
 DROP FUNCTION IF EXISTS qi.nitrogen_isotopes_price();
 
 DROP INDEX IF EXISTS qi.idx_cfc_formula_best_choice;
-DROP INDEX IF EXISTS qi.idx_cfc_formula; -- удалён
 DROP INDEX IF EXISTS qi.idx_cfc_market_route;
 DROP INDEX IF EXISTS qi.idx_cfc_market_hub;
 DROP INDEX IF EXISTS qi.idx_cfc_pk;
@@ -74,9 +73,9 @@ CREATE TABLE qi.conveyor_formulas
     cf_customized_runs INTEGER NOT NULL,
     cf_decryptor_type_id INTEGER,
     cf_ancient_relics qi.esi_formulas_relics NOT NULL DEFAULT 'unused',
-	cf_prior_blueprint_type_id INTEGER, -- Capital Hull Repairer II делается из разных bpc/bpo
-	cf_material_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
-	cf_time_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
+    cf_prior_blueprint_type_id INTEGER, -- Capital Hull Repairer II делается из разных bpc/bpo
+    cf_material_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
+    cf_time_efficiency INTEGER, -- если не указано, то подразумевается значение 0 (нужно для обратного вычисления кода декриптора)
     CONSTRAINT pk_cf PRIMARY KEY (cf_formula),
     CONSTRAINT fk_cf_product_type_id FOREIGN KEY (cf_product_type_id)
         REFERENCES qi.eve_sde_type_ids(sdet_type_id) MATCH SIMPLE
@@ -102,23 +101,23 @@ TABLESPACE pg_default;
 
 CREATE UNIQUE INDEX idx_unq_cf1
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id, cf_prior_blueprint_type_id)
+    (cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id, cf_prior_blueprint_type_id)
     WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf2
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_prior_blueprint_type_id)
-	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
+    (cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_prior_blueprint_type_id)
+    WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NOT NULL));
 
 CREATE UNIQUE INDEX idx_unq_cf3
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id)
+    (cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics, cf_decryptor_type_id)
     WHERE ((cf_decryptor_type_id IS NOT NULL) AND (cf_prior_blueprint_type_id IS NULL));
 
-CREATE UNIQUE INDEX idx_unq_cf4
+CREATE UNIQUE INDEX idx_unq_cf4 -- по сути это вариант для T1 продукции у которой меняется ME без декриптора
     ON qi.conveyor_formulas USING btree
-	(cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_ancient_relics)
-	WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NULL));
+    (cf_blueprint_type_id, cf_activity, cf_product_type_id, cf_customized_runs, cf_material_efficiency) -- cf_ancient_relics
+    WHERE ((cf_decryptor_type_id IS NULL) AND (cf_prior_blueprint_type_id IS NULL) AND (cf_material_efficiency IS NOT NULL));
 
 CREATE INDEX idx_cf_product_type_id
     ON qi.conveyor_formulas USING btree
@@ -217,10 +216,10 @@ TABLESPACE pg_default;
 CREATE TABLE qi.conveyor_formula_calculus
 (
     cfc_formula INTEGER NOT NULL,
-	-- вычисляемые и кешированные данные формулы
-	cfc_products_per_single_run INTEGER NOT NULL, -- кешируется: количество продукции, производимой за один прогон (из таблицы eve_sde_blueprint_products)
-	cfc_products_num INTEGER NOT NULL, -- вычисляется: количество продукции, производимой формулой (как произведение customized_runs и products_per_single_run)
-	cfc_best_choice BOOLEAN NOT NULL DEFAULT FALSE, -- вычисляется: наилучшая формула (наиболее прибыльный вариант) производства выбранного продукта
+    -- вычисляемые и кешированные данные формулы
+    cfc_products_per_single_run INTEGER NOT NULL, -- кешируется: количество продукции, производимой за один прогон (из таблицы eve_sde_blueprint_products)
+    cfc_products_num INTEGER NOT NULL, -- вычисляется: количество продукции, производимой формулой (как произведение customized_runs и products_per_single_run)
+    cfc_best_choice BOOLEAN NOT NULL DEFAULT FALSE, -- вычисляется: наилучшая формула (наиболее прибыльный вариант) производства выбранного продукта
     -- производстенные и торговые локации
     cfc_industry_hub BIGINT NOT NULL, -- ожидается 1 вариант: фабрика, где расположено основное производство (откуда идёт торговый маршрут и куда привозятся материалы из Jita)
     cfc_trade_hub BIGINT NOT NULL, -- вариантность: торговый хаб, где продаются произведённые продукты
@@ -244,14 +243,14 @@ CREATE TABLE qi.conveyor_formula_calculus
     cfc_ready_transfer_cost DOUBLE PRECISION NOT NULL, -- вычисляется: стоимость перевозки готовой продукции (общее кол-во, произведённой по формуле) в торговый хаб
     cfc_products_recommended_price DOUBLE PRECISION, -- вычисляется: рекомендованная стоимость (общее кол-во по формуле) готовой продукции индивидуально для торгового хаба (по совокупности известных цен)
     cfc_products_sell_fee_and_tax DOUBLE PRECISION, -- вычисляется: ориентировочные комиссии и налоги относительно рекомендованной стоимости
-	cfc_single_product_price_wo_fee_tax DOUBLE PRECISION, -- вычисляется: прибыль от продажи партии продуктов по рекомендованной цене в торговом хабе
+    cfc_single_product_price_wo_fee_tax DOUBLE PRECISION, -- вычисляется: прибыль от продажи партии продуктов по рекомендованной цене в торговом хабе
     -- сводные данные по производству по формуле
     cfc_total_gross_cost DOUBLE PRECISION NOT NULL, -- вычисляется: итоговая стоимость производственного проекта по формуле с транспортировкой до торгового хаба
-	cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость производства одной единицы продукции (частное от total_gross_cost и products_num)
-	cfc_product_mininum_price DOUBLE PRECISION NOT NULL, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
+    cfc_single_product_cost DOUBLE PRECISION NOT NULL, -- кешируется: стоимость производства одной единицы продукции (частное от total_gross_cost и products_num)
+    cfc_product_mininum_price DOUBLE PRECISION NOT NULL, -- кешируется: минимально-рекомендованная цена выставления продукции в торговом хабе (total_gross_cost + products_sell_fee_and_tax) / products_num
     cfc_single_product_profit DOUBLE PRECISION, -- кешируется: профит от производства и продажи одонго экземпляра продукта (cfc_single_product_price_wo_fee_tax-cfc_single_product_cost)
     -- дата/время актуализации сведений о стоимости производства по формуле
-	cfc_created_at TIMESTAMP,
+    cfc_created_at TIMESTAMP,
     cfc_updated_at TIMESTAMP,
     CONSTRAINT pk_cfc PRIMARY KEY (cfc_formula, cfc_industry_hub, cfc_trade_hub, cfc_trader_corp),
     CONSTRAINT fk_cfc_formula FOREIGN KEY (cfc_formula)
@@ -671,7 +670,10 @@ create or replace view qi.conveyor_formulas_industry_costs as
      -- ready product selling details
      --r.output_fuel_quantity,
      x.ready_volume,
-     x.ready_volume * r.output_m3_cost as ready_transfer_cost,
+     case when x.ready_volume <= 386404
+      then x.ready_volume * r.output_m3_cost
+      else 0
+     end ready_transfer_cost,
      x.products_recommended_price,
      x.products_recommended_price * (r.sales_brokers_fee + r.sales_tax) as products_sell_fee_and_tax
     from (

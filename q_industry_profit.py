@@ -313,7 +313,14 @@ def main():
             # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4},   # так нельзя, см. ниже
             # {'bptid': 41630, 'qr': 5, 'me': 2, 'te': 4, 'bpc': 41627},  # Capital Hull Repairer II из разных чертежей
             # {'bptid': 54850, 'qr': 10, 'me': 5, 'te': 10, 'bpc': 54845}, # Small Vorton Projector II Blueprint (Tech I)
-            {'bptid': 79326, 'qr': 1, 'me': 0, 'te': 0},
+            # {'bptid': 79326, 'qr': 1, 'me': 0, 'te': 0},
+            # {'bptid': 23918, 'qr': 1, 'me': 8, 'te': 16},  # Wyvern
+            # {'bptid': 23918, 'qr': 1, 'me': 9, 'te': 16},  # Wyvern
+            # {'bptid': 23918, 'qr': 2, 'me': 8, 'te': 16},  # Wyvern
+            # {'bptid': 23918, 'qr': 2, 'me': 9, 'te': 16},  # Wyvern
+            # {'bptid': 57526, 'qr': 1, 'me': 8, 'te': 14},  # Enhanced Neurolink Protection Cell
+            # {'bptid': 57526, 'qr': 2, 'me': 8, 'te': 14},  # Enhanced Neurolink Protection Cell
+            {'bptid': 45648, 'qr': 1, 'me': 0, 'te': 0},  # Komodo
         ]
 
     # см. также eve_conveyor_tools.py : setup_blueprint_details
@@ -329,6 +336,7 @@ def main():
         'common_components': [  # market-группы компонентов общего потребления
             1870,  # Fuel Blocks
             65,  # Advanced Components
+            1883,  # Advanced Capital Components
             2768,  # Protective Components
             1908,  # R.A.M.
             1147,  # Subsystem Components

@@ -15,7 +15,8 @@ class QSwaggerDictionary:
         self.sde_lifetime: typing.Dict[typing.Tuple[str, int], datetime.datetime] = {}  # what:corporation_id
         self.conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]] = {}
         self.conveyor_requirements: typing.Dict[int, QSwaggerConveyorRequirement] = {}
-        self.conveyor_formulas: typing.Dict[int, QSwaggerConveyorFormula] = {}
+        self.conveyor_best_formulas: typing.Dict[int, QSwaggerConveyorBestFormula] = {}
+        self.conveyor_formulas: typing.Dict[int, typing.List[QSwaggerConveyorFormula]] = {}
         self.sde_market_groups: typing.Dict[int, QSwaggerMarketGroup] = {}
         self.sde_categories: typing.Dict[int, QSwaggerCategory] = {}
         self.sde_groups: typing.Dict[int, QSwaggerGroup] = {}
@@ -42,6 +43,7 @@ class QSwaggerDictionary:
         del self.sde_categories
         del self.sde_market_groups
         del self.conveyor_formulas
+        del self.conveyor_best_formulas
         del self.conveyor_requirements
         del self.conveyor_limits
         del self.sde_lifetime
@@ -388,19 +390,19 @@ class QSwaggerDictionary:
             corporation: QSwaggerCorporation) -> typing.Dict[int, QSwaggerStation]:
         if not isinstance(corporation, QSwaggerCorporation):
             raise Exception("Illegal corporation descriptor")
-        if not corporation.assets and not corporation.blueprints:  # загружайте как минимум ассеты
-            raise Exception("You should load assets firstly")
-        assets_stations: typing.Set[int] = set()
-        if corporation.assets:
-            assets_stations = set([a.station_id for a in corporation.assets.values() if a.station_id is not None])
-        blueprints_stations: typing.Set[int] = set()
-        if corporation.blueprints:
-            blueprints_stations = set([b.station_id for b in corporation.blueprints.values() if b.station_id is not None])
-        market_stations: typing.Set[int] = set()
-        if corporation.orders:
-            market_stations = set([o.location_id for o in corporation.orders.values() if o.location_id is not None])
-        station_ids: typing.Set[int] = assets_stations | blueprints_stations | market_stations
-        return self.load_stations(station_ids)
+        if corporation.assets or corporation.blueprints or corporation.orders:  # загружайте как минимум ассеты
+            assets_stations: typing.Set[int] = set()
+            if corporation.assets:
+                assets_stations = set([a.station_id for a in corporation.assets.values() if a.station_id is not None])
+            blueprints_stations: typing.Set[int] = set()
+            if corporation.blueprints:
+                blueprints_stations = set([b.station_id for b in corporation.blueprints.values() if b.station_id is not None])
+            market_stations: typing.Set[int] = set()
+            if corporation.orders:
+                market_stations = set([o.location_id for o in corporation.orders.values() if o.location_id is not None])
+            station_ids: typing.Set[int] = assets_stations | blueprints_stations | market_stations
+            return self.load_stations(station_ids)
+        return {}
 
     def get_market_group_chain(self, item_type: QSwaggerTypeId) -> typing.List[int]:
         chain: typing.List[int] = []
@@ -443,6 +445,11 @@ class QSwaggerDictionary:
             self.stations)
         return self.conveyor_limits
 
+    def get_conveyor_requirement(self, type_id: int) -> typing.Optional[QSwaggerConveyorRequirement]:
+        cached_conveyor_requirements: typing.Optional[QSwaggerConveyorRequirement] = \
+            self.conveyor_requirements.get(type_id)
+        return cached_conveyor_requirements
+
     def load_conveyor_requirements(self) -> typing.Dict[int, QSwaggerConveyorRequirement]:
         if self.conveyor_requirements:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
@@ -455,18 +462,36 @@ class QSwaggerDictionary:
             self.conveyor_limits)
         return self.conveyor_requirements
 
-    def get_conveyor_formula(self, type_id: int) -> typing.Optional[QSwaggerConveyorFormula]:
-        cached_conveyor_formula: typing.Optional[QSwaggerConveyorFormula] = self.conveyor_formulas.get(type_id)
-        return cached_conveyor_formula
+    def get_conveyor_best_formula(self, type_id: int) -> typing.Optional[QSwaggerConveyorBestFormula]:
+        cached_conveyor_best_formula: typing.Optional[QSwaggerConveyorBestFormula] = self.conveyor_best_formulas.get(type_id)
+        return cached_conveyor_best_formula
 
-    def load_conveyor_formulas(self) -> typing.Dict[int, QSwaggerConveyorFormula]:
+    def load_conveyor_best_formulas(self) -> typing.Dict[int, QSwaggerConveyorBestFormula]:
+        if self.conveyor_best_formulas:
+            # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
+            raise Exception("Unable to load conveyor best formulas twice")
+        if not self.sde_type_ids:  # загружайте предметы
+            raise Exception("You should load type ids first")
+        self.conveyor_best_formulas = self.__qit.get_conveyor_best_formulas(
+            # справочники
+            self.sde_type_ids)
+        return self.conveyor_best_formulas
+
+    def get_conveyor_formulas(self, product_type_id: int) -> typing.Optional[typing.List[QSwaggerConveyorFormula]]:
+        cached_conveyor_formulas: typing.Optional[typing.List[QSwaggerConveyorFormula]] = \
+            self.conveyor_formulas.get(product_type_id)
+        return cached_conveyor_formulas
+
+    def load_conveyor_formulas(self) -> typing.Dict[int, typing.List[QSwaggerConveyorFormula]]:
         if self.conveyor_formulas:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
             raise Exception("Unable to load conveyor formulas twice")
         if not self.sde_type_ids:  # загружайте предметы
-            raise Exception("You should load type ids and conveyor limits first")
+            raise Exception("You should load type ids first")
         self.conveyor_formulas = self.__qit.get_conveyor_formulas(
             # справочники
             self.sde_type_ids,
-            self.conveyor_limits)
+            self.sde_blueprints,
+            # публичные сведения (пилоты, структуры, станции)
+            self.stations)
         return self.conveyor_formulas

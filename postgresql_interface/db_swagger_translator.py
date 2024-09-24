@@ -1109,44 +1109,187 @@ where
             data[type_id] = requirement
         return data
 
-    def get_conveyor_formulas(
+    def get_conveyor_best_formulas(
             self,
-            type_ids: typing.Dict[int, QSwaggerTypeId],
-            conveyor_limits: typing.Dict[int, typing.List[QSwaggerConveyorLimit]]) -> \
-            typing.Dict[int, QSwaggerConveyorFormula]:
+            type_ids: typing.Dict[int, QSwaggerTypeId]) -> \
+            typing.Dict[int, QSwaggerConveyorBestFormula]:
         rows = self.db.select_all_rows("""
 select
- f.cf_product_type_id product_type_id,
- --f.cf_blueprint_type_id as blueprint_type_id,
- --f.cf_prior_blueprint_type_id as prior_blueprint_type_id,
- f.cf_decryptor_type_id decryptor_type_id,
- max(c.cfc_single_product_profit / c.cfc_total_gross_cost) as rel_profit
-from
- qi.conveyor_formula_calculus c,
- qi.conveyor_formulas f
-where
- --f.cf_product_type_id in (54782, 54783, 54781, 54785, 54786, 54784) and
- c.cfc_best_choice and
- f.cf_formula=c.cfc_formula and
- c.cfc_trade_hub=60003760
-group by f.cf_product_type_id, f.cf_decryptor_type_id;
+ x.product_type_id,
+ x.decryptor_type_id,
+ x.profit_w_decryptor,
+ c0.profit_wo_decryptor
+from (
+ select
+  f.cf_product_type_id product_type_id,
+  --f.cf_blueprint_type_id as blueprint_type_id,
+  --f.cf_prior_blueprint_type_id as prior_blueprint_type_id,
+  f.cf_decryptor_type_id decryptor_type_id,
+  --c.cfc_single_product_profit as abs_profit,
+  max(c.cfc_single_product_profit) as profit_w_decryptor
+ from
+  qi.conveyor_formula_calculus c,
+  qi.conveyor_formulas f
+ where
+  --f.cf_product_type_id in (54782, 54783, 54781, 54785, 54786, 54784) and
+  c.cfc_best_choice and
+  f.cf_formula=c.cfc_formula and
+  c.cfc_trade_hub=60003760
+ group by f.cf_product_type_id, f.cf_decryptor_type_id
+) x
+ left outer join (
+  select
+   f.cf_product_type_id product_type_id,
+   max(c.cfc_single_product_profit) profit_wo_decryptor
+  from
+   qi.conveyor_formula_calculus c,
+   qi.conveyor_formulas f
+  where
+   f.cf_formula=c.cfc_formula and
+   c.cfc_trade_hub=60003760 and
+   f.cf_decryptor_type_id is null
+  group by f.cf_product_type_id
+ ) as c0 on (x.product_type_id=c0.product_type_id);
 """)
         if rows is None:
             return {}
         # обработка данных по лимитам конвейера и связывание их с другими кешированными объектами
-        data: typing.Dict[int, QSwaggerConveyorFormula] = {}
+        data: typing.Dict[int, QSwaggerConveyorBestFormula] = {}
         for row in rows:
             # получаем информацию о предмете
             type_id: int = row[0]
             decryptor_type_id: int = row[1]
             cached_item_type: QSwaggerTypeId = type_ids.get(type_id)
             cached_decryptor_type: QSwaggerTypeId = type_ids.get(decryptor_type_id)
-            cached_conveyor_limit: typing.Optional[typing.List[QSwaggerConveyorLimit]] = conveyor_limits.get(type_id)
-            # добавляем потребность
-            requirement: QSwaggerConveyorFormula = QSwaggerConveyorFormula(
+            # добавляем наилучшую формулу
+            best_formula: QSwaggerConveyorBestFormula = QSwaggerConveyorBestFormula(
                 cached_item_type,
-                cached_conveyor_limit,
                 cached_decryptor_type,
                 row)
-            data[type_id] = requirement
+            data[type_id] = best_formula
+        return data
+
+    def get_conveyor_formulas(
+            self,
+            type_ids: typing.Dict[int, QSwaggerTypeId],
+            blueprints: typing.Dict[int, QSwaggerBlueprint],
+            stations: typing.Dict[int, QSwaggerStation]) -> \
+            typing.Dict[int, typing.List[QSwaggerConveyorFormula]]:
+        rows = self.db.select_all_rows("""
+select
+ f.cf_formula,--0
+ f.cf_blueprint_type_id,--1
+ f.cf_activity,--2
+ f.cf_product_type_id,--3
+ f.cf_customized_runs,--4
+ f.cf_decryptor_type_id,--5
+ f.cf_ancient_relics,--6
+ f.cf_prior_blueprint_type_id,--7
+ f.cf_material_efficiency,--8
+ f.cf_time_efficiency,--9
+ c.cfc_products_per_single_run,--10
+ c.cfc_products_num,--11
+ c.cfc_best_choice,--12
+ c.cfc_industry_hub,--13
+ c.cfc_trade_hub,--14
+ c.cfc_trader_corp,--15
+ c.cfc_buying_brokers_fee,--16
+ c.cfc_sales_brokers_fee,--17
+ c.cfc_sales_tax,--18
+ c.cfc_fuel_price_isk,--19
+ c.cfc_materials_cost,--20
+ c.cfc_materials_cost_with_fee,--21
+ c.cfc_purchase_volume,--22
+ c.cfc_materials_transfer_cost,--23
+ c.cfc_jobs_cost,--24
+ c.cfc_ready_volume,--25
+ c.cfc_ready_transfer_cost,--26
+ c.cfc_products_recommended_price,--27
+ c.cfc_products_sell_fee_and_tax,--28
+ c.cfc_single_product_price_wo_fee_tax,--29
+ c.cfc_total_gross_cost,--30
+ c.cfc_single_product_cost,--31
+ c.cfc_product_mininum_price,--32
+ c.cfc_single_product_profit--33
+from qi.conveyor_formulas f, qi.conveyor_formula_calculus c
+where f.cf_formula=c.cfc_formula
+order by f.cf_blueprint_type_id, f.cf_activity, f.cf_product_type_id, f.cf_prior_blueprint_type_id;
+""")
+        if rows is None:
+            return {}
+        # ---
+        cached_blueprint: typing.Optional[QSwaggerBlueprint] = None
+        cached_activity: typing.Optional[typing.Union[QSwaggerBlueprintManufacturing, QSwaggerBlueprintInvention,
+                               QSwaggerBlueprintCopying, QSwaggerBlueprintResearchMaterial,
+                               QSwaggerBlueprintResearchTime, QSwaggerBlueprintReaction]] = None  # noqa
+        cached_product_type: typing.Optional[QSwaggerTypeId] = None  # noqa
+        cached_prior_blueprint: typing.Optional[QSwaggerBlueprint] = None  # noqa
+        cached_industry_hub: typing.Optional[QSwaggerStation] = None  # noqa
+        cached_trade_hub: typing.Optional[QSwaggerStation] = None  # noqa
+        # ---
+        prev_blueprint_type_id: int = -1
+        prev_activity_id: int = -1
+        prev_product_type_id: int = -1
+        prev_prior_blueprint_type_id: int = -1
+        prev_industry_hub_id: int = -1
+        prev_trade_hub_id: int = -1
+        # ---
+        # обработка данных по лимитам конвейера и связывание их с другими кешированными объектами
+        data: typing.Dict[int, typing.List[QSwaggerConveyorFormula]] = {}
+        for row in rows:
+            # получаем информацию о формуле
+            formula_id: int = row[0]
+            # используем факт того, что набор данных отсортирован и прореживаем ненужный поиск одних и тех же чертежей
+            blueprint_type_id: int = row[1]
+            if blueprint_type_id != prev_blueprint_type_id:
+                prev_blueprint_type_id = blueprint_type_id
+                # возможна ситуация, когда чертёж неизвестен
+                cached_blueprint = blueprints.get(blueprint_type_id)
+                prev_activity_id = -1
+            # используем факт того, что набор данных отсортирован и прореживаем ненужный поиск одних и тех же activity
+            activity_id: int = row[2]
+            if cached_blueprint:
+                if activity_id != prev_activity_id:
+                    prev_activity_id = activity_id
+                    # возможная ситуация, что чертёж есть, а активность выше не добавлена, т.к. продукт non published:
+                    # - 2179  Sansha Wrath Cruise Missile Blueprint (Haunter Cruise Missile не published)
+                    cached_activity = cached_blueprint.get_activity(activity_id)
+            # используем факт того, что набор данных отсортирован и прореживаем ненужный поиск одних и тех же продуктов
+            product_type_id: int = row[3]
+            if product_type_id != prev_product_type_id:
+                prev_product_type_id = product_type_id
+                cached_product_type = type_ids.get(product_type_id)
+            # используем факт того, что набор данных отсортирован и прореживаем ненужный поиск одних и тех же чертежей
+            prior_blueprint_type_id: int = row[7]
+            if prior_blueprint_type_id != prev_prior_blueprint_type_id:
+                prev_prior_blueprint_type_id = prior_blueprint_type_id
+                # возможна ситуация, когда чертёж неизвестен
+                cached_prior_blueprint = blueprints.get(prior_blueprint_type_id)
+            # используем факт того, что торговые и производственные хабы сильно разрежены в наборе данных
+            industry_hub_id: int = row[13]
+            if industry_hub_id != prev_industry_hub_id:
+                prev_industry_hub_id = industry_hub_id
+                cached_industry_hub = stations.get(industry_hub_id)
+            trade_hub_id: int = row[14]
+            if trade_hub_id != prev_trade_hub_id:
+                prev_trade_hub_id = trade_hub_id
+                cached_trade_hub = stations.get(trade_hub_id)
+            # информация о декрипторах не может быть последовательно отсортирована
+            decryptor_type_id: int = row[5]
+            cached_decryptor_type: typing.Optional[QSwaggerTypeId] = type_ids.get(decryptor_type_id)
+            # добавляем conveyor-формулу
+            conveyor_formula: QSwaggerConveyorFormula = QSwaggerConveyorFormula(
+                cached_blueprint,
+                cached_activity,
+                cached_product_type,
+                cached_decryptor_type,
+                cached_prior_blueprint,
+                cached_trade_hub,
+                cached_trade_hub,
+                row)
+            conveyor_formulas: typing.Optional[typing.List[QSwaggerConveyorFormula]] = data.get(product_type_id)
+            if conveyor_formulas:
+                conveyor_formulas.append(conveyor_formula)
+            else:
+                data[product_type_id] = [conveyor_formula]
         return data

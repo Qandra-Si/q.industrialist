@@ -256,6 +256,43 @@ def main():
             del eve_industry_systems_data
             del sde_inv_names
 
+            # см. также eve_conveyor_tools.py : setup_blueprint_details
+            # см. также q_industry_profit.py : main
+            # см. также q_dictionaries.py : main
+            industry_plan_customization = profit.QIndustryPlanCustomization(
+                # длительность всех реакций - около 1 суток
+                reaction_runs=15,
+                # длительность производства компонентов общего потребления (таких как Advanced Components или
+                # Fuel Blocks) тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме,
+                # в котором необходимо
+                industry_time=5 * 60 * 60 * 24,
+                # market-группы компонентов общего потребления
+                common_components=[
+                    1870,  # Fuel Blocks
+                    65,    # Advanced Components
+                    1883,  # Advanced Capital Components
+                    2768,  # Protective Components
+                    1908,  # R.A.M.
+                    1147,  # Subsystem Components
+                ],
+                # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
+                #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
+                # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
+                # * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
+                # рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
+                # Invention_Chance =
+                #  Base_Chance *
+                #  (1 + ((Encryption_Skill_Level / 40) +
+                #        ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
+                #       )
+                #  ) * Decryptor_Modifier
+                # 27.5% => min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
+                min_probability=27.5,
+                # экономия материалов (material efficiency) промежуточных чертежей
+                unknown_blueprints_me=10,
+                # экономия времени (time efficiency) промежуточных чертежей
+                unknown_blueprints_te=20)
+
             # автоматический выбор чертежей для их расчёта и загрузки в БД
             possible_decryptors: typing.List[profit.QPossibleDecryptor] = profit.get_list_of_decryptors()
             calc_inputs: typing.List[typing.Dict[str, int]] = []
@@ -266,14 +303,58 @@ def main():
                 if not tid.get('published', False): continue  # Clone Grade Beta Blueprint
                 blueprint = sde_blueprints[key]
                 blueprint_type_id: int = int(key)
+                # проверка, возможно ли производство по этому чертежу?
                 if 'manufacturing' in blueprint['activities']:
                     assert len(blueprint['activities']['manufacturing']['products']) == 1
-                    product_type_id: int = blueprint['activities']['manufacturing']['products'][0]['typeID']
+                    product_type_id = blueprint['activities']['manufacturing']['products'][0]['typeID']
                     product_tid = sde_type_ids.get(str(product_type_id))
                     if product_tid.get('published', False):  # тут м.б. Haunter Cruise Missile
-                        # print(blueprint_type_id, tid['name']['en'])
-                        # calc_inputs.append({'bptid': blueprint_type_id})  # TODO: , 'qr': 10, 'me': 10, 'te': 20})
-                        pass
+                        if 'groupID' in product_tid:
+                            product_group_id: int = product_tid['groupID']
+                            if product_group_id in [
+                                30,  # Titan
+                                659,  # Supercarrier
+                                1538,  # Force Auxiliary
+                                547,  # Carrier
+                                # нельзя, здесь все кораблики T2 уровня: 4594,  # Lancer Dreadnought
+                                485,  # Dreadnought
+                            ]:
+                                calc_inputs.append({
+                                    'bptid': blueprint_type_id,
+                                    'qr': 1,
+                                    'me': 0,
+                                    'te': 0})
+                                is_original: bool = 'research_material' in blueprint['activities']
+                                if is_original:
+                                    # TODO: также следует проверять blueprint['maxProductionLimit']
+                                    for me in range(1, 10+1):
+                                        calc_inputs.append({
+                                            'bptid': blueprint_type_id,
+                                            'qr': 1,
+                                            'me': me,
+                                            'te': me * 2})  # te не влияет на расчёты профита
+                            elif product_group_id in [
+                                334,  # Construction Component #334 (апгрейд чертежа до me=10, te=20)
+                                913,  # Advanced Capital Construction Components #913 (аналогично)
+                                1136  # Fuel Block #1136 (аналогично)
+                            ]:
+                                manufacturing = blueprint['activities']['manufacturing']
+                                need_quantity: int = 1
+                                single_run_time: int = manufacturing['time']
+                                products_per_single_run: int = manufacturing['products'][0]['quantity']
+                                is_commonly_used: bool = True
+                                bpos, runs = eve_industry_profit.get_optimized_runs_quantity__manufacturing(
+                                    need_quantity,
+                                    single_run_time,
+                                    products_per_single_run,
+                                    is_commonly_used,
+                                    industry_plan_customization.industry_time)
+                                calc_inputs.append({
+                                    'bptid': blueprint_type_id,
+                                    'qr': runs,
+                                    'me': 10,
+                                    'te': 20})
+                # проверка, возможен ли инвент чертежей?
                 if 'invention' in blueprint['activities']:
                     if 'products' in blueprint['activities']['invention']:  # тут м.б. Coalesced Element Blueprint
                         for t2_blueprint_invent in blueprint['activities']['invention']['products']:
@@ -311,42 +392,6 @@ def main():
                                             pass
                                         else:
                                             assert 0
-
-            # см. также eve_conveyor_tools.py : setup_blueprint_details
-            # см. также q_industry_profit.py : main
-            # см. также q_dictionaries.py : main
-            industry_plan_customization = profit.QIndustryPlanCustomization(
-                # длительность всех реакций - около 1 суток
-                reaction_runs=15,
-                # длительность производства компонентов общего потребления (таких как Advanced Components или
-                # Fuel Blocks) тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме,
-                # в котором необходимо
-                industry_time=5 * 60 * 60 * 24,
-                # market-группы компонентов общего потребления
-                common_components=[
-                    1870,  # Fuel Blocks
-                    65,    # Advanced Components
-                    2768,  # Protective Components
-                    1908,  # R.A.M.
-                    1147,  # Subsystem Components
-                ],
-                # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
-                #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
-                # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
-                # * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
-                # рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
-                # Invention_Chance =
-                #  Base_Chance *
-                #  (1 + ((Encryption_Skill_Level / 40) +
-                #        ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
-                #       )
-                #  ) * Decryptor_Modifier
-                # 27.5% => min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
-                min_probability=27.5,
-                # экономия материалов (material efficiency) промежуточных чертежей
-                unknown_blueprints_me=10,
-                # экономия времени (time efficiency) промежуточных чертежей
-                unknown_blueprints_te=20)
 
             qidbdics.clean_conveyor_formulas()
 

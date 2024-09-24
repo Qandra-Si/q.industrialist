@@ -422,7 +422,75 @@ def generate_industry_tree(
     return base_industry
 
 
-# TODO: см. также get_optimized_runs_quantity
+def get_optimized_runs_quantity__unoptimized(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        products_per_single_run: int) -> typing.Tuple[int, int]:
+    blueprints_or_runs: int = math.ceil(need_quantity / products_per_single_run)
+    runs_quantity: int = blueprints_or_runs
+    return 1, runs_quantity
+
+
+def get_optimized_runs_quantity__reaction(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        products_per_single_run: int,
+        # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
+        reaction_runs: typing.Optional[int]) -> typing.Tuple[int, int]:
+    # если не None, то настроенное кол-во ранов для реакций
+    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
+    if reaction_runs:
+        runs_number_per_day: int = reaction_runs
+        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
+        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
+        optimized_blueprints_quantity: int = \
+            math.ceil(need_quantity / (products_per_single_run * runs_number_per_day))
+        optimized_runs_quantity: int = runs_number_per_day
+        return optimized_blueprints_quantity, optimized_runs_quantity
+    else:
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            products_per_single_run)
+
+
+def get_optimized_runs_quantity__manufacturing(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        single_run_time: int,
+        products_per_single_run: int,
+        is_commonly_used: bool,
+        # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
+        industry_time: typing.Optional[int]) -> typing.Tuple[int, int]:
+    # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
+    runs_number_per_day: typing.Optional[int] = None
+    if is_commonly_used:
+        # если не None, то длительность запуска производственных работ
+        if industry_time:
+            if single_run_time >= industry_time:
+                runs_number_per_day = 1
+            elif single_run_time > 0:
+                runs_number_per_day = math.ceil(industry_time / single_run_time)
+    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
+    if runs_number_per_day:
+        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
+        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
+        optimized_blueprints_quantity: int = \
+            math.ceil(need_quantity / (products_per_single_run * runs_number_per_day))
+        optimized_runs_quantity: int = runs_number_per_day
+        return optimized_blueprints_quantity, optimized_runs_quantity
+    # если настройки оптимизации не заданы, то считаем кол-во чертежей/ранов с учётом лишь только потребностей
+    else:
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            products_per_single_run)
+
+
 def get_optimized_runs_quantity(
         # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
         need_quantity: int,
@@ -432,32 +500,23 @@ def get_optimized_runs_quantity(
         # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
         industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization] = None) -> typing.Tuple[int, int]:
     # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
-    runs_number_per_day = None
     if industry.action == profit.QIndustryAction.reaction:
-        # если не None, то настроенное кол-во ранов для реакций
-        customized_reaction_runs = industry_plan_customization.reaction_runs if industry_plan_customization else None
-        if customized_reaction_runs:
-            runs_number_per_day = customized_reaction_runs
-    elif industry.action == profit.QIndustryAction.manufacturing and industry.product.is_commonly_used:
-        # если не None, то длительность запуска производственных работ
-        customized_industry_time = industry_plan_customization.industry_time if industry_plan_customization else None
-        if customized_industry_time:
-            if industry.single_run_time >= customized_industry_time:
-                runs_number_per_day = 1
-            elif industry.single_run_time > 0:
-                runs_number_per_day = math.ceil(customized_industry_time / industry.single_run_time)
-    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
-    if runs_number_per_day:
-        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
-        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
-        optimized_blueprints_quantity: int = math.ceil(need_quantity / (industry.products_per_single_run * runs_number_per_day))
-        optimized_runs_quantity: int = runs_number_per_day
-        return optimized_blueprints_quantity, optimized_runs_quantity
+        return get_optimized_runs_quantity__reaction(
+            need_quantity,
+            industry.products_per_single_run,
+            industry_plan_customization.reaction_runs if industry_plan_customization else None)
+    elif industry.action == profit.QIndustryAction.manufacturing:
+        return get_optimized_runs_quantity__manufacturing(
+            need_quantity,
+            industry.single_run_time,
+            industry.products_per_single_run,
+            industry.product.is_commonly_used,
+            industry_plan_customization.industry_time if industry_plan_customization else None)
     # если настройки оптимизации не заданы, то считаем кол-во чертежей/ранов с учётом лишь только потребностей
     else:
-        blueprints_or_runs: int = math.ceil(need_quantity / industry.products_per_single_run)
-        runs_quantity: int = blueprints_or_runs
-        return 1, runs_quantity
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            industry.products_per_single_run)
 
 
 def calculate_purchased_ratio(

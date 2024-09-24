@@ -7,3 +7,4 @@ datetime
 python-dateutil
 sshtunnel
 memory_profiler
+discord.py

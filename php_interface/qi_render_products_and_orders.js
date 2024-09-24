@@ -282,7 +282,7 @@ $("#frmIndustryProduct").on("submit", function(e){
      }else{
       span_profit = "<span style='color:"+((row.single_product_profit < 0.01)?"red":"green")+"'>";
       rows += rowIndustryProduct('Профит производства 1 шт продукта', span_profit+numLikeEve(row.single_product_profit.toFixed(2))+"</span>", 'ISK');
-      rows += rowIndustryProduct('Профит производства 1 шт продукта', span_profit+numLikeEve(((row.single_product_profit/row.total_gross_cost)*100.0).toFixed(2))+"</span>", '%');
+      rows += rowIndustryProduct('Профит производства партии', span_profit+numLikeEve(((row.single_product_profit/row.total_gross_cost)*100.0).toFixed(2))+"</span>", '%');
      }
      rows += "<hr>";
      rows += rowIndustryProduct('Формула зарегистрирована', row.created_at, 'мин');
