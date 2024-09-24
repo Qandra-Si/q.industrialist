@@ -497,11 +497,12 @@ def construct_products_for_blueprints(
     return products
 
 
-def get_blueprint_type_id_by_product_id(
+def get_any_blueprint_type_id_by_product_id(
         product_id: int,
         sde_bp_materials: typing.Dict[str, typing.Dict[str, typing.Any]],
-        sde_type_ids: typing.Dict[str, typing.Dict[str, typing.Any]],
-        activity: str = "manufacturing") -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+        sde_type_ids: typing.Optional[typing.Dict[str, typing.Dict[str, typing.Any]]],
+        activity: typing.Optional[str] = "manufacturing") -> \
+        typing.Optional[typing.Tuple[int, typing.Any, typing.Any]]:
     """
     Внимание! это вредный метод, он очень медленно работает, перебирая ВСЕ чертежи и ВСЕ продукты по ВСЕМ activity.
     Чтобы ускориться предварительную переиндексацию с помощью construct_products_for_blueprints.
@@ -512,20 +513,55 @@ def get_blueprint_type_id_by_product_id(
     * в игре нельзя найти неопубликованный чертёж (его не существует)
     """
     for blueprint_type_id, blueprint_data in sde_bp_materials.items():
-        bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
-        if not bp_tid_dict or not bp_tid_dict.get("published", False):
-            continue
-        __bpm2 = blueprint_data["activities"].get(activity)
-        if not __bpm2:
-            continue
-        __bpm3 = __bpm2.get("products")
-        if not __bpm3:
-            continue
-        for m in __bpm3:
-            type_id: int = m["typeID"]
-            if product_id == type_id:
-                return int(blueprint_type_id), blueprint_data
-    return None, None
+        if sde_type_ids is not None:
+            bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
+            if not bp_tid_dict or not bp_tid_dict.get("published", False):
+                continue
+        if activity is not None:
+            bpm2 = blueprint_data["activities"].get(activity)
+            if not bpm2:
+                continue
+            bpm3 = bpm2.get("products")
+            if bpm3:
+                for m in bpm3:
+                    type_id: int = m["typeID"]
+                    if product_id == type_id:
+                        return int(blueprint_type_id), blueprint_data, bpm2
+        else:
+            for bpm2 in blueprint_data["activities"]:
+                bpm3 = bpm2.get("products")
+                if bpm3:
+                    for m in bpm3:
+                        type_id: int = m["typeID"]
+                        if product_id == type_id:
+                            return int(blueprint_type_id), blueprint_data, bpm2
+    return None
+
+
+def get_blueprint_type_id_by_product_id(
+        product_id: int,
+        sde_bp_materials: typing.Dict[str, typing.Dict[str, typing.Any]],
+        sde_type_ids: typing.Dict[str, typing.Dict[str, typing.Any]],
+        activity: str = "manufacturing") -> \
+        typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
+    """
+    Внимание! это вредный метод, он очень медленно работает, перебирая ВСЕ чертежи и ВСЕ продукты по ВСЕМ activity.
+    Чтобы ускориться предварительную переиндексацию с помощью construct_products_for_blueprints.
+    ----
+    Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
+    Внимание!
+    * в игре можно найти неопубликованный предмет, который можно произвести (чёртеж существует)
+    * в игре нельзя найти неопубликованный чертёж (его не существует)
+    """
+    res: typing.Optional[typing.Tuple[int, typing.Any, typing.Any]] = \
+        get_any_blueprint_type_id_by_product_id(
+            product_id,
+            sde_bp_materials,
+            sde_type_ids,
+            activity)
+    if res is None:
+        return None, None
+    return res[0], res[1]
 
 
 def get_blueprint_type_id_by_manufacturing_product_id(
