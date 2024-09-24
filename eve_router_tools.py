@@ -555,12 +555,13 @@ class DecryptorDetails:
         return self.__time
 
 
-def which_decryptor_applies_to_blueprint(
+def which_decryptor_applies_to_blueprint__static_variant(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
         # продукт для проверки (внимание! чертежи плохо каталогизированы, market-группы часто не заданы,
         # или отсутствуют у T2-чертежей)
-        product_type: db.QSwaggerTypeId) -> typing.Optional[DecryptorDetails]:
+        product_type: db.QSwaggerTypeId) -> typing.Optional[typing.Tuple[DecryptorDetails, bool]]:  # bool: required
+    decryptor_required: bool = False
     decryptor_type: typing.Optional[db.QSwaggerTypeId] = None
     market_group: typing.Optional[db.QSwaggerMarketGroup] = qid.there_is_market_group_in_chain(
         product_type,
@@ -575,16 +576,47 @@ def which_decryptor_applies_to_blueprint(
         elif market_group.group_id == 9:  # Ship Equipment (соответствует Ship Equipment=209 в чертежах)
             # тут только капитальные модули (риги проверены выше)
             if product_type.name[:8] == 'Capital ':
+                decryptor_required = True
                 decryptor_type = qid.get_type_id(34207)  # Optimized Attainment Decryptor
             elif product_type.group:
                 if product_type.group.name == 'Capital' or product_type.group.name == 'Extra Large':
+                    decryptor_required = True
                     decryptor_type = qid.get_type_id(34207)  # Optimized Attainment Decryptor
         else:
             raise Exception("This shouldn't have happened")
     if decryptor_type:
-        return DecryptorDetails(decryptor_type)
+        return DecryptorDetails(decryptor_type), decryptor_required
     else:
         return None
+
+
+def which_decryptor_applies_to_blueprint__formula_variant(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # продукт для проверки по спискам conveyor_best_formulas
+        product_type: db.QSwaggerTypeId) -> typing.Optional[typing.Tuple[DecryptorDetails, bool]]:  # bool: required
+    conveyor_best_formula: typing.Optional[db.QSwaggerConveyorBestFormula] = qid.get_conveyor_best_formula(product_type.type_id)
+    # если есть предварительно рассчитанная conveyor-формула, то выбираем именно её (с неё точно всё в порядке, все
+    # варианты расчётов можно проверить и убедиться в правильности)
+    if conveyor_best_formula:
+        decryptor_type: typing.Optional[db.QSwaggerTypeId] = conveyor_best_formula.decryptor_type
+        if decryptor_type:
+            return DecryptorDetails(decryptor_type), conveyor_best_formula.decryptor_required
+        else:
+            return None
+    # если conveyor-формулы готовой нет, то скорее всего предмет не является Tech II, тогда выбираем декриптор
+    # с помощью старого алгоритма (правила принятые в ri4)
+    return which_decryptor_applies_to_blueprint__static_variant(qid, product_type)
+
+
+def which_decryptor_applies_to_blueprint(
+        # данные (справочники)
+        qid: db.QSwaggerDictionary,
+        # продукт для проверки (внимание! чертежи плохо каталогизированы, market-группы часто не заданы,
+        # или отсутствуют у T2-чертежей)
+        product_type: db.QSwaggerTypeId) -> typing.Optional[typing.Tuple[DecryptorDetails, bool]]:  # bool: required
+    # return which_decryptor_applies_to_blueprint__static_variant(qid, product_type)
+    return which_decryptor_applies_to_blueprint__formula_variant(qid, product_type)
 
 
 # blueprints_details: подробности о чертежах этого типа [{"q": -1, "r": -1}, {"q": 2, "r": -1}, {"q": -2, "r": 179}]
@@ -599,18 +631,18 @@ def get_materials_list(
         # список чертежей для которых необходимо рассчитать потребность в материалах
         blueprints: typing.List[db.QSwaggerCorporationBlueprint],
         fixed_number_of_runs: typing.Optional[int] = None) \
-        -> typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]:
+        -> typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]]:
     # список материалов по набору чертежей с учётом ME
-    materials_list_with_efficiency: typing.Dict[db.QSwaggerActivity, typing.Dict[int, db.QSwaggerMaterial]] = {}
+    materials_list_with_efficiency: typing.Dict[db.QSwaggerActivity, typing.Dict[int, db.QSwaggerOptionalMaterial]] = {}
 
-    def push_into(__a: db.QSwaggerActivity, __m: db.QSwaggerMaterial, __q: int) -> None:
+    def push_into(__a: db.QSwaggerActivity, __m: db.QSwaggerMaterial, __q: int, __o: bool) -> None:
         __in_cache205: typing.Dict[int, db.QSwaggerMaterial] = materials_list_with_efficiency.get(__a)
         if not __in_cache205:
             materials_list_with_efficiency[__a] = {}
             __in_cache205 = materials_list_with_efficiency.get(__a)
         __in_cache209: db.QSwaggerMaterial = __in_cache205.get(__m.material_id)
         if not __in_cache209:
-            __in_cache205[__m.material_id] = db.QSwaggerMaterial(__m.material_type, __q)
+            __in_cache205[__m.material_id] = db.QSwaggerOptionalMaterial(__m.material_type, __q, __o)
         else:
             __in_cache209.increment_quantity(__q)
 
@@ -641,7 +673,7 @@ def get_materials_list(
                 # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
                 industry_input *= quantity_of_blueprints
                 # сохранение информации в справочник материалов
-                push_into(activity, m, industry_input)
+                push_into(activity, m, industry_input, False)
             # ---
             if a == db.QSwaggerActivityCode.INVENTION:
                 # Добавляем декрипторы (замечения и ограничения):
@@ -657,13 +689,13 @@ def get_materials_list(
                 product_blueprint_id: int = invention.products[0].product_id
                 product_blueprint_type: db.QSwaggerBlueprint = qid.get_blueprint(product_blueprint_id)
                 if product_blueprint_type and product_blueprint_type.manufacturing:
-                    decryptor_details: typing.Optional[DecryptorDetails] = None
+                    decryptor_details: typing.Optional[typing.Tuple[DecryptorDetails, bool]] = None
                     if b.blueprint_type.manufacturing:
                         decryptor_details = which_decryptor_applies_to_blueprint(
                             qid,
                             # чертёж: b.blueprint_type.blueprint_type
-                            b.blueprint_type.manufacturing.product_type)
-                    if decryptor_details:
+                            product_blueprint_type.manufacturing.product_type)
+                    if decryptor_details is not None:
                         # расчёт кол-ва декрипторов с учётом эффективности производства
                         industry_input = eve_efficiency.get_industry_material_efficiency(
                             str(a),
@@ -673,11 +705,15 @@ def get_materials_list(
                         # выход готовой продукции с одного запуска по N ранов умножаем на кол-во чертежей
                         industry_input *= quantity_of_blueprints
                         # сохранение информации в справочник материалов
-                        push_into(activity, db.QSwaggerMaterial(decryptor_details.type, 0), industry_input)
+                        push_into(
+                            activity,
+                            db.QSwaggerMaterial(decryptor_details[0].type, 0),
+                            industry_input,
+                            not decryptor_details[1])
     # ---
-    result: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
+    result: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
     for activity in materials_list_with_efficiency.keys():
-        mm: typing.Dict[int, db.QSwaggerMaterial] = materials_list_with_efficiency.get(activity)
+        mm: typing.Dict[int, db.QSwaggerOptionalMaterial] = materials_list_with_efficiency.get(activity)
         result[activity] = [m for m in mm.values()]
     return result
 
@@ -721,26 +757,35 @@ class ConveyorCorporationStockMaterials:
         def __init__(self,
                      enough: bool,
                      max_possible: typing.Optional[int],
-                     not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]):
+                     not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]]):
             self.non_decryptors_missing: bool = not enough
             self.decryptors_missing: typing.Optional[bool] = None
+            self.decryptors_optional: typing.Optional[bool] = None
             self.max_possible: typing.Optional[int] = max_possible
-            self.not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = not_available
+            self.not_available: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = not_available
 
         @property
         def enough(self):
-            return not self.non_decryptors_missing
+            if self.non_decryptors_missing:
+                return False
+            elif self.decryptors_optional is None or self.decryptors_optional:
+                return True
+            else:
+                return False
 
         @property
-        def only_decryptors_missing(self):
-            return not self.non_decryptors_missing and self.decryptors_missing
+        def only_optional_decryptors_missing(self):
+            if self.non_decryptors_missing:
+                return False
+            else:
+                return self.decryptors_missing and self.decryptors_optional
 
     def check_enough_materials_at_station(
             self,
             # идентификатор станции на которой в коробках стока находятся материалы
             station_id: int,
             # материалы в списке не должны дублироваться (их необходимо суммировать до проверки)
-            required_materials: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]]) \
+            required_materials: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]]) \
             -> CheckEnoughResult:
         available_materials: typing.Dict[int, db.QSwaggerMaterial] = self.stock_materials.get(station_id)
         if not available_materials:
@@ -752,9 +797,9 @@ class ConveyorCorporationStockMaterials:
         result: ConveyorCorporationStockMaterials.CheckEnoughResult = \
             ConveyorCorporationStockMaterials.CheckEnoughResult(True, -1, {})
 
-        def push(a338: db.QSwaggerActivity, m338: db.QSwaggerMaterial, q338: int) -> bool:
-            m340: db.QSwaggerMaterial = db.QSwaggerMaterial(m338.material_type, q338)
-            mm334: typing.List[db.QSwaggerMaterial] = result.not_available.get(a338)
+        def push(a338: db.QSwaggerActivity, m338: db.QSwaggerOptionalMaterial, q338: int) -> bool:
+            m340: db.QSwaggerOptionalMaterial = db.QSwaggerOptionalMaterial(m338.material_type, q338, m338.optional)
+            mm334: typing.List[db.QSwaggerOptionalMaterial] = result.not_available.get(a338)
             if mm334 is None:
                 result.not_available[a338] = [m340]
             else:
@@ -762,6 +807,7 @@ class ConveyorCorporationStockMaterials:
             is_decryptor: bool = m338.material_type.market_group_id == 1873
             if is_decryptor:
                 result.decryptors_missing = True
+                result.decryptors_optional = m340.optional
             else:
                 result.non_decryptors_missing = True
             return is_decryptor
@@ -829,16 +875,16 @@ class ConveyorMaterialRequirements:
             self.me: int = me
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
             self.max_possible_for_single: int = 0
-            self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
+            self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
             self.run_possible: bool = False
-            self.only_decryptors_missing_for_stack: bool = True
-            self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
-            self.not_available_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = {}
+            self.only_optional_decryptors_missing_for_stack: bool = True
+            self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
+            self.not_available_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
 
         def apply_materials_info(self,
-                                 materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
+                                 materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]],
                                  enough_for_single: ConveyorCorporationStockMaterials.CheckEnoughResult,
-                                 materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]],
+                                 materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]],
                                  enough_for_stack: ConveyorCorporationStockMaterials.CheckEnoughResult):
             del self.required_materials_for_single
             del self.required_materials_for_stack
@@ -848,7 +894,7 @@ class ConveyorMaterialRequirements:
             self.required_materials_for_single = materials_for_single
             # ---
             self.run_possible = enough_for_single.enough
-            self.only_decryptors_missing_for_stack = enough_for_stack.only_decryptors_missing
+            self.only_optional_decryptors_missing_for_stack = enough_for_stack.only_optional_decryptors_missing
             self.required_materials_for_stack = materials_for_stack
             self.not_available_materials_for_stack = enough_for_stack.not_available
 
@@ -909,17 +955,19 @@ class ConveyorMaterialRequirements:
                   "\n")
             """
             # вычисляем минимально необходимое кол-во материалов для работ хотя-бы по одному чертежу
-            materials_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = get_materials_list(
-                qid,
-                conveyor_settings,
-                [b0],
-                conveyor_settings.fixed_number_of_runs)
+            materials_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = \
+                get_materials_list(
+                    qid,
+                    conveyor_settings,
+                    [b0],
+                    conveyor_settings.fixed_number_of_runs)
             # считаем общее количество материалов для работ по стеку чертежей
-            materials_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerMaterial]] = get_materials_list(
-                qid,
-                conveyor_settings,
-                stack.group,
-                conveyor_settings.fixed_number_of_runs)
+            materials_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = \
+                get_materials_list(
+                    qid,
+                    conveyor_settings,
+                    stack.group,
+                    conveyor_settings.fixed_number_of_runs)
             # проверка доступности материалов имеющихся в стоке
             enough_for_single: ConveyorCorporationStockMaterials.CheckEnoughResult = \
                 available_materials.check_enough_materials_at_station(b0.station_id, materials_single)
@@ -1484,6 +1532,9 @@ class ConveyorManufacturingAnalysis:
         if self.product_tier1_limits:
             self.product_tier1_limit = sum([_.approximate for _ in self.product_tier1_limits])
             self.product_tier1_overstock = self.num_ready >= self.product_tier1_limit
+        # поиск формулы производства для этого предмета
+        self.product_tier1_best_formula: typing.Optional[db.QSwaggerConveyorBestFormula] = \
+            qid.get_conveyor_best_formula(self.product_tier1.product_id)
 
     @classmethod
     def from_blueprint_tier1(
@@ -1663,6 +1714,14 @@ class ConveyorInventAnalysis:
     def num_prepared(self) -> int:
         if not self.__analysis_tier2.product: return 0
         return self.__analysis_tier2.product.num_prepared
+
+    """
+    conveyor-формула производства предмета
+    """
+    @property
+    def product_tier2_best_formula(self) -> typing.Optional[db.QSwaggerConveyorBestFormula]:
+        if not self.__analysis_tier2.product: return None
+        return self.__analysis_tier2.product.product_tier1_best_formula
 
 
 class ConveyorInventProductsAnalysis:
@@ -2278,13 +2337,15 @@ class ConveyorDemands:
                      invention: db.QSwaggerBlueprintInvention,
                      invented_product: db.QSwaggerInventionProduct,
                      invented_bpc: db.QSwaggerBlueprint,
-                     decryptor_details: typing.Optional[DecryptorDetails]):
+                     decryptor_details: typing.Optional[DecryptorDetails],
+                     decryptor_required: typing.Optional[bool]):
             self.copied_bpc: db.QSwaggerBlueprint = copied_bpc
             self.copying: db.QSwaggerBlueprintCopying = copying
             self.invention: db.QSwaggerBlueprintInvention = invention
             self.invented_product: db.QSwaggerInventionProduct = invented_product
             self.invented_bpc: db.QSwaggerBlueprint = invented_bpc
             self.decryptor_details: typing.Optional[DecryptorDetails] = decryptor_details
+            self.decryptor_required: typing.Optional[bool] = decryptor_required
             self.invention_days_max: int = 0
             self.invent_1x1_run_time: float = 0.0
             self.max_invent_runs_per_days: int = 0
@@ -2358,17 +2419,19 @@ class ConveyorDemands:
         decryptor_probability: float = 0.0
         decryptor_runs: int = 0
         decryptor_time: float = 0.0
+        decryptor_required: typing.Optional[bool] = None
 
         # выбираем декриптор
-        decryptor_details: typing.Optional[DecryptorDetails] = which_decryptor_applies_to_blueprint(
+        decryptor_details: typing.Optional[typing.Tuple[DecryptorDetails, bool]] = which_decryptor_applies_to_blueprint(
             qid,
             # чертёж: coalesce(copied_bpc.blueprint_type, invented_bpc.blueprint_type)
             invented_bpc.manufacturing.product_type)
         # выполняем coalesce для параметров декриптора
-        if decryptor_details:
-            decryptor_probability: float = decryptor_details.probability  # +?% вероятность успеха
-            decryptor_runs: int = decryptor_details.runs  # +? число прогонов проекта
-            decryptor_time: float = decryptor_details.time_efficiency  # +?% экономия времени производства
+        if decryptor_details is not None:
+            decryptor_probability: float = decryptor_details[0].probability  # +?% вероятность успеха
+            decryptor_runs: int = decryptor_details[0].runs  # +? число прогонов проекта
+            decryptor_time: float = decryptor_details[0].time_efficiency  # +?% экономия времени производства
+            decryptor_required: bool = decryptor_details[1]
 
         # ------------------------------------------------------
         # расчёт плана инвента
@@ -2380,7 +2443,8 @@ class ConveyorDemands:
             invention,
             invented_product,
             invented_bpc,
-            decryptor_details)
+            None if decryptor_required is None else decryptor_details[0],
+            decryptor_required)
 
         # ------------------------------------------------------
         # расчёт длительности инвента

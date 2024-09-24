@@ -1,5 +1,6 @@
 ﻿# -*- encoding: utf-8 -*-
 import typing
+import profit
 
 
 class QDictionaries:
@@ -454,3 +455,149 @@ class QDictionaries:
             self.insert_market_group(group_id, mg)
         del sde_market_groups_keys
 
+    def clean_conveyor_formulas(self) -> None:
+        self.db.execute("DELETE FROM conveyor_formulas;")
+
+    def actualize_conveyor_formula(self, conveyor_formula: profit.QIndustryFormula) -> None:
+        ancient_relics: str = 'unused'
+        cf_formula_row = self.db.select_one_row(
+            "INSERT INTO conveyor_formulas("
+            " cf_blueprint_type_id,"
+            " cf_activity,"
+            " cf_product_type_id,"
+            " cf_customized_runs,"
+            " cf_decryptor_type_id,"
+            " cf_ancient_relics,"
+            " cf_prior_blueprint_type_id,"
+            " cf_material_efficiency,"
+            " cf_time_efficiency)"
+            "VALUES("
+            " %(bp)s,"
+            " %(a)s,"
+            " %(p)s,"
+            " %(cr)s,"
+            " %(d)s,"
+            " %(ar)s,"
+            " %(bpo)s,"
+            " %(me)s,"
+            " %(te)s)"
+            "RETURNING cf_formula;",
+            {'bp': conveyor_formula.blueprint_type_id,
+             'a': 1,
+             'p': conveyor_formula.product_type_id,
+             'cr': conveyor_formula.customized_runs,
+             'd': conveyor_formula.decryptor_type_id,  # м.б. None
+             'ar': ancient_relics,
+             'bpo': conveyor_formula.prior_blueprint_type_id,  # м.б. None (но возможны варианты либо BPO либо BPC)
+             'me': conveyor_formula.material_efficiency,
+             'te': conveyor_formula.time_efficiency,
+             }
+        )
+        cf_formula: int = cf_formula_row[0]
+        for p in conveyor_formula.purchase:
+            self.db.execute(
+                "INSERT INTO conveyor_formula_purchase("
+                " cfp_formula,"
+                " cfp_material_type_id,"
+                " cfp_quantity)"
+                "VALUES("
+                " %(f)s,"
+                " %(m)s,"
+                " %(q)s);",
+                {'f': cf_formula,
+                 'm': p.type_id,
+                 'q': p.quantity,
+                 }
+            )
+        for jc in conveyor_formula.job_costs:
+            self.db.execute(
+                "INSERT INTO conveyor_formula_jobs("
+                " cfj_formula,"
+                " cfj_usage_chain,"
+                " cfj_solar_system_id,"
+                " cfj_blueprint_type_id,"
+                " cfj_planned_blueprints,"
+                " cfj_planned_runs,"
+                " cfj_activity_code,"
+                " cfj_activity_eiv,"
+                " cfj_job_cost_base_multiplier,"
+                " cfj_role_bonus_job_cost,"
+                " cfj_rigs_bonus_job_cost,"
+                " cfj_scc_surcharge,"
+                " cfj_facility_tax)"
+                "VALUES("
+                " %(f)s,"
+                " %(uc)s,"
+                " %(ss)s,"
+                " %(b)s,"
+                " %(pb)s,"
+                " %(pr)s,"
+                " %(ac)s,"
+                " %(ae)s,"
+                " %(jm)s,"
+                " %(ro)s,"
+                " %(ri)s,"
+                " %(scc)s,"
+                " %(tax)s);",
+                {'f': cf_formula,
+                 'uc': jc.usage_chain,
+                 'ss': jc.solar_system_id,
+                 'b': jc.blueprint_type_id,
+                 'pb': jc.planned_blueprints,
+                 'pr': jc.planned_runs,
+                 'ac': jc.activity_code,
+                 'ae': jc.activity_eiv,
+                 'jm': jc.job_cost_base_multiplier,
+                 'ro': jc.role_bonus_job_cost,
+                 'ri': jc.rigs_bonus_job_cost,
+                 'scc': jc.scc_surcharge,
+                 'tax': jc.facility_tax,
+                 }
+            )
+
+    def clean_items(self):
+        self.db.execute("DELETE FROM eve_sde_items;")
+
+    def insert_item(self, item_id: int, location_id: int, type_id: int) -> None:
+        self.db.execute(
+            "INSERT INTO eve_sde_items("
+            " sdeii_item_id,"
+            " sdeii_location_id,"
+            " sdeii_type_id) "
+            "VALUES("
+            " %(i)s,"
+            " %(l)s,"
+            " %(t)s)"
+            "ON CONFLICT ON CONSTRAINT pk_sdeii DO UPDATE SET"
+            " sdeii_location_id=%(l)s,"
+            " sdeii_type_id=%(t)s;",
+            {'i': item_id,
+             'l': location_id,
+             't': type_id,
+             }
+        )
+
+    def actualize_items(self, sde_inv_items):
+        # "0": {  # '(none)'
+        #  "locationID": 0,
+        #  "typeID": 0  # '#System'
+        # },
+        # "9": {  # 'EVE Universe'
+        #  "locationID": 0,
+        #  "typeID": 0  # '#System'
+        # },
+        # "10000054": {  # 'Aridia'
+        #  "locationID": 9,
+        #  "typeID": 3  # 'Region'
+        # },
+        # "20000626": {  # 'Leseasesh'
+        #  "locationID": 10000054,
+        #  "typeID": 4  # 'Constellation'
+        # },
+        # "30004283": {  # 'Shafrak'
+        #  "locationID": 20000626,
+        #  "typeID": 5  # 'Solar System'
+        # },
+        for _item_id, item_dict in sde_inv_items.items():
+            item_id: int = int(_item_id)
+            self.insert_item(item_id, int(item_dict['locationID']), int(item_dict['typeID']))

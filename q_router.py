@@ -62,6 +62,7 @@ def main():
     qid.load_universe_groups()
     qid.load_all_known_type_ids()
     qid.load_blueprints()
+    qid.load_conveyor_best_formulas()
     # загрузка информации, связанной с корпорациями
     for corporation_name in argv_prms['corporation']:
         # публичные сведения (пилоты, структуры, станции, корпорации)
@@ -85,6 +86,8 @@ def main():
         station: typing.Optional[db.QSwaggerStation] = qid.load_station_by_name(r['station'])
         if not station:
             raise Exception(f"Unable to load station by name: {r['station']}")
+    # загрузка conveyor-формул после загрузки всех справочных и корпоративных данных (в т.ч. станций)
+    qid.load_conveyor_formulas()
     # отключаемся от сервера
     qid.disconnect_from_translator()
     del qit

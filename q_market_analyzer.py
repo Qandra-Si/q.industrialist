@@ -56,7 +56,7 @@ def main():
     for t in [t for t in sde_type_ids if t in sde_bp_materials.keys() and sde_type_ids[t].get('published')==False]:
         del sde_bp_materials[t]
     # построение списка продуктов, которые появляются в результате производства
-    products_for_bps = set(eve_sde_tools.get_products_for_blueprints(sde_bp_materials))
+    products_for_bps = set(eve_sde_tools.construct_products_for_blueprints_by_activity(sde_bp_materials))
     materials_for_bps = eve_sde_tools.get_materials_for_blueprints(sde_bp_materials)
     research_materials_for_bps = eve_sde_tools.get_research_materials_for_blueprints(sde_bp_materials)
     materials_for_bps.extend(research_materials_for_bps)

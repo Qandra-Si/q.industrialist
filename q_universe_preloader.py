@@ -29,6 +29,13 @@ Usually single launch for one corporation takes 1.5-2 minutes, but in case of a 
 downtime, it will take up to 3-4 minutes for each very active corporation.
 Loading market prices for The Forge region will require about 1GB of memory.
 
+To refresh blueprints you need to feel market_hubs and market_routes tables and then
+run the following command from this directory:
+
+$ chcp 65001 & @rem on Windows only!
+$ python q_dictionaries.py --category=conveyor_formulas --cache_dir=~/.q_industrialist
+$ python q_universe_preloader.py --category=trade_hubs --category=industry_systems --category=market_prices --category=conveyor_formulas --pilot="Your Name" --online --cache_dir=~/.q_industrialist
+
 Required application scopes:
     * esi-universe.read_structures.v1 - Requires: access token
     * esi-corporations.read_structures.v1 - Requires role(s): Station_Manager
@@ -40,11 +47,11 @@ Required application scopes:
 import sys
 import typing
 
+import q_industrialist_settings
 import eve_db_tools
 import console_app
+import postgresql_interface as db
 # from memory_profiler import memory_usage
-
-import q_industrialist_settings
 
 
 def main():
@@ -60,7 +67,6 @@ def main():
         # * markets region history, т.е. рыночных цен по регионам - раз в день ОЧЕНЬ МЕДЛЕННО
         'public',
         # актуализация рыночных цен на товары во вселенной, в частности:
-        # * adjusted и average цен, которые которые отображаются в ingame-клиенте (т.н. universe price) - БЫСТРО
         # * цен в market-хабах по заданным настройках - скорость зависит от региона, но в частности Jita ДОЛГО
         # * цен на структурах по заданным настройкам - доступ зависит от корпорации, если альянс оч.крупный то НЕ БЫСТРО
         'trade_hubs',
@@ -76,7 +82,7 @@ def main():
         'goods',
         # актуализация производственных индексов по всем солнечным системам вселенной - БЫСТРО (обновляется редко)
         'industry_systems',
-        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (обновляется по четвергам)
+        # актуализация adjusted и average цен на материалы в вселенной - НЕ БЫСТРО (в EVE Online обновляется по четвергам)
         'market_prices',
         # пересчёт кеша таблиц для conveyor-формул (выборка данных по стоимости производства различных предметов)
         'conveyor_formulas',
@@ -120,6 +126,55 @@ def main():
     conveyor_formulas_delivery_refresh: bool = False
     pilot_max_num: int = len(argv_prms["character_names"])
 
+    # пытаемся в список g_market_hubs добавить станции из БД, в которых ведётся торговля (trade_hub в настройках
+    # является non archive)
+    active_market_hubs: typing.List[typing.Dict[str, typing.Union[int, str, typing.List[typing.Union[str, db.QSwaggerInterface.MarketHub]]]]] = \
+        q_industrialist_settings.g_market_hubs
+    active_market_structures: typing.List[typing.Union[typing.Dict[str, typing.Union[int, str]]]] = \
+        q_industrialist_settings.g_market_structures
+    # ---
+    for hub in dbtools.active_market_hubs:
+        # настройки загруженные из базы данных имеют выше приоритет, чем заданные в q_industrialist_settings (постепенно
+        # пытаюсь отказаться от устаревающей практики ввода настроек в _settings файлах), в связи с чем, если в БД уже
+        # есть станция, которая либо активная, либо архивная, то она либо добавляется в список для загрузки цен, либо
+        # удаляется оттуда
+        if hub.is_nonuser_station:
+            region_dict: typing.Dict[str, typing.Union[int, str, typing.List[str]]] = \
+                next((_ for _ in active_market_hubs if _['region'] == hub.region), None)
+            if not region_dict:
+                if hub.active:
+                    active_market_hubs.append({
+                        'region': hub.region,
+                        'region_id': hub.region_id,
+                        'trade_hubs': [hub.trade_hub]})
+            else:
+                region_dict.update({'region_id': hub.region_id})
+                region_stations: typing.List[typing.Union[str, db.QSwaggerInterface.MarketHub]] = region_dict['trade_hubs']
+                if hub.trade_hub not in region_stations:
+                    if hub.active:
+                        region_stations.append(hub)
+                else:
+                    if hub.archive:
+                        region_stations.remove(hub.trade_hub)
+                    elif hub.active:
+                        region_stations.remove(hub.trade_hub)
+                        region_stations.append(hub)
+        # аналогичные действия выполняем для структур, где настройки заданные в БД также имеют приоритет выше, чем в
+        # файле _settings
+        if hub.is_user_structure:
+            structure_dict: typing.Dict[str, typing.Union[int, str]] = \
+                next((_ for _ in active_market_structures if _['structure_id'] == hub.trade_hub_id), None)
+            if not structure_dict:
+                if hub.active:
+                    active_market_structures.append({
+                        'structure_id': hub.trade_hub_id,
+                        'corporation_name': hub.trader_corporation})
+            else:
+                if hub.active:
+                    structure_dict['corporation_name'] = hub.trader_corporation
+                elif hub.archive:
+                    active_market_structures.remove(structure_dict)
+
     for pilot_num, pilot_name in enumerate(argv_prms["character_names"], start=1):
         # настройка Eve Online ESI Swagger interface
         authz = dbtools.auth_pilot_by_name(
@@ -157,7 +212,8 @@ def main():
                           format(universe_structures_stat[1], universe_structures_stat[0]))
                 sys.stdout.flush()
 
-            # загружаем производственные индексы всех солнечных систем вселенной
+            # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
+            # market-хабам и пишем в БД
             if categories & {'all', 'public', 'rare', 'industry_systems'}:
                 # Requires: public access
                 industry_systems_updated = dbtools.actualize_industry_systems()
@@ -190,12 +246,20 @@ def main():
                         conveyor_formulas_jobs_refresh = True
                 sys.stdout.flush()
 
-            # в зависимости от заданных натроек загружаем цены в регионах, фильтруем по
+            # в зависимости от заданных настроек загружаем цены в регионах, фильтруем по
             # market-хабам и пишем в БД
             if categories & {'all', 'public', 'rare', 'trade_hubs'}:
                 # Requires: public access
-                for region in q_industrialist_settings.g_market_hubs:
-                    found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(region['region'], region['trade_hubs'])
+                for region in active_market_hubs:
+                    found_market_goods, updated_market_orders = dbtools.actualize_trade_hubs_market_orders(
+                        region['region'],
+                        # в настройках заданных пользователем это строковый параметр - название станции (м.б. загружен
+                        # из БД вместе с настройками активных торговых хабов, тогда это будет объект с названием и
+                        # кодом станции)
+                        region['trade_hubs'],
+                        # в настройках заданных пользователем это необязательный параметр (м.б. загружен из БД вместе
+                        # с настройками активных торговых хабов)
+                        region.get('region_id'))
                     print("'{}' market has {} goods and {} order updates\n".format(
                         region['region'],
                         'not new' if found_market_goods is None else found_market_goods,
@@ -209,7 +273,7 @@ def main():
                             conveyor_formulas_purchase_refresh = True
 
                 # Requires: public access
-                for structure in q_industrialist_settings.g_market_structures:
+                for structure in active_market_structures:
                     if structure.get("corporation_name", None) is None:
                         found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
                         print("'{}' market has {} goods and {} order updates\n".format(
@@ -224,7 +288,7 @@ def main():
         # одразом фильтрация осуществляется по названиям корпораций)
         if categories & {'all', 'corporation', 'trade_hubs'}:
             # Requires: public access
-            for structure in q_industrialist_settings.g_market_structures:
+            for structure in active_market_structures:
                 if structure.get("corporation_name") == corporation_name:
                     found_market_goods, updated_market_orders = dbtools.actualize_markets_structures_prices(structure.get("structure_id"))
                     print("'{}' market has {} goods and {} order updates\n".format(
@@ -350,6 +414,7 @@ def main():
                                      'purchase' if conveyor_formulas_purchase_refresh else '',
                                      'delivery' if conveyor_formulas_delivery_refresh else '']))
                 ))
+                dbtools.actualize_conveyor_formulas_calculus()
 
     sys.stdout.flush()
 

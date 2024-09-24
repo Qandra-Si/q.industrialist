@@ -12,12 +12,13 @@ import profit
 # составляем дерево материалов, которые будут использоваться в производстве
 def generate_materials_tree(
         # входной список материалов, используемых в производстве
-        curr_materials,
+        curr_materials: typing.List[typing.Dict[str, int]],
         # выходной список со всеми возможными материалами, задействованными в производстве
         curr_industry: profit.QIndustryTree,
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_products: typing.Dict[str, typing.Dict[int, eve_sde_tools.EveSDEProduct]],
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
@@ -25,12 +26,12 @@ def generate_materials_tree(
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices],
         # настройки оптимизации производства
         industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization]):
-    for m1 in enumerate(curr_materials, start=1):
-        material_tid: int = int(m1[1]['typeID'])
-        material_qty: int = int(m1[1]['quantity'])
+    for m1 in curr_materials:
+        material_tid: int = int(m1['typeID'])
+        material_qty: int = int(m1['quantity'])
         material_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_tid)
-        material_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
-        material_market_group_name: str = sde_market_groups[str(material_market_group_id)]['nameID']['en']
+        material_market_group_id: typing.Optional[int] = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, material_tid)
+        material_market_group_name: typing.Optional[str] = sde_market_groups[str(material_market_group_id)]['nameID']['en'] if material_market_group_id else None
         material_meta_group_id: typing.Optional[int] = sde_type_ids[str(material_tid)].get('metaGroupID', None)
         material_volume: float = sde_type_ids[str(material_tid)].get('volume', 0.0)
         material_adjusted_price: float = eve_esi_tools.get_material_adjusted_price(material_tid, eve_market_prices_data)
@@ -56,96 +57,85 @@ def generate_materials_tree(
         # или: проверяем, возможно ли получить данный материал с помощью его reaction-производства?
         # или: если способов производства данного вида материалов так и не найдено, то данный материал закупается,
         #      переходим к следующему
-        for activity in ['manufacturing', 'reaction', 'copying']:
-            if activity == 'copying':
-                # пытаемся получить чертёж и параметры копирки (если она предполагается для этого чертежа)
-                material_bp_tid, blueprint_dict = None, eve_sde_tools.get_blueprint_copying_activity(
-                    sde_bp_materials,
-                    material_tid)
-                if blueprint_dict is None:
-                    continue
-                # синтезируем фейковый dict с copying-ом так, чтобы он был подобен другим подобным dict-ам
-                material_bp_tid = material_tid
-                blueprint_dict = {
-                    'activities': {
-                        'copying': {
-                            'products': [{'quantity': 1, 'typeID': material_tid}],
-                            'materials': blueprint_dict.get('materials', []),
-                            'time': blueprint_dict.get('time', 0),
-                        }
-                    },
-                    'maxProductionLimit': sde_bp_materials[str(material_tid)]['maxProductionLimit']
-                }
-                material_produce_action = profit.QIndustryAction.copying
+        cached_product: typing.Optional[eve_sde_tools.EveSDEProduct] = sde_products['manufacturing'].get(material_tid)
+        if cached_product:
+            material_produce_action: profit.QIndustryAction = profit.QIndustryAction.manufacturing
+        else:
+            # пытаемся получить чертёж/формулу и параметры производства/реакции
+            cached_product: typing.Optional[eve_sde_tools.EveSDEProduct] = sde_products['reaction'].get(material_tid)
+            if cached_product:
+                material_produce_action: profit.QIndustryAction = profit.QIndustryAction.reaction
             else:
-                # пытаемся получить чертёж/формулу и параметры производства/реакции
-                material_bp_tid, blueprint_dict = eve_sde_tools.get_blueprint_type_id_by_product_id(
-                    material_tid,
-                    sde_bp_materials,
-                    sde_type_ids,
-                    activity)
-                if blueprint_dict is None:
+                # пытаемся получить чертёж и параметры копирки (если она предполагается для этого чертежа)
+                cached_product: typing.Optional[eve_sde_tools.EveSDEProduct] = sde_products['copying'].get(material_tid)
+                if cached_product:
+                    material_produce_action = profit.QIndustryAction.copying
+                else:
                     continue
-                material_produce_action: profit.QIndustryAction = profit.QIndustryAction.reaction \
-                    if activity == 'reaction' else profit.QIndustryAction.manufacturing
-            # теперь рассчитываем потребности для этой activity
-            assert material_bp_tid is not None
-            max_production_limit: int = blueprint_dict['maxProductionLimit']
-            blueprint_dict = blueprint_dict['activities'][activity]
-            assert len(blueprint_dict.get('products', [])) == 1
-            assert blueprint_dict['products'][0]['typeID'] == material_tid
-            # готовим данные для следующего уровня вложенности
-            products_per_single_run: int = blueprint_dict['products'][0]['quantity']
-            single_run_time: int = blueprint_dict['time']
-            next_materials = blueprint_dict['materials']
-            # считаем EIV, который потребуется для вычисления стоимости job cost
-            estimated_items_value: float = profit.calc_estimated_items_value(
-                material_bp_tid,
-                activity,
+        # теперь рассчитываем потребности для этой activity
+        activity: str = str(material_produce_action)
+        material_bp_tid = cached_product.blueprint_type_id
+        max_production_limit: int = cached_product.max_production_limit
+        # assert len(cached_product.activity_data.get('products', [])) == 1
+        # assert cached_product.activity_data['products'][0]['typeID'] == material_tid
+        # готовим данные для следующего уровня вложенности
+        products_per_single_run: int = cached_product.products_per_single_run
+        single_run_time: int = cached_product.activity_data['time']
+        next_materials: typing.Optional[typing.List[typing.Dict[str, int]]] = \
+            cached_product.activity_data.get('materials')
+        # считаем EIV, который потребуется для вычисления стоимости job cost
+        estimated_items_value: float = profit.calc_estimated_items_value(
+            material_bp_tid,
+            activity,
+            sde_bp_materials,
+            eve_market_prices_data)
+        # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+        system_indices, cost_index = profit.get_industry_cost_index(
+            material_tid,
+            activity,
+            industry_cost_indices)
+        # в этой точке понятно, что данный материал можно произвести, поэтому список материалов для него будет
+        # пополнен более сложным способом
+        next_industry: profit.QIndustryTree = profit.QIndustryTree(
+            material_bp_tid,
+            eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_bp_tid),
+            q_material,
+            material_produce_action,
+            products_per_single_run,
+            max_production_limit,
+            single_run_time,
+            estimated_items_value,
+            system_indices,
+            cost_index)
+        # настраиваем ME чертежа (нам его знать неоткуда, поэтому ставим максимальное ME)
+        if industry_plan_customization and (material_produce_action == profit.QIndustryAction.manufacturing):
+            # TODO: не Tech II (2) и не Structure Tech II (53), и не Tech III (14)
+            if q_material.meta_group_id is None or q_material.meta_group_id in {2, 53, 14}:
+                if industry_plan_customization.unknown_blueprints_me is not None:
+                    next_industry.set_me(industry_plan_customization.unknown_blueprints_me)
+                if industry_plan_customization.unknown_blueprints_te is not None:
+                    next_industry.set_te(industry_plan_customization.unknown_blueprints_te)
+        # подключаем к метариалу следующий уровень производства
+        q_material.set_industry(next_industry)
+        # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
+        # для нового уровня вложенности
+        if next_materials:
+            generate_materials_tree(
+                next_materials,
+                next_industry,
+                sde_type_ids,
                 sde_bp_materials,
-                eve_market_prices_data)
-            # получаем информацию о производственных индексах в системе, где крафтится этот продукт
-            system_indices, cost_index = profit.get_industry_cost_index(
-                material_tid,
-                activity,
-                industry_cost_indices)
-            # в этой точке понятно, что данный материал можно произвести, поэтому список материалов для него будет
-            # пополнен более сложным способом
-            next_industry: profit.QIndustryTree = profit.QIndustryTree(
-                material_bp_tid,
-                eve_sde_tools.get_item_name_by_type_id(sde_type_ids, material_bp_tid),
-                q_material,
-                material_produce_action,
-                products_per_single_run,
-                max_production_limit,
-                single_run_time,
-                estimated_items_value,
-                system_indices,
-                cost_index)
-            # настраиваем ME чертежа (нам его знать неоткуда, поэтому ставим максимальное ME)
-            if industry_plan_customization and industry_plan_customization.unknown_blueprints_me is not None:
-                if material_produce_action == profit.QIndustryAction.manufacturing:
-                    if q_material.meta_group_id is None or q_material.meta_group_id in {2, 14}:  # TODO: не Tech II и не Tech III
-                        next_industry.set_me(industry_plan_customization.unknown_blueprints_me)
-            # подключаем к метариалу следующий уровень производства
-            q_material.set_industry(next_industry)
-            # повторяем те же самые действия по формированию списка задействованных материалов, но теперь уже
-            # для нового уровня вложенности
-            if next_materials:
-                generate_materials_tree(
-                    next_materials,
-                    next_industry,
-                    sde_type_ids,
-                    sde_bp_materials,
-                    sde_market_groups,
-                    eve_market_prices_data,
-                    industry_cost_indices,
-                    industry_plan_customization)
-            break
+                sde_products,
+                sde_market_groups,
+                eve_market_prices_data,
+                industry_cost_indices,
+                industry_plan_customization)
 
 
 # генерация чертежа/чертежей (в результате запуска научки) для точного расчёта научки с учётом datacores и decryptors
 def schedule_industry_job__invent(
+        # идентификатор "предыдущего" чертежа, из которого делается blueprint_type_id (могут быть варианты)
+        prior_blueprint_type_id: typing.Optional[int],
         # идентификатор чертежа, для которого производится планирование производственной работы
         blueprint_type_id: int,
         blueprint_runs: int,
@@ -156,6 +146,7 @@ def schedule_industry_job__invent(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_products: typing.Dict[str, typing.Dict[int, eve_sde_tools.EveSDEProduct]],
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
@@ -164,13 +155,17 @@ def schedule_industry_job__invent(
         # настройки оптимизации производства
         industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization]):
     # пытаемся получить чертёж и параметры инвента (если он предполагается для этого чертежа)
-    source_blueprint_type_id, invent_dict = eve_sde_tools.get_blueprint_type_id_by_invention_product_id(
-        blueprint_type_id,
-        sde_bp_materials,
-        sde_type_ids)
+    cached_product: typing.Optional[eve_sde_tools.EveSDEProduct] = sde_products['invention'].get(blueprint_type_id)
     # если инвент данного чертежа возможен, то добавляем в дерево работ декрипторы и датакоры
-    if not source_blueprint_type_id:
+    if not cached_product:
         return
+    # если возможны варианты инвента данного чертежа, как например для Capital Hull Repairer II Blueprint, то выполняем
+    # поиск исходного чертежа по заданному входному параметру (номер должен быть задан корректно, а не огульно)
+    if isinstance(cached_product, list):
+        assert prior_blueprint_type_id is not None
+        cached_product = next((_ for _ in cached_product if _.blueprint_type_id == prior_blueprint_type_id), None)
+        assert cached_product is not None
+    source_blueprint_type_id: int = cached_product.blueprint_type_id
     # TODO: принимаем за точку отсчёта один чертёж
     blueprint_quantity: int = 1
 
@@ -181,6 +176,12 @@ def schedule_industry_job__invent(
     blueprints_market_group_id: int = 2
     blueprints_market_group_name: str = sde_market_groups[str(blueprints_market_group_id)]['nameID']['en']
     blueprint_meta_group_id: typing.Optional[int] = sde_type_ids[str(blueprint_type_id)].get('metaGroupID', None)
+
+    # коррекция meta группы 1 => 2 для, например, Small Vorton Projector II (который является продукцией Tech II),
+    # но чертёж Small Vorton Projector II Blueprint у него (к сожалению) относится к Tech I - это ошибка в sde
+    if blueprint_meta_group_id == 1:
+        if curr_industry.product.meta_group_id == 2:
+            blueprint_meta_group_id = 2
 
     # пополняем список материалов T2 чертежом
     invented_material: profit.QMaterial = profit.QMaterial(
@@ -196,15 +197,15 @@ def schedule_industry_job__invent(
     curr_industry.append_material(invented_material)
 
     # теперь к T2-чертежу подключаем инвент-работу
-    max_production_limit: int = invent_dict.get('maxProductionLimit', 0)
-    invent_dict = invent_dict['activities']['invention']
+    max_production_limit: int = cached_product.max_production_limit
+    invent_dict = cached_product.activity_data
     assert len(invent_dict.get('products', [])) >= 1
     invent_product_dict = next((p for p in invent_dict['products'] if p['typeID'] == blueprint_type_id), None)
     assert invent_product_dict is not None
     # получаем параметры инвента: (1) кол-во прогонов Т2 чертежа?
     blueprint_runs_per_single_copy: int = invent_product_dict['quantity']
     invent_run_time: int = invent_dict['time']
-    invent_materials__decryptors_only = invent_dict['materials']
+    invent_materials__decryptors_only: typing.List[typing.Dict[str, int]] = invent_dict['materials']
     invent_probability: float = invent_product_dict['probability']
 
     # считаем EIV, который потребуется для вычисления стоимости job cost
@@ -235,7 +236,7 @@ def schedule_industry_job__invent(
     invented_material.set_industry(invent_industry)
 
     # в список материалов подкладываем чертёж, который должен скопироваться N раз
-    invent_materials = [{'typeID': source_blueprint_type_id, 'quantity': 1}]
+    invent_materials: typing.List[typing.Dict[str, int]] = [{'typeID': source_blueprint_type_id, 'quantity': 1}]
     invent_materials.extend(invent_materials__decryptors_only)
 
     # считаем параметры декриптора
@@ -280,6 +281,7 @@ def schedule_industry_job__invent(
         invent_industry,
         sde_type_ids,
         sde_bp_materials,
+        sde_products,
         sde_market_groups,
         eve_market_prices_data,
         industry_cost_indices,
@@ -293,6 +295,7 @@ def generate_industry_tree(
         # sde данные, загруженные из .converted_xxx.json файлов
         sde_type_ids,
         sde_bp_materials,
+        sde_products: typing.Dict[str, typing.Dict[int, eve_sde_tools.EveSDEProduct]],
         sde_market_groups,
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
@@ -313,13 +316,13 @@ def generate_industry_tree(
     max_production_limit: int = bp0_dict.get('maxProductionLimit', 0)
 
     # из справочной информации о чертеже здесь интересны только материалы, которые будут использоваться в производстве
-    base_materials = bp0_dict.get('materials')
+    base_materials: typing.Optional[typing.List[typing.Dict[str, int]]] = bp0_dict.get('materials')
     assert base_materials is not None
 
     # генерируем дескриптор продукта, который будем крафтить
     product_type_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id)
-    product_market_group_id: int = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, product_type_id)
-    product_market_group_name: str = sde_market_groups[str(product_market_group_id)]['nameID']['en']
+    product_market_group_id: typing.Optional[int] = eve_sde_tools.get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, product_type_id)
+    product_market_group_name: typing.Optional[str] = sde_market_groups[str(product_market_group_id)]['nameID']['en'] if product_market_group_id else None
     product_volume: float = sde_type_ids[str(product_type_id)].get('volume', 0.0)
     product_meta_group_id: typing.Optional[int] = sde_type_ids[str(product_type_id)].get('metaGroupID', None)
     product_adjusted_price: float = eve_esi_tools.get_material_adjusted_price(product_type_id, eve_market_prices_data)
@@ -332,13 +335,13 @@ def generate_industry_tree(
 
     # если me, te и qr не заданы, то пытаемся получить их автоматизированно
     if 'me' not in calc_input or 'te' not in calc_input or 'qr' not in calc_input:
-        if product_meta_group_id == 2:  # Tech II
+        if product_meta_group_id in {2, 53}:  # Tech II (2), Structure Tech II (53)
             calc_input.update(eve_efficiency.get_t2_bpc_attributes(
                 product_type_id,
                 {},
                 sde_type_ids,
                 sde_market_groups))
-        elif product_meta_group_id == 14:  # Tech III
+        elif product_meta_group_id == 14:  # Tech III (14)
             calc_input.update(eve_efficiency.get_t3_bpc_attributes(
                 product_type_id,
                 {},
@@ -384,11 +387,13 @@ def generate_industry_tree(
         system_indices,
         cost_index)
     base_industry.set_me(calc_input['me'])
+    base_industry.set_te(calc_input['te'])
     base_industry.set_blueprint_runs_per_single_copy(customized_runs)
     # TODO: base_industry.set_te(calc_input['te'])
 
     # планируем работу (инвент если потребуется)
     schedule_industry_job__invent(
+        calc_input.get('bpc'),
         blueprint_type_id,
         customized_runs,
         calc_input['me'],
@@ -396,6 +401,7 @@ def generate_industry_tree(
         base_industry,
         sde_type_ids,
         sde_bp_materials,
+        sde_products,
         sde_market_groups,
         eve_market_prices_data,
         industry_cost_indices,
@@ -407,6 +413,7 @@ def generate_industry_tree(
         base_industry,
         sde_type_ids,
         sde_bp_materials,
+        sde_products,
         sde_market_groups,
         eve_market_prices_data,
         industry_cost_indices,
@@ -415,7 +422,75 @@ def generate_industry_tree(
     return base_industry
 
 
-# TODO: см. также get_optimized_runs_quantity
+def get_optimized_runs_quantity__unoptimized(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        products_per_single_run: int) -> typing.Tuple[int, int]:
+    blueprints_or_runs: int = math.ceil(need_quantity / products_per_single_run)
+    runs_quantity: int = blueprints_or_runs
+    return 1, runs_quantity
+
+
+def get_optimized_runs_quantity__reaction(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        products_per_single_run: int,
+        # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
+        reaction_runs: typing.Optional[int]) -> typing.Tuple[int, int]:
+    # если не None, то настроенное кол-во ранов для реакций
+    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
+    if reaction_runs:
+        runs_number_per_day: int = reaction_runs
+        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
+        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
+        optimized_blueprints_quantity: int = \
+            math.ceil(need_quantity / (products_per_single_run * runs_number_per_day))
+        optimized_runs_quantity: int = runs_number_per_day
+        return optimized_blueprints_quantity, optimized_runs_quantity
+    else:
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            products_per_single_run)
+
+
+def get_optimized_runs_quantity__manufacturing(
+        # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
+        need_quantity: int,
+        # сведения о типе производства: кол-во продуктов, которые будут получены за один раз чертежа, признак - формула
+        # ли, или реакция продукта? параметры чертежа? и т.п.
+        single_run_time: int,
+        products_per_single_run: int,
+        is_commonly_used: bool,
+        # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
+        industry_time: typing.Optional[int]) -> typing.Tuple[int, int]:
+    # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
+    runs_number_per_day: typing.Optional[int] = None
+    if is_commonly_used:
+        # если не None, то длительность запуска производственных работ
+        if industry_time:
+            if single_run_time >= industry_time:
+                runs_number_per_day = 1
+            elif single_run_time > 0:
+                runs_number_per_day = math.ceil(industry_time / single_run_time)
+    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
+    if runs_number_per_day:
+        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
+        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
+        optimized_blueprints_quantity: int = \
+            math.ceil(need_quantity / (products_per_single_run * runs_number_per_day))
+        optimized_runs_quantity: int = runs_number_per_day
+        return optimized_blueprints_quantity, optimized_runs_quantity
+    # если настройки оптимизации не заданы, то считаем кол-во чертежей/ранов с учётом лишь только потребностей
+    else:
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            products_per_single_run)
+
+
 def get_optimized_runs_quantity(
         # кол-во продуктов, требуемых (с учётом предыдущей эффективности)
         need_quantity: int,
@@ -425,32 +500,23 @@ def get_optimized_runs_quantity(
         # настройки генерации отчёта, см. также eve_conveyor_tools.py : setup_blueprint_details
         industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization] = None) -> typing.Tuple[int, int]:
     # расчёт кол-ва ранов для данного чертежа (учёт настроек оптимизации производства)
-    runs_number_per_day = None
     if industry.action == profit.QIndustryAction.reaction:
-        # если не None, то настроенное кол-во ранов для реакций
-        customized_reaction_runs = industry_plan_customization.reaction_runs if industry_plan_customization else None
-        if customized_reaction_runs:
-            runs_number_per_day = customized_reaction_runs
-    elif industry.action == profit.QIndustryAction.manufacturing and industry.product.is_commonly_used:
-        # если не None, то длительность запуска производственных работ
-        customized_industry_time = industry_plan_customization.industry_time if industry_plan_customization else None
-        if customized_industry_time:
-            if industry.single_run_time >= customized_industry_time:
-                runs_number_per_day = 1
-            elif industry.single_run_time > 0:
-                runs_number_per_day = math.ceil(customized_industry_time / industry.single_run_time)
-    # если заданы настройки оптимизации, то считаем кол-во чертежей/ранов с учётом настроек
-    if runs_number_per_day:
-        # реакции: планируется к запуску N чертежей по, как правило, 15 ранов (сутки)
-        # производство: планируется к запуску N ранов для, как правило, оригиналов (длительностью в сутки)
-        optimized_blueprints_quantity: int = math.ceil(need_quantity / (industry.products_per_single_run * runs_number_per_day))
-        optimized_runs_quantity: int = runs_number_per_day
-        return optimized_blueprints_quantity, optimized_runs_quantity
+        return get_optimized_runs_quantity__reaction(
+            need_quantity,
+            industry.products_per_single_run,
+            industry_plan_customization.reaction_runs if industry_plan_customization else None)
+    elif industry.action == profit.QIndustryAction.manufacturing:
+        return get_optimized_runs_quantity__manufacturing(
+            need_quantity,
+            industry.single_run_time,
+            industry.products_per_single_run,
+            industry.product.is_commonly_used,
+            industry_plan_customization.industry_time if industry_plan_customization else None)
     # если настройки оптимизации не заданы, то считаем кол-во чертежей/ранов с учётом лишь только потребностей
     else:
-        blueprints_or_runs: int = math.ceil(need_quantity / industry.products_per_single_run)
-        runs_quantity: int = blueprints_or_runs
-        return 1, runs_quantity
+        return get_optimized_runs_quantity__unoptimized(
+            need_quantity,
+            industry.products_per_single_run)
 
 
 def calculate_purchased_ratio(
@@ -607,7 +673,7 @@ def copy_reused_industry_plan__internal(
 def copy_reused_industry_plan(
         reused_materials_quantity: int,
         # исходные данные для формирования отчёта и плана производства
-        planned_material: typing.Optional[profit.QPlannedMaterial],
+        prior_planned_material: typing.Optional[profit.QPlannedMaterial],
         current_material: profit.QMaterial,
         cached_material: profit.QIndustryMaterial,
         # соотношение использования материалов в данном текущем цикле производственной активности
@@ -615,15 +681,17 @@ def copy_reused_industry_plan(
         # справочник текущего производства с настройками оптимизации процесса
         industry_plan: profit.QIndustryPlan) -> profit.QPlannedMaterial:
     assert reused_materials_quantity > 0
-    assert planned_material is not None
     assert current_material is not None
     assert current_material.industry is not None
     assert cached_material is not None
 
     # составляем план использования материала в рамках текущего плана производства
+    # Внимание! это нормально, что prior_planned_material м.б. None, т.к. например в производстве Scourge Rage Rocket
+    # требуется 45 Titanium Carbide, излишки которого остаются при получении 1 шт Graviton Pulse Generator, в таком
+    # случае prior_planned_material==None
     reused_material: profit.QPlannedMaterial = profit.QPlannedMaterial(
         current_material,
-        planned_material,
+        prior_planned_material,
         reused_materials_quantity,
         usage_chain)
 
@@ -998,11 +1066,20 @@ def assemble_industry_formula(industry_plan: profit.QIndustryPlan) -> profit.QIn
         _.obtaining_plan.activity_plan.industry.action == profit.QIndustryAction.invention), None)
     if invent_tree and invent_tree.decryptor_probability is not None:
         used_decryptor_type_id = invent_tree.materials[-1].type_id
+    # получаем информацию об исходном чертеже (актуально для чертежей, в которые инвентятся разные варианты)
+    prior_blueprint_type_id: typing.Optional[int] = next((
+        _.industry.blueprint_type_id for _ in industry_plan.base_industry.materials
+        if _.industry and _.industry.action == profit.QIndustryAction.invention), None)
     # составляем производственную формулу
     industry_formula: profit.QIndustryFormula = profit.QIndustryFormula(
+        prior_blueprint_type_id,
+        industry_plan.base_industry.blueprint_type_id,
         industry_plan.base_industry.product_type_id,
         used_decryptor_type_id,
-        industry_plan.customized_runs)
+        industry_plan.customized_runs,
+        industry_plan.base_industry.products_per_single_run,
+        industry_plan.base_industry.me,
+        industry_plan.base_industry.te)
     # выполняем рекурсивный поиск всех работ чтобы посчитать их стоимость
     assemble_industry_jobs(industry_plan.base_planned_activity, industry_formula, 1.0)
     # считаем сколько покупных материалов и в какой пропорции необходимо для постройки продукта

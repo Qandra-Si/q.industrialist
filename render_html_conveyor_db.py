@@ -1354,8 +1354,8 @@ def dump_list_of_possible_blueprints(
         tr_class: str = ''
         for stack in stacks:
             x1: bool = not stack.run_possible
-            x2: bool = stack.run_possible and stack.only_decryptors_missing_for_stack
-            x3: bool = stack.run_possible and not stack.only_decryptors_missing_for_stack
+            x2: bool = stack.run_possible and stack.only_optional_decryptors_missing_for_stack
+            x3: bool = stack.run_possible and not stack.only_optional_decryptors_missing_for_stack
             if not tr_class:
                 if x1:
                     tr_class = 'row-impossible'
@@ -1392,7 +1392,7 @@ def dump_list_of_possible_blueprints(
                 if head:
                     if not __stack784.run_possible:  # нельзя запустить (нет материалов)
                         div_class: str = 'run-impossible'
-                    elif not __stack784.only_decryptors_missing_for_stack:  # можно запустить (все материалы есть)
+                    elif not __stack784.only_optional_decryptors_missing_for_stack:  # можно запустить (все материалы есть)
                         div_class: str = 'run-possible'
                     else:  # можно запустить (не хватает декрипторов)
                         div_class: str = 'run-optional'

@@ -1,4 +1,4 @@
-import math
+п»їimport math
 import typing
 import profit
 import eve_sde_tools
@@ -8,10 +8,10 @@ import eve_esi_tools
 def get_industry_cost_index(
         product_type_id: int,
         action: str,
-        # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
+        # РёРЅРґРµРєСЃС‹ СЃС‚РѕРёРјРѕСЃС‚Рё РїСЂРѕРёР·РІРѕРґСЃС‚РІР° РґР»СЏ СЂР°Р·Р»РёС‡РЅС‹С… СЃРёСЃС‚РµРј (СЃРёСЃС‚РµРјС‹ Рё РїСЂРѕРґСѓРєС†РёСЏ Р·Р°РґР°РЅС‹ РІ РЅР°СЃС‚СЂРѕР№РєР°С… СЂРѕСѓС‚РёРЅРіР°)
         industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) \
         -> typing.Tuple[profit.QIndustryCostIndices, float]:
-    # получаем информацию о производственных индексах в системе, где крафтится этот продукт
+    # РїРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅС‹С… РёРЅРґРµРєСЃР°С… РІ СЃРёСЃС‚РµРјРµ, РіРґРµ РєСЂР°С„С‚РёС‚СЃСЏ СЌС‚РѕС‚ РїСЂРѕРґСѓРєС‚
     system_indices: profit.QIndustryCostIndices = next((
         _ for _ in industry_cost_indices
         if product_type_id in _.product_ids), None)
@@ -20,12 +20,12 @@ def get_industry_cost_index(
             _ for _ in industry_cost_indices
             if not _.product_ids), None)
     assert system_indices is not None
-    # получаем производственный индекс в системе
+    # РїРѕР»СѓС‡Р°РµРј РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ РІ СЃРёСЃС‚РµРјРµ
     cost_index: float = next((
         float(_['cost_index']) for _ in system_indices.cost_indices
         if _['activity'] == action), None)
     assert cost_index is not None
-    # возвращаем tuple
+    # РІРѕР·РІСЂР°С‰Р°РµРј tuple
     return system_indices, cost_index
 
 
@@ -35,13 +35,13 @@ def calc_estimated_items_value(
         sde_bp_materials,
         eve_market_prices_data) -> float:
     if activity in ['manufacturing', 'reaction']:
-        # EIV считается по материалам используемым в производственной активности
+        # EIV СЃС‡РёС‚Р°РµС‚СЃСЏ РїРѕ РјР°С‚РµСЂРёР°Р»Р°Рј РёСЃРїРѕР»СЊР·СѓРµРјС‹Рј РІ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅРѕР№ Р°РєС‚РёРІРЅРѕСЃС‚Рё
         bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, activity, blueprint_type_id)
     elif activity in ['invention']:
-        # EIV считается по материалам используемым в производстве T2 продукта (из продукта инвента)
+        # EIV СЃС‡РёС‚Р°РµС‚СЃСЏ РїРѕ РјР°С‚РµСЂРёР°Р»Р°Рј РёСЃРїРѕР»СЊР·СѓРµРјС‹Рј РІ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµ T2 РїСЂРѕРґСѓРєС‚Р° (РёР· РїСЂРѕРґСѓРєС‚Р° РёРЅРІРµРЅС‚Р°)
         bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
     elif activity in ['copying']:
-        # EIV считается по материалам используемым в производстве T1 продукта (из копии)
+        # EIV СЃС‡РёС‚Р°РµС‚СЃСЏ РїРѕ РјР°С‚РµСЂРёР°Р»Р°Рј РёСЃРїРѕР»СЊР·СѓРµРјС‹Рј РІ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµ T1 РїСЂРѕРґСѓРєС‚Р° (РёР· РєРѕРїРёРё)
         bp0_dict = eve_sde_tools.get_blueprint_any_activity(sde_bp_materials, 'manufacturing', blueprint_type_id)
     else:
         assert 0
@@ -50,7 +50,7 @@ def calc_estimated_items_value(
     estimated_items_value: float = 0.0
     materials = bp0_dict.get('materials')
 
-    # перебираем список материалов, которые будут использоваться в производстве
+    # РїРµСЂРµР±РёСЂР°РµРј СЃРїРёСЃРѕРє РјР°С‚РµСЂРёР°Р»РѕРІ, РєРѕС‚РѕСЂС‹Рµ Р±СѓРґСѓС‚ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊСЃСЏ РІ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµ
     for m in materials:
         material_tid: int = int(m['typeID'])
         material_qty: int = int(m['quantity'])
@@ -59,7 +59,7 @@ def calc_estimated_items_value(
             eve_market_prices_data)
         estimated_items_value += material_qty * material_adjusted_price
 
-    # считаем EIV, который потребуется для вычисления стоимости job cost
+    # СЃС‡РёС‚Р°РµРј EIV, РєРѕС‚РѕСЂС‹Р№ РїРѕС‚СЂРµР±СѓРµС‚СЃСЏ РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ СЃС‚РѕРёРјРѕСЃС‚Рё job cost
     return math.ceil(estimated_items_value)
 
 

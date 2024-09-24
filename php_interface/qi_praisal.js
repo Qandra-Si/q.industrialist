@@ -81,7 +81,6 @@ function eveSysNumber(x) { return x <= 2147483647; }
 function eveUserNumber(x) { return x > 2147483647; }
 
 function numLikeEve(x) {
-  if (x < 1.0) return x;
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 (function() {
@@ -278,6 +277,17 @@ $(document).ready(function(){
   //- отправка запроса на формирование таблицы текущий маркет-ордеров
   //- отправка запроса на формирование таблицы текущий маркет-ордеров
   refreshMarketOrdersAndHistory(type_id, hub, corp);
+ });
+
+ $('#dtlsSelTransferHub a').click(function(e) {
+  e.preventDefault();
+  var type_id = $('#copyTypeId').attr('data-copy');
+  var li = $(this).closest('li');
+  var hub = li.attr('hub');
+  var corp = li.attr('corp');
+  //- отправка запроса на формирование таблицы текущий маркет-ордеров
+  //- отправка запроса на формирование таблицы текущий маркет-ордеров
+  refreshIndustryProductTransferDetails(type_id, hub, corp);
  });
 
  // работа с буфером обмена

@@ -213,6 +213,16 @@ class QSwaggerMaterial:
         return self.__material_type.type_id
 
 
+class QSwaggerOptionalMaterial(QSwaggerMaterial):
+    def __init__(self, material_type: QSwaggerTypeId, quantity: int, optional: bool):
+        super().__init__(material_type, quantity)
+        self.__optional: bool = optional
+
+    @property
+    def optional(self) -> bool:
+        return self.__optional
+
+
 class QSwaggerActivityMaterials:
     def __init__(self):
         self.__materials: typing.List[QSwaggerMaterial] = []
@@ -1106,3 +1116,268 @@ class QSwaggerConveyorRequirement:
     @property
     def rest_percent(self) -> float:
         return self.__rest_percent
+
+
+class QSwaggerConveyorBestFormula:
+    def __init__(self,
+                 item_type: typing.Optional[QSwaggerTypeId],
+                 decryptor_type: typing.Optional[QSwaggerTypeId],
+                 row):
+        self.__type_id: int = row[0]
+        self.__type: typing.Optional[QSwaggerTypeId] = item_type
+        self.__decryptor_type_id: int = row[1]
+        self.__decryptor_type: typing.Optional[QSwaggerTypeId] = decryptor_type
+        self.__profit_with_decryptor: float = row[2]
+        self.__profit_without_decryptor: float = row[3]
+
+    @property
+    def type_id(self) -> int:
+        return self.__type_id
+
+    @property
+    def type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__type
+
+    @property
+    def decryptor_type_id(self) -> int:
+        return self.__decryptor_type_id
+
+    @property
+    def decryptor_type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__decryptor_type
+
+    @property
+    def profit_with_decryptor(self) -> float:
+        return self.__profit_with_decryptor
+
+    @property
+    def profit_without_decryptor(self) -> float:
+        return self.__profit_without_decryptor
+
+    @property
+    def decryptor_required(self) -> bool:
+        return self.__profit_without_decryptor <= 1.00
+
+
+class QSwaggerConveyorFormula:
+    def __init__(self,
+                 blueprint: typing.Optional[QSwaggerBlueprint],
+                 activity: typing.Optional[typing.Union[QSwaggerBlueprintManufacturing, QSwaggerBlueprintInvention,
+                                           QSwaggerBlueprintCopying, QSwaggerBlueprintResearchMaterial,
+                                           QSwaggerBlueprintResearchTime, QSwaggerBlueprintReaction]],
+                 product_type: typing.Optional[QSwaggerTypeId],
+                 decryptor_type: typing.Optional[QSwaggerTypeId],
+                 prior_blueprint: typing.Optional[QSwaggerBlueprint],
+                 industry_hub: typing.Optional[QSwaggerStation],
+                 trade_hub: typing.Optional[QSwaggerStation],
+                 row):
+        self.__formula_id: int = row[0]
+        self.__blueprint_type_id: int = row[1]
+        self.__blueprint: typing.Optional[QSwaggerBlueprint] = blueprint
+        self.__activity_id: int = row[2]
+        self.__activity: typing.Optional[typing.Union[QSwaggerBlueprintManufacturing, QSwaggerBlueprintInvention,
+                                         QSwaggerBlueprintCopying, QSwaggerBlueprintResearchMaterial,
+                                         QSwaggerBlueprintResearchTime, QSwaggerBlueprintReaction]] = activity
+        self.__product_type_id: int = row[3]
+        self.__product_type: typing.Optional[QSwaggerTypeId] = product_type
+        self.__customized_runs: int = row[4]
+        self.__decryptor_type_id: typing.Optional[int] = row[5]
+        self.__decryptor_type: typing.Optional[QSwaggerTypeId] = decryptor_type
+        self.__ancient_relics = row[6]
+        self.__prior_blueprint_type_id: typing.Optional[int] = row[7]
+        self.__prior_blueprint: typing.Optional[QSwaggerBlueprint] = prior_blueprint
+        self.__material_efficiency: typing.Optional[int] = row[8]
+        self.__time_efficiency: typing.Optional[int] = row[9]
+        # ---
+        self.__products_per_single_run: int = row[10]
+        self.__products_num: int = row[11]
+        self.__best_choice: bool = row[12]
+        self.__industry_hub_id: int = row[13]
+        self.__industry_hub: typing.Optional[QSwaggerStation] = industry_hub
+        self.__trade_hub_id: int = row[14]
+        self.__trade_hub: typing.Optional[QSwaggerStation] = trade_hub
+        self.__trader_corp_id: int = row[15]
+        self.__buying_brokers_fee: float = row[16]
+        self.__sales_brokers_fee: float = row[17]
+        self.__sales_tax: float = row[18]
+        self.__fuel_price_isk: float = row[19]
+        self.__materials_cost: float = row[20]
+        self.__materials_cost_with_fee: float = row[21]
+        self.__purchase_volume: float = row[22]
+        self.__materials_transfer_cost: float = row[23]
+        self.__jobs_cost: float = row[24]
+        self.__ready_volume: float = row[25]
+        self.__ready_transfer_cost: float = row[26]
+        self.__products_recommended_price: typing.Optional[float] = row[27]
+        self.__products_sell_fee_and_tax: typing.Optional[float] = row[28]
+        self.__single_product_price_wo_fee_tax: typing.Optional[float] = row[29]
+        self.__total_gross_cost: float = row[30]
+        self.__single_product_cost: float = row[31]
+        self.__product_mininum_price: float = row[32]
+        self.__single_product_profit: typing.Optional[float] = row[33]
+
+    @property
+    def formula_id(self) -> int:
+        return self.__formula_id
+
+    @property
+    def blueprint_type_id(self) -> int:
+        return self.__blueprint_type_id
+
+    @property
+    def blueprint(self) -> typing.Optional[QSwaggerBlueprint]:
+        return self.__blueprint
+
+    @property
+    def activity_id(self) -> int:
+        return self.__activity_id
+
+    @property
+    def activity(self) -> typing.Optional[typing.Union[QSwaggerBlueprintManufacturing, QSwaggerBlueprintInvention,
+                                          QSwaggerBlueprintCopying, QSwaggerBlueprintResearchMaterial,
+                                          QSwaggerBlueprintResearchTime, QSwaggerBlueprintReaction]]:
+        return self.__activity
+
+    @property
+    def product_type_id(self) -> int:
+        return self.__product_type_id
+
+    @property
+    def product_type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__product_type
+
+    @property
+    def customized_runs(self) -> int:
+        return self.__customized_runs
+
+    @property
+    def decryptor_type_id(self) -> typing.Optional[int]:
+        return self.__decryptor_type_id
+
+    @property
+    def decryptor_type(self) -> typing.Optional[QSwaggerTypeId]:
+        return self.__decryptor_type
+
+    @property
+    def ancient_relics(self):
+        return self.__ancient_relics
+
+    @property
+    def prior_blueprint_type_id(self) -> int:
+        return self.__prior_blueprint_type_id
+
+    @property
+    def prior_blueprint(self) -> typing.Optional[QSwaggerBlueprint]:
+        return self.__prior_blueprint
+
+    @property
+    def material_efficiency(self) -> typing.Optional[int]:
+        return self.__material_efficiency
+
+    @property
+    def time_efficiency(self) -> typing.Optional[int]:
+        return self.__time_efficiency
+
+    @property
+    def products_per_single_run(self) -> int:
+        return self.__products_per_single_run
+
+    @property
+    def products_num(self) -> int:
+        return self.__products_num
+
+    @property
+    def best_choice(self) -> bool:
+        return self.__best_choice
+
+    @property
+    def industry_hub_id(self) -> int:
+        return self.__industry_hub_id
+
+    @property
+    def industry_hub(self) -> typing.Optional[QSwaggerStation]:
+        return self.__industry_hub
+
+    @property
+    def trade_hub_id(self) -> int:
+        return self.__trade_hub_id
+
+    @property
+    def trade_hub(self) -> typing.Optional[QSwaggerStation]:
+        return self.__trade_hub
+
+    @property
+    def trader_corp_id(self) -> int:
+        return self.__trader_corp_id
+
+    @property
+    def buying_brokers_fee(self) -> float:
+        return self.__buying_brokers_fee
+
+    @property
+    def sales_brokers_fee(self) -> float:
+        return self.__sales_brokers_fee
+
+    @property
+    def sales_tax(self) -> float:
+        return self.__sales_tax
+
+    @property
+    def fuel_price_isk(self) -> float:
+        return self.__fuel_price_isk
+
+    @property
+    def materials_cost(self) -> float:
+        return self.__materials_cost
+
+    @property
+    def materials_cost_with_fee(self) -> float:
+        return self.__materials_cost_with_fee
+
+    @property
+    def purchase_volume(self) -> float:
+        return self.__purchase_volume
+
+    @property
+    def materials_transfer_cost(self) -> float:
+        return self.__materials_transfer_cost
+
+    @property
+    def jobs_cost(self) -> float:
+        return self.__jobs_cost
+
+    @property
+    def ready_volume(self) -> float:
+        return self.__ready_volume
+
+    @property
+    def ready_transfer_cost(self) -> float:
+        return self.__ready_transfer_cost
+
+    @property
+    def products_recommended_price(self) -> typing.Optional[float]:
+        return self.__products_recommended_price
+
+    @property
+    def products_sell_fee_and_tax(self) -> typing.Optional[float]:
+        return self.__products_sell_fee_and_tax
+
+    @property
+    def single_product_price_wo_fee_tax(self) -> typing.Optional[float]:
+        return self.__single_product_price_wo_fee_tax
+
+    @property
+    def total_gross_cost(self) -> float:
+        return self.__total_gross_cost
+
+    @property
+    def single_product_cost(self) -> float:
+        return self.__single_product_cost
+
+    @property
+    def product_mininum_price(self) -> float:
+        return self.__product_mininum_price
+
+    @property
+    def single_product_profit(self) -> typing.Optional[float]:
+        return self.__single_product_profit

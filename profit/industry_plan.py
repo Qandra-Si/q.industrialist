@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+﻿# -*- encoding: utf-8 -*-
 import math
 import typing
 from .industry_tree import QBaseMaterial
@@ -442,14 +442,18 @@ class QIndustryPlanCustomization:
                  industry_time: typing.Optional[int],
                  common_components: typing.Optional[typing.List[int]],
                  min_probability: typing.Optional[float],
-                 unknown_blueprints_me: typing.Optional[int]):
+                 unknown_blueprints_me: typing.Optional[int],
+                 unknown_blueprints_te: typing.Optional[int]):
         if unknown_blueprints_me is not None:
             assert 0 <= unknown_blueprints_me <= 10
+        if unknown_blueprints_te is not None:
+            assert 0 <= unknown_blueprints_me <= 20
         self.__reaction_runs: typing.Optional[int] = reaction_runs
         self.__industry_time: typing.Optional[int] = industry_time
         self.__common_components: typing.Optional[typing.List[int]] = common_components
         self.__min_probability: typing.Optional[float] = min_probability
         self.__unknown_blueprints_me: typing.Optional[int] = unknown_blueprints_me
+        self.__unknown_blueprints_te: typing.Optional[int] = unknown_blueprints_te
 
     @property
     def reaction_runs(self) -> typing.Optional[int]:
@@ -470,6 +474,10 @@ class QIndustryPlanCustomization:
     @property
     def unknown_blueprints_me(self) -> typing.Optional[int]:
         return self.__unknown_blueprints_me
+
+    @property
+    def unknown_blueprints_te(self) -> typing.Optional[int]:
+        return self.__unknown_blueprints_te
 
 
 class QIndustryPlan:

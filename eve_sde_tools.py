@@ -310,8 +310,8 @@ def get_basis_market_group_by_group_id(sde_market_groups, group_id: int):
             return __group_id
 
 
-def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id):
-    group_id = get_market_group_by_type_id(sde_type_ids, type_id)
+def get_basis_market_group_by_type_id(sde_type_ids, sde_market_groups, type_id: int) -> typing.Optional[int]:
+    group_id: typing.Optional[int] = get_market_group_by_type_id(sde_type_ids, type_id)
     if group_id is None:
         return None
     return get_basis_market_group_by_group_id(sde_market_groups, int(group_id))
@@ -413,7 +413,7 @@ def get_research_materials_for_blueprints(sde_bp_materials):
     return research_materials_for_bps
 
 
-def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
+def construct_products_for_blueprints_by_activity(sde_bp_materials, activity="manufacturing"):
     """
     Построение списка продуктов, которые появляются в результате производства
     """
@@ -432,24 +432,90 @@ def get_products_for_blueprints(sde_bp_materials, activity="manufacturing"):
     return products_for_bps
 
 
+class EveSDEProduct:
+    def __init__(self,
+                 product_type_id: int,
+                 blueprint_type_id: int,
+                 blueprint_type: typing.Dict[str, typing.Any],
+                 max_production_limit: int,
+                 activity_data: typing.Dict[str, typing.Any],
+                 products_per_single_run: int):
+        self.product_type_id: int = product_type_id
+        self.blueprint_type_id: int = blueprint_type_id
+        self.blueprint_type: typing.Dict[str, typing.Any] = blueprint_type
+        self.max_production_limit: int = max_production_limit
+        self.activity_data: typing.Dict[str, typing.Any] = activity_data
+        self.products_per_single_run: int = products_per_single_run
+
+
+def construct_products_for_blueprints(
+        sde_bp_materials: typing.Dict[str, typing.Dict[str, typing.Any]],
+        sde_type_ids: typing.Dict[str, typing.Dict[str, typing.Any]]) \
+        -> typing.Dict[str, typing.Dict[int, typing.Union[EveSDEProduct, typing.List[EveSDEProduct]]]]:
+    products: typing.Dict[str, typing.Dict[int, typing.Any]] = {
+        'manufacturing': dict(),
+        'research_time': dict(),
+        'research_material': dict(),
+        'copying': dict(),
+        'invention': dict(),
+        'reaction': dict()}
+    for blueprint_type_id, blueprint_data in sde_bp_materials.items():
+        bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
+        if not bp_tid_dict or not bp_tid_dict.get('published', False):
+            continue
+        blueprint_type_id__int: int = int(blueprint_type_id)
+        for activity, activity_data in blueprint_data['activities'].items():
+            products_data = activity_data.get('products')
+            activity_of_products: typing.Dict[int, typing.Union[EveSDEProduct, typing.List[EveSDEProduct]]] = products[activity]
+            if products_data:
+                for p in products_data:
+                    product_type_id: int = p['typeID']
+                    product_obj: EveSDEProduct = EveSDEProduct(
+                        product_type_id,
+                        blueprint_type_id__int,
+                        bp_tid_dict,
+                        blueprint_data['maxProductionLimit'],
+                        activity_data,
+                        p['quantity'])
+                    product_dict: typing.Union[EveSDEProduct, typing.List[EveSDEProduct]] = activity_of_products.get(product_type_id)
+                    if product_dict is None:
+                        activity_of_products[product_type_id] = product_obj
+                    elif isinstance(product_dict, list):
+                        product_dict.append(product_obj)
+                    else:
+                        activity_of_products[product_type_id] = [product_dict, product_obj]
+            elif activity in {'research_time', 'research_material', 'copying'}:
+                # Внимание! Coalesced Element Blueprint (36949) является published и имеет invent без продукта
+                product_type_id = int(blueprint_type_id)
+                activity_of_products[product_type_id] = EveSDEProduct(
+                        product_type_id,
+                        blueprint_type_id__int,
+                        bp_tid_dict,
+                        blueprint_data['maxProductionLimit'],
+                        activity_data,
+                        1)
+    return products
+
+
 def get_blueprint_type_id_by_product_id(
         product_id: int,
-        sde_bp_materials,
-        sde_type_ids,
+        sde_bp_materials: typing.Dict[str, typing.Dict[str, typing.Any]],
+        sde_type_ids: typing.Dict[str, typing.Dict[str, typing.Any]],
         activity: str = "manufacturing") -> typing.Tuple[typing.Optional[int], typing.Optional[typing.Any]]:
     """
+    Внимание! это вредный метод, он очень медленно работает, перебирая ВСЕ чертежи и ВСЕ продукты по ВСЕМ activity.
+    Чтобы ускориться предварительную переиндексацию с помощью construct_products_for_blueprints.
+    ----
     Поиск идентификатора чертежа по известному идентификатору manufacturing-продукта
     Внимание!
     * в игре можно найти неопубликованный предмет, который можно произвести (чёртеж существует)
     * в игре нельзя найти неопубликованный чертёж (его не существует)
     """
-    for blueprint_type_id in sde_bp_materials:
+    for blueprint_type_id, blueprint_data in sde_bp_materials.items():
         bp_tid_dict = sde_type_ids.get(str(blueprint_type_id))
         if not bp_tid_dict or not bp_tid_dict.get("published", False):
-            bp_tid_dict = bp_tid_dict
             continue
-        __bpm1 = sde_bp_materials[blueprint_type_id]["activities"]
-        __bpm2 = __bpm1.get(activity)
+        __bpm2 = blueprint_data["activities"].get(activity)
         if not __bpm2:
             continue
         __bpm3 = __bpm2.get("products")
@@ -458,7 +524,7 @@ def get_blueprint_type_id_by_product_id(
         for m in __bpm3:
             type_id: int = m["typeID"]
             if product_id == type_id:
-                return int(blueprint_type_id), sde_bp_materials[blueprint_type_id]
+                return int(blueprint_type_id), blueprint_data
     return None, None
 
 
@@ -747,6 +813,22 @@ def __clean_positions(ws_dir, name):
     del positions
 
 
+def __sort_blueprint_materials(ws_dir, name):
+    blueprints = read_converted(ws_dir, name)
+    for b in blueprints.values():
+        if 'activities' not in b:
+            continue
+        for a in b['activities'].values():
+            if 'materials' in a:
+                a['materials'].sort(key=lambda bp: bp['quantity'], reverse=True)
+    # json
+    f_name_json = __get_converted_name(ws_dir, name)
+    s = json.dumps(blueprints, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+", encoding='utf8')
+    f.write(s)
+    del blueprints
+
+
 def __generate_long_term_industry(ws_dir, name):
     """
     :param ws_dir: каталог, где хранятся все кешированные .json файлы
@@ -956,6 +1038,9 @@ def main():  # rebuild .yaml files
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "blueprints", "blueprints", ["activities", "maxProductionLimit"])
+    print("Sorting materials in .converted_blueprints.json file...")
+    sys.stdout.flush()
+    __sort_blueprint_materials(workspace_cache_files_dir, "blueprints")
 
     print("Rebuilding categories.yaml file...")
     sys.stdout.flush()

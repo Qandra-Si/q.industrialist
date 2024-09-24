@@ -238,6 +238,7 @@ function __dump_products_and_orders_dialog(&$market_hubs) { ?>
   <li role="presentation" class="active"><a href="#navPrice" aria-controls="navPrice" role="tab" data-toggle="tab">Цены</a></li>
   <li role="presentation"><a href="#navAssets" aria-controls="navAssets" role="tab" data-toggle="tab">Имущество</a></li>
   <li role="presentation"><a href="#navTrade" aria-controls="navTrade" role="tab" data-toggle="tab">Торговля</a></li>
+  <li role="presentation"><a href="#navIndustry" aria-controls="navIndustry" role="tab" data-toggle="tab">Производство</a></li>
   <li role="presentation"><a href="#navDetails" aria-controls="navDetails" role="tab" data-toggle="tab">Характеристики</a></li>
 </ul>
 <div class="tab-content">
@@ -324,6 +325,7 @@ function __dump_products_and_orders_dialog(&$market_hubs) { ?>
        </ul>
       </nav>
     </center>
+    <!-- -->
     <div class="row">
      <div class="col-md-5">
       Текущие ордера в маркете
@@ -391,6 +393,31 @@ function __dump_products_and_orders_dialog(&$market_hubs) { ?>
      </form>
     </div>
      </div>
+    </div>
+  </div>
+  <!-- -->
+  <div role="tabpanel" class="tab-pane" id="navIndustry">
+    <!-- -->
+    <center>
+      <nav aria-label="Market Hubs" id="dtlsSelTransferHub">
+       <ul class="pagination pagination-sm">
+<?php
+  foreach ($market_hubs as ["hub" => $hub, "co" => $co, "a" => $a, "f" => $f, "ss" => $ss])
+  {
+    if ($a == 't' || $f == 't') continue; // archive or forbidden
+    ?><li hub="<?=$hub?>" corp="<?=$co?>"><a href="#"><?=$ss?></a></li><?php
+  }
+?>
+       </ul>
+      </nav>
+    </center>
+    <!-- -->
+    <form id="frmIndustryProduct">
+     <input type="hidden" name="corp" readonly value="">
+     <input type="hidden" name="hub" readonly value="">
+     <input type="hidden" name="tid" readonly>
+    </form>
+    <div id="dtlsIndustryProduct-wrapper" style="font-size: 90%;">
     </div>
   </div>
   <!-- -->

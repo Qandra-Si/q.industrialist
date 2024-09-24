@@ -170,6 +170,142 @@ $("#frmMarketHistory").on("submit", function(e){
  });
 });
 
+function refreshIndustryProductTransferDetails(type_id, hub, corp) {
+ setOption('Selected Market Hub', hub);
+ setOption('Selected Trader Corp', corp);
+ for (const h of g_market_hubs) {
+  if (h === null) break;
+  if (h[0] != hub) continue;
+  if (h[1] != corp) continue;
+  $('#dtlsSelTransferHub ul').find('li').each(function() {
+   var li = $(this);
+   if ((li.attr('hub') == hub) && (li.attr('corp')))
+    li.addClass('active');
+   else
+    li.removeClass('active');
+  });
+  break;
+ }
+ //- отправка запроса на формирование формы с расчётами производства продукта
+ //$("#tblMarketOrders tbody").html('');
+ var frm = $("#frmIndustryProduct");
+ frm.find("input[name='corp']").val(corp); // мб. список
+ frm.find("input[name='hub']").val(hub);
+ frm.find("input[name='tid']").val(type_id);
+ frm.submit();
+}
+
+function rowIndustryProduct(caption, val, meas='', col1=0, col2=6, col3=6, col4=0, mark=true){
+ return "<div class='row'>"+
+  ((col1==0)?'':"<div class='col-md-"+col1+"'></div>")+
+  "<div class='col-md-"+col2+"'>"+caption+"</div>"+
+  "<div class='col-md-"+col3+"' align='right'>"+(mark?"<mark>":"")+val+(mark?"</mark>":"")+(meas?(" "+meas):"")+"</div>"+
+  ((col4==0)?'':"<div class='col-md-"+col4+"'></div>")+
+  "</div>";
+}
+
+$("#frmIndustryProduct").on("submit", function(e){
+ e.preventDefault();
+ $.ajax({
+  url: '/tools/cfc.php',
+  method: 'post',
+  dataType: 'json',
+  data: $(this).serialize(),
+  success: function(data){
+   var rows = '';
+   if ($(data).length == 0) {
+    rows = '<center>Нет рассчитанной формулы производства</center>';
+   }
+   else {
+    var products_per_single_run = 0;
+    $(data).each(function(i,row) {
+     if(i == 0){
+      if (row.prior_blueprint_type_id === undefined)
+       rows += rowIndustryProduct('Чертёж', row.blueprint, '', 2, 4, 4, 2);
+      else
+       rows += rowIndustryProduct('Чертежи', "<mark>"+row.prior_blueprint+"</mark> <grayed>("+row.prior_blueprint_type_id+")</grayed><br>"+
+                                             "<mark>"+row.blueprint+"</mark> <grayed>("+row.blueprint_type_id+")</grayed>",
+                                             '', 2, 1, 7, 2, false);
+      rows += rowIndustryProduct('Код производства', row.activity, '', 2, 4, 4, 2);
+      rows += rowIndustryProduct('Кол-во продукции за 1 прогон', row.products_per_single_run, '', 2, 4, 4, 2);
+      // best_choice
+      rows += rowIndustryProduct('Комиссия при закупке сырья', (row.buying_brokers_fee*100.0).toFixed(2), '%', 2, 4, 4, 2);
+      rows += rowIndustryProduct('Комиссия и налог с продаж', ((row.sales_brokers_fee)*100.0).toFixed(2)+" + "+((row.sales_tax)*100.0).toFixed(2)+" = "+((row.sales_brokers_fee+row.sales_tax)*100.0).toFixed(2), '%', 2, 4, 4, 2);
+      rows += rowIndustryProduct('Цена топляка для Rhea', numLikeEve(row.fuel_price_isk.toFixed(2)), 'ISK', 2, 4, 4, 2);
+      rows += rowIndustryProduct('Рекомендованная цена 1 шт продукта', '<span class="text-primary">'+numLikeEve((row.products_recommended_price/row.products_num).toFixed(2))+'</span>', 'ISK', 2, 4, 4, 2);
+      products_per_single_run = row.products_per_single_run;
+     }
+    rows += "<hr style='margin-top: 16px; margin-bottom: 16px;'>";
+     // меняется от одной записи к другой
+     rows += "<div class='row'><div class='col-md-5'>";
+     //---
+     if (!(row.decryptor === undefined))
+      rows += rowIndustryProduct('Декриптор', "<span style='color:#"+(i?"8dc169":"ec5c5c")+";'>"+row.decryptor+'</span>', '<grayed>('+row.decryptor_type_id+')</grayed>', 0, 2, 10);
+     else
+      rows += rowIndustryProduct('Декриптор', "<grayed>не используется</grayed>");
+     if (!(row.ancient_relics === undefined))
+      rows += rowIndustryProduct('Реликт', row.ancient_relics);
+     rows += rowIndustryProduct('Формула №', row.formula);
+     rows += rowIndustryProduct('Прогоны', row.customized_runs, 'шт');
+     rows += rowIndustryProduct('Запуск работ', numLikeEve(row.jobs_cost.toFixed(2)), 'ISK');
+     rows += "<hr>";
+     rows += rowIndustryProduct('Партия продукции', row.customized_runs+" * "+products_per_single_run+" = "+row.products_num, 'шт');
+     rows += rowIndustryProduct('Стоимость материалов', numLikeEve(row.materials_cost.toFixed(2)), 'ISK');
+     rows += rowIndustryProduct('Закуп материалов в Jita', numLikeEve(row.materials_cost_with_fee.toFixed(2)), 'ISK');
+     rows += rowIndustryProduct('Объём материалов', numLikeEve(row.purchase_volume.toFixed(2)), 'm³');
+     rows += rowIndustryProduct('Доставка материалов', numLikeEve(row.materials_transfer_cost.toFixed(2)), 'ISK');
+     rows += "<hr>";
+     rows += rowIndustryProduct('Объём партии продукции', numLikeEve(row.ready_volume.toFixed(2)), 'm³');
+     rows += rowIndustryProduct('Вывоз партии продукции', numLikeEve(row.ready_transfer_cost.toFixed(2)), 'ISK');
+     //---
+     rows += "</div><div class='col-md-7'>";
+     //---
+     if (row.products_recommended_price === undefined){
+      rows += rowIndustryProduct('Рекомендованная стоимость партии', '<grayed>нет данных о ценах</grayed>');
+      rows += rowIndustryProduct('Комиссия с продаж партии', '<grayed>нет данных о ценах</grayed>');
+      rows += rowIndustryProduct('Прибыль от продажи партии', '<grayed>нет данных о ценах</grayed>');
+      rows += rowIndustryProduct('Рекомендованная цена 1 шт продукта', '<grayed>нет данных о ценах</grayed>');
+      rows += rowIndustryProduct('Прибыль от продажи 1 шт продукта', '<grayed>нет данных о ценах</grayed>');
+     }else{
+      rows += rowIndustryProduct('Рекомендованная стоимость партии', numLikeEve(row.products_recommended_price.toFixed(2)), 'ISK');
+      rows += rowIndustryProduct('Комиссия с продаж партии', numLikeEve(row.products_sell_fee_and_tax.toFixed(2)), 'ISK');
+      rows += rowIndustryProduct('Прибыль от продажи партии', numLikeEve((row.single_product_price_wo_fee_tax*row.products_num).toFixed(2)), 'ISK');
+      rows += rowIndustryProduct('Прибыль от продажи 1 шт продукта', numLikeEve(row.single_product_price_wo_fee_tax.toFixed(2)), 'ISK');
+     }
+     rows += "<hr>";
+     rows += rowIndustryProduct('Затраты на производство партии', numLikeEve(row.total_gross_cost.toFixed(2)), 'ISK');
+     rows += rowIndustryProduct('Затраты на производство 1 шт', numLikeEve(row.single_product_cost.toFixed(2)), 'ISK');
+     rows += rowIndustryProduct('Нижний порог продажи 1 шт продукта', '<span class="text-primary">'+numLikeEve(row.product_mininum_price.toFixed(2))+'</span>', 'ISK');
+     if (row.single_product_profit === undefined){
+      rows += rowIndustryProduct('Профит производства 1 шт продукта', '<grayed>нет данных о ценах</grayed>');
+      rows += rowIndustryProduct('Профит производства 1 шт продукта', '<grayed>нет данных о ценах</grayed>');
+     }else{
+      span_profit = "<span style='color:"+((row.single_product_profit < 0.01)?"red":"green")+"'>";
+      rows += rowIndustryProduct('Профит производства 1 шт продукта', span_profit+numLikeEve(row.single_product_profit.toFixed(2))+"</span>", 'ISK');
+      rows += rowIndustryProduct('Профит производства партии', span_profit+numLikeEve(((row.single_product_profit/row.total_gross_cost)*100.0).toFixed(2))+"</span>", '%');
+     }
+     rows += "<hr>";
+     rows += rowIndustryProduct('Формула зарегистрирована', row.created_at, 'мин');
+     rows += rowIndustryProduct('Формула обновлена', row.updated_at, 'мин');
+     //---
+     rows += "</div></div>";
+    });
+   }
+   var dtls = $("#dtlsIndustryProduct-wrapper");
+   dtls.html(rows);
+  },
+  error: function (jqXHR, exception) {
+   if (jqXHR.status === 0) alert('Not connect. Verify Network.');
+   else if (jqXHR.status == 404) alert('Requested page not found (404).');
+   else if (jqXHR.status == 500) alert('Internal Server Error (500).');
+   else if (exception === 'parsererror') alert('Requested JSON parse failed.'); // некорректный ввод post-params => return в .php, нет данных
+   else if (exception === 'timeout') alert('Time out error.'); // сервер завис?
+   else if (exception === 'abort') alert('Ajax request aborted.');
+   else alert('Uncaught Error. ' + jqXHR.responseText);
+  }
+ });
+});
+
 $("#frmCorpAssets").on("submit", function(e){
  e.preventDefault();
  $.ajax({
@@ -230,6 +366,7 @@ function showProductInfoDialog(elem) {
  var hub = getOption('Selected Market Hub', 60003760);
  var corp = getOption('Selected Trader Corp', 98553333);
  refreshMarketOrdersAndHistory(type_id, hub, corp);
+ refreshIndustryProductTransferDetails(type_id, hub, corp);
  //- отправка запроса на формирование таблица корпоративного имущества
  refreshCorpAssets(type_id);
  //- формирование содержимого диалогового окна

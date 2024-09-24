@@ -58,7 +58,7 @@ class QSwaggerInterface:
         )
         return aids
 
-    def select_region_id_by_name(self, region: str):
+    def select_region_id_by_name(self, region: str) -> typing.Optional[int]:
         row = self.db.select_one_row(
             "SELECT sden_id "
             "FROM eve_sde_names "
@@ -67,9 +67,9 @@ class QSwaggerInterface:
         )
         if row is None:
             return None
-        return row[0]
+        return int(row[0])
 
-    def select_station_id_by_name(self, station: str):
+    def select_station_id_by_name(self, station: str) -> typing.Optional[int]:
         row = self.db.select_one_row(
             "SELECT sden_id "
             "FROM eve_sde_names "
@@ -78,7 +78,7 @@ class QSwaggerInterface:
         )
         if row is None:
             return None
-        return row[0]
+        return int(row[0])
 
     # -------------------------------------------------------------------------
     # characters/{character_id}/
@@ -2973,3 +2973,59 @@ class QSwaggerInterface:
              'at': updated_at,
              }
         )
+
+    # -------------------------------------------------------------------------
+    # [<conveyor_formulas]
+    # -------------------------------------------------------------------------
+
+    def actualize_conveyor_formulas_calculus(self):
+        self.db.execute("CALL cfc_full_calculus();")
+
+    # -------------------------------------------------------------------------
+    # [<market_hubs]
+    # -------------------------------------------------------------------------
+
+    class MarketHub:
+        def __init__(self, row: typing.Dict[int, typing.Union[int, str, bool]]):
+            self.region_id: int = int(row[0])  # 'region_id'
+            self.constellation_id: int = int(row[1])  # 'constellation_id'
+            self.solar_system_id: int = int(row[2])  # 'solar_system_id'
+            self.trade_hub_id: int = int(row[3])  # 'trade_hub_id'
+            self.region: str = row[4]  # 'region'
+            self.constellation: str = row[5]  # 'constellation'
+            self.solar_system: str = row[6]  # 'solar_system'
+            self.trade_hub: str = row[7]  # 'trade_hub'
+            self.archive: bool = row[8]  # 'archive'
+            self.active: bool = not self.archive
+            self.trader_corporation: typing.Optional[str] = row[9]  # trader_corporation
+            self.is_user_structure: bool = self.trade_hub_id >= 1000000000000
+            self.is_nonuser_station: bool = not self.is_user_structure
+
+    def get_active_market_hubs(self) -> typing.Optional[typing.List[MarketHub]]:
+        rows = self.db.select_all_rows("""
+select
+ solar_systems.region_id,
+ solar_systems.constellation_id,
+ solar_systems.solar_system_id,
+ hubs.mh_hub_id trade_hub_id,
+ solar_systems.region,
+ solar_systems.constellation,
+ solar_systems.solar_system,
+ stations.name trade_hub,
+ hubs.mh_archive archive,
+ corporations.eco_name trader_corporation
+from
+ qi.market_hubs hubs
+  left outer join qi.esi_corporations corporations on (corporations.eco_corporation_id=hubs.mh_trader_corp),
+ qi.esi_known_stations stations,
+ qi.eve_sde_solar_systems solar_systems
+where
+ hubs.mh_hub_id=stations.location_id and
+ solar_systems.solar_system_id=stations.solar_system_id;""")
+        if rows is None:
+            return None
+        data: typing.Optional[typing.List[QSwaggerInterface.MarketHub]] = []
+        for row in rows:
+            data.append(QSwaggerInterface.MarketHub(row))
+        del rows
+        return data

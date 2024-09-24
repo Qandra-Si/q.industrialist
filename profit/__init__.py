@@ -17,6 +17,8 @@ from .industry_plan import QIndustryMaterialsRepository  # noqa
 from .industry_plan import QIndustryJobCostAccumulator  # noqa
 from .industry_plan import QIndustryPlanCustomization  # noqa
 from .industry_plan import QIndustryPlan  # noqa
+from .industry_efficiency import QPossibleDecryptor  # noqa
+from .industry_efficiency import get_list_of_decryptors  # noqa
 from .industry_efficiency import efficiency_calculator  # noqa
 from .industry_efficiency import get_decryptor_parameters  # noqa
 from .industry_markets import eve_ceiling  # noqa

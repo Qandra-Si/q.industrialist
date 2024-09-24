@@ -15,6 +15,12 @@
 CREATE SCHEMA IF NOT EXISTS qi AUTHORIZATION qi_user;
 
 
+DROP VIEW IF EXISTS  qi.eve_sde_solar_systems;
+DROP INDEX IF EXISTS qi.idx_sdeii_type_id;
+DROP INDEX IF EXISTS qi.idx_sdeii_location_id;
+DROP INDEX IF EXISTS qi.idx_sdeii_pk;
+DROP TABLE IF EXISTS qi.eve_sde_items;
+
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_semantic;
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree_sorted;
 DROP VIEW IF EXISTS  qi.eve_sde_market_groups_tree;
@@ -38,6 +44,7 @@ DROP TABLE IF EXISTS qi.eve_sde_category_ids;
 DROP INDEX IF EXISTS qi.idx_sdebm_fk;
 DROP TABLE IF EXISTS qi.eve_sde_blueprint_materials;
 DROP INDEX IF EXISTS qi.idx_sdebp_fk;
+DROP INDEX IF EXISTS qi.idx_sdebp_pk;
 DROP TABLE IF EXISTS qi.eve_sde_blueprint_products;
 DROP INDEX IF EXISTS qi.idx_sdeb_pk;
 DROP TABLE IF EXISTS qi.eve_sde_blueprints;
@@ -119,11 +126,17 @@ CREATE TABLE qi.eve_sde_blueprint_products
     sdebp_quantity INTEGER NOT NULL,
     sdebp_probability DOUBLE PRECISION,
     sdebp_max_production_limit INTEGER,
+    CONSTRAINT pk_sdebp PRIMARY KEY (sdebp_blueprint_type_id,sdebp_activity,sdebp_product_id),
     CONSTRAINT fk_sdebp FOREIGN KEY (sdebp_blueprint_type_id,sdebp_activity)
         REFERENCES qi.eve_sde_blueprints(sdeb_blueprint_type_id,sdeb_activity) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE
 )
+TABLESPACE pg_default;
+
+CREATE UNIQUE INDEX idx_sdebp_pk
+    ON qi.eve_sde_blueprint_products USING btree
+    (sdebp_blueprint_type_id ASC NULLS LAST, sdebp_activity ASC NULLS LAST, sdebp_product_id ASC NULLS LAST)
 TABLESPACE pg_default;
 
 CREATE INDEX idx_sdebp_fk
@@ -343,6 +356,37 @@ TABLESPACE pg_default;
 CREATE INDEX idx_sdet_created_at
     ON qi.eve_sde_type_ids USING btree
     (sdet_created_at ASC NULLS LAST)
+TABLESPACE pg_default;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- EVE Static Data Interface (invItems)
+-- справочник по celestial объёктам вселенной (регионы, констелляции, системы, луны...)
+--------------------------------------------------------------------------------
+CREATE TABLE qi.eve_sde_items
+(
+    sdeii_item_id INTEGER NOT NULL,
+    sdeii_location_id INTEGER NOT NULL,
+    sdeii_type_id INTEGER NOT NULL,
+    CONSTRAINT pk_sdeii PRIMARY KEY (sdeii_item_id)
+)
+TABLESPACE pg_default;
+
+ALTER TABLE qi.eve_sde_items OWNER TO qi_user;
+
+CREATE UNIQUE INDEX idx_sdeii_pk
+    ON qi.eve_sde_items USING btree
+    (sdeii_item_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeii_location_id
+    ON qi.eve_sde_items USING btree
+    (sdeii_location_id ASC NULLS LAST)
+TABLESPACE pg_default;
+
+CREATE INDEX idx_sdeii_type_id
+    ON qi.eve_sde_items USING btree
+    (sdeii_type_id ASC NULLS LAST)
 TABLESPACE pg_default;
 --------------------------------------------------------------------------------
 
