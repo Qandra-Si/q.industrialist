@@ -813,6 +813,22 @@ def __clean_positions(ws_dir, name):
     del positions
 
 
+def __sort_blueprint_materials(ws_dir, name):
+    blueprints = read_converted(ws_dir, name)
+    for b in blueprints.values():
+        if 'activities' not in b:
+            continue
+        for a in b['activities'].values():
+            if 'materials' in a:
+                a['materials'].sort(key=lambda bp: bp['quantity'], reverse=True)
+    # json
+    f_name_json = __get_converted_name(ws_dir, name)
+    s = json.dumps(blueprints, indent=1, sort_keys=False)
+    f = open(f_name_json, "wt+", encoding='utf8')
+    f.write(s)
+    del blueprints
+
+
 def __generate_long_term_industry(ws_dir, name):
     """
     :param ws_dir: каталог, где хранятся все кешированные .json файлы
@@ -1022,6 +1038,9 @@ def main():  # rebuild .yaml files
     print("Rebuilding blueprints.yaml file...")
     sys.stdout.flush()
     __rebuild(workspace_cache_files_dir, "fsd", "blueprints", "blueprints", ["activities", "maxProductionLimit"])
+    print("Sorting materials in .converted_blueprints.json file...")
+    sys.stdout.flush()
+    __sort_blueprint_materials(workspace_cache_files_dir, "blueprints")
 
     print("Rebuilding categories.yaml file...")
     sys.stdout.flush()
