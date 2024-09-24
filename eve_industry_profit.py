@@ -300,7 +300,7 @@ def generate_industry_tree(
         # esi данные, загруженные с серверов CCP
         eve_market_prices_data,
         # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
-        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> profit.QIndustryTree:
+        industry_cost_indices:  typing.List[profit.QIndustryCostIndices]) -> typing.Optional[profit.QIndustryTree]:
     assert 'bptid' in calc_input
     blueprint_type_id = calc_input.get('bptid')
     assert blueprint_type_id is not None
@@ -318,6 +318,11 @@ def generate_industry_tree(
     # из справочной информации о чертеже здесь интересны только материалы, которые будут использоваться в производстве
     base_materials: typing.Optional[typing.List[typing.Dict[str, int]]] = bp0_dict.get('materials')
     assert base_materials is not None
+
+    # проверка на странные чертежи типа:
+    # Thukker Component Assembly Array Blueprint (33868) - производится то, что требуется в материалах
+    if next((1 for _ in base_materials if _['typeID'] == product_type_id), None):
+        return None
 
     # генерируем дескриптор продукта, который будем крафтить
     product_type_name: str = eve_sde_tools.get_item_name_by_type_id(sde_type_ids, product_type_id)

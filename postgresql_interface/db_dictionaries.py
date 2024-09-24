@@ -458,6 +458,38 @@ class QDictionaries:
     def clean_conveyor_formulas(self) -> None:
         self.db.execute("DELETE FROM conveyor_formulas;")
 
+    def get_existed_conveyor_formulas(self) -> typing.List[typing.Dict[str, int]]:
+        # SELECT json_agg(x) FROM ( ... );
+        rows = self.db.select_all_rows( # f.cf_formula formula,
+            "SELECT"
+            " f.cf_blueprint_type_id bptid,"
+            " f.cf_customized_runs qr,"
+            " f.cf_material_efficiency me,"
+            " f.cf_time_efficiency te,"
+            " f.cf_prior_blueprint_type_id bpc "
+            "FROM conveyor_formulas f;")
+        if rows is None:
+            return []
+        data = []
+        for row in rows:
+            if row[4] is None:
+                data.append({
+                    'bptid': int(row[0]),
+                    'qr': int(row[1]),
+                    'me': int(row[2]),
+                    'te': int(row[3])
+                })
+            else:
+                data.append({
+                    'bptid': int(row[0]),
+                    'qr': int(row[1]),
+                    'me': int(row[2]),
+                    'te': int(row[3]),
+                    'bpc': int(row[4])
+                })
+        del rows
+        return data
+
     def actualize_conveyor_formula(self, conveyor_formula: profit.QIndustryFormula) -> None:
         ancient_relics: str = 'unused'
         cf_formula_row = self.db.select_one_row(
