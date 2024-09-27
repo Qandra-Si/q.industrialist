@@ -366,6 +366,10 @@ begin
  elsif isk < 100000000000.0 then isk = round(isk::numeric, -7);
  elsif isk < 1000000000000.0 then isk = round(isk::numeric, -8);
  elsif isk < 10000000000000.0 then isk = round(isk::numeric, -9);
+ elsif isk < 100000000000000.0 then isk = round(isk::numeric, -10);
+ elsif isk < 1000000000000000.0 then isk = round(isk::numeric, -11);
+ elsif isk < 10000000000000000.0 then isk = round(isk::numeric, -12);
+ elsif isk < 100000000000000000.0 then isk = round(isk::numeric, -13);
  else assert false, 'too much isk at time';
  end if;
  return isk;
@@ -395,6 +399,10 @@ begin
  elsif isk < 100000000000.0 then pip = 10000000.0;
  elsif isk < 1000000000000.0 then pip = 100000000.0;
  elsif isk < 10000000000000.0 then pip = 1000000000.0;
+ elsif isk < 100000000000000.0 then pip = 10000000000.0;
+ elsif isk < 1000000000000000.0 then pip = 100000000000.0;
+ elsif isk < 10000000000000000.0 then pip = 1000000000000.0;
+ elsif isk < 100000000000000000.0 then pip = 10000000000000.0;
  else assert false, 'too much isk at time';
  end if;
  return qi.eve_ceiling((isk + pip * points)::numeric);
