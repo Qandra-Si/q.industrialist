@@ -187,19 +187,19 @@ def main():
         del sde_market_groups
 
     if category in ['all', 'type_ids']:
-        value = input("Are you sure to cleanup type_ids in database?\n"
-                      "Too much afterward overheads!!!\n"
-                      "Please type 'yes': ")
-        if value == 'yes':
+        user_choice = input("Are you sure to cleanup type_ids in database?\n"
+                            "Too much afterward overheads!!!\n"
+                            "Please type 'yes': ")
+        if user_choice == 'yes':
             sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
             qidbdics.actualize_type_ids(sde_type_ids)
             del sde_type_ids
             
     if category in ['all', 'conveyor_formulas']:
-        value = input("Are you sure to cleanup conveyor_formulas in database?\n"
-                      "Too much afterward overheads!!!\n"
-                      "Please type 'yes': ")
-        if value == 'yes':
+        user_choice = input("Are you sure to cleanup conveyor_formulas in database?\n"
+                            "Too much afterward overheads!!!\n"
+                            "Please type 'yes' or 'append': ")
+        if user_choice == 'yes' or user_choice == 'append':
             sde_type_ids = eve_sde_tools.read_converted(workspace_cache_files_dir, "typeIDs")
             sde_market_groups = eve_sde_tools.read_converted(workspace_cache_files_dir, "marketGroups")
             sde_blueprints = eve_sde_tools.read_converted(workspace_cache_files_dir, "blueprints")
@@ -309,6 +309,23 @@ def main():
                     product_type_id = blueprint['activities']['manufacturing']['products'][0]['typeID']
                     product_tid = sde_type_ids.get(str(product_type_id))
                     if product_tid.get('published', False):  # тут м.б. Haunter Cruise Missile
+                        # проверяем, может быть нам попался фракционный чертёж? если да, то me=0, te=0
+                        # фракционные чертежи отличаются тем, что не имеют никаких производственных
+                        # активностей, кроме manufacturing, и сами не являются продуктом другого
+                        # производства
+                        if len(blueprint['activities']) == 1:
+                            is_any_prior_blueprint: typing.Optional[int] = \
+                                next((1 for _ in sde_products.values() if blueprint_type_id in _.keys()), None)
+                            # если предыдущего чертежа в цепочке производства нет, то это фракционный BPC
+                            if is_any_prior_blueprint is None:
+                                # print('Fractional blueprint copy: ', tid['name']['en'])
+                                calc_inputs.append({
+                                    'bptid': blueprint_type_id,
+                                    'qr': 1,
+                                    'me': 0,
+                                    'te': 0})
+                                continue
+                        # продолжаем просматривать чертежи по группам, может быть это супера?
                         if 'groupID' in product_tid:
                             product_group_id: int = product_tid['groupID']
                             if product_group_id in [
@@ -318,6 +335,9 @@ def main():
                                 547,  # Carrier
                                 # нельзя, здесь все кораблики T2 уровня: 4594,  # Lancer Dreadnought
                                 485,  # Dreadnought
+                                883,  # Capital Industrial Ship
+                                # нельзя, здесь все кораблики Т2 уровня: 902,  # Jump Freighter
+                                1657,  # Citadel
                             ]:
                                 calc_inputs.append({
                                     'bptid': blueprint_type_id,
@@ -393,14 +413,18 @@ def main():
                                         else:
                                             assert 0
 
-            qidbdics.clean_conveyor_formulas()
+            if user_choice == 'yes':
+                qidbdics.clean_conveyor_formulas()
+            else:
+                exists: typing.List[typing.Dict[str, int]] = qidbdics.get_existed_conveyor_formulas()
+                calc_inputs = list(filter(lambda _: _ not in exists, calc_inputs))
 
             calc_num: int = 0
             for calc_input in calc_inputs:
                 conveyor_formula: typing.Optional[profit.QIndustryFormula] = None
                 try:
                     # выходные данные после расчёта: дерево материалов и работ, которые надо выполнить
-                    industry_tree: profit.QIndustryTree = eve_industry_profit.generate_industry_tree(
+                    industry_tree: typing.Optional[profit.QIndustryTree] = eve_industry_profit.generate_industry_tree(
                         # вход и выход для расчёта
                         calc_input,
                         industry_plan_customization,
@@ -411,6 +435,11 @@ def main():
                         sde_market_groups,
                         eve_market_prices_data,
                         industry_cost_indices)
+
+                    # проверка на странные чертежи типа:
+                    # Thukker Component Assembly Array Blueprint (33868) - производится то, что требуется в материалах
+                    if industry_tree is None:
+                        continue
 
                     # выходные данные после расчёта: список материалов и ratio-показатели их расхода для
                     # производства qr-ранов

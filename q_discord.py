@@ -182,7 +182,7 @@ class InformationCommands(commands.Cog, name="Получение сведени�
             paginator = discord.ext.commands.Paginator(prefix='', suffix='')
             paginator.add_line(f'`{item.name}`')
             paginator.add_line(f'* type_id = `{item.type_id}`')
-            paginator.add_line(f'* published = {'yes' if item.published else 'no'}')
+            paginator.add_line(f"* published = {'yes' if item.published else 'no'}")
             if item.group_id:
                 if item.group:
                     if item.group.category:
@@ -387,8 +387,8 @@ class InformationCommands(commands.Cog, name="Получение сведени�
                         if key_station != station_id or \
                            key_corporation != corporation.corporation_id or\
                            key_buy != is_buy_order:
-                            paginator.add_line(f'{'Закупка' if is_buy_order else 'Продажа'} '
-                                               f'`{corporation.corporation_name}` в `{station_name}`:')
+                            paginator.add_line(f"{'Закупка' if is_buy_order else 'Продажа'} "
+                                               f"`{corporation.corporation_name}` в `{station_name}`:")
                             (buy_embed if is_buy_order else sell_embed).add_field(
                                 name=solar_system,
                                 value=f'{remain:,d} шт\n'
@@ -399,9 +399,9 @@ class InformationCommands(commands.Cog, name="Получение сведени�
                             key_corporation = corporation.corporation_id
                             key_buy = is_buy_order
                         paginator.add_line(f'* размещено ордеров: {len(oo)}')
-                        paginator.add_line(f'* осталось {'закупить' if is_buy_order else 'продать'}: {remain:,d} шт')
-                        paginator.add_line(f'* {'ордера исполнены' if is_multi_order else 'ордер исполнен'} на:'
-                                           f' {100.0*(1.0-remain/total):,.1f}%')
+                        paginator.add_line(f"* осталось {'закупить' if is_buy_order else 'продать'}: {remain:,d} шт")
+                        paginator.add_line(f"* {'ордера исполнены' if is_multi_order else 'ордер исполнен'} на:"
+                                           f" {100.0*(1.0-remain/total):,.1f}%")
                         if not is_multi_order:
                             issuer: str = oo[0].issuer.character_name if oo[0].issuer else str(oo[0].issuer_id)
                             paginator.add_line(f'* ордер выставлен по цене: `{oo[0].price:,.2f}` ISK (`{issuer}`)')
@@ -545,6 +545,8 @@ class InformationCommands(commands.Cog, name="Получение сведени�
                 547,  # Carrier
                 4594,  # Lancer Dreadnought
                 485,  # Dreadnought
+                883,  # Capital Industrial Ship
+                1657,  # Citadel
             ]
             # ---
             embed = discord.Embed(title=item.name, description=self.get_item_description(item), colour=0x337AB7)
@@ -604,8 +606,8 @@ class InformationCommands(commands.Cog, name="Получение сведени�
                 for f in conveyor_formulas:
                     value: str = ''
                     if not fake_jita_sell_orders and f.single_product_profit:
-                        value += f'{'Убыток: ' if f.single_product_profit < 0.01 else 'Доход: '}' \
-                                 f'{f.single_product_profit:,.2f} ISK\n'
+                        value += f"{'Убыток: ' if f.single_product_profit < 0.01 else 'Доход: '}" \
+                                 f"{f.single_product_profit:,.2f} ISK\n"
                     value += f'Итого: {self.simplify_isk(f.single_product_cost)} ISK'
                     if fake_jita_sell_orders:
                         value += f'\nМатериалы: {self.simplify_isk(f.materials_cost)} ISK'
