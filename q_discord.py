@@ -545,6 +545,8 @@ class InformationCommands(commands.Cog, name="Получение сведени�
                 547,  # Carrier
                 4594,  # Lancer Dreadnought
                 485,  # Dreadnought
+                883,  # Capital Industrial Ship
+                1657,  # Citadel
             ]
             # ---
             embed = discord.Embed(title=item.name, description=self.get_item_description(item), colour=0x337AB7)

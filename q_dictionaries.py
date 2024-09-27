@@ -335,6 +335,9 @@ def main():
                                 547,  # Carrier
                                 # нельзя, здесь все кораблики T2 уровня: 4594,  # Lancer Dreadnought
                                 485,  # Dreadnought
+                                883,  # Capital Industrial Ship
+                                # нельзя, здесь все кораблики Т2 уровня: 902,  # Jump Freighter
+                                1657,  # Citadel
                             ]:
                                 calc_inputs.append({
                                     'bptid': blueprint_type_id,
