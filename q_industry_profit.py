@@ -320,7 +320,8 @@ def main():
             # {'bptid': 23918, 'qr': 2, 'me': 9, 'te': 16},  # Wyvern
             # {'bptid': 57526, 'qr': 1, 'me': 8, 'te': 14},  # Enhanced Neurolink Protection Cell
             # {'bptid': 57526, 'qr': 2, 'me': 8, 'te': 14},  # Enhanced Neurolink Protection Cell
-            {'bptid': 45648, 'qr': 1, 'me': 0, 'te': 0},  # Komodo
+            # {'bptid': 45648, 'qr': 1, 'me': 0, 'te': 0},  # Komodo
+            {'bptid': 47968, 'qr': 1, 'me': 0, 'te': 0},  # Leshak
         ]
 
     # см. также eve_conveyor_tools.py : setup_blueprint_details
