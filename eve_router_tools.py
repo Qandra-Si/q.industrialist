@@ -28,6 +28,8 @@ class RouterSettings:
 
 class ConveyorSettings: pass  # forward declaration
 class ConveyorDictionary: pass  # forward declaration
+class ConveyorIndustryAnalysis: pass  # forward declaration
+class ConveyorManufacturingProductAnalysis: pass  # forward declaration
 
 
 class ConveyorSettingsContainer:
@@ -868,11 +870,12 @@ def calc_available_materials(conveyor_settings: typing.List[ConveyorSettings]) \
 
 class ConveyorMaterialRequirements:
     class StackOfBlueprints:
-        def __init__(self, name: str, station_id: int, runs: int, me: int, group: typing.List[db.QSwaggerCorporationBlueprint]):
+        def __init__(self, name: str, station_id: int, runs: int, me: int, te: int, group: typing.List[db.QSwaggerCorporationBlueprint]):
             self.name: str = name
             self.station_id: int = station_id
             self.runs: int = runs
             self.me: int = me
+            self.te: int = te
             self.group: typing.List[db.QSwaggerCorporationBlueprint] = group
             self.max_possible_for_single: int = 0
             self.required_materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
@@ -880,6 +883,13 @@ class ConveyorMaterialRequirements:
             self.only_optional_decryptors_missing_for_stack: bool = True
             self.required_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
             self.not_available_materials_for_stack: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]] = {}
+            self.conveyor_formula: typing.Optional[db.QSwaggerConveyorFormula] = None
+
+        @property
+        def is_unprofitable(self) -> typing.Optional[bool]:
+            if self.conveyor_formula and self.conveyor_formula.single_product_profit is not None:
+                return self.conveyor_formula.single_product_profit < 0.01
+            return None
 
         def apply_materials_info(self,
                                  materials_for_single: typing.Dict[db.QSwaggerActivity, typing.List[db.QSwaggerOptionalMaterial]],
@@ -908,6 +918,8 @@ class ConveyorMaterialRequirements:
             self,
             # данные (справочники)
             qid: db.QSwaggerDictionary,
+            # анализ чертежей на предмет перепроизводства и нерентабельности
+            industry_analysis: ConveyorIndustryAnalysis,
             # настройки генерации отчёта
             conveyor_settings: ConveyorSettings,
             # ассеты стока (материалы для расчёта возможностей и потребностей конвейера
@@ -939,6 +951,7 @@ class ConveyorMaterialRequirements:
                     group[0].station_id,
                     group[0].runs,
                     group[0].material_efficiency,
+                    group[0].time_efficiency,
                     group))
         self.__grouped_and_sorted.sort(key=lambda x: (x.name, x.runs, -x.me))  # name:runs:me (длительность произв.)
         # рассчитываем потребности в материалах
@@ -975,12 +988,25 @@ class ConveyorMaterialRequirements:
                 available_materials.check_enough_materials_at_station(b0.station_id, materials_stack)
             # сохранение результатов расчёта в стеке чертежей
             stack.apply_materials_info(materials_single, enough_for_single, materials_stack, enough_for_stack)
+            # получение conveyor-формул для проверки профитности/нерентабельности производства
+            if b0.is_copy:
+                manufacturing_analysis: typing.Optional[ConveyorManufacturingProductAnalysis] = \
+                    industry_analysis.manufacturing_analysis.get(b0.type_id)
+                if manufacturing_analysis and manufacturing_analysis.product and manufacturing_analysis.product.product_tier1:
+                    stack.conveyor_formula = manufacturing_analysis.product.get_manufacturing_conveyor_formula(
+                        60003760,  # Jita trade hub id
+                        b0.type_id,
+                        b0.runs,  # валидно только при b0.is_copy==True
+                        b0.material_efficiency,
+                        b0.time_efficiency)
         return self.__grouped_and_sorted
 
 
 def calc_corp_conveyor(
         # данные (справочники)
         qid: db.QSwaggerDictionary,
+        # анализ чертежей на предмет перепроизводства и нерентабельности
+        industry_analysis: ConveyorIndustryAnalysis,
         # настройки генерации отчёта
         router_settings: typing.List[RouterSettings],
         conveyor_settings: ConveyorSettings,
@@ -996,6 +1022,7 @@ def calc_corp_conveyor(
     # все чертежи собраны в стеки по одному типу название:длительность_производства (name:runs:me)
     grouped_and_sorted: typing.List[ConveyorMaterialRequirements.StackOfBlueprints] = requirements.calc(
         qid,
+        industry_analysis,
         conveyor_settings,
         available_materials,
         ready_blueprints
@@ -1535,6 +1562,9 @@ class ConveyorManufacturingAnalysis:
         # поиск формулы производства для этого предмета
         self.product_tier1_best_formula: typing.Optional[db.QSwaggerConveyorBestFormula] = \
             qid.get_conveyor_best_formula(self.product_tier1.product_id)
+        # поиск conveyor-формул для этого типа предмета
+        self.product_tier1_conveyor_formulas: typing.Optional[typing.List[db.QSwaggerConveyorFormula]] = \
+            qid.get_conveyor_formulas(self.product_tier1.product_id)
 
     @classmethod
     def from_blueprint_tier1(
@@ -1562,6 +1592,23 @@ class ConveyorManufacturingAnalysis:
     def num_prepared(self) -> int:
         # подсчёт кол-ва готовых чертежей для производства этого продукта (в кол-ве ранов)
         return self.product_tier1_num_in_blueprint_runs
+
+    def get_manufacturing_conveyor_formula(self,
+                                           trade_hub_id: int,
+                                           blueprint_type_id: int,
+                                           runs: int, me: int, te: int) -> \
+            typing.Optional[db.QSwaggerConveyorFormula]:
+        if not self.product_tier1_conveyor_formulas:
+            return None
+        res: typing.Optional[db.QSwaggerConveyorFormula] = next((
+            _ for _ in self.product_tier1_conveyor_formulas
+            if _.blueprint_type_id == blueprint_type_id and
+               _.customized_runs == runs and
+               _.material_efficiency == me and
+               _.time_efficiency == te and
+               _.trade_hub_id == trade_hub_id
+        ), None)
+        return res
 
 
 class ConveyorManufacturingProductAnalysis:
@@ -2123,6 +2170,16 @@ class ConveyorIndustryAnalysis:
                     all_variants_overstock = manufacturing_analysis.product.product_tier1_overstock
         return all_variants_overstock
 
+    def is_all_variants_unprofitable(self, type_id: int, settings: ConveyorSettings) -> typing.Optional[bool]:
+        all_variants_unprofitable: typing.Optional[bool] = None
+        """
+        if db.QSwaggerActivityCode.INVENTION in settings.activities:
+            invent_analysis: typing.Optional[ConveyorInventProductsAnalysis] = self.invent_analysis.get(type_id)
+            if invent_analysis:
+                all_variants_unprofitable = invent_analysis.is_all_variants_overstock()
+        """
+        return all_variants_unprofitable
+
 
 class ConveyorDemands:
     class Corrected:
@@ -2621,7 +2678,7 @@ class ConveyorCalculations:
                 # данные (справочники)
                 qid: db.QSwaggerDictionary,
                 global_dictionary: ConveyorDictionary,
-                # анализ чертежей на предмет перепроизводства
+                # анализ чертежей на предмет перепроизводства и нерентабельности
                 industry_analysis: ConveyorIndustryAnalysis,
                 # настройки генерации отчёта
                 settings: ConveyorSettings,
@@ -2763,6 +2820,8 @@ class ConveyorCalculations:
                     calc_corp_conveyor(
                         # данные (справочники)
                         qid,
+                        # анализ чертежей на предмет перепроизводства и нерентабельности
+                        industry_analysis,
                         # настройки генерации отчёта
                         router_settings,
                         settings,

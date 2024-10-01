@@ -441,6 +441,7 @@ function rebuildConveyorTable() {
  var show_impossible = (getOption('option', 'run-impossible') == 1) ? 1 : 0;
  var show_lost = (getOption('option', 'lost-items') == 1) ? 1 : 0;
  var show_overstock = (getOption('option', 'overstock-product') == 1) ? 1 : 0;
+ var show_unprofitable = (getOption('option', 'unprofitable-product') == 1) ? 1 : 0;
  var show_phantom = (getOption('option', 'phantom-blueprints') == 1) ? 1 : 0;
  var show_required = (getOption('option', 'required-blueprints') == 1) ? 1 : 0;
  var show_active = (getOption('option', 'job-active') == 1) ? 1 : 0;
@@ -455,36 +456,38 @@ function rebuildConveyorTable() {
    var tag = conveyorTagToStr(tr);
    hide_conveyor = (getOption('conveyor', tag) == 1) ? 0 : 1;
   }
-  else if (tr.hasClass('row-impossible')) {
-   changeElemVisibility(tr, hide_conveyor * show_impossible);
-   multiple = true;
+  else {
+   x1 = tr.hasClass('row-impossible')?1:0;
+   x2 = tr.hasClass('row-overstock')?1:0;
+   x3 = tr.hasClass('row-unprofitable')?1:0;
+   if (x1||x2||x3) {
+    // row-overstock и row-unprofitable встречается со всеми остальными row-классами
+    changeElemVisibility(tr, hide_conveyor * (x1*show_impossible + x2*show_overstock + x3*show_unprofitable));
+    multiple = true;
+   }
+   else if (tr.hasClass('row-possible')) {
+    changeElemVisibility(tr, hide_conveyor * show_possible);
+    multiple = true;
+   }
+   else if (tr.hasClass('row-optional')) {
+    changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
+    multiple = true;
+   }
+   else if (tr.hasClass('row-multiple')) {
+    changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
+    multiple = true;
+   }
+   else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets') || tr.hasClass('lost-jobs'))
+    changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
+   else if (tr.hasClass('phantom-blueprints'))
+    changeElemVisibility(tr, hide_conveyor * show_phantom);
+   else if (tr.hasClass('required-blueprints'))
+    changeElemVisibility(tr, hide_conveyor * show_required);
+   else if (tr.hasClass('job-active'))
+    changeElemVisibility(tr, hide_conveyor * show_active);
+   else if (tr.hasClass('job-completed'))
+    changeElemVisibility(tr, hide_conveyor * show_completed);
   }
-  else if (tr.hasClass('row-overstock')) { // row-overstock встречается со всеми остальными row-классами
-   changeElemVisibility(tr, hide_conveyor * show_overstock);
-   multiple = true;
-  }
-  else if (tr.hasClass('row-possible')) {
-   changeElemVisibility(tr, hide_conveyor * show_possible);
-   multiple = true;
-  }
-  else if (tr.hasClass('row-optional')) {
-   changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
-   multiple = true;
-  }
-  else if (tr.hasClass('row-multiple')) {
-   changeElemVisibility(tr, hide_conveyor * (show_possible + show_impossible));
-   multiple = true;
-  }
-  else if (tr.hasClass('lost-blueprints') || tr.hasClass('lost-assets') || tr.hasClass('lost-jobs'))
-   changeElemVisibility(tr, show_lost); // если потеряшки включены, то они отображаются всегда
-  else if (tr.hasClass('phantom-blueprints'))
-   changeElemVisibility(tr, hide_conveyor * show_phantom);
-  else if (tr.hasClass('required-blueprints'))
-   changeElemVisibility(tr, hide_conveyor * show_required);
-  else if (tr.hasClass('job-active'))
-   changeElemVisibility(tr, hide_conveyor * show_active);
-  else if (tr.hasClass('job-completed'))
-   changeElemVisibility(tr, hide_conveyor * show_completed);
   if (multiple) {
    tr.find('td div').each(function() {
     if ($(this).hasClass('run-possible'))
@@ -500,6 +503,9 @@ function rebuildConveyorTable() {
  $('div.overstock-product').each(function() {
   changeElemVisibility($(this), hide_conveyor * show_overstock);
  });
+ $('div.unprofitable-product').each(function() {
+  changeElemVisibility($(this), hide_conveyor * show_unprofitable);
+ });
 
  var used_materials = (getOption('option', 'used-materials') == 1) ? 1 : 0;
  var not_available = (getOption('option', 'not-available') == 1) ? 1 : 0;
@@ -508,6 +514,9 @@ function rebuildConveyorTable() {
  var industry_product = (getOption('option', 'industry-product') == 1) ? 1 : 0;
  $('div.industry-product').each(function() { changeElemVisibility($(this), industry_product); });
  $('div.invent-product').each(function() { changeElemVisibility($(this), industry_product); }); // когда продукт один
+
+ var industry_profit = (getOption('option', 'industry-profit') == 1) ? 1 : 0;
+ $('profit').each(function() { changeElemVisibility($(this), industry_profit); });
 }
 function rebuildRouterTable() {
  var show_endlvl_manuf = (getOption('option', 'end-level-manuf') == 1) ? 1 : 0;

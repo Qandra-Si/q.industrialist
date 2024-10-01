@@ -1171,11 +1171,12 @@ from (
 
     def get_conveyor_formulas(
             self,
+            only_for_active_hubs: bool,
             type_ids: typing.Dict[int, QSwaggerTypeId],
             blueprints: typing.Dict[int, QSwaggerBlueprint],
             stations: typing.Dict[int, QSwaggerStation]) -> \
             typing.Dict[int, typing.List[QSwaggerConveyorFormula]]:
-        rows = self.db.select_all_rows("""
+        rows = self.db.select_all_rows(f"""
 select
  f.cf_formula,--0
  f.cf_blueprint_type_id,--1
@@ -1212,7 +1213,9 @@ select
  c.cfc_product_mininum_price,--32
  c.cfc_single_product_profit--33
 from qi.conveyor_formulas f, qi.conveyor_formula_calculus c
-where f.cf_formula=c.cfc_formula
+where
+ f.cf_formula=c.cfc_formula
+ {'and c.cfc_trade_hub in (select mh_hub_id from qi.market_hubs where not mh_archive)' if only_for_active_hubs else ''}
 order by f.cf_blueprint_type_id, f.cf_activity, f.cf_product_type_id, f.cf_prior_blueprint_type_id;
 """)
         if rows is None:

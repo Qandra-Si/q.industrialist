@@ -90,6 +90,9 @@ table.tbl-lifetime tbody tr td left { color: #ffa600; }
 div.qind-tid { font-size: 85%; }
 tid { white-space: nowrap; }
 mute { color: #777; }
+profit { color: #777; }
+profit > pos_profit { color: green; }
+profit > neg_profit { color: red; }
 
 /* окно спроса производства */
 table.tbl-requirements tr { font-size: small; }
@@ -249,6 +252,19 @@ qdecr { color: #8dc169; }
  color: #ff0048;
  -webkit-animation: overstock-pulsate 1.2s linear infinite;
  animation: overstock-pulsate 1.2s linear infinite;
+}
+/* поведение метки нерентабельно */
+.label-unprofitable { background-color: #000; color: #ff8300; }
+@keyframes unprofitable-pulsate{50%{color:#ff8300;text-shadow:0 -1px rgba(0,0,0,.3),0 0 5px #f09000,0 0 8px #f00;}}
+.qind-copy-btn:hover + * ~ div .label-unprofitable {
+ color: #f00;
+ -webkit-animation: unprofitable-pulsate 1.2s linear infinite;
+ animation: unprofitable-pulsate 1.2s linear infinite;
+}
+.qind-copy-btn:hover + * ~ .label-unprofitable {
+ color: #f00;
+ -webkit-animation: unprofitable-pulsate 1.2s linear infinite;
+ animation: unprofitable-pulsate 1.2s linear infinite;
 }
 /* поведение кнопки info около продукта инвента */
 a.qind-info-btn { color: #808080; }

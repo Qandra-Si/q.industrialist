@@ -482,13 +482,14 @@ class QSwaggerDictionary:
             self.conveyor_formulas.get(product_type_id)
         return cached_conveyor_formulas
 
-    def load_conveyor_formulas(self) -> typing.Dict[int, typing.List[QSwaggerConveyorFormula]]:
+    def load_conveyor_formulas(self, only_for_active_hubs: bool = True) -> typing.Dict[int, typing.List[QSwaggerConveyorFormula]]:
         if self.conveyor_formulas:
             # на элементы этого справочника ссылаются другие справочники (недопустимо подменять справочник в рантайме)
             raise Exception("Unable to load conveyor formulas twice")
         if not self.sde_type_ids:  # загружайте предметы
             raise Exception("You should load type ids first")
         self.conveyor_formulas = self.__qit.get_conveyor_formulas(
+            only_for_active_hubs,
             # справочники
             self.sde_type_ids,
             self.sde_blueprints,

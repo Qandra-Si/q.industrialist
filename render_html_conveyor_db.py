@@ -6,6 +6,7 @@ import itertools
 import render_html
 from render_html import get_span_glyphicon as glyphicon
 from render_html import get_span_glyphicon_ex as glyphicon_ex
+import profit
 
 import postgresql_interface as db
 import eve_router_tools as tools
@@ -158,6 +159,7 @@ class NavMenuDefaults:
         self.run_possible: bool = True
         self.run_impossible: bool = False
         self.overstock_products: bool = False
+        self.unprofitable_products: bool = False
         self.lost_items: bool = False
         self.phantom_blueprints: bool = False
         self.job_active: bool = False
@@ -167,6 +169,7 @@ class NavMenuDefaults:
         self.used_materials: bool = False
         self.not_available: bool = False
         self.industry_product: bool = False
+        self.industry_profit: bool = False
 
     def get(self, label: str) -> bool:
         if label == 'row-multiple' or \
@@ -177,6 +180,8 @@ class NavMenuDefaults:
             return self.run_impossible
         elif label == 'overstock-product' or label == 'row-overstock':
             return self.overstock_products
+        elif label == 'unprofitable-product' or label == 'row-unprofitable':
+            return self.unprofitable_products
         elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             return self.lost_items
         elif label == 'phantom-blueprints':
@@ -192,6 +197,8 @@ class NavMenuDefaults:
             return self.not_available
         elif label == 'industry-product' or label == 'invent-product':
             return self.industry_product
+        elif label == 'industry-profit':
+            return self.industry_profit
         else:
             raise Exception("Unsupported label to get nav menu defaults")
 
@@ -204,6 +211,8 @@ class NavMenuDefaults:
             opt: bool = self.run_impossible
         elif label == 'overstock-product' or label == 'row-overstock':
             opt: bool = self.overstock_products
+        elif label == 'unprofitable-product' or label == 'row-unprofitable':
+            opt: bool = self.unprofitable_products
         elif label == 'lost-blueprints' or label == 'lost-assets' or label == 'lost-jobs':
             opt: bool = self.lost_items
         elif label == 'phantom-blueprints':
@@ -221,6 +230,8 @@ class NavMenuDefaults:
             opt: bool = self.not_available
         elif label == 'industry-product' or label == 'invent-product':
             opt: bool = self.industry_product
+        elif label == 'industry-profit':
+            opt: bool = self.industry_profit
         else:
             raise Exception("Unsupported label to get nav menu defaults")
         return '' if opt else (' hidden' if prefix else 'hidden')
@@ -232,18 +243,20 @@ g_nav_menu_defaults: NavMenuDefaults = NavMenuDefaults()
 def dump_nav_menu(glf) -> None:
     global g_nav_menu_defaults
     menu_settings: typing.List[typing.Optional[typing.Tuple[bool, str, str, bool]]] = [
-        (g_nav_menu_defaults.run_possible,        'run-possible',        'Доступные для запуска работы', True),
-        (g_nav_menu_defaults.run_impossible,      'run-impossible',      'Недоступные для запуска работы', True),
-        (g_nav_menu_defaults.overstock_products,  'overstock-product',   'Избыточные чертежи (перепроизводство)', True),
-        (g_nav_menu_defaults.lost_items,          'lost-items',          'Потерянные предметы (не на своём месте)', True),
-        (g_nav_menu_defaults.phantom_blueprints,  'phantom-blueprints',  'Фантомные чертежи (рассогласованные)', True),
-        (g_nav_menu_defaults.required_blueprints, 'required-blueprints', 'Спрос на продукцию', True),
-        (g_nav_menu_defaults.job_active,          'job-active',          'Ведущиеся проекты', True),
-        (g_nav_menu_defaults.job_completed,       'job-completed',       'Завершённые проекты', True),
+        (g_nav_menu_defaults.run_possible,         'run-possible',        'Доступные для запуска работы', True),
+        (g_nav_menu_defaults.run_impossible,       'run-impossible',      'Недоступные для запуска работы', True),
+        (g_nav_menu_defaults.overstock_products,   'overstock-product',   'Избыточные чертежи (перепроизводство)', True),
+        (g_nav_menu_defaults.unprofitable_products,'unprofitable-product','Убыточные чертежи (нерентабельно)', True),
+        (g_nav_menu_defaults.lost_items,           'lost-items',          'Потерянные предметы (не на своём месте)', True),
+        (g_nav_menu_defaults.phantom_blueprints,   'phantom-blueprints',  'Фантомные чертежи (рассогласованные)', True),
+        (g_nav_menu_defaults.required_blueprints,  'required-blueprints', 'Спрос на продукцию', True),
+        (g_nav_menu_defaults.job_active,           'job-active',          'Ведущиеся проекты', True),
+        (g_nav_menu_defaults.job_completed,        'job-completed',       'Завершённые проекты', True),
         None,
-        (g_nav_menu_defaults.used_materials,      'used-materials',      'Используемые материалы', True),
-        (g_nav_menu_defaults.not_available,       'not-available',       'Недоступные материалы', True),
-        (g_nav_menu_defaults.industry_product,    'industry-product',    'Продукты производства', True),
+        (g_nav_menu_defaults.used_materials,       'used-materials',      'Используемые материалы', True),
+        (g_nav_menu_defaults.not_available,        'not-available',       'Недоступные материалы', True),
+        (g_nav_menu_defaults.industry_product,     'industry-product',    'Продукты производства', True),
+        (g_nav_menu_defaults.industry_profit,      'industry-profit',     'Профит производства', True),
         None,
         (True, 'end-level-manuf', "Производство последнего уровня", False),  # btnToggleEndLevelManuf
         (False, 'entry-level-purchasing', "Список для закупки", False),  # btnToggleEntryLevelPurchasing
@@ -1350,13 +1363,24 @@ def dump_list_of_possible_blueprints(
     global g_nav_menu_defaults
     for type_name, stacks in grouped:
         type_id: int = stacks[0].group[0].type_id
-        # ---
+
+        manufacturing_analysis: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = None
+        if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
+            _: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = \
+                industry_analysis.manufacturing_analysis.get(type_id)
+            if _ and _.product and _.product.product_tier1:
+                manufacturing_analysis = _
+
+        if type_id == 22437:
+            type_id = type_id
+
         tr_class: str = ''
         for stack in stacks:
             x1: bool = not stack.run_possible
             x2: bool = stack.run_possible and stack.only_optional_decryptors_missing_for_stack
             x3: bool = stack.run_possible and not stack.only_optional_decryptors_missing_for_stack
             if not tr_class:
+                # добавляя сюда новые строки не забывай, что row-impossible может встретиться с напр. row-unprofitable
                 if x1:
                     tr_class = 'row-impossible'
                 elif x2:
@@ -1381,6 +1405,20 @@ def dump_list_of_possible_blueprints(
             tr_class += g_nav_menu_defaults.css(tr_class)
         if industry_analysis.is_all_variants_overstock(type_id, settings):
             tr_class += ' row-overstock'
+
+        is_all_stacks_unprofitable: typing.Optional[bool] = None
+        for stack in stacks:
+            if stack.is_unprofitable is not None:
+                if is_all_stacks_unprofitable is None:
+                    is_all_stacks_unprofitable = stack.is_unprofitable
+                elif is_all_stacks_unprofitable and not stack.is_unprofitable:
+                    is_all_stacks_unprofitable = False
+                    break
+            elif is_all_stacks_unprofitable:
+                is_all_stacks_unprofitable = False
+                break
+        if is_all_stacks_unprofitable:
+            tr_class += ' row-unprofitable'
 
         def tr_div_class(which: str,
                          __stack784: typing.Optional[tools.ConveyorMaterialRequirements.StackOfBlueprints] = None,
@@ -1433,16 +1471,24 @@ def dump_list_of_possible_blueprints(
             else:
                 min_duration, max_duration = min(min_duration, tt[0]), max(max_duration, tt[1])
             me_te_tag: str = ''
+            conveyor_formula_profit: str = ''
             if db.QSwaggerActivityCode.RESEARCH_TIME in settings.activities or \
                db.QSwaggerActivityCode.RESEARCH_MATERIAL in settings.activities:
                 me_te_tag = f"<me_tag>{b0.material_efficiency}% <mute>/</mute> {b0.time_efficiency}%</me_tag>"
             elif db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
                 me_te_tag = f"<me_tag>{b0.material_efficiency}% <mute>/ {b0.time_efficiency}%</mute></me_tag>"
+                if stack.conveyor_formula and stack.conveyor_formula.single_product_profit is not None:
+                    is_unprofitable: bool = stack.conveyor_formula.single_product_profit < 0.01
+                    sign_tag: str = 'neg_profit' if is_unprofitable else 'pos_profit'
+                    sign_str: str = 'убыток' if is_unprofitable >= 0.01 else 'профит'
+                    human_readable: float = profit.eve_ceiling(stack.conveyor_formula.single_product_profit)
+                    human_readable_str: str = f'{human_readable:,.2f}' if human_readable < 1000.0 else f'{human_readable:,.0f}'
+                    conveyor_formula_profit = f'<profit>, {sign_str} <{sign_tag}>{human_readable_str}</{sign_tag}> ISK</profit>'
             elif db.QSwaggerActivityCode.INVENTION in settings.activities:
                 pass  # для инвента me_te_tag нет смысла показывать
             details += f"{tr_div_class('div', stack, True)}" \
                        f"{f'<mute>Копия - </mute>{str(b0.runs)}<mute> {declension_of_runs(b0.runs)}</mute>' if b0.is_copy else 'Оригинал'} " \
-                       f"{me_te_tag}" \
+                       f"{me_te_tag}{conveyor_formula_profit}" \
                        f"<qmaterials {format_json_data('arr', js)}></qmaterials>" \
                        f"{tr_div_class('div', None, False)}"
             quantities += f"{tr_div_class('div', stack, True)}" \
@@ -1488,23 +1534,22 @@ def dump_list_of_possible_blueprints(
                         if num_prepared > 0 and ia.product_tier2_overstock:
                             variants += ' <label class="label label-overstock">перепроизводство</label>'
                         variants += '</div>'
-        if db.QSwaggerActivityCode.MANUFACTURING in settings.activities:
-            manufacturing_analysis: typing.Optional[tools.ConveyorManufacturingProductAnalysis] = \
-                industry_analysis.manufacturing_analysis.get(type_id)
-            if manufacturing_analysis and manufacturing_analysis.product and manufacturing_analysis.product.product_tier1:
-                ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
-                num_ready: int = ma.num_ready
-                # формирование отчёта со сведениями о производстве
-                variants_class: str = "industry-product" + g_nav_menu_defaults.css('industry-product')
-                variants += \
-                    f'<div class="{variants_class}">' \
-                    f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
-                    '</div>'
-                product_info_btn = '&nbsp;' + format_product_tier1_info_btn(ma)
-                product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
-                # если произведено излишнее количество продукции, то отмечаем чертежи маркером
-                if num_ready > 0 and ma.product_tier1_overstock:
-                    product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+        if manufacturing_analysis:
+            ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
+            num_ready: int = ma.num_ready
+            # формирование отчёта со сведениями о производстве
+            variants_class: str = "industry-product" + g_nav_menu_defaults.css('industry-product')
+            variants += \
+                f'<div class="{variants_class}">' \
+                f'<qproduct tid="{ma.product_tier1.product_id}" icn="20" cl="qind-sign"></qproduct>' \
+                '</div>'
+            product_info_btn = '&nbsp;' + format_product_tier1_info_btn(ma)
+            product_details_note = f' <mute> - имеется</mute> {num_ready} <mute>шт</mute>'
+            # если произведено излишнее количество продукции, то отмечаем чертежи маркером
+            if num_ready > 0 and ma.product_tier1_overstock:
+                product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+            if is_all_stacks_unprofitable:
+                product_details_note += ' <label class="label label-unprofitable">нерентабельно</label>'
 
         blueprint_copy_btn: str = f'&nbsp;<a data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn"' \
                                   f' data-toggle="tooltip">{glyphicon("copy")}</a>'

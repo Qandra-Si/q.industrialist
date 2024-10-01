@@ -87,7 +87,7 @@ def main():
         if not station:
             raise Exception(f"Unable to load station by name: {r['station']}")
     # загрузка conveyor-формул после загрузки всех справочных и корпоративных данных (в т.ч. станций)
-    qid.load_conveyor_formulas()
+    qid.load_conveyor_formulas(only_for_active_hubs=True)
     # отключаемся от сервера
     qid.disconnect_from_translator()
     del qit

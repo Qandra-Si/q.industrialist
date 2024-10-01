@@ -94,7 +94,7 @@ class Database:
                     raise Exception(f"Unable to load station by name: {r['station']}")
         # загрузка conveyor-формул после загрузки всех справочных и корпоративных данных (в т.ч. станций)
         if conveyor_formulas:
-            self.qid.load_conveyor_formulas()
+            self.qid.load_conveyor_formulas(only_for_active_hubs=True)
 
     def __del__(self):
         # отключаемся от сервера
