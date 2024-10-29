@@ -4,19 +4,25 @@
 [![GitHub stars](https://img.shields.io/github/stars/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/stargazers)
 [![GitHub license](https://img.shields.io/github/license/Qandra-Si/q.industrialist)](https://github.com/Qandra-Si/q.industrialist/blob/master/LICENSE)
 
-Инструмент для планирования перевозок, построения планов изготовления модулей, кораблей, отслеживания процесса выполнения контрактов.
+Инструмент для планирования перевозок, построения планов изготовления модулей, кораблей, отслеживания процесса выполнения контрактов, отслеживания торговых операций.
 
-<img src="https://qandra-si.github.io/q.industrialist/004-conveyor_v0.7.1.png" height="80%" width="80%">
+<img src="https://qandra-si.github.io/q.industrialist/006-router_v1.0-DarkFman.png" height="80%" width="80%">
 
 ## Возможности текущей версии
-Q.Industrialist версии v0.7.0 является набором утилит выполненных в виде python-скриптов. Скрипты принимают аргументы командной строки, таким образом, например, настраивается выбор имени пилота, от имени которого будут запрашиваться данные с серверов CCP.
+Q.Industrialist версии v1.0-DarkFman является набором утилит выполненных в виде python-скриптов. Скрипты принимают аргументы командной строки, таким образом, например, настраивается выбор имени пилота, от имени которого будут запрашиваться данные с серверов CCP.
 
 [![EVE - Ночной цех №46 новые инструменты RI4](https://img.youtube.com/vi/Gxh2vXRkL_I/0.jpg)](https://www.youtube.com/watch?v=Gxh2vXRkL_I "EVE - Ночной цех №46 новые инструменты RI4")
 
 В выпуске "Ночной цех №46" на youtube-канале [z85tv](https://www.youtube.com/channel/UC_H7mou0O9GbMB_mvKZe-uw) в сентябре 2020 года состоялся обзор возможностей отчётов, которые были сгенерированы утилитами Q.Industrialist версии v0.6.x. Таким образом можно бегло получить представление о возможностях и способу использования программного обеспечения Q.Industrialist.
 
+[![EVE - Ночной цех №57 Vendetta и Q.Industrialist](https://img.youtube.com/vi/cEzYDjQpLAY/0.jpg)](https://www.youtube.com/watch?v=cEzYDjQpLAY "EVE - Ночной цех №57 Vendetta и Q.Industrialist")
+
+В выпуске "Ночной цех №57" в январе 2023 года анонсируются новые возможности программного обеспечения Q.Industrialist, интеграция расчётов рентабельности в производстенные процессы.
+
+Возможности актуальной версии программного обеспечения публикуются в виде обучающих видео-роликов в канале на [Rutube](https://rutube.ru/plst/661088/) и [Youtube](https://www.youtube.com/watch?v=LEEtZPG-xsE&list=PLKoH6-WjvAiyRt-NRIjMsT9mZhS8fI-Ol&index=3).
+
 ### Требования
-Для получения данных по корпорации, с которыми работают утилиты Q.Industrialist в большинстве случаев требуется директорская роль. *Внимание, требуется именно Director role, а не должность Директора!* Поскольку утилиты оперируют информацией об имуществе корпорации, т.н. assets/ассеты, для доступа к этим данным [требуется](https://esi.evetech.net/ui/#/Assets/get_corporations_corporation_id_assets) директорская роль. В том числе, для работы отдельных утилит Q.Industrialist потребуются и другие роли, общий список требуемых ролей:
+Для получения данных по корпорации, с которыми работают утилиты Q.Industrialist в большинстве случаев [требуется](https://esi.evetech.net/ui/#/Assets/get_corporations_corporation_id_assets) директорская роль. **Внимание, требуется именно Director role, а не должность Директора!** Программы анализируют информацию об имуществе корпорации, т.н. assets/ассеты, анализируют корпоративные ордера и запущенные работы корпоративного производства, состояние подразделений кошелька. В том числе, для работы отдельных утилит Q.Industrialist потребуются и другие роли, общий список требуемых ролей:
 * Director - для доступа к имуществу корпорации, спискам чертежей 
 * Factory_Manager - для доступа к списку производственных работ, списку POS-ов
 * Accountant или Junior_Accountant - для доступа к информации о балансе корпоративных кошельков
@@ -29,33 +35,408 @@ Q.Industrialist версии v0.7.0 является набором утилит
 # Установка и настройка
 
 ## Установка и настройка на сервере
-Для автономного запуска скриптов и круглосуточной доступности отчётов с помощью веб-сервера, следуйте инструкции ниже. Если у вас есть свой сервер, подключенный к сети интернет, можете перейти к шагу №2.
+Для автономного запуска скриптов и круглосуточной доступности отчётов с помощью веб-сервера, следуйте инструкции ниже.
 
-### Шаг 1. Настройка VPS-сервера
-Если у вас нет сервера, подключенного к сети интернет, то предлагаю рассмотреть возможность начать использовать VPS-сервер, это т.н. выделенный виртуальный сервер, который приобретается в аренду на один день, неделю или месяц и дольше.
+Для нормальной работы Q.Industrialist вам понадобится VPS-сервер с Linux и как минимум, 1 Gb RAM, 1 Core CPU, 20 Gb SSD.
 
-Предложений аренды VPS-серверов в сети интернет довольно много, вы самостоятельно можете выбрать подходящую площадку, ознакомившись с тарифами и возможностями. В настоящий момент времени разработка программного обеспечения Q.Industrialist ведётся на серверах SimpleCloud, нареканий в надёжности и стабильности доступа к которым нет. Всвязи с чем предлагаю партнёрскую ссылку https://simplecloud.ru/start/82673 (с самой партнёрской программой можно ознакомиться [по ссылке](https://simplecloud.ru/partners/)) зарегистрировавшись по которой вы сможете поддержать дальнейшую разработку Q.Industrialist :+1:
+Последовательно выполните команды по установке необходимых для работы зависимостей:
 
-Для нормальной работы Q.Industrialist вам понадобится VPS-сервер с, как минимум, 1 Гб оперативной памяти. По тарифам на площадке по ссылке приведённой выше: 1 Gb RAM, 1 Core CPU, 20 Gb SSD с безлимитным трафиком обходятся в 250 руб/мес.
+```bash
+sudo apt install \
+    python3 python3-venv python3-psycopg python3-psycopg2 \
+    gcc git python3-dev \
+    postgresql libpq-dev \
+    wget
 
-*Итак... если ваш бюджет позволит вам оплачивать автономную работу Q.Industrialist для вашей корпорации, а также у вашего пилота имеется роль Director (см. раздел [Требования](https://github.com/Qandra-Si/q.industrialist#%D1%82%D1%80%D0%B5%D0%B1%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F) выше)... продолжим. Если нет, то либо заранее решите вопрос с доступом, либо перейдите в раздел [Установка и настройка среды разработчика (локальный запуск)](https://github.com/Qandra-Si/q.industrialist#%D1%83%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B8-%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D1%81%D1%80%D0%B5%D0%B4%D1%8B-%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%87%D0%B8%D0%BA%D0%B0-%D0%BB%D0%BE%D0%BA%D0%B0%D0%BB%D1%8C%D0%BD%D1%8B%D0%B9-%D0%B7%D0%B0%D0%BF%D1%83%D1%81%D0%BA) утилит Q.Industrialist. Однако локальный запуск не позволит пилотам вашей корпорации просматривать отчёты, полученные в результате работы программ, такая возможность будет локально только у вас.*
+# настраиваем русскую локаль для того, чтобы с комфортом редактировать файлы с настройками
+# (пояснения даны на русском языке)
+sudo locale-gen ru_RU
+sudo locale-gen ru_RU.UTF-8
+sudo update-locale
+sudo dpkg-reconfigure locales
+localectl set-locale LANG=ru_RU.UTF-8
+unset LANG
+LANG=ru_RU.UTF-8
 
-На VPS-сервере вам необходимо установить операционную систему Linux, дистрибутив можете выбрать тот который вам привычнее. В примерах ниже инструкции по установке и настройке программного обеспечения приведены для ОС Debian GNU/Linux. После того, как ваша площадка на VPS-сервере подготовлена, вам необходимо подключиться к серверу по протоколу ssh. Если опыта работы с программами по ssh-протоколу у вас нет, то для ОС Windows в качестве программы-терминала рекомендую [PuTTY](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html), а для обмена файлами с сервером програму [WinSCP](https://winscp.net/eng/docs/lang:ru).
+mkdir ~/q_industrialist
+cd ~/q_industrialist
 
-... дописать
+git clone https://github.com/Qandra-Si/q.industrialist.git .
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 
-### Шаг 2. Установка Q.Industrialist на сервере
+# если на этом этапе во время установки зависимостей появится сообщение об
+# ошибке, обратитесь к разработчику (контакты см. ниже)
 
-... дописать
+# если ошибок не появилось, то перейдите к созданию базы данных:
+sudo -u postgres psql --port=5432 postgres postgres
+```
 
-### Шаг 3. Настройка Q.Industrialist на сервере
+Продолжайте вводить команды в терминале psql:
 
-... дописать
+```sql
+CREATE DATABASE qi_db WITH ENCODING = 'UTF8' TABLESPACE = pg_default CONNECTION LIMIT = -1;
+CREATE USER qi_user WITH LOGIN PASSWORD 'придумайте-и-запишите-пароль' NOSUPERUSER INHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
+GRANT ALL ON DATABASE qi_db TO qi_user;
+quit
+```
 
-### Помощь зала?
+После создания базы данных выполните настройку сервера БД. Откройте файл `pg_hba.conf` в режиме редактирования, добавьте в него нового пользователя:
+
+```bash
+sudo nano /etc/postgresql/16/main/pg_hba.conf
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   qi_db           qi_user                                 md5
+
+# после сохранения изменения выполните перезагрузку конфигурации
+sudo systemctl reload postgresql
+
+# после чего можно перейти к настройке создании таблиц в базе данных:
+cd ~/q_industrialist/database
+./run_scripts.sh
+
+# внимание! обновление схемы базы данных неавтоматизировано, но разработчик
+# при переходе на новую версию выпускает upgrades.sql таким образом,
+# чтобы сохранить накопленную информацию в базе данных и выполнить её обновление
+# с сохранением информации
+
+# не запускайте скрипт создания таблиц в базе данных повторно, скрипт всё удалит
+
+# следите за обновлением программного обеспечения и при переходе выполняйте
+# команды из соответствующих upgrades.sql, которые появились при обновлении
+
+# если на данном этапе вам нужна помощь, обратитесь к разработчику (контакты см. ниже)
+```
+
+Создайте своё ESI приложение по [pэтой ссылке](https://developers.eveonline.com/applications). Нажмите кнопку "Create New Application", введите название приложения, например "Q.Industrialist моей корпорации", введите примечание, выберите режим "Authentication & API Access", укажите Callback URL "https://localhost/callback/ ", последовательно добавьте следующие разрешения:
+
+```txt
+esi-location.read_location.v1
+esi-wallet.read_character_wallet.v1
+esi-universe.read_structures.v1
+esi-corporations.read_corporation_membership.v1
+esi-assets.read_assets.v1
+esi-fittings.read_fittings.v1
+esi-markets.structure_markets.v1
+esi-corporations.read_structures.v1
+esi-characters.read_blueprints.v1
+esi-contracts.read_character_contracts.v1
+esi-wallet.read_corporation_wallets.v1
+esi-corporations.read_divisions.v1
+esi-assets.read_corporation_assets.v1
+esi-corporations.read_blueprints.v1
+esi-contracts.read_corporation_contracts.v1
+esi-corporations.read_starbases.v1
+esi-industry.read_corporation_jobs.v1
+esi-markets.read_corporation_orders.v1
+esi-industry.read_corporation_mining.v1
+esi-planets.read_customs_offices.v1
+esi-corporations.read_facilities.v1
+```
+
+После ввода всех параметров нажмите кнопку "Create Application".
+
+Снова откройте карточку приложения, нажмите кнопку "View Applicaiton", вам будет показаны два параметра: "Client ID" и "Secret Key".
+
+```bash
+# настройте подключение к базе данных, для этого скопируйте файл с шаблонными
+# настройками и отредактируейте его
+cp ~/q_industrialist/q_industrialist_settings.py.template ~/q_industrialist/q_industrialist_settings.py
+# отредактируйте файл q_industrialist_settings.py
+# найдите в секции g_database поле password и замените его на ваш пароль
+# найдите параметр g_client_id и введите "Client ID" вашего ESI-приложения
+nano ~/q_industrialist/q_industrialist_settings.py
+
+# укажите производственные станции и структуры, также воспользовавшись шаблонными
+# настройками, отредактировав их:
+cp ~/q_industrialist/q_router_settings.py.template ~/q_industrialist/q_router_settings.py
+# отредактируйте файл q_router_settings.py
+# найдите в секции g_database поле password и замените его на ваш пароль
+nano ~/q_industrialist/q_router_settings.py
+```
+
+После создания базы данных потребуется скачать файлы с игровых серверов EVE Online и выполнить их конвертацию (конвертация и скачивание необходимых данных будет выполняться около часа, при необходимости запускайте следующие команды в screen-е):
+
+```bash
+# создаём директорию в которой во время работы будет сохраняться множество файлов
+# получаемых с серверов EVE Online
+mkdir -p $HOME/.q_industrialist
+
+cd ~/q_industrialist/static_data_interface
+
+# скачиваем файл с данными static data interface (SDE) с серверов EVE Online
+wget -O sde.zip https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip
+# если с доступом к файлу будут какие-то проблемы, то скачайте файл вручную отсюда:
+# https://developers.eveonline.com/resource/resources
+
+unzip sde.zip
+
+
+# следующая программа потребует не менее 1 Гб памяти на конвертацию файлов
+cd ~/q_industrialist
+.venv/bin/python eve_sde_tools.py --cache_dir=$HOME/.q_industrialist
+
+# файл и распакованную из него информацию можно удалить после обработки
+rm -f ~/q_industrialist/static_data_interface/sde.zip
+rm -rf ~/q_industrialist/static_data_interface/{bsd,fsd,universe}
+
+# следующая программа задаст несколько вопросов, рекомендуется ответить утвердительно
+cd ~/q_industrialist
+.venv/bin/python q_dictionaries.py --category=all --cache_dir=$HOME/.q_industrialist
+
+# Are you sure to cleanup type_ids in database?
+# Too much afterward overheads!!!
+# Please type 'yes': yes
+# Are you sure to cleanup conveyor_formulas in database?
+# Too much afterward overheads!!!
+# Please type 'yes' or 'append': yes
+
+# на следующем этапе от вас потребуется выполнить аутентификацию с использованием
+# браузера от имени персонажа у которого есть права на чтение корпоративных данных
+# если вы выполняете авторизацию персонажа другого человека, попросите у него
+# токен, который выдаст браузер в адресной строке (после перехода по указанной ссылке)
+cd ~/q_industrialist
+.venv/bin/python q_universe_preloader.py --category=all --pilot="Qandra Si" --online --cache_dir=$HOME/.q_industrialist
+
+# Open the following link in your browser:
+#
+# https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redire......e=unique-state
+#
+# Copy the "code" query parameter and enter it here: 0000000000000000000000
+# Copy your SSO application's secret key and enter it here: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+
+# Если вы всё введёте правильно, начнётся загрузка данных и первичное заполнение базы данных
+```
+    
+Внимание! когда разработчики игры EVE Online выпускают очередное обновление, добавляют в игру новые предметы или меняют настройки производства, следует повторять сценарий приведённый выше.
+
+Выполните настройку требуемых вам модулей (отдельно можно использовать модуль Cynonetwork, или Blueprints, или Router). Если вы решите не настраивать модуль, то отключите его также в файле `run-all-with-preload.sh` (см. инструкцию ниже).
+
+```bash
+cd ~/q_industrialist
+# вам следует выполнить настройку следующих модулей:
+ls -1 *_settings.py.template
+# модули, которые вы уже настроили:
+ls -1 *_settings.py
+
+# выполните копирование шаблонного файла, откройте копию и отредактируейте (например):
+cp q_capital_settings.py.template q_capital_settings.py
+nano q_capital_settings.py
+```
+
+После загрузки данных переходим к установке и настройке web-сервера. Если вы захотите настроить https на сервере, то воспользуйтесь [этой инструкцией](https://letsencrypt.org/ru/getting-started/).
+
+```bash
+sudo apt install nginx php8.3-fpm php-pgsql
+
+# создайте пароли для пользователей закрытой части сервера
+sudo sh -c "echo -n 'pilot1:' >> /etc/nginx/.htpasswd"
+sudo sh -c "openssl passwd -apr1 >> /etc/nginx/.htpasswd"
+sudo sh -c "echo -n 'pilot2:' >> /etc/nginx/.htpasswd"
+sudo sh -c "openssl passwd -apr1 >> /etc/nginx/.htpasswd"
+
+# настройте подключение к базе данных, для этого скопируйте файл с шаблонными
+# настройками и отредактируейте его
+cp ~/q_industrialist/php_interface/.settings.php.template ~/q_industrialist/php_interface/.settings.php
+# отредактируйте файл .settings.php
+# найдите поле DB_PASSWORD и замените его на ваш пароль
+nano ~/q_industrialist/php_interface/.settings.php
+
+# скопируйте необходимые файлы в корень сервера
+sudo mkdir -p /var/www/html
+sudo cp -rf ~/q_industrialist/offline_resources/favicon/* /var/www/html/
+sudo rm /var/www/html/README.md
+sudo chmod $USER:www-data -R /var/www/cat
+```
+
+Отредактируйте файл конфигурации `/etc/nginx/sites-enabled/default` сервера nginx.
+
+```conf
+server {
+  root /var/www/html;
+  index index.html index.htm;
+  server_name  <здесь-доменное-имя-вашего-сервера>;
+  location / {
+    try_files $uri $uri/ =404;
+  }
+  location /qbot {
+    alias /var/www/qindustrialist_bot;
+    index welcome.html;
+    try_files $uri $uri/ =404;
+  }
+  location ~ \.php$ {
+    # путь к директории, где расположены файлы Q.Industrialist
+    # например /home/user/q_industrialist
+    root /<директория программ Q.Industrialist>/php_interface;
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    auth_basic "Restricted Content";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    # increase request timeout
+    proxy_read_timeout 520;
+    proxy_connect_timeout 520;
+    proxy_send_timeout 520;
+  }
+  location ~ /\.ht {
+   deny all;
+  }
+  location ~ /\.env {
+   deny all;
+  }
+}
+```
+
+Отредактируйте файл с планом обновления информации с серверов EVE Online запустив команду `crontab -e` (замените путь `/home/user` на вашу домашнюю директорию):
+
+```txt
+# регулярная чистка кеша
+39,59 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_corporations_*_{assets,blueprints}.json >> /tmp/tmp.cron 2>&1
+59 3  * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
+59 13 * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
+# генерирование основных отчётов
+*/5 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile /home/user/run-ALL.sh >> /tmp/tmp.cron 2>&1
+# market prices, industry indicies, adjusted prices
+39 */2 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
+9 */3 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
+# capital trackers
+# 19,49 * * * * /usr/bin/flock -w 0 /tmp/qind-once.lockfile /home/user/run-capitals.sh >> /tmp/tmp-once.cron 2>&1
+```
+
+Содержимое файлов для планировщика приведено ниже:
+
+Файл `~/run-ALL.sh`
+```bash
+#!/bin/bash
+/home/user/run-database.sh
+/home/user/run-all-with-preload.sh
+```
+
+Файл `~/run-database.sh`
+```bash
+#!/bin/bash
+# можно указать нескольких директоров разных корпораций
+if /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_universe_preloader.py \
+     --category=corporation --category=industry_systems --category=market_prices --category=conveyor_formulas \
+     --pilot="Qandra Si" \
+     --online --cache_dir=/home/user/.q_industrialist
+then
+  /home/user/run-router.sh
+fi
+```
+
+Файл `~/run-router.sh`
+```bash
+#!/bin/bash
+function cmp_files {
+ local a=`if [ -f $1 ]; then md5sum $1 | cut -d' ' -f1 ; else echo "" ; fi`
+ local b=`if [ -f $2 ]; then md5sum $2 | cut -d' ' -f1 ; else echo "" ; fi`
+ if [ -n "$a" ] && [ -n "$b" ]; then
+  if [[ "$a" != "$b" ]]; then
+   echo 1 #"diff $a <> $b"
+  else
+   echo 0 #"same $a == $b"
+  fi
+ else
+  echo -1 #"no file"
+ fi
+}
+
+# можно указать названия нескольких корпораций
+if /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_router.py \
+    --corporation="R Industry" --corporation="R Strike" \
+    --offline --cache_dir=/home/user/.q_industrialist
+then
+  f0s="user/.q_industrialist/router.html"
+  f0d="/var/www/html/router.html"
+  echo "$f0d is outdated and will be replaced"
+  cp $f0s $f0d
+
+  f1s="user/q_industrialist/render_stylesheet_dark.css"
+  f1d="/var/www/html/render_stylesheet_dark.css"
+  f2s="user/q_industrialist/render_html_conveyor.js"
+  f2d="/var/www/html/render_html_conveyor.js"
+  f3s="/home/user/q_industrialist/render_html_conveyor.css"
+  f3d="/var/www/html/render_html_conveyor.css"
+  if [[ "`cmp_files $f1s $f1d`" != "0" ]]; then
+   cp $f1s $f1d
+  fi
+  if [[ "`cmp_files $f2s $f2d`" != "0" ]]; then
+   cp $f2s $f2d
+  fi
+  if [[ "`cmp_files $f3s $f3d`" != "0" ]]; then
+   cp $f3s $f3d
+  fi
+fi
+```
+
+Файл `~/run-all-with-preload.sh`
+```bash
+#!/bin/bash
+
+# можно указать нескольких директоров разных корпораций
+if /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_preloader.py \
+       --pilot="Kekuit Void" \
+       --online --cache_dir=/home/user/.q_industrialist
+then
+  #/home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_shareholders.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  #cp /home/user/.q_industrialist/shareholders_*.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_logist.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/cynonetwork.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_conveyor.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/conveyor.html /var/www/html
+  cp /home/user/.q_industrialist/conveyor{0,1,2,3,4,5,6,7,8,9}.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_accounting.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/accounting.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_blueprints.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+    cp /home/user/.q_industrialist/blueprints*.html /var/www/html
+  # используется esi_corporation_industry_jobs, т.ч. для успешной работы требуется запуск master-версии
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_workflow.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/workflow.html /var/www/html
+  cp /home/user/.q_industrialist/industry.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_regroup.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/regroup.html /var/www/html
+  # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned from using ESI. Please contact Technical Support. (support@eveonline.com)
+  # /home/user/q_industrialist/q_market_analyzer.py --pilot="Kekuit Void" --offline --cache_dir=/home/user/.q_industrialist
+  #cp /home/user/.q_industrialist/markets_analyzer*.html /var/www/html
+  /home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/render_html_index.py --cache_dir=/home/user/.q_industrialist
+  cp /home/user/.q_industrialist/index.html /var/www/html
+  # Upwell Palatine Keepstar (rewrite)
+  ## /home/user/q_industrialist/.venv/bin/python /home/user/q_upwell_palatine_keepstar/q_capital.py --pilot="Fritz Perlz" --pilot="olegez" --online --cache_dir=/home/user/q_upwell_palatine_keepstar/.q_industrialist
+  ## cp /home/user/q_upwell_palatine_keepstar/.q_industrialist/upwell_palatine_keepstar.html /var/www/html
+fi
+```
+
+Файл `~/run-public-rare.sh`
+```bash
+#!/bin/bash
+# можно указать нескольких директоров разных корпораций
+/home/user/q_industrialist/.venv/bin/python /home/user/q_industrialist/q_universe_preloader.py \
+    --category=public --category=rare --category=trade_hubs \
+    --pilot="Qandra Si" \
+    --online --cache_dir=/home/user/.q_industrialist-rare
+```
+
+Для корректной работы скриптов потребуется создать несколько дополнительных директорий:
+
+```bash
+mkdir -p ~/.q_industrialist-rare
+cd ~/.q_industrialist-rare
+ln -s ~/.q_industrialist/auth_cache auth_cache
+```
+
+После чего проверить работу всех программ (убедиться, что все настройки заданы, подключенный пилот имеет доступ к корпоративным данным, программы не запрашивают токены ESI-приложений и т.п.) то есть, что программы способны будут работать в фоновом режиме:
+
+```bash
+~/run-public-rare.sh
+~/run-database.sh
+~/run-all-with-preload.sh
+```
+
 Если для вас инструкция оказалось слишком сложной, или вы столкнулись с техническими сложностями, то вы можете запросить *Помощь зала*, обратившись за помощью в [Discord-канале z85.tv](https://discord.com/invite/QH7YZ75), упомянув что помощью нужна именно по Q.Industrialist.
 
 ## Установка и настройка среды разработчика (локальный запуск)
+
+**Внимание! следующая инструкция устарела.**
 
 В разделе [выше](https://github.com/Qandra-Si/q.industrialist#%D1%83%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0-%D0%B8-%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D0%BD%D0%B0-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B5) приведены инструкции по настройке и запуску Q.Industrialist в операционной системе Linux. В следующем разделе приведены инструкции по настройке Q.Industrialist в операционной системе Windows.
 
