@@ -286,23 +286,7 @@ server {
 }
 ```
 
-Отредактируйте файл с планом обновления информации с серверов EVE Online запустив команду `crontab -e` (замените путь `/home/user` на вашу домашнюю директорию):
-
-```txt
-# регулярная чистка кеша
-39,59 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_corporations_*_{assets,blueprints}.json >> /tmp/tmp.cron 2>&1
-59 3  * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
-59 13 * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
-# генерирование основных отчётов
-*/5 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile /home/user/run-ALL.sh >> /tmp/tmp.cron 2>&1
-# market prices, industry indicies, adjusted prices
-39 */2 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
-9 */3 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
-# capital trackers
-# 19,49 * * * * /usr/bin/flock -w 0 /tmp/qind-once.lockfile /home/user/run-capitals.sh >> /tmp/tmp-once.cron 2>&1
-```
-
-Содержимое файлов для планировщика приведено ниже:
+Подготовьте скрипты для планировщика с запуском модулей:
 
 Файл `~/run-ALL.sh`
 ```bash
@@ -430,6 +414,22 @@ ln -s ~/.q_industrialist/auth_cache auth_cache
 ~/run-public-rare.sh
 ~/run-database.sh
 ~/run-all-with-preload.sh
+```
+
+Отредактируйте файл с планом обновления информации с серверов EVE Online запустив команду `crontab -e` (замените путь `/home/user` на вашу домашнюю директорию):
+
+```txt
+# регулярная чистка кеша
+39,59 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_corporations_*_{assets,blueprints}.json >> /tmp/tmp.cron 2>&1
+59 3  * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
+59 13 * * * /usr/bin/flock -w 0 /tmp/qind.lockfile rm --verbose /home/user/.q_industrialist/esi_cache/.cache_*.json >> /tmp/tmp.cron 2>&1
+# генерирование основных отчётов
+*/5 * * * * /usr/bin/flock -w 0 /tmp/qind.lockfile /home/user/run-ALL.sh >> /tmp/tmp.cron 2>&1
+# market prices, industry indicies, adjusted prices
+39 */2 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
+9 */3 * * * /usr/bin/flock -w 0 /tmp/qind-rare.lockfile /home/user/run-public-rare.sh >> /tmp/tmp-rare.cron 2>&1
+# capital trackers
+# 19,49 * * * * /usr/bin/flock -w 0 /tmp/qind-once.lockfile /home/user/run-capitals.sh >> /tmp/tmp-once.cron 2>&1
 ```
 
 Если для вас инструкция оказалось слишком сложной, или вы столкнулись с техническими сложностями, то вы можете запросить *Помощь зала*, обратившись за помощью в [Discord-канале z85.tv](https://discord.com/invite/QH7YZ75), упомянув что помощью нужна именно по Q.Industrialist.
