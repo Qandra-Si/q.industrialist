@@ -145,7 +145,7 @@ class QIndustryFormula:
             total_job_cost: float = jc.usage_chain * jc.planned_blueprints * jc.planned_runs * single_run_job_cost
             """
             # ----------------------------------------------------------------------------------------------------------
-            total_job_cost: float = jc.usage_chain * jc.planned_blueprints * jc.planned_runs * \    
+            total_job_cost: float = jc.usage_chain * jc.planned_blueprints * jc.planned_runs * \
                 (  # single_run_job_cost
                     (   # total_job_gross_cost
                         # system_cost
