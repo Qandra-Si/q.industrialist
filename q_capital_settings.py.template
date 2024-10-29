@@ -35,10 +35,24 @@ g_report_options = [
 ]
 
 g_night_factory_rest_ships = [
-    'Bane',
-    'Karura',
-    'Hubris',
-    'Valravn',
+    #сделан:'Komodo',
+    #сделана:'Vendetta',
+    # новые корабли
+    #'Bane',
+    #'Karura',
+    #'Hubris',
+    #'Valravn',
+    # вроде не достроены ещё?
+    # дарк попросил удалить:'Caiman',
+    #сент.2023:'Chemosh',
+    #сент.2023:'Loggerhead',
+    #сент.2023:'Dagon',
+#    'Molok',  # (посик чертежа, последний титан)
+    #июл.2024:'Squall',
+    #июл.2024:'Avalanche',
+    #июл.2024:'Deluge',
+    #июл.2024:'Torrent',
+#    'Azariel',
 ]
 
 def init_night_factory_rest_ships(ships):

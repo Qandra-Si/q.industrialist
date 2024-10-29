@@ -2,8 +2,9 @@
 # содержит настройки анализа маркетов в регионах:
 
 g_regions = [
-    "The Forge",
-    "Metropolis",
+    # "The Forge",
+    # "Metropolis",
+    # НЕЛЬЗЯ СЮДА ДОБАВЛЯТЬ РЕГИОНЫ БЕЗ СОГЛАСОВАНИЯ С ССР, ИНАЧЕ БУДЕТ БАН: You have been banned from using ESI. Please contact Technical Support. (support@eveonline.com)
 ]
 
 
