@@ -22,7 +22,7 @@ DROP FUNCTION IF EXISTS qi.eve_ceiling_change_by_point(double precision, integer
 DROP FUNCTION IF EXISTS qi.nitrogen_isotopes_price();
 
 DROP INDEX IF EXISTS qi.idx_cfc_formula_best_choice;
-DROP INDEX IF EXISTS qi.idx_cfc_formula; -- удалён
+--DROP INDEX IF EXISTS qi.idx_cfc_formula; -- удалён
 DROP INDEX IF EXISTS qi.idx_cfc_market_route;
 DROP INDEX IF EXISTS qi.idx_cfc_market_hub;
 DROP INDEX IF EXISTS qi.idx_cfc_pk;
@@ -50,7 +50,7 @@ DROP TYPE  IF EXISTS qi.esi_formulas_relics;
 
 --- conveyor_limits
 
-DROP INDEX IF EXISTS qi.idx_cl_trade_hub;
+DROP INDEX IF EXISTS qi.idx_cl_trade_hub_corp;
 DROP INDEX IF EXISTS qi.idx_cl_trader_corp;
 DROP INDEX IF EXISTS qi.idx_cl_pk;
 DROP TABLE IF EXISTS qi.conveyor_limits;
@@ -417,14 +417,14 @@ CREATE OR REPLACE FUNCTION qi.nitrogen_isotopes_price()
 AS $function$
    select coalesce(
            x.buy,
-           (select emp_average_price as average_price from esi_markets_prices universe where emp_type_id = 17888),
+           (select emp_average_price as average_price from qi.esi_markets_prices universe where emp_type_id = 17888),
            x.sell,
            545.40) -- hardcoded price (august 2024)
    from (
     select
      qi.eve_ceiling_change_by_point(ethp_buy,1) * 1.0132 as buy, -- TODO: Jita 1.32 fee
      ethp_sell as sell
-    from esi_trade_hub_prices
+    from qi.esi_trade_hub_prices
     where ethp_location_id = 60003760 and ethp_type_id = 17888 -- Nitrogen Isotopes
    ) x
   $function$
@@ -496,14 +496,14 @@ create or replace view qi.conveyor_formulas_purchase_materials as
     qi.eve_ceiling_change_by_point(jita.buy,1) as jita_buy,
     universe.emp_average_price as average_price
    from
-    conveyor_formulas f,
-    conveyor_formula_purchase p
+    qi.conveyor_formulas f,
+    qi.conveyor_formula_purchase p
      left outer join (
       select ethp_type_id, ethp_sell as sell, ethp_buy as buy
-      from esi_trade_hub_prices
+      from qi.esi_trade_hub_prices
       where ethp_location_id = 60003760
      ) jita on (p.cfp_material_type_id = jita.ethp_type_id)
-     left outer join esi_markets_prices universe on (p.cfp_material_type_id = universe.emp_type_id)
+     left outer join qi.esi_markets_prices universe on (p.cfp_material_type_id = universe.emp_type_id)
    where f.cf_formula=p.cfp_formula
   ) x
   group by x.formula;
@@ -561,14 +561,14 @@ create or replace view qi.conveyor_formulas_jobs_costs as
       cfj_scc_surcharge,
       cfj_facility_tax
      from
-      conveyor_formula_jobs j
+      qi.conveyor_formula_jobs j
        left outer join (
         select sdebm_blueprint_type_id, sdebm_activity, sum(sdebm_quantity * emp_adjusted_price) as eiv
-        from eve_sde_blueprint_materials, esi_markets_prices
+        from qi.eve_sde_blueprint_materials, qi.esi_markets_prices
         where sdebm_material_id=emp_type_id
         group by 1, 2
        ) as m on (m.sdebm_blueprint_type_id=j.cfj_blueprint_type_id and m.sdebm_activity=j.cfj_activity_eiv),
-      esi_industry_cost_indices ci
+      qi.esi_industry_cost_indices ci
      where ci.system_id=j.cfj_solar_system_id and ci.activity=j.cfj_activity_code
     ) x
    ) w
@@ -666,7 +666,7 @@ create or replace view qi.conveyor_formulas_products_prices as
     universe.emp_average_price average_price
    from
     (select distinct f.cf_product_type_id as type_id, r.trade_hub
-     from conveyor_formulas f, qi.conveyor_formulas_market_routes r
+     from qi.conveyor_formulas f, qi.conveyor_formulas_market_routes r
      --where f.cf_product_type_id=40560
     ) x
      -- цены на продукт производства в торговом хабе прямо сейчас
@@ -681,7 +681,7 @@ create or replace view qi.conveyor_formulas_products_prices as
        where ethp_location_id=60003760
      ) jita on (jita.type_id=x.type_id)
      -- усреднённые цены на продукт производства во вселенной
-     left outer join esi_markets_prices universe on (emp_type_id=x.type_id)
+     left outer join qi.esi_markets_prices universe on (emp_type_id=x.type_id)
    ) prices;
 
 
