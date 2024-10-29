@@ -52,6 +52,8 @@ def __get_icon_src(icon_id, sde_icon_ids):
         nm = sde_icon_ids[str(icon_id)]["iconFile"]
         if q_industrialist_settings.g_use_filesystem_resources:
             return 'image_export_collection/{}'.format(nm)
+        elif nm[:6] == "Icons/":  # Icons/items/28_128_1.png -> https://iec.jita.space/items/28_128_1.png
+            return 'https://iec.jita.space/{}'.format(nm[6:])
         else:  # https://everef.net/img/Icons/items/9_64_5.png
             return 'https://everef.net/img/{}'.format(nm)
     else:

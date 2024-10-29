@@ -9,7 +9,7 @@ def __dump_industry_jobs_details(
         __jobs):
     render_html.__dump_any_into_modal_header(
         glf,
-        '<span class="text-primary">{nm}</span> Contracts'.format(nm=corporation_name),
+        '<span class="text-primary">{nm}</span> Industrial Jobs'.format(nm=corporation_name),
         unique_id='{nm}_industry'.format(nm=corporation_id),
         btn_size="btn-xs",
         btn_nm="details&hellip;")
