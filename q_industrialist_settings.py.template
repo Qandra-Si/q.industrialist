@@ -2,6 +2,7 @@
 # g_client_scope : application scopes, едины для всех приложений проекта
 
 g_use_filesystem_resources = False
+g_client_id = "00000000000000000000000000000000"
 g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
@@ -55,7 +56,7 @@ g_market_structures: typing.List[typing.Dict[str, typing.Union[int, str]]] = [
     # {'error': 'Market access denied'}
     # так что добавлять структуры в этот список следует крайне осторожно, пожно схлопотать бан
 
-    { "structure_id": 1034323745897,  # P-ZMZV - SUSLIK Q STAR (Keepstar)
-      "corporation_name": "R Initiative 4",  # название корпорации, от имени которой считывать market-данные (д.б. доступ)
-    },
+    # { "structure_id": 1034323745897,  # P-ZMZV - SUSLIK Q STAR (Keepstar)
+    #   "corporation_name": "R Initiative 4",  # название корпорации, от имени которой считывать market-данные (д.б. доступ)
+    # },
 ]

@@ -21,7 +21,13 @@ from .error import EveOnlineClientError
 
 
 class EveESIClient:
-    def __init__(self, auth_cache, keep_alive: bool, debug: bool = False, logger: bool = True, user_agent=None):
+    def __init__(self,
+                 auth_cache,
+                 client_id: str,
+                 keep_alive: bool,
+                 debug: bool = False,
+                 logger: bool = True,
+                 user_agent=None):
         """ constructor
 
         :param EveESIAuth auth_cache: authz tokens storage
@@ -41,10 +47,6 @@ class EveESIClient:
         if not isinstance(auth_cache, EveESIAuth):
             raise EveOnlineClientError("You should use EveESIAuth to configure client")
         self.__auth_cache = auth_cache
-
-        # используется, если не пользователь не будет указаывать свой собственный идентификатор
-        # Application: R Initiative 4 Q.Industrialist
-        self.__default_ri4_client_id: str = "022ea197e3f2414f913b789e016990c8"
 
         # для корректной работы с ESI Swagger Interface следует указать User-Agent в заголовках запросов
         self.__user_agent = user_agent
@@ -414,8 +416,6 @@ class EveESIClient:
         if not client_id:
             client_id = input("Copy your SSO application's client ID and enter it "
                               "here [press 'Enter' for default Q.Industrialist app]: ")
-            if not client_id:
-                client_id = self.__default_ri4_client_id
 
         # Because this is a desktop/mobile application, you should use
         # the PKCE protocol when contacting the EVE SSO. In this case, that

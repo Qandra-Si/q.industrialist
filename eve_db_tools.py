@@ -15,6 +15,7 @@ import eve_esi_interface as esi
 import postgresql_interface as db
 
 from __init__ import __version__
+import q_industrialist_settings
 
 
 def is_dicts_equal_by_keys(dict1, dict2, keys):
@@ -210,6 +211,7 @@ class QDatabaseTools:
             debug=True)
         client = esi.EveESIClient(
             auth,
+            q_industrialist_settings.g_client_id,
             keep_alive=True,
             debug=False,
             logger=True,
