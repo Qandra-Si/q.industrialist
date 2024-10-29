@@ -1,3 +1,4 @@
+typing
 python-jose
 requests
 PyYAML
