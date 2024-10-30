@@ -19,8 +19,6 @@ Q.Industrialist версии v1.1-Imine является набором утил
 
 В выпуске "Ночной цех №57" в январе 2023 года анонсируются новые возможности программного обеспечения Q.Industrialist, интеграция расчётов рентабельности в производстенные процессы.
 
-Возможности актуальной версии программного обеспечения публикуются в виде обучающих видео-роликов в канале на [Rutube](https://rutube.ru/plst/661088/) и [Youtube](https://www.youtube.com/watch?v=LEEtZPG-xsE&list=PLKoH6-WjvAiyRt-NRIjMsT9mZhS8fI-Ol&index=3).
-
 Плейлисты, в которых публикуются обучающие видеоролики по функционалу Q.Industrialist можно посмотреть на [Rutube](https://rutube.ru/plst/661088/) и [YouTube](https://www.youtube.com/watch?v=LEEtZPG-xsE&list=PLKoH6-WjvAiyRt-NRIjMsT9mZhS8fI-Ol&index=3).
 
 ### Требования
