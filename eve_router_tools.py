@@ -17,6 +17,36 @@ def coalesce(*arg):
   return None
 
 
+# Списки output задают те предметы, которые крафтятся на тех или иных станциях/структурах:
+#  * output_market_groups - список номеров market_group_id (предполагается обработка всех вложенных подгрупп)
+#  * output_groups - список номеров group_id групп
+#  * output_categories - список номеров category_id категорий
+#  * output_types - индивидуальный список type_id предметов, которые добавляются к спискам output
+#  * except_output_types - индивидуальный список type_id предметов, которые удаляются из списка output
+# перекомпоновка output_types, output_market_groups, output_groups и except_output_types в set(output)
+def combine_router_outputs(routes, sde_groups, sde_type_ids, sde_market_groups):
+    for r in routes:
+        r['output'] = r.get('output_types', [])
+        if r.get('output_groups'):
+            gg: typing.Set[int] = set(r['output_groups'])
+            r['output'].extend([int(_[0]) for _ in sde_type_ids.items() if _[1].get('groupID', -1) in gg])
+        if r.get('output_categories'):
+            cc: typing.Set[int] = set(r['output_categories'])
+            gg: typing.Set[int] = set([int(_[0]) for _ in sde_groups.items() if _[1].get('categoryID', -1) in cc])
+            r['output'].extend([int(_[0]) for _ in sde_type_ids.items() if _[1].get('groupID', -1) in gg])
+        if r.get('output_market_groups'):
+            mg: typing.Set[int] = set(r['output_market_groups'])
+            while True:
+                mgg: typing.Set[int] = set([int(_[0]) for _ in sde_market_groups.items() if _[1].get('parentGroupID', -1) in mg])
+                if not mgg - mg: break
+                mg |= mgg
+            r['output'].extend([int(_[0]) for _ in sde_type_ids.items() if _[1].get('marketGroupID', -1) in mg])
+        if r.get('except_output_types'):
+            r['output'] = set(r['output']) - set(r['except_output_types'])
+        else:
+            r['output'] = set(r['output'])
+
+
 class RouterSettings:
     def __init__(self):
         # параметры работы конвейера

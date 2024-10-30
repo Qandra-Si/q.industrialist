@@ -36,6 +36,7 @@ import q_industrialist_settings
 import q_router_settings
 import console_app
 import eve_sde_tools
+import eve_router_tools
 import profit
 import eve_esi_interface as esi
 import eve_industry_profit
@@ -135,6 +136,7 @@ def main():
     argv_prms = console_app.get_argv_prms()
 
     sde_type_ids = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "typeIDs")
+    sde_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "groupIDs")
     sde_market_groups = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "marketGroups")
     sde_bp_materials = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "blueprints")
     sde_inv_names = eve_sde_tools.read_converted(argv_prms["workspace_cache_files_dir"], "invNames")
@@ -226,6 +228,10 @@ def main():
         print(sys.exc_info())
         raise
 
+    eve_router_tools.combine_router_outputs(
+        q_router_settings.g_routes,
+        sde_groups, sde_type_ids, sde_market_groups)
+
     # индексы стоимости производства для различных систем (системы и продукция заданы в настройках роутинга)
     industry_cost_indices: typing.List[profit.QIndustryCostIndices] = []
     for r in q_router_settings.g_routes:
@@ -246,7 +252,7 @@ def main():
             solar_system,
             cost_indices,
             r['station'],
-            set(r['output']),
+            r['output'],
             factory_bonuses)
         industry_cost_indices.append(iic)
 
