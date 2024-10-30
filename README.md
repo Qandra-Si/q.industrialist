@@ -21,6 +21,8 @@ Q.Industrialist версии v1.1-Imine является набором утил
 
 Возможности актуальной версии программного обеспечения публикуются в виде обучающих видео-роликов в канале на [Rutube](https://rutube.ru/plst/661088/) и [Youtube](https://www.youtube.com/watch?v=LEEtZPG-xsE&list=PLKoH6-WjvAiyRt-NRIjMsT9mZhS8fI-Ol&index=3).
 
+Плейлисты, в которых публикуются обучающие видеоролики по функционалу Q.Industrialist можно посмотреть на [Rutube](https://rutube.ru/plst/661088/) и [YouTube](https://www.youtube.com/watch?v=LEEtZPG-xsE&list=PLKoH6-WjvAiyRt-NRIjMsT9mZhS8fI-Ol&index=3).
+
 ### Требования
 Для получения данных по корпорации, с которыми работают утилиты Q.Industrialist в большинстве случаев [требуется](https://esi.evetech.net/ui/#/Assets/get_corporations_corporation_id_assets) директорская роль. **Внимание, требуется именно Director role, а не должность Директора!** Программы анализируют информацию об имуществе корпорации, т.н. assets/ассеты, анализируют корпоративные ордера и запущенные работы корпоративного производства, состояние подразделений кошелька. В том числе, для работы отдельных утилит Q.Industrialist потребуются и другие роли, общий список требуемых ролей:
 * Director - для доступа к имуществу корпорации, спискам чертежей 
