@@ -2,7 +2,9 @@
 # g_client_scope : application scopes, едины для всех приложений проекта
 
 g_use_filesystem_resources = False
+
 g_client_id = "00000000000000000000000000000000"
+
 g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
@@ -19,6 +21,7 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-markets.structure_markets.v1",  # Requires one of the following EVE corporation role(s): Accountant, Trader
                   "esi-corporations.read_corporation_membership.v1",  # Requires: access token
                  ]
+
 g_database = {
     #"ssh_tunnel": {
     #    "host": "server.ru",
@@ -35,6 +38,46 @@ g_database = {
     "user":     "qi_user",
     "password": "qi_LAZ7dBLmSJb9"  # <-- this is the value you probably need to edit
 }
+
+
+# см. также eve_conveyor_tools.py : setup_blueprint_details
+# см. также q_industry_profit.py : main
+# см. также q_dictionaries.py : main
+g_industry_calc_customization = {
+    # длительность всех реакций - около 1 суток
+    'reaction_runs': 15,
+    # длительность производства компонентов общего потребления (таких как Advanced Components или Fuel Blocks)
+    # тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме, в котором необходимо
+    'industry_time': 5 * 60 * 60 * 24,  # типично для R Industry
+    # 'industry_time': (5 * 60 * 60 * 24) // 8,  # производство по 2400 Fuel Blocks (60 runs)
+    'common_components': [  # market-группы компонентов общего потребления
+        1870,  # Fuel Blocks
+        65,    # Advanced Components
+        1883,  # Advanced Capital Components
+        2768,  # Protective Components
+        1908,  # R.A.M.
+        1147,  # Subsystem Components
+    ],
+    # === min_probability ===
+    # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
+    #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
+    # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
+    # * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
+    # рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
+    # Invention_Chance =
+    #  Base_Chance *
+    #  (1 + ((Encryption_Skill_Level / 40) +
+    #        ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
+    #       )
+    #  ) * Decryptor_Modifier
+    # 'min_probability': 36.7,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 4)
+    'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
+    # экономия материалов (material efficiency) промежуточных чертежей
+    'unknown_blueprints_me': 10,
+    # экономия времени (time efficiency) промежуточных чертежей
+    'unknown_blueprints_te': 20,
+}
+
 g_market_regions = {
     "The Forge",
 }

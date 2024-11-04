@@ -265,22 +265,23 @@ def main():
             # см. также eve_conveyor_tools.py : setup_blueprint_details
             # см. также q_industry_profit.py : main
             # см. также q_dictionaries.py : main
+            icc = q_industrialist_settings.g_industry_calc_customization
             industry_plan_customization = profit.QIndustryPlanCustomization(
                 # длительность всех реакций - около 1 суток
-                reaction_runs=15,
+                reaction_runs=icc.get('reaction_runs', 15),
                 # длительность производства компонентов общего потребления (таких как Advanced Components или
                 # Fuel Blocks) тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме,
                 # в котором необходимо
-                industry_time=5 * 60 * 60 * 24,
+                industry_time=icc.get('industry_time', 5*60*60*24),
                 # market-группы компонентов общего потребления
-                common_components=[
+                common_components=icc.get('common_components', [
                     1870,  # Fuel Blocks
                     65,    # Advanced Components
                     1883,  # Advanced Capital Components
                     2768,  # Protective Components
                     1908,  # R.A.M.
                     1147,  # Subsystem Components
-                ],
+                ]),
                 # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
                 #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
                 # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
@@ -293,11 +294,11 @@ def main():
                 #       )
                 #  ) * Decryptor_Modifier
                 # 27.5% => min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
-                min_probability=27.5,
+                min_probability=icc.get('min_probability', 27.5),
                 # экономия материалов (material efficiency) промежуточных чертежей
-                unknown_blueprints_me=10,
+                unknown_blueprints_me=icc.get('unknown_blueprints_me', 10),
                 # экономия времени (time efficiency) промежуточных чертежей
-                unknown_blueprints_te=20)
+                unknown_blueprints_te=icc.get('unknown_blueprints_te', 20))
 
             # автоматический выбор чертежей для их расчёта и загрузки в БД
             possible_decryptors: typing.List[profit.QPossibleDecryptor] = profit.get_list_of_decryptors()
@@ -419,6 +420,59 @@ def main():
                                             pass
                                         else:
                                             assert 0
+
+            # в том случае, если invent невозможен, то проверяем что чертёж (1) не продаётся в маркете,
+            # (2) опубликован, (3) не является продуктом инвента, его (4) продукция опубликована
+            for key in sde_blueprints.keys():
+                # ограничитель: if len(calc_inputs) >= 10: break
+                tid = sde_type_ids.get(key)
+                if not tid: continue
+                if not tid.get('published', False): continue  # Clone Grade Beta Blueprint
+                if tid.get('marketGroupID') is not None: continue
+                blueprint = sde_blueprints[key]
+                if 'invention' in blueprint['activities']: continue
+                blueprint_type_id: int = int(key)
+                if sde_products['invention'].get(blueprint_type_id) is not None: continue
+                # проверка, возможно ли производство по этому чертежу?
+                if 'manufacturing' in blueprint['activities']:
+                    if 'materials' not in blueprint['activities']['manufacturing']: continue  # Apotheosis Blueprint
+                    assert len(blueprint['activities']['manufacturing']['products']) == 1
+                    product_type_id = blueprint['activities']['manufacturing']['products'][0]['typeID']
+                    product_tid = sde_type_ids.get(str(product_type_id))
+                    if product_tid.get('published', False):  # тут м.б. Haunter Cruise Missile
+                        """
+                        -- поиск фракционных чертежей, которые продаются только в контрактах
+                        select
+                         bid.sdet_type_name, -- x.*,
+                         pid.sdet_type_name, -- p.*,
+                         bid.sdet_meta_group_id,
+                         (SELECT sden_name FROM qi.eve_sde_names WHERE sden_category=0 and sden_id=bid.sdet_meta_group_id)
+                        from
+                         qi.eve_sde_blueprints x,
+                         qi.eve_sde_blueprint_products p,
+                         qi.eve_sde_type_ids bid,
+                         qi.eve_sde_type_ids pid
+                        where 
+                         bid.sdet_market_group_id is null and
+                         x.sdeb_blueprint_type_id=bid.sdet_type_id and
+                         bid.sdet_published and
+                         x.sdeb_activity=1 and
+                         x.sdeb_blueprint_type_id not in (select sdeb_blueprint_type_id from qi.eve_sde_blueprints where sdeb_activity=8) and
+                         x.sdeb_blueprint_type_id not in (select sdebp_product_id from qi.eve_sde_blueprint_products where sdebp_activity=8) and
+                         x.sdeb_blueprint_type_id in (select distinct sdebm_blueprint_type_id from qi.eve_sde_blueprint_materials) and
+                         p.sdebp_blueprint_type_id=x.sdeb_blueprint_type_id and
+                         p.sdebp_activity=1 and
+                         p.sdebp_product_id=pid.sdet_type_id and
+                         pid.sdet_published
+                        order by pid.sdet_type_name
+                        """
+                        if not next((1 for _ in calc_inputs if _['bptid'] == blueprint_type_id), None):
+                            # print(tid['name']['en'])
+                            calc_inputs.append({
+                                'bptid': blueprint_type_id,
+                                'qr': 1,
+                                'me': 0,
+                                'te': 0})
 
             if user_choice == 'yes':
                 qidbdics.clean_conveyor_formulas()

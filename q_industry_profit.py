@@ -332,54 +332,18 @@ def main():
             {'bptid': 39583, 'qr': 3, 'me': 2+1, 'te': 4+8},  # Endurance + Symmetry Decryptor
         ]
 
-    # см. также eve_conveyor_tools.py : setup_blueprint_details
-    # см. также q_industry_profit.py : main
-    # см. также q_dictionaries.py : main
-    calc_customization = {
-        # длительность всех реакций - около 1 суток
-        'reaction_runs': 15,
-        # длительность производства компонентов общего потребления (таких как Advanced Components или Fuel Blocks)
-        # тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме, в котором необходимо
-        # 'industry_time': 5 * 60 * 60 * 24,  # типично для R Industry
-        'industry_time': (5 * 60 * 60 * 24) // 8,  # производство по 2400 Fuel Blocks (60 runs)
-        'common_components': [  # market-группы компонентов общего потребления
-            1870,  # Fuel Blocks
-            65,  # Advanced Components
-            1883,  # Advanced Capital Components
-            2768,  # Protective Components
-            1908,  # R.A.M.
-            1147,  # Subsystem Components
-        ],
-        # === min_probability ===
-        # * 18% jump freighters; 22% battleships; 26% cruisers, BCs, industrial, mining barges;
-        #   30% frigate hull, destroyer hull; 34% modules, ammo, drones, rigs
-        # * Tech 3 cruiser hulls and subsystems have 22%, 30% or 34% chance depending on artifact used
-        # * Tech 3 destroyer hulls have 26%, 35% or 39% chance depending on artifact used
-        # рекомендации к минимальным скилам: 3+3+3 (27..30% навыки и импланты)
-        # Invention_Chance =
-        #  Base_Chance *
-        #  (1 + ((Encryption_Skill_Level / 40) +
-        #        ((Datacore_1_Skill_Level + Datacore_2_Skill_Level) / 30)
-        #       )
-        #  ) * Decryptor_Modifier
-        'min_probability': 27.5,  # min навыки и импланты пилотов запускающих инвенты (вся научка мин в 3)
-        # экономия материалов (material efficiency) промежуточных чертежей
-        'unknown_blueprints_me': 10,
-        # экономия времени (time efficiency) промежуточных чертежей
-        'unknown_blueprints_te': 20,
-    }
-
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
     # см. также eve_conveyor_tools.py : setup_blueprint_details
     industry_plan_customization: typing.Optional[profit.QIndustryPlanCustomization] = None
-    if calc_customization:
+    if q_industrialist_settings.g_industry_calc_customization:
+        icc = q_industrialist_settings.g_industry_calc_customization
         industry_plan_customization = profit.QIndustryPlanCustomization(
-            reaction_runs=calc_customization.get('reaction_runs'),
-            industry_time=calc_customization.get('industry_time'),
-            common_components=calc_customization.get('common_components'),
-            min_probability=calc_customization.get('min_probability'),
-            unknown_blueprints_me=calc_customization.get('unknown_blueprints_me'),
-            unknown_blueprints_te=calc_customization.get('unknown_blueprints_te'))
+            reaction_runs=icc.get('reaction_runs'),
+            industry_time=icc.get('industry_time'),
+            common_components=icc.get('common_components'),
+            min_probability=icc.get('min_probability'),
+            unknown_blueprints_me=icc.get('unknown_blueprints_me'),
+            unknown_blueprints_te=icc.get('unknown_blueprints_te'))
 
     calc_num: int = 0
     for calc_input in calc_inputs:
