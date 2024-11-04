@@ -94,17 +94,6 @@ def main():
     qidb.disconnect()
     del qidb
 
-    unique_manuf_lines: typing.Set[int] = set()
-    for r in q_router_settings.g_routes:
-        for p in r['output']:
-            if p in unique_manuf_lines:
-                raise Exception(f"Unable to add manuf product twice: product #{p}")
-            unique_manuf_lines.add(p)
-            product: typing.Optional[db.QSwaggerTypeId] = qid.get_type_id(p)
-            if not product:
-                raise Exception(f"Unable to add unknown product: product #{p}")
-    del unique_manuf_lines
-
     # следуем по загруженным данным и собираем входные данные (настройки) маршрутизации продуктов производства
     settings_of_router: typing.List[tools.RouterSettings] = []
     for r in q_router_settings.g_routes:
@@ -112,8 +101,23 @@ def main():
         settings: tools.RouterSettings = tools.RouterSettings()
         settings.station = r['station']
         settings.desc = r['desc']
-        settings.output = r['output']
+        settings.cached_output = qid.get_type_ids_by_params(
+            r.get('output_types', []),
+            r.get('output_groups', []),
+            r.get('output_categories', []),
+            r.get('output_market_groups', []),
+            r.get('except_output_types', []))
+        settings.output = list(settings.cached_output.keys())
         settings_of_router.append(settings)
+
+    # проверка конфликтных ситуаций (никакой продукт не может быть упомянут дважды на разных станциях)
+    unique_manuf_lines: typing.Set[int] = set()
+    for settings in settings_of_router:
+        for p in settings.output:
+            if p in unique_manuf_lines:
+                raise Exception(f"Unable to add manuf product twice: product #{p} to {settings.station}")
+            unique_manuf_lines.add(p)
+    del unique_manuf_lines
 
     # следуем по загруженным данным и собираем входные данные (настройки) запуска алгоритма конвейера
     settings_of_conveyors: typing.List[tools.ConveyorSettings] = []

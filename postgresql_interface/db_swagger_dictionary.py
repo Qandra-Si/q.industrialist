@@ -120,6 +120,45 @@ class QSwaggerDictionary:
             only_published=False)
         return self.sde_type_ids
 
+    def get_type_ids_by_params(
+            self,
+            type_ids: typing.Optional[typing.List[int]] = None,
+            groups: typing.Optional[typing.List[int]] = None,
+            categories: typing.Optional[typing.List[int]] = None,
+            market_groups: typing.Optional[typing.List[int]] = None,
+            except_type_ids: typing.Optional[typing.List[int]] = None) -> typing.Dict[int, QSwaggerTypeId]:
+        output: typing.Dict[int, QSwaggerTypeId] = {}
+        # см. аналогичную реализацию в eve_router_tools.combine_router_outputs
+        if type_ids:
+            for tid in type_ids:
+                cached: typing.Optional[QSwaggerTypeId] = self.get_type_id(tid)
+                if cached:
+                    output[cached.type_id] = cached
+        gg: typing.Set[int] = set()
+        mg: typing.Set[int] = set()
+        if groups:
+            gg = set(groups)
+        if categories:
+            cc: typing.Set[int] = set(categories)
+            gg |= set([_id for _id, _ in self.sde_groups.items() if _.category_id in cc])
+        if market_groups:
+            mg = set(market_groups)
+            while True:
+                mgg: typing.Set[int] = set([_id for _id, _ in self.sde_market_groups.items() if _.parent_id in mg])
+                if not mgg - mg: break
+                mg |= mgg
+        if gg or mg:
+            for cached in self.sde_type_ids.values():
+                if cached.group_id in gg:
+                    output[cached.type_id] = cached
+                elif cached.market_group_id in mg:
+                    output[cached.type_id] = cached
+        if except_type_ids:
+            for _id in except_type_ids:
+                if _id in output:
+                    del output[_id]
+        return output
+
     def get_blueprint(self, blueprint_type_id: int) -> typing.Optional[QSwaggerBlueprint]:
         cached_blueprint: QSwaggerBlueprint = self.sde_blueprints.get(blueprint_type_id)
         return cached_blueprint
