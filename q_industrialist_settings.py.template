@@ -45,10 +45,12 @@ g_database = {
 # см. также q_dictionaries.py : main
 g_industry_calc_customization = {
     # длительность всех реакций - около 1 суток
-    'reaction_runs': 15,
+    'reaction_runs': 15,  # типично для R Industry (сутки)
+    # 'reaction_runs': 7 * 15,  # неделя
     # длительность производства компонентов общего потребления (таких как Advanced Components или Fuel Blocks)
     # тоже принимается около 1 суток, остальные материалы рассчитываются в том объёме, в котором необходимо
-    'industry_time': 5 * 60 * 60 * 24,  # типично для R Industry
+    'industry_time': 5 * 60 * 60 * 24,  # типично для R Industry (сутки)
+    # 'industry_time': 7 * 5 * 60 * 60 * 24,  # неделя
     # 'industry_time': (5 * 60 * 60 * 24) // 8,  # производство по 2400 Fuel Blocks (60 runs)
     'common_components': [  # market-группы компонентов общего потребления
         1870,  # Fuel Blocks
