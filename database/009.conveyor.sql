@@ -820,8 +820,8 @@ AS $procedure$
        sales_brokers_fee,
        sales_tax,
        fuel_price_isk,
-       materials_cost,
-       materials_cost_with_fee,
+       coalesce(materials_cost,0) materials_cost,
+       coalesce(materials_cost_with_fee,0) materials_cost_with_fee,
        purchase_volume,
        materials_transfer_cost,
        jobs_cost,
@@ -830,13 +830,14 @@ AS $procedure$
        products_recommended_price,
        products_sell_fee_and_tax,
        single_product_price_wo_fee_tax,
-       total_gross_cost,
-       single_product_cost,
-       product_mininum_price,
+       coalesce(total_gross_cost,0) total_gross_cost,
+       coalesce(single_product_cost,0) single_product_cost,
+       coalesce(product_mininum_price,0) product_mininum_price,
        single_product_profit,
        CURRENT_TIMESTAMP AT TIME ZONE 'GMT',
        CURRENT_TIMESTAMP AT TIME ZONE 'GMT'
       FROM qi.conveyor_formulas_industry_costs
+      --WHERE materials_cost <= 0.01 or materials_cost is null
       --WHERE formula=1782
   ON CONFLICT ON CONSTRAINT pk_cfc DO UPDATE SET
    --pk:cfc_formula = excluded.cfc_formula,
