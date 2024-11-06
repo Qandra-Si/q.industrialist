@@ -55,7 +55,8 @@ def main():
             pilot_name,
             argv_prms["offline_mode"],
             argv_prms["workspace_cache_files_dir"],
-            "903a77e405e34ae5996c008282187d7c",  # токен приложения Q.Individualist
+            q_individualist_settings.g_client_id,  # токен приложения Q.Individualist
+            q_individualist_settings.g_client_restrict_tls13
         )
         character_id = authz["character_id"]
         character_name = authz["character_name"]

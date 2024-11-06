@@ -2,12 +2,22 @@
 # g_client_scope : application scopes, едины для всех приложений проекта
 
 g_use_filesystem_resources = False
+
+g_client_id = "00000000000000000000000000000000"
 g_client_scope = ["esi-wallet.read_character_wallet.v1",  # Requires: access token
                   "esi-planets.manage_planets.v1",  # Requires: access token
                   "esi-assets.read_assets.v1",  # Requires: access token
                   "esi-characters.read_blueprints.v1",  # Requires: access token
                   "esi-industry.read_character_jobs.v1",  # Requires: access token
                   ]
+# TLS1.3 with SNI denied in Russia by RKN since 06.11.2024
+# для того, чтобы проверить, нужно ли выставить следующий параметр в True, следует выполнить команду:
+# curl -X GET "https://esi.evetech.net/latest/status/?datasource=tranquility" -H  "accept: application/json" -H  "Cache-Control: no-cache"
+# если придёт ошибка: {"error":"unroutable"}, то выставить в True
+# также можно проврерить различие и удостовериться:
+# curl --tlsv1.2 --tls-max 1.2 -X GET "https://esi.evetech.net/latest/status/?datasource=tranquility" -H  "accept: application/json" -H  "Cache-Control: no-cache"
+g_client_restrict_tls13: bool = False
+
 g_database = {
     "host":     "127.0.0.1",
     "dbname":   "qi_db",

@@ -1,4 +1,5 @@
 ﻿# -*- encoding: utf-8 -*-
+import typing
 import json
 import os.path
 from pathlib import Path
@@ -11,14 +12,14 @@ from .eve_esi_client import EveESIClient
 
 
 class EveOnlineInterface:
-    def __init__(self, client, scopes, cache_dir, offline_mode=False):
+    def __init__(self, client, scopes, cache_dir, offline_mode: bool = False):
         """ constructor
 
         :param EveOnlineConfig config: configuration of Eve Online Client
         """
         self.__server_url = "https://esi.evetech.net/latest/"
         self.__scopes = scopes
-        self.__offline_mode = offline_mode
+        self.__offline_mode: bool = offline_mode
 
         self.__cache_dir = cache_dir  # {tmp_dir}/.esi_cache/
         self.setup_cache_dir(cache_dir)
@@ -439,10 +440,11 @@ class EveOnlineInterface:
                 raise
         return piece_data
 
-    def authenticate(self, character_name=None, client_id=None):
+    def authenticate(self, character_name: typing.Optional[str] = None, client_id: typing.Optional[str] = None):
         """ Main authenticate method to login character into system
 
         :param character_name: pilot' name for signin, or None value for signup new pilot into system
+        :param client_id: ESI application Client ID parameter
         """
         authz = {} if character_name is None else self.__client.auth_cache.read_cache(character_name)
         if not self.__offline_mode:

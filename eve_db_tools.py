@@ -15,7 +15,7 @@ import eve_esi_interface as esi
 import postgresql_interface as db
 
 from __init__ import __version__
-import q_industrialist_settings
+# не используй здесь ни настройки q_industrialist_settings, ни настройки из q_individualist_settings
 
 
 def is_dicts_equal_by_keys(dict1, dict2, keys):
@@ -204,19 +204,26 @@ class QDatabaseTools:
         self.qidb.disconnect()
         del self.qidb
 
-    def auth_pilot_by_name(self, pilot_name, offline_mode, cache_files_dir, client_id=None):
+    def auth_pilot_by_name(
+            self,
+            pilot_name,
+            offline_mode: bool,
+            cache_files_dir: str,
+            client_id: str,
+            client_restrict_tls13: bool):
+        assert client_id is not None
         # настройка Eve Online ESI Swagger interface
         auth = esi.EveESIAuth(
             '{}/auth_cache'.format(cache_files_dir),
             debug=True)
         client = esi.EveESIClient(
             auth,
-            q_industrialist_settings.g_client_id,
+            client_id,
             keep_alive=True,
             debug=False,
             logger=True,
             user_agent='Q.Industrialist v{ver}'.format(ver=__version__),
-            restrict_tls13=q_industrialist_settings.g_client_restrict_tls13)
+            restrict_tls13=client_restrict_tls13)
         self.esiswagger = esi.EveOnlineInterface(
             client,
             self.__client_scope,

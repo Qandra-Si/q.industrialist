@@ -78,6 +78,7 @@ class EveESIClient:
 
         # резервируем session-объект, для того чтобы не заниматься переподключениями, а пользоваться keep-alive
         self.__keep_alive: bool = keep_alive
+        self.__restrict_tls13: bool = restrict_tls13
         self.__session = None
         self.__adapter: typing.Optional[EveESIClient.TLSAdapter] = None
 
@@ -85,6 +86,7 @@ class EveESIClient:
         # закрываем сессию
         if self.__session is not None:
             del self.__session
+        if self.__adapter is not None:
             del self.__adapter
 
     @property
@@ -154,19 +156,22 @@ class EveESIClient:
     def __establish(self) -> requests.Session:
         if self.__session is not None:
             del self.__session
+        if self.__adapter is not None:
             del self.__adapter
         if self.__logger:
             print("starting new HTTPS connection: {}:443".format(self.__login_host))
         self.__session = requests.Session()
-        self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
-        self.__session.mount("https://", self.__adapter)
+        if self.__restrict_tls13:
+            self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
+            self.__session.mount("https://", self.__adapter)
         return self.__session
 
     def __keep_connection(self) -> requests.Session:
         if self.__session is None:
             self.__session = requests.Session()
-            self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
-            self.__session.mount("https://", self.__adapter)
+            if self.__restrict_tls13:
+                self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
+                self.__session.mount("https://", self.__adapter)
         return self.__session
 
     def __print_auth_url(self, client_id, client_scopes, code_challenge=None):
@@ -432,7 +437,7 @@ class EveESIClient:
         print("\nSSO response code is: {}".format(sso_response.status_code))
         print("\nSSO response JSON is: {}".format(sso_response.json()))
 
-    def auth(self, client_scopes, client_id=None):
+    def auth(self, client_scopes, client_id: typing.Optional[str] = None):
         print("Follow the prompts and enter the info asked for.")
 
         # Generate the PKCE code challenge
@@ -455,7 +460,7 @@ class EveESIClient:
         # Notice that the query parameter of the following URL will contain this
         # code challenge.
 
-        self.__print_auth_url(client_id, client_scopes) # не используется: , code_challenge=code_challenge)
+        self.__print_auth_url(client_id, client_scopes)  # не используется: , code_challenge=code_challenge)
 
         auth_code = input("Copy the \"code\" query parameter and enter it here: ")
         app_secret = input("Copy your SSO application's secret key and enter it here: ")
