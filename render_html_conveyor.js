@@ -115,11 +115,15 @@ function toggleMenuMarker(btn, show){
 function toggleSortMarkers(mode, asc){
  $('button.qind-btn-sort').each(function() {
   if ($(this).attr('qind-group') == mode) {
+   changeElemVisibility($(this).find('span.symb'), 0);
+   changeElemVisibility($(this).find('span.nm'), 1);
    $(this).addClass('active');
    changeElemVisibility($(this).find('span.asc'), asc);
    changeElemVisibility($(this).find('span.desc'), !asc);
   }
   else {
+   changeElemVisibility($(this).find('span.symb'), 1);
+   changeElemVisibility($(this).find('span.nm'), 0);
    $(this).removeClass('active');
    changeElemVisibility($(this).find('span.asc'), 0);
    changeElemVisibility($(this).find('span.desc'), 0);

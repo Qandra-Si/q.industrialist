@@ -271,10 +271,10 @@ def dump_nav_menu(glf) -> None:
         (False, 'exist-in-stock', "Кол-во материалов в стоке", False),  # btnToggleExistInStock
         (False, 'in-progress', "Кол-во материалов, находящихся в производстве", False),  # btnToggleInProgress
     ]
-    menu_sort: typing.List[typing.Tuple[bool, str, str, str, str]] = [
-        (True,  'name',     'Название',     'sort-by-alphabet',   'sort-by-alphabet-alt'),
-        (False, 'duration', 'Длительность', 'sort-by-attributes', 'sort-by-attributes-alt'),
-        (False, 'priority', 'Приоритет',    'sort-by-order',      'sort-by-order-alt'),
+    menu_sort: typing.List[typing.Tuple[bool, str, str, str, str, str]] = [
+        (True,  'name',     'Название',     'sort-by-alphabet',   'sort-by-alphabet-alt',   'font'),
+        (False, 'duration', 'Длительность', 'sort-by-attributes', 'sort-by-attributes-alt', 'time'),
+        (False, 'priority', 'Приоритет',    'sort-by-order',      'sort-by-order-alt',      'fire'),
     ]
     glf.write("""
 <nav class="navbar navbar-default">
@@ -330,7 +330,10 @@ def dump_nav_menu(glf) -> None:
 """)
     for m in menu_sort:
         glf.write(f"<button type='button' class='btn btn-default qind-btn-sort' qind-group='{m[1]}'>"
-                  f"{m[2]}{glyphicon_ex(m[3],['asc','hidden'])}{glyphicon_ex(m[4], ['desc','hidden'])}"
+                  f"{glyphicon_ex(m[5],['symb','hidden'])}"
+                  f"<span class='nm'>{m[2]}</span> "
+                  f"{glyphicon_ex(m[3],['asc','hidden'])}"
+                  f"{glyphicon_ex(m[4], ['desc','hidden'])}"
                   "</button>")
     glf.write("""
     </div>
