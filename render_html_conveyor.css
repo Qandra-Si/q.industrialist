@@ -266,6 +266,19 @@ qdecr { color: #8dc169; }
  -webkit-animation: unprofitable-pulsate 1.2s linear infinite;
  animation: unprofitable-pulsate 1.2s linear infinite;
 }
+/* поведение метки не задан лимит */
+.label-unlimited { background-color: #000; color: #00abff; }
+@keyframes unlimited-pulsate{50%{color:#00abff;text-shadow:0 -1px rgba(0,0,0,.3),0 0 5px #00b0f0,0 0 8px #f00;}}
+.qind-copy-btn:hover + * ~ div .label-unlimited {
+ color: #fff;
+ -webkit-animation: unlimited-pulsate 1.2s linear infinite;
+ animation: unlimited-pulsate 1.2s linear infinite;
+}
+.qind-copy-btn:hover + * ~ .label-unlimited {
+ color: #fff;
+ -webkit-animation: unlimited-pulsate 1.2s linear infinite;
+ animation: unlimited-pulsate 1.2s linear infinite;
+}
 /* поведение кнопки info около продукта инвента */
 a.qind-info-btn { color: #808080; }
 a.qind-info-btn:hover,

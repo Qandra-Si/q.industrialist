@@ -1550,6 +1550,8 @@ def dump_list_of_possible_blueprints(
                         # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                         if num_prepared > 0 and ia.product_tier2_overstock:
                             product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
+                        if ia.product_tier2_limit is None:
+                            product_details_note += ' <label class="label label-unlimited">не задан лимит</label>'
                 else:
                     for ia in invent_analysis.products:
                         if ia.product_tier2 is None: continue
@@ -1563,6 +1565,8 @@ def dump_list_of_possible_blueprints(
                         # если произведено излишнее количество продукции, то отмечаем чертежи маркером
                         if num_prepared > 0 and ia.product_tier2_overstock:
                             variants += ' <label class="label label-overstock">перепроизводство</label>'
+                        if ia.product_tier2_limit is None:
+                            product_details_note += ' <label class="label label-unlimited">не задан лимит</label>'
                         variants += '</div>'
         if manufacturing_analysis:
             ma: tools.ConveyorManufacturingAnalysis = manufacturing_analysis.product
@@ -1580,6 +1584,8 @@ def dump_list_of_possible_blueprints(
                 product_details_note += ' <label class="label label-overstock">перепроизводство</label>'
             if is_all_stacks_unprofitable:
                 product_details_note += ' <label class="label label-unprofitable">нерентабельно</label>'
+            if ma.product_tier1_limit is None:
+                product_details_note += f' <label class="label label-unlimited">{glyphicon("stats")} не задан лимит</label>'
 
         blueprint_copy_btn: str = f'&nbsp;<a data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn"' \
                                   f' data-toggle="tooltip">{glyphicon("copy")}</a>'
