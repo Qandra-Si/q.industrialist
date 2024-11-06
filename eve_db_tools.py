@@ -215,7 +215,8 @@ class QDatabaseTools:
             keep_alive=True,
             debug=False,
             logger=True,
-            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+            user_agent='Q.Industrialist v{ver}'.format(ver=__version__),
+            restrict_tls13=q_industrialist_settings.g_client_restrict_tls13)
         self.esiswagger = esi.EveOnlineInterface(
             client,
             self.__client_scope,

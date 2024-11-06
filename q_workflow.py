@@ -643,7 +643,8 @@ def main():
             keep_alive=True,
             debug=argv_prms["verbose_mode"],
             logger=True,
-            user_agent='Q.Industrialist v{ver}'.format(ver=__version__))
+            user_agent='Q.Industrialist v{ver}'.format(ver=__version__),
+            restrict_tls13=q_industrialist_settings.g_client_restrict_tls13)
         interface = esi.EveOnlineInterface(
             client,
             q_industrialist_settings.g_client_scope,

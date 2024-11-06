@@ -4,7 +4,6 @@
 g_use_filesystem_resources = False
 
 g_client_id = "00000000000000000000000000000000"
-
 g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-assets.read_corporation_assets.v1",  # Requires role(s): Director
                   "esi-corporations.read_blueprints.v1",  # Requires role(s): Director
@@ -21,6 +20,13 @@ g_client_scope = ["esi-fittings.read_fittings.v1",  # Requires: access token
                   "esi-markets.structure_markets.v1",  # Requires one of the following EVE corporation role(s): Accountant, Trader
                   "esi-corporations.read_corporation_membership.v1",  # Requires: access token
                  ]
+# TLS1.3 with SNI denied in Russia by RKN since 06.11.2024
+# для того, чтобы проверить, нужно ли выставить следующий параметр в True, следует выполнить команду:
+# curl -X GET "https://esi.evetech.net/latest/status/?datasource=tranquility" -H  "accept: application/json" -H  "Cache-Control: no-cache"
+# если придёт ошибка: {"error":"unroutable"}, то выставить в True
+# также можно проврерить различие и удостовериться:
+# curl --tlsv1.2 --tls-max 1.2 -X GET "https://esi.evetech.net/latest/status/?datasource=tranquility" -H  "accept: application/json" -H  "Cache-Control: no-cache"
+g_client_restrict_tls13: bool = False
 
 g_database = {
     #"ssh_tunnel": {

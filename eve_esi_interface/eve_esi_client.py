@@ -6,8 +6,13 @@ found here are used by the OAuth 2.0 contained in this project.
 
 See https://github.com/esi/esi-docs
 """
+import ssl
+import typing
 import urllib
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
+import ssl
 import sys
 import base64
 import hashlib
@@ -21,13 +26,30 @@ from .error import EveOnlineClientError
 
 
 class EveESIClient:
+    class TLSAdapter(requests.adapters.HTTPAdapter):
+        def __init__(self, ssl_options=0, **kwargs):
+            self.ssl_options = ssl_options
+            super(EveESIClient.TLSAdapter, self).__init__(**kwargs)
+
+        def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+            ctx = ssl.create_default_context()
+            ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+            ctx.options = self.ssl_options
+            self.poolmanager = PoolManager(
+                num_pools=connections,
+                maxsize=maxsize,
+                block=block,
+                ssl_context=ctx,
+                **pool_kwargs)
+
     def __init__(self,
                  auth_cache,
                  client_id: str,
                  keep_alive: bool,
                  debug: bool = False,
                  logger: bool = True,
-                 user_agent=None):
+                 user_agent=None,
+                 restrict_tls13: bool = False):
         """ constructor
 
         :param EveESIAuth auth_cache: authz tokens storage
@@ -57,11 +79,13 @@ class EveESIClient:
         # резервируем session-объект, для того чтобы не заниматься переподключениями, а пользоваться keep-alive
         self.__keep_alive: bool = keep_alive
         self.__session = None
+        self.__adapter: typing.Optional[EveESIClient.TLSAdapter] = None
 
     def __del__(self):
         # закрываем сессию
         if self.__session is not None:
             del self.__session
+            del self.__adapter
 
     @property
     def auth_cache(self):
@@ -130,14 +154,19 @@ class EveESIClient:
     def __establish(self) -> requests.Session:
         if self.__session is not None:
             del self.__session
+            del self.__adapter
         if self.__logger:
             print("starting new HTTPS connection: {}:443".format(self.__login_host))
         self.__session = requests.Session()
+        self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
+        self.__session.mount("https://", self.__adapter)
         return self.__session
 
     def __keep_connection(self) -> requests.Session:
         if self.__session is None:
             self.__session = requests.Session()
+            self.__adapter = EveESIClient.TLSAdapter(ssl.OP_NO_TLSv1_3)
+            self.__session.mount("https://", self.__adapter)
         return self.__session
 
     def __print_auth_url(self, client_id, client_scopes, code_challenge=None):
