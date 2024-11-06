@@ -133,7 +133,8 @@ def format_product_tier2_info_btn(ia: tools.ConveyorInventAnalysis) -> str:
             'j': ia.product_tier2_num_in_jobs,
             's': ia.product_tier2_num_in_sell,
             'b': ia.product_tier2_num_in_blueprints,
-            'r': ia.product_tier2_num_in_blueprint_runs}
+            'r': ia.product_tier2_num_in_blueprint_runs,
+            'q': ia.product_tier2_num_in_blueprint_runs * ia.product_tier2.quantity}
     product_info_btn: str = \
         '<a data-target="#" role="button" class="qind-info-btn"' \
         f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
@@ -147,7 +148,8 @@ def format_product_tier1_info_btn(ma: tools.ConveyorManufacturingAnalysis) -> st
             'j': ma.product_tier1_num_in_jobs,
             's': ma.product_tier1_num_in_sell,
             'b': ma.product_tier1_num_in_blueprints,
-            'r': ma.product_tier1_num_in_blueprint_runs}
+            'r': ma.product_tier1_num_in_blueprint_runs,
+            'q': ma.product_tier1_num_in_blueprint_runs * ma.product_tier1.quantity}
     product_info_btn: str = \
         '<a data-target="#" role="button" class="qind-info-btn"' \
         f'{format_json_data("product", info)}>{glyphicon("info-sign")}</a>'
@@ -983,9 +985,10 @@ def dump_industry_product_dialog(glf) -> None:
     glf.write("""<p>
 Хранится в ассетах: <span id="product-in-assets" class="quantity"></span><br>
 Производится: <span id="product-in-jobs" class="quantity"></span><br>
-Выставлено на продажу: <span id="product-in-sale" class="quantity"></span><br>
+Выставлено на продажу: <span id="product-in-sale" class="quantity"></span><hr>
 Подготовлено чертежей: <span id="product-in-blueprints" class="quantity"></span><br>
-Прогоны чертежей: <span id="product-in-blueprint-runs" class="quantity"></span><hr>
+Подготовлено прогонов: <span id="product-in-blueprint-runs" class="quantity"></span><br>
+Подготовлено продуктов: <span id="product-in-blueprint-qty" class="quantity"></span><hr>
 Порог производства: <span id="product-limit" class="quantity"></span>
 </p>""")
     # закрываем footer модального диалога

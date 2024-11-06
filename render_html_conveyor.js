@@ -210,6 +210,7 @@ function getSortKey(x, asc, what) { // what: 0-name, 1-duration, 2-priority, 3-d
       if (!(data_product.a === undefined) && (data_product.a > 0)) exist += data_product.a;
       if (!(data_product.j === undefined) && (data_product.j > 0)) exist += data_product.j;
       if (!(data_product.s === undefined) && (data_product.s > 0)) exist += data_product.s;
+      if ((activity == 8) && !(data_product.q === undefined) && (data_product.q > 0)) exist += data_product.q;
       if (val1 === null)
        val1 = 1.0 - (exist / limit);
       else {
@@ -227,7 +228,7 @@ function getSortKey(x, asc, what) { // what: 0-name, 1-duration, 2-priority, 3-d
    else
     val = -sort.n; // пороги производства неизвестны - всегда внизу
    //e = row.find('qname');
-   //e.html(val1 + ' ' + val2);
+   //e.html(activity + ' ' + val1 + ' ' + val2);
    break; }
   }
  }
@@ -662,6 +663,8 @@ function showIndustryProductModal(elem) {
  $('#product-in-blueprints').html(txt);
  if (!(data_product.r === undefined) && (data_product.r > 0)) txt = data_product.r; else txt = nodata;
  $('#product-in-blueprint-runs').html(txt);
+ if (!(data_product.q === undefined) && (data_product.q > 0)) txt = data_product.q; else txt = nodata;
+ $('#product-in-blueprint-qty').html(txt);
  //
  if (!(data_product.l === undefined) && (data_product.l > 0)) txt = data_product.l; else txt = 'порог не задан';
  $('#product-limit').html(txt);

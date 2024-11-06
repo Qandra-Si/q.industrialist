@@ -1632,8 +1632,8 @@ class ConveyorManufacturingAnalysis:
 
     @property
     def num_prepared(self) -> int:
-        # подсчёт кол-ва готовых чертежей для производства этого продукта (в кол-ве ранов)
-        return self.product_tier1_num_in_blueprint_runs
+        # подсчёт кол-ва готовых чертежей для производства этого продукта (в кол-ве продуктов)
+        return self.product_tier1_num_in_blueprint_runs * self.product_tier1.quantity
 
     def get_manufacturing_conveyor_formula(self,
                                            trade_hub_id: int,
