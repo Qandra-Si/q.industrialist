@@ -332,6 +332,14 @@ def main():
                                     'me': 0,
                                     'te': 0})
                                 continue
+                        # добавляем исключения - чертежи, которые ориентировочно будут запускаться на 1 прогон
+                        if product_tid['name']['en'] == 'Orca':
+                            calc_inputs.append({
+                                'bptid': blueprint_type_id,
+                                'qr': 1,
+                                'me': 10,
+                                'te': 20})
+                            continue
                         # продолжаем просматривать чертежи по группам, может быть это супера?
                         if 'groupID' in product_tid:
                             product_group_id: int = product_tid['groupID']
