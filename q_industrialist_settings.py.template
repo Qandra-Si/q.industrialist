@@ -58,7 +58,9 @@ g_industry_calc_customization = {
     'industry_time': 5 * 60 * 60 * 24,  # типично для R Industry (сутки)
     # 'industry_time': 7 * 5 * 60 * 60 * 24,  # неделя
     # 'industry_time': (5 * 60 * 60 * 24) // 8,  # производство по 2400 Fuel Blocks (60 runs)
-    'common_components': [  # market-группы компонентов общего потребления
+	# market-группы компонентов общего потребления, которые производятся крупными партиями за один
+	# запуск работы (количество прогонов настраивается с помощью industry_time)
+    'common_components': [
         1870,  # Fuel Blocks
         65,    # Advanced Components
         1883,  # Advanced Capital Components
