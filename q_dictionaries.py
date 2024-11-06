@@ -333,7 +333,7 @@ def main():
                                     'te': 0})
                                 continue
                         # добавляем исключения - чертежи, которые ориентировочно будут запускаться на 1 прогон
-                        if product_tid['name']['en'] == 'Orca':
+                        if blueprint_type_id == 28607:  # Orca
                             calc_inputs.append({
                                 'bptid': blueprint_type_id,
                                 'qr': 1,

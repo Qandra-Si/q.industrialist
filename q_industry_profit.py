@@ -330,7 +330,8 @@ def main():
             # {'bptid': 57526, 'qr': 2, 'me': 8, 'te': 14},  # Enhanced Neurolink Protection Cell
             # {'bptid': 45648, 'qr': 1, 'me': 0, 'te': 0},  # Komodo
             # {'bptid': 47968, 'qr': 1, 'me': 0, 'te': 0},  # Leshak
-            {'bptid': 39583, 'qr': 3, 'me': 2+1, 'te': 4+8},  # Endurance + Symmetry Decryptor
+            # {'bptid': 39583, 'qr': 3, 'me': 2+1, 'te': 4+8},  # Endurance + Symmetry Decryptor
+            {'bptid': 28607, 'qr': 1, 'me': 10, 'te': 20},  # Orca
         ]
 
     # настройки оптимизации производства: реакции на 15 ран (сутки) и производство в зависимости от времени (сутки)
