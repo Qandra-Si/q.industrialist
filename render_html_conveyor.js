@@ -115,14 +115,14 @@ function toggleMenuMarker(btn, show){
 function toggleSortMarkers(mode, asc){
  $('button.qind-btn-sort').each(function() {
   if ($(this).attr('qind-group') == mode) {
-   changeElemVisibility($(this).find('span.symb'), 0);
+   //changeElemVisibility($(this).find('span.symb'), 1);
    changeElemVisibility($(this).find('span.nm'), 1);
    $(this).addClass('active');
    changeElemVisibility($(this).find('span.asc'), asc);
    changeElemVisibility($(this).find('span.desc'), !asc);
   }
   else {
-   changeElemVisibility($(this).find('span.symb'), 1);
+   //changeElemVisibility($(this).find('span.symb'), 1);
    changeElemVisibility($(this).find('span.nm'), 0);
    $(this).removeClass('active');
    changeElemVisibility($(this).find('span.asc'), 0);
@@ -148,7 +148,7 @@ const g_tbl_summary_priority_multiplier = 100000; // приоритетов де
 const g_tbl_summary_activity_multiplier = Math.floor(g_tbl_summary_priority_multiplier / 10); // activity от 1 до 9
 const g_tbl_summary_half_activity = Math.floor(g_tbl_summary_activity_multiplier / 2);
 //-----------
-function getSortKey(x, asc, what) { // what: 0-name, 1-duration
+function getSortKey(x, asc, what) { // what: 0-name, 1-duration, 2-priority, 3-demand, 4-profit
  var row = $(x);
  var priority = g_tbl_summary_unused_priority;
  var activity = 0;
@@ -179,7 +179,7 @@ function getSortKey(x, asc, what) { // what: 0-name, 1-duration
    else // незапускаемые работы/строки всегда внизу
     val = asc ? (g_tbl_summary_half_activity + sort.n) : sort.n;
    break;
-  case 1: // duration
+  case 1: // duration (аналогичено profit)
    priority = g_tbl_summary_unused_priority;
    if (!(sort.d == undefined))
     val = sort.d;
@@ -188,6 +188,47 @@ function getSortKey(x, asc, what) { // what: 0-name, 1-duration
    else // duration неизвестен (это не чертёж для запуска) - всегда внизу
     val = -sort.n;
    break;
+  case 4: // profit (аналогичено duration)
+   priority = g_tbl_summary_unused_priority;
+   if (!(sort.i == undefined))
+    val = sort.i;
+   else if (!(sort.i1 == undefined))
+    val = (asc ? sort.i1 : sort.i2);
+   else // profit неизвестен (чёртеж нестандартный) - всегда внизу
+    val = -sort.n;
+   break;
+  case 3: { // demand
+   priority = g_tbl_summary_unused_priority;
+   val1 = null;
+   val2 = null;
+   row.find('td a.qind-info-btn').each(function() {
+    let data_product = $(this).data('product');
+    if (!(data_product === undefined)) {
+     if (!(data_product.l === undefined) && (data_product.l > 0)) {
+      let limit = data_product.l;
+      var exist = 0;
+      if (!(data_product.a === undefined) && (data_product.a > 0)) exist += data_product.a;
+      if (!(data_product.j === undefined) && (data_product.j > 0)) exist += data_product.j;
+      if (!(data_product.s === undefined) && (data_product.s > 0)) exist += data_product.s;
+      if (val1 === null)
+       val1 = 1.0 - (exist / limit);
+      else {
+       if (val2 === null) val2 = val1;
+       val1 = Math.min(val1, 1.0 - (exist / limit));
+       val2 = Math.max(val2, 1.0 - (exist / limit));
+      }
+     }
+    }
+   });
+   if (!(val2 === null))
+    val = g_tbl_summary_half_activity + (asc ? val1 : val2);
+   else if (!(val1 === null))
+    val = g_tbl_summary_half_activity + val1;
+   else
+    val = -sort.n; // пороги производства неизвестны - всегда внизу
+   //e = row.find('qname');
+   //e.html(val1 + ' ' + val2);
+   break; }
   }
  }
  return [g_tbl_summary_priority_multiplier * (priority+1) + g_tbl_summary_activity_multiplier * activity, val];
@@ -216,6 +257,8 @@ function sortConveyorInternal(table, asc, what) {
    return (asc?1:-1) * ((keyA[0]>keyB[0])?1:-1);
   case 0: // name
   case 1: // duration
+  case 3: // demand
+  case 4: // profit
    if (keyA[0] == keyB[0]) {
     if (keyA[1] == 0) return -1;
     if (keyB[1] == 0) return 1;
@@ -240,6 +283,8 @@ function sortConveyor() {
  //case 'name': what = 0; break;
  case 'duration': what = 1; break;
  case 'priority': what = 2; break;
+ case 'demand': what = 3; break;
+ case 'profit': what = 4; break;
  }
  $('tr.row-conveyor').each(function() {
   var tag = $(this).data('tag');

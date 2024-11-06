@@ -1460,7 +1460,8 @@ def get_conveyor_table_sort_data(
         priority: int,
         activities: typing.List[db.QSwaggerActivityCode],
         row_num: typing.Optional[int],
-        duration: typing.Optional[typing.Tuple[int, int]]):
+        duration: typing.Optional[typing.Tuple[int, int]],
+        profit: typing.Optional[typing.Tuple[float, float]]):
     sort = {'p': priority, 'a': [_.to_int() for _ in activities]}
     if row_num is not None:
         sort.update({'n': row_num + 1})  # не м.б. 0, т.к. 0 зарезервирован для banner-а
@@ -1471,6 +1472,13 @@ def get_conveyor_table_sort_data(
             sort.update({'d1': duration[0], 'd2': duration[1]})
     elif row_num is not None:
         sort.update({'lp': 1})   # нижняя часть (несортируемая)
+    if profit is not None:
+        isk0: int = int(round(profit[0], 0))
+        isk1: int = int(round(profit[1], 0))
+        if isk0 == isk1:  # 0-min, 1-max
+            sort.update({'i': isk0})
+        else:
+            sort.update({'i1': isk0, 'i2': isk1})
     return sort
 
 

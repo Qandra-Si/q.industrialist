@@ -275,6 +275,8 @@ def dump_nav_menu(glf) -> None:
         (True,  'name',     'Название',     'sort-by-alphabet',   'sort-by-alphabet-alt',   'font'),
         (False, 'duration', 'Длительность', 'sort-by-attributes', 'sort-by-attributes-alt', 'time'),
         (False, 'priority', 'Приоритет',    'sort-by-order',      'sort-by-order-alt',      'fire'),
+        (False, 'demand',   'Потребность',  'sort-by-attributes', 'sort-by-attributes-alt', 'cutlery'),
+        (False, 'profit',   'Профит',       'sort-by-attributes', 'sort-by-attributes-alt', 'usd'),
     ]
     glf.write("""
 <nav class="navbar navbar-default">
@@ -330,8 +332,8 @@ def dump_nav_menu(glf) -> None:
 """)
     for m in menu_sort:
         glf.write(f"<button type='button' class='btn btn-default qind-btn-sort' qind-group='{m[1]}'>"
-                  f"{glyphicon_ex(m[5],['symb','hidden'])}"
-                  f"<span class='nm'>{m[2]}</span> "
+                  f"{glyphicon_ex(m[5],['symb'])}"
+                  f"<span class='nm'> {m[2]} </span>"
                   f"{glyphicon_ex(m[3],['asc','hidden'])}"
                   f"{glyphicon_ex(m[4], ['desc','hidden'])}"
                   "</button>")
@@ -1135,7 +1137,12 @@ def dump_list_of_jobs(
         tr_class: str = 'job-active' if is_active_jobs else 'job-completed'
         tr_class += g_nav_menu_defaults.css(tr_class)
         # --- --- ---
-        sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=None)
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            settings.activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=None,
+            profit=None)
         # --- --- ---
         activity_icon: str = get_industry_icons(db.get_activities_by_nums([j0.activity.to_int()]))
         # --- --- ---
@@ -1212,7 +1219,12 @@ def dump_list_of_lost_blueprints(
     for type_name, group in grouped_and_sorted:
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
-        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=None,
+            profit=None)
         # ---
         containers: typing.Set[str] = set()
         for b in group:
@@ -1264,7 +1276,12 @@ def dump_list_of_lost_asset_items(
         a0: db.QSwaggerCorporationAssetsItem = group[0]
         type_id: int = a0.type_id
         type_name: str = a0.item_type.name
-        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=None,
+            profit=None)
         # ---
         containers: typing.Set[str] = set()
         for a in group:
@@ -1321,7 +1338,12 @@ def dump_list_of_phantom_blueprints(
         b0: db.QSwaggerCorporationBlueprint = group[0]
         type_id: int = b0.type_id
         type_name: str = b0.blueprint_type.blueprint_type.name
-        sort = tools.get_conveyor_table_sort_data(priority, activities, row_num=get_tbl_summary_row_num(False), duration=None)
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=None,
+            profit=None)
 
         glf.write(f"""<tr
  class="phantom-blueprints{g_nav_menu_defaults.css('phantom-blueprints')}"
@@ -1373,9 +1395,6 @@ def dump_list_of_possible_blueprints(
                 industry_analysis.manufacturing_analysis.get(type_id)
             if _ and _.product and _.product.product_tier1:
                 manufacturing_analysis = _
-
-        if type_id == 22437:
-            type_id = type_id
 
         tr_class: str = ''
         for stack in stacks:
@@ -1460,6 +1479,8 @@ def dump_list_of_possible_blueprints(
         times: str = '<br>'
         min_duration: int = 0
         max_duration: int = 0
+        min_profit: typing.Optional[float] = None
+        max_profit: typing.Optional[float] = None
         for stack in stacks:
             # TODO: здесь какая-то путаница с activity(ies)
             na = []
@@ -1487,6 +1508,12 @@ def dump_list_of_possible_blueprints(
                     human_readable: float = profit.eve_ceiling(stack.conveyor_formula.single_product_profit)
                     human_readable_str: str = f'{human_readable:,.2f}' if human_readable < 1000.0 else f'{human_readable:,.0f}'
                     conveyor_formula_profit = f'<profit>, {sign_str} <{sign_tag}>{human_readable_str}</{sign_tag}> ISK</profit>'
+                    if min_profit is None:
+                        min_profit = stack.conveyor_formula.single_product_profit
+                        max_profit = min_profit
+                    else:
+                        min_profit = min(min_profit, stack.conveyor_formula.single_product_profit)
+                        max_profit = max(max_profit, stack.conveyor_formula.single_product_profit)
             elif db.QSwaggerActivityCode.INVENTION in settings.activities:
                 pass  # для инвента me_te_tag нет смысла показывать
             details += f"{tr_div_class('div', stack, True)}" \
@@ -1557,7 +1584,12 @@ def dump_list_of_possible_blueprints(
         blueprint_copy_btn: str = f'&nbsp;<a data-target="#" role="button" data-tid="{type_id}" class="qind-copy-btn"' \
                                   f' data-toggle="tooltip">{glyphicon("copy")}</a>'
 
-        sort = tools.get_conveyor_table_sort_data(priority, settings.activities, row_num=get_tbl_summary_row_num(False), duration=(min_duration, max_duration))
+        sort = tools.get_conveyor_table_sort_data(
+            priority,
+            settings.activities,
+            row_num=get_tbl_summary_row_num(False),
+            duration=(min_duration, max_duration),
+            profit=None if min_profit is None else (min_profit, max_profit))
         activity_icons: str = get_industry_icons(settings.activities)
 
         glf.write(f"""<tr{tr_div_class('tr')} {format_json_data('sort', sort)}>
@@ -1646,7 +1678,8 @@ def dump_list_of_blueprint_requirements(
             priority,
             activities,
             row_num=get_tbl_summary_row_num(False),
-            duration=(duration, duration))
+            duration=(duration, duration),
+            profit=None)  # TODO: рассчитать!
         activity_icons: str = get_industry_icons(activities)
 
         blueprint_copy_btn: str = \
@@ -1682,7 +1715,7 @@ def dump_conveyor_banner(
     else:
         additional_class: str = ''
     # сведения для java-script с информацией о коробках конвейера (приоритет и activity)
-    tag = tools.get_conveyor_table_sort_data(priority, activities, row_num=None, duration=None)
+    tag = tools.get_conveyor_table_sort_data(priority, activities, row_num=None, duration=None, profit=None)
     glf.write(f"""<tr class="row-conveyor{additional_class}" {format_json_data('tag', tag)}>
 <td colspan="8">{label}<mute>{', '.join([str(_) for _ in activities])}</mute>
 <a data-target="#" role="button" class="qind-btn-hide qind-btn-hide-open">{glyphicon('eye-open')}</a>
