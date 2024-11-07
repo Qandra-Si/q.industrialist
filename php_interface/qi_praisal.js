@@ -81,7 +81,10 @@ function eveSysNumber(x) { return x <= 2147483647; }
 function eveUserNumber(x) { return x > 2147483647; }
 
 function numLikeEve(x) {
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return Number.parseFloat(x).toFixed(2).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function numToFixed(x, fixed) {
+  return Number.parseFloat(x).toFixed(fixed).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 (function() {
   /**

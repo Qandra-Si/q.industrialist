@@ -25,8 +25,8 @@ function fillMarketHubsTable(tbody,active) {
    '<td>'+Math.round10(tax*100.0,-1)+'</td>'+
    '<td>'+Math.round10(margin*100.0,-1)+'</td>'+
    '<td>';
-  if (!(h[12]===null)) rows=rows+numLikeEve(h[12]);
-  if (!(h[13]===null)) rows=rows+'<br>'+numLikeEve(h[13]);
+  if (!(h[12]===null)) rows=rows+numToFixed(h[12], 3);
+  if (!(h[13]===null)) rows=rows+'<br>'+numToFixed(h[13], 0);
   rows=rows+
    '</td>';
   if (h[14]===null) rows=rows+'<td></td>';
