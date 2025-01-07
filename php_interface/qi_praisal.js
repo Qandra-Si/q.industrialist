@@ -23,7 +23,9 @@ function resetOptionsMenuToDefault() {
  resetOptionToDefault('Selected Trader Corp', 98553333); // R Strike
  resetOptionToDefault('Show Jita Price', 1);
  resetOptionToDefault('Show Amarr Price', 1);
+ resetOptionToDefault('Selected Sales Margin', 0); // disabled
  resetOptionToDefault('Show Universe Price', 1);
+ resetOptionToDefault('Show Sales Margin', 0);
  resetOptionToDefault('Show Market Volume', 1);
  resetOptionToDefault('Show Best Offer', 1);
  resetOptionToDefault('Show Only Our Orders', 0);
@@ -68,6 +70,20 @@ function rebuildOptionsMenu() {
   $('#lbHiddenMarketHubs').html('-');
  else
   $('#lbHiddenMarketHubs').html(hidden_hub_names.join(","));
+
+ var selected_sales_margin = ls.getItem('Selected Sales Margin');
+ $('a.toggle-margin-option').each(function() {
+  const margin = parseInt($(this).attr('margin'));
+  var img = $(this).find('span.glyphicon-star');
+  if (margin == selected_sales_margin)
+   img.removeClass('hidden');
+  else
+   img.addClass('hidden');
+ });
+ if (selected_sales_margin == 0)
+  $('#lbSelectedSalesMargin').html('отключена');
+ else
+  $('#lbSelectedSalesMargin').html(selected_sales_margin+' %');
 }
 function applyOptionVal(show, selector) {
  $(selector).each(function() { if (show==1) $(this).removeClass('hidden'); else $(this).addClass('hidden'); })
@@ -148,6 +164,12 @@ function getTableHeaderIndex(title) {
  var idx = null;
  $('#tbl thead tr').find('th').each(function() {
   var t = $(this).html();
+  const mark1 = t.indexOf('<mark');
+  if (mark1 !== -1) {
+    var mark2 = t.indexOf('</mark>');
+    if (mark2 !== -1)
+      t = t.slice(0, mark1) + t.slice(mark2+7);
+  }
   t = t.replace(/\s/g, '').replace(/<\/?[^>]+(>|$)/g, "").toLowerCase();
   if (t.localeCompare(title)==0)
    idx = $(this).index();
@@ -216,6 +238,26 @@ function rebuildBody() {
   applyOptionVal(0, '#tbl thead tr th:nth-child('+idx+')');
   applyOptionVal(0, '#tbl tbody tr td:nth-child('+idx+')');
  }
+
+ const selected_sales_margin = ls.getItem('Selected Sales Margin');
+ var sales_margin_idx = getTableHeaderIndex('наценка');
+ if (!(sales_margin_idx === null)) {
+  sales_margin_idx++;
+  const show = (selected_sales_margin > 0) ? 1 : 0;
+  applyOptionVal(show, '#tbl thead tr th:nth-child('+sales_margin_idx+')');
+  applyOptionVal(show, '#tbl tbody tr td:nth-child('+sales_margin_idx+')');
+ }
+ if (selected_sales_margin > 0) {
+  $('#lbSelectedSalesMarginTbl').html(selected_sales_margin+'%');
+  const mltpl = 1.0 + (selected_sales_margin/100.0);
+  $('#tbl tbody tr td:nth-child('+sales_margin_idx+')').each(function() {
+   var jita = parseFloat($(this).attr('jita'));
+   elem = $(this).find('price_ordinal');
+   if (!(jita) || !(elem)) return;
+   const isk = Math.round10(jita * mltpl, -2);
+   elem.html(numLikeEve(eveCeiling(isk)));
+  });
+ }
 }
 
 // Options menu and submenu setup
@@ -264,6 +306,12 @@ $(document).ready(function(){
     hubs.splice(idx,1);
   }
   ls.setItem('Hidden Market Hubs', JSON.stringify(hubs));
+  rebuildOptionsMenu();
+  rebuildBody();
+ });
+ $('a.toggle-margin-option').on("click", function(e){
+  var margin = parseInt($(this).attr('margin'));
+  ls.setItem('Selected Sales Margin', margin);
   rebuildOptionsMenu();
   rebuildBody();
  });

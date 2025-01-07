@@ -92,6 +92,25 @@ function __dump_praisal_menu_bar(&$market_hubs)
 ?>
         </ul>
        </li>
+       <li class="dropdown-submenu">
+        <a class="options-submenu" data-target="#" role="button">Наценка продаж <mark id="lbSelectedSalesMargin">-</mark><span class="caret"></span></a>
+        <ul class="dropdown-menu" style="display: none;">
+<?php
+  for ($margin = 0; $margin <= 25; ++$margin)
+  {
+    if ($margin == 0)
+    {
+      ?><li><a id="btnToggleSalesMargin<?=$margin?>" margin="<?=$margin?>" class="option toggle-margin-option" data-target="#" role="button"><span class="glyphicon glyphicon-star hidden" aria-hidden="true"></span> отключить</a></li>
+      <li role="separator" class="divider"></li><?php
+    }
+    else
+    {
+      ?><li><a id="btnToggleSalesMargin<?=$margin?>" margin="<?=$margin?>" class="option toggle-margin-option" data-target="#" role="button"><span class="glyphicon glyphicon-star hidden" aria-hidden="true"></span> <?=$margin?> %</a></li><?php
+    }
+  }
+?>
+        </ul>
+       </li>
        <li role="separator" class="divider"></li>
        <li><a id="btnToggleMarketVolume" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowMarketVolume"></span> Показывать объём товара на рынке</a></li>
        <li><a id="btnToggleBestOffer" data-target="#" role="button"><span class="glyphicon glyphicon-star" aria-hidden="true" id="imgShowBestOffer"></span> Показывать объём лучшего предложения</a></li>
@@ -117,7 +136,7 @@ function __dump_praisal_table_header(&$market_hubs)
 
   $hubs_count = count($active_market_hub_ids);
   $col_qty = 3;
-  $col_uni_pr = 3 + $hubs_count + 3;
+  $col_uni_pr = 3 + $hubs_count + 4;
 ?><style>
 #tbl tbody tr td:nth-child(<?=$col_qty?>) { font-size: large; vertical-align: middle; }
 <?php foreach (range($col_qty,$col_uni_pr) as $num) { ?>
@@ -160,8 +179,9 @@ their-orders-only {}
   </th>
 <?php } ?>
   <th>Jita Sell..Buy</th><!--2+hubs+0-->
-  <th>Amarr Sell..Buy</th><!--2+hubs+1-->
-  <th>Universe<br>Price</th><!--2+hubs+2-->
+  <th>Наценка <mark id="lbSelectedSalesMarginTbl">10%</mark></th><!--2+hubs+1-->
+  <th>Amarr Sell..Buy</th><!--2+hubs+2-->
+  <th>Universe<br>Price</th><!--2+hubs+3-->
  </tr>
 </thead>
 <tbody>
@@ -249,6 +269,14 @@ function __dump_praisal_table_row($type_id, $cnt, $t, &$market_hubs, &$sale_orde
    if (!(is_null($b))) { ?><?='<price_grayed>'.number_format($b,2,'.',',').'</price_grayed>'?><?php }
   }
  }
+?></td>
+<td<?php
+ if ($t) {
+  $s = $t['jita_sell'];
+  if ($s && !(is_null($s))) { ?> jita='<?=$s?>'><?='<price_ordinal>'.number_format($s,2,'.',',').'</price_ordinal>'?><?php }
+  else echo ">";
+ }
+ else echo ">";
 ?></td>
 <td><?php
  if ($t) {
