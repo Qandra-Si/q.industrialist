@@ -1,182 +1,173 @@
-﻿# индивидуальные настройки дл¤ работы скрипта q_router.py
+﻿# индивидуальные настройки для работы скрипта q_router.py
 # содержит настройки работы с производственным конвейером:
+#
+# https://docs.google.com/spreadsheets/d/1l7C_7u14shzGSRi_0pAB79WCRWov4y6-YMuuc65UFK4/edit#gid=0
+#
+# скрипт выборки названий:
+# select x.name, ids.sdet_type_id, ids.sdet_type_name
+# from qi.eve_sde_market_groups_tree x, qi.eve_sde_type_ids ids
+# where
+#  --name = 'Processed Moon Materials'
+#  --name = 'Advanced Moon Materials'
+#  name = 'Booster Materials'
+#  --x.parent =65
+#  --x.id =2767
+#  --x.id = 499
+#  --x.id = 1860
+#  and ids.sdet_market_group_id =x.id and ids.sdet_published
+# order by x.name, ids.sdet_type_name
+
+# Бонусы структур, которые учитываются автоматически:
+#  * Sotiyo: me -1% (manufacturing), te -30% (manufacturing and science), job_cost -5% (manufacturing and science)
+#  * Athanor: нет производственных бонусов
+#  * Tatara: te -25% (reaction)
+#  * Azbel: me -1% (manufacturing), te -20% (manufacturing and science), job_cost -4% (manufacturing and science)
+#  * Raitaru: me -1% (manufacturing), te -15% (manufacturing and science), job_cost -3% (manufacturing and science)
+
+# Списки output задают те предметы, которые крафтятся на тех или иных станциях/структурах:
+#  * output_market_groups - список номеров market_group_id (предполагается обработка всех вложенных подгрупп)
+#  * output_groups - список номеров group_id групп
+#  * output_categories - список номеров category_id категорий
+#  * output_types - индивидуальный список type_id предметов, которые добавляются к спискам output
+#  * except_output_types - индивидуальный список type_id предметов, которые удаляются из списка output
+# для переиндексации используй метод eve_router_tools.combine_router_outputs()
 
 g_routes = [
-    {'solar_system': 'Tama',  # система указываетс¤ вручную дл¤ non-database скриптов
-     'station': "Tama - Svarog Reaction & Reprocessing (Svarog Engineering)",
-     'desc': '“атара, реакции',
-     'output': [
-        # Processed Moon Materials
-          16663,  # Caesarium Cadmide
-          57453,  # Carbon Fiber
-          16659,  # Carbon Polymers
-          16660,  # Ceramic Powder
-          16655,  # Crystallite Alloy
-          16668,  # Dysporite
-          16656,  # Fernite Alloy
-          16669,  # Ferrofluid
-          17769,  # Fluxed Condensates
-          16665,  # Hexite
-          16666,  # Hyperflurite
-          16667,  # Neo Mercurite
-          57454,  # Oxy-Organic Solvents
-          16662,  # Platinum Technite
-          33337,  # Promethium Mercurite
-          17960,  # Prometium
-          16657,  # Rolled Tungsten Alloy
-          16658,  # Silicon Diborite
-          16664,  # Solerium
-          16661,  # Sulfuric Acid
-          57455,  # Thermosetting Polymer
-          33336,  # Thulium Hafnite
-          16654,  # Titanium Chromide
-          17959,  # Vanadium Hafnite
-        # Molecular-Forged Materials
-          57469,  # Goal-Orienting Neurolink Stabilizer
-          57463,  # Isotropic Neofullerene Alpha-3
-          57464,  # Isotropic Neofullerene Beta-6
-          57465,  # Isotropic Neofullerene Gamma-9
-          57467,  # Reaction-Orienting Neurolink Stabilizer
-          57468,  # Stress-Responding Neurolink Stabilizer
-          57466,  # Ultradian-Cycling Neurolink Stabilizer
-          57460,  # Axosomatic Neurolink Enhancer             <--- двойное назначение
-          57461,  # Cogni-Emotive Neurolink Enhancer          <--- двойное назначение
-          57459,  # Hypnagogic Neurolink Enhancer             <--- двойное назначение
-          57462,  # Sense-Heuristic Neurolink Enhancer        <--- двойное назначение
-          57458,  # Meta-Operant Neurolink Enhancer           <--- это варитс¤ из 4х редких реакций
-        # Polymer Materials
-          30311,  # C3-FTM Acid
-          30310,  # Carbon-86 Epoxy Resin
-          30305,  # Fullerene Intercalated Graphite
-          30303,  # Fulleroferrocene
-          30309,  # Graphene Nanoribbons
-          30307,  # Lanthanum Metallofullerene
-          30306,  # Methanofullerene
-          30304,  # PPD Fullerene Fibers
-          30308,  # Scandium Metallofullerene
+    {'solar_system': 'XTVZ-E',  # система указывается вручную для non-database скриптов
+     'station': "XTVZ-E - Alice' Brewery",
+     'desc': 'реакции',
+     'output_market_groups': [
+       500,     # Processed Moon Materials  <---  элементы группы входят в output частично
+       2767,    # Molecular-Forged Materials
+       # 1858,  # Booster Materials  <---  пока нигде не варим (это наркота)
      ],
-     # Tatara: te -25% (reaction)
-     'structure': 'Tatara',  # структура указываетс¤ вручную дл¤ non-database скриптов
+     'except_output_types': [
+       # Processed Moon Materials
+       32824,  # Unrefined Caesarium Cadmide               <--- устарели (вышли из эксплуатации)
+       32829,  # Unrefined Crystallite Alloy               <--- устарели (вышли из эксплуатации)
+       29660,  # Unrefined Dysporite                       <--- устарели (вышли из эксплуатации)
+       32828,  # Unrefined Fernite Alloy                   <--- устарели (вышли из эксплуатации)
+       29663,  # Unrefined Ferrofluid                      <--- устарели (вышли из эксплуатации)
+       29659,  # Unrefined Fluxed Condensates              <--- устарели (вышли из эксплуатации)
+       32825,  # Unrefined Hexite                          <--- устарели (вышли из эксплуатации)
+       29664,  # Unrefined Hyperflurite                    <--- устарели (вышли из эксплуатации)
+       29661,  # Unrefined Neo Mercurite                   <--- устарели (вышли из эксплуатации)
+       32822,  # Unrefined Platinum Technite               <--- устарели (вышли из эксплуатации)
+       33338,  # Unrefined Promethium Mercurite            <--- устарели (вышли из эксплуатации)
+       29662,  # Unrefined Prometium                       <--- устарели (вышли из эксплуатации)
+       32826,  # Unrefined Rolled Tungsten Alloy           <--- устарели (вышли из эксплуатации)
+       32823,  # Unrefined Solerium                        <--- устарели (вышли из эксплуатации)
+       33339,  # Unrefined Thulium Hafnite                 <--- устарели (вышли из эксплуатации)
+       32827,  # Unrefined Titanium Chromide               <--- устарели (вышли из эксплуатации)
+       32821,  # Unrefined Vanadium Hafnite                <--- устарели (вышли из эксплуатации)
+     ],
+     'structure': 'Athanor',  # структура указывается вручную для non-database скриптов
      'structure_rigs': [
          {'activity': 'reaction',
-          'me': -2.4,  # material consumption (расход материалов в проекте)
-          'te': -24.0,  # job duration (срок выполнени¤ проекта)
+          'me': -2.2,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
           },
      ],
-    },
-    {'solar_system': 'Ignoitton',  # система указываетс¤ вручную дл¤ non-database скриптов
-     'station': "Ignoitton - Svarog Reaction & Reprocessing (Svarog Pioneers)",
-     'desc': 'јтанор, реакции',
-     'output': [
-        # Advanced Moon Materials
-          16670,  # Crystalline Carbonide
-          17317,  # Fermionic Condensates
-          16673,  # Fernite Carbide
-          16683,  # Ferrogel
-          16679,  # Fullerides
-          16682,  # Hypersynaptic Fibers
-          16681,  # Nanotransistors
-          33362,  # Nonlinear Metamaterials
-          16680,  # Phenolic Composites
-          33359,  # Photonic Metamaterials
-          33361,  # Plasmonic Metamaterials
-          57456,  # Pressurized Oxidizers      <--- уезжает на —отию (остальное не јзбель)
-          57457,  # Reinforced Carbon Fiber    <--- уезжает на —отию (остальное не јзбель)
-          16678,  # Sylramic Fibers
-          33360,  # Terahertz Metamaterials
-          16671,  # Titanium Carbide
-          16672,  # Tungsten Carbide
+     },
+    {'solar_system': 'B2J-5N',  # система указывается вручную для non-database скриптов
+     'station': "B2J-5N - Mendeleev",
+     'desc': 'реакции',
+     'output_market_groups': [
+       499,  # Advanced Moon Materials
      ],
-     # Athanor: нет производственных бонусов
-     'structure': 'Athanor',  # структура указываетс¤ вручную дл¤ non-database скриптов
+     'structure': 'Tatara',  # структура указывается вручную для non-database скриптов
      'structure_rigs': [
          {'activity': 'reaction',
-          'me': -2.4,  # material consumption (расход материалов в проекте)
-          'te': -24.0,  # job duration (срок выполнени¤ проекта)
+          'me': -2.2,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
           },
      ],
     },
-    {'solar_system': 'Itamo',  # система указываетс¤ вручную дл¤ non-database скриптов
-     'station': "Itamo - Production Center (BLACK MARKET INDUSTRY HOLDING)",
-     'desc': 'јзбель, производство',
-     'output': [
-        # Advanced Components (Amarr)
-          11549,  # Antimatter Reactor Unit
-          11694,  # EM Pulse Generator
-          11532,  # Fusion Thruster
-          11689,  # Laser Focusing Crystals
-          11557,  # Linear Shield Emitter
-          11539,  # Nanoelectrical Microprocessor
-          11537,  # Radar Sensor Cluster
-          11554,  # Tesseract Capacitor Unit
-          11543,  # Tungsten Carbide Armor Plate
-          #57470, # U-C Trigger Neurolink Conduit           <--- не варитс¤ на јзбели (варитс¤ на —отие)
-        # Advanced Components (Caldari)
-          11534,  # Gravimetric Sensor Cluster
-          11693,  # Graviton Pulse Generator
-          11550,  # Graviton Reactor Unit
-          11533,  # Magpulse Thruster
-          11540,  # Quantum Microprocessor
-          #57471, # R-O Trigger Neurolink Conduit           <--- не варитс¤ на јзбели (варитс¤ на —отие)
-          11552,  # Scalar Capacitor Unit
-          11690,  # Superconductor Rails
-          11558,  # Sustained Shield Emitter
-          11544,  # Titanium Diborite Armor Plate
-        # Advanced Components (Gallente)
-          11545,  # Crystalline Carbonide Armor Plate
-          11547,  # Fusion Reactor Unit
-          11531,  # Ion Thruster
-          11535,  # Magnetometric Sensor Cluster
-          11553,  # Oscillator Capacitor Unit
-          11688,  # Particle Accelerator Unit
-          11541,  # Photon Microprocessor
-          11695,  # Plasma Pulse Generator
-          11556,  # Pulse Shield Emitter
-          #57472, # S-R Trigger Neurolink Conduit           <--- не варитс¤ на јзбели (варитс¤ на —отие)
-        # Advanced Components (Minmatar)
-          11555,  # Deflection Shield Emitter
-          11551,  # Electrolytic Capacitor Unit
-          11542,  # Fernite Carbide Composite Armor Plate
-          #57473, # G-O Trigger Neurolink Conduit           <--- не варитс¤ на јзбели (варитс¤ на —отие)
-          11536,  # Ladar Sensor Cluster
-          11538,  # Nanomechanical Microprocessor
-          11692,  # Nuclear Pulse Generator
-          11548,  # Nuclear Reactor Unit
-          11530,  # Plasma Thruster
-          11691,  # Thermonuclear Trigger Unit
-        # Advanced Components (Triglavian)                  <--- нет чертежей, не варитс¤ на јзбели
-          #53288,  # Capital Singularity Radiation Convertor
-          #53290,  # Capital Trinary State Processor
-          #53289,  # Capital Zero-Point Field Manipulator
-          #52314,  # Lattice Locked Dekaisogen
-          #52310,  # Radiation Absorption Thruster
-          #52311,  # Singularity Radiation Convertor
-          #52313,  # Trinary State Processor
-          #52312,  # Zero-Point Field Manipulator
+    {'solar_system': 'XTVZ-E',  # система указывается вручную для non-database скриптов
+     'station': "XTVZ-E - King Glorden",
+     'desc': 'производство',
+     'output_market_groups': [
+       65,  # Advanced Components
      ],
-     # Azbel: me -1% (manufacturing), te -20% (manufacturing and science), job_cost -4% (manufacturing and science)
-     'structure': 'Azbel',  # структура указываетс¤ вручную дл¤ non-database скриптов
-     'structure_rigs': [
-         {'activity': 'research_material',
-          'te': -42.0,  # job duration (срок выполнени¤ проекта)
-          'job_cost': -21.0,  # job cost (стоимость выполнени¤ проекта)
-          },
-         {'activity': 'copying',
-          'te': -42.0,  # job duration (срок выполнени¤ проекта)
-          'job_cost': -21.0,  # job cost (стоимость выполнени¤ проекта)
-          },
+     'except_output_types': [
+       # Advanced Components (Amarr)
+       57470,  # U-C Trigger Neurolink Conduit  <--- не варится на Азбели (варится на Сотие)
+       # Advanced Components (Caldari)
+       57471,  # R-O Trigger Neurolink Conduit  <--- не варится на Азбели (варится на Сотие)
+       # Advanced Components (Gallente)
+       57472,  # S-R Trigger Neurolink Conduit  <--- не варится на Азбели (варится на Сотие)
+       # Advanced Components (Minmatar)
+       57473,  # G-O Trigger Neurolink Conduit  <--- не варится на Азбели (варится на Сотие)
+       # Advanced Components (Triglavian)  <--- нет чертежей, не варится на Азбели
+       53288,  # Capital Singularity Radiation Convertor
+       53290,  # Capital Trinary State Processor
+       53289,  # Capital Zero-Point Field Manipulator
+       52314,  # Lattice Locked Dekaisogen
+       52310,  # Radiation Absorption Thruster
+       52311,  # Singularity Radiation Convertor
+       52313,  # Trinary State Processor
+       52312,  # Zero-Point Field Manipulator
      ],
-    },
-    {'solar_system': 'Jita',  # система указываетс¤ вручную дл¤ non-database скриптов
-     'station': "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
-     'desc': 'ќбщее производство (например —оти¤)',
-     'output': [],
-     # Sotiyo: me -1% (manufacturing), te -30% (manufacturing and science), job_cost -5% (manufacturing and science)
-     'structure': 'Sotiyo',  # структура указываетс¤ вручную дл¤ non-database скриптов
+     'structure': 'Azbel',  # структура указывается вручную для non-database скриптов
      'structure_rigs': [
          {'activity': 'manufacturing',
           'me': -4.2,  # material consumption (расход материалов в проекте)
-          'te': -42.0,  # job duration (срок выполнени¤ проекта)
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          },
+         {'activity': 'research_material',
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          'job_cost': -21.0,  # job cost (стоимость выполнения проекта)
+          },
+         {'activity': 'copying',
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          'job_cost': -21.0,  # job cost (стоимость выполнения проекта)
+          },
+     ],
+    },
+    {'solar_system': '1-EVAX',  # система указывается вручную для non-database скриптов
+     'station': "1-EVAX - DarkFman vs Photon UI",
+     'desc': 'реакции',
+     'output_market_groups': [
+       1860,  # Polymer Materials
+     ],
+     'structure': 'Athanor',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'reaction',
+          'me': -2.6,  # material consumption (расход материалов в проекте)
+          'te': -22.0,  # job duration (срок выполнения проекта)
+          },
+     ],
+    },
+    {'solar_system': '06-70G',  # система указывается вручную для non-database скриптов
+     'station': "06-70G - Production",
+     'desc': 'супера',
+     'output_groups': [
+       30,  # Titan
+       659,  # Supercarrier
+       1538,  # Force Auxiliary
+       547,  # Carrier
+       4594,  # Lancer Dreadnought
+       485,  # Dreadnought
+     ],
+     'output_types': [
+       57489,  # Enhanced Neurolink Protection Cell  <---  слишком дорого запускать на нашей Сотие
+     ],
+     'structure': 'Sotiyo',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'manufacturing',
+          'me': -4.2,  # material consumption (расход материалов в проекте)
+          'te': -42.0,  # job duration (срок выполнения проекта)
+          },
+     ],
+    },
+    {'solar_system': 'B2J-5N',  # система указывается вручную для non-database скриптов
+     'station': "B2J-5N - Shukhov (R)",
+     'desc': 'производство и инвент',
+     'structure': 'Sotiyo',  # структура указывается вручную для non-database скриптов
+     'structure_rigs': [
+         {'activity': 'manufacturing',
+          'me': -4.2,  # material consumption (расход материалов в проекте)
+          'te': -42.0,  # job duration (срок выполнения проекта)
           },
      ],
     },
