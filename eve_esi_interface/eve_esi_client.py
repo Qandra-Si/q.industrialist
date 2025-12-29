@@ -385,6 +385,16 @@ class EveESIClient:
                         throttle_error_times = throttle_error_times + 1
                         time.sleep(5)
                         continue
+                    elif (res.status_code in [429, 420]) and (throttle_error_times < self.__attempts_to_reconnect):
+                        print(res.json())
+                        # 429 Client Error: Too Many Requests for url:
+                        #   https://esi.evetech.net/latest/killmails/130938744/ececcbbd104e3ecb484a716832475bad91c606e9/
+                        # 420 Client Error: Too Many Requests for url:
+                        #   corporations/98733834/wallets/1/journal/?page=1
+                        # {'error': 'Rate limit exceeded'}
+                        throttle_error_times = throttle_error_times + 1
+                        time.sleep(20)
+                        continue
                     res.raise_for_status()
                     break
             except requests.exceptions.ConnectionError as err:
@@ -500,3 +510,4 @@ class EveESIClient:
         else:
             self.__print_sso_failure(sso_auth_response)
             sys.exit(1)
+
